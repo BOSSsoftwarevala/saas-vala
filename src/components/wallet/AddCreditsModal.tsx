@@ -19,8 +19,12 @@ import {
   Shield,
   Globe,
   ArrowLeft,
+  Building2,
+  Copy,
+  Clock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface AddCreditsModalProps {
   open: boolean;
@@ -33,10 +37,21 @@ const presetAmounts = [500, 1000, 2000, 5000, 10000];
 const paymentMethods = [
   { id: 'card', name: 'Debit/Credit Card', icon: CreditCard, badge: 'Instant' },
   { id: 'upi', name: 'UPI Payment', icon: Wallet, badge: 'Instant' },
+  { id: 'bank', name: 'Bank Transfer (NEFT/IMPS)', icon: Building2, badge: 'Manual Verify' },
   { id: 'international', name: 'International Card', icon: Globe, badge: 'All Countries' },
 ];
 
-type Step = 'amount' | 'method' | 'processing' | 'success';
+const bankDetails = {
+  accountName: 'SOFTWARE VALA',
+  bankName: 'INDIAN BANK',
+  accountType: 'Current',
+  accountNumber: '8045924772',
+  ifsc: 'IDIB000K196',
+  branchCode: '01940',
+  branchName: 'KANKAR BAGH',
+};
+
+type Step = 'amount' | 'method' | 'bank_details' | 'processing' | 'success' | 'pending';
 
 export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsModalProps) {
   const [step, setStep] = useState<Step>('amount');
@@ -44,6 +59,7 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
   const [customAmount, setCustomAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [retryCount, setRetryCount] = useState(0);
+  const [transactionRef, setTransactionRef] = useState('');
 
   const handleClose = () => {
     setStep('amount');
@@ -51,6 +67,7 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
     setCustomAmount('');
     setPaymentMethod('card');
     setRetryCount(0);
+    setTransactionRef('');
     onOpenChange(false);
   };
 
@@ -70,6 +87,69 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
   const handleProceedToPayment = () => {
     if (amount >= 100) {
       setStep('method');
+    }
+  };
+
+  const handleCopy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copied!`);
+  };
+
+  const handlePaymentMethodSelect = () => {
+    if (paymentMethod === 'bank') {
+      setStep('bank_details');
+    } else {
+      handlePayment();
+    }
+  };
+
+  const handleBankTransferSubmit = async () => {
+    if (!transactionRef.trim()) {
+      toast.error('Please enter transaction reference number');
+      return;
+    }
+
+    setStep('processing');
+
+    // Create pending transaction for bank transfer
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data: userData } = await supabase.auth.getUser();
+      
+      if (userData.user) {
+        const { data: walletData } = await supabase
+          .from('wallets')
+          .select('id, balance')
+          .eq('user_id', userData.user.id)
+          .maybeSingle();
+
+        if (walletData) {
+          // Create pending transaction (admin will verify and complete)
+          await supabase.from('transactions').insert({
+            wallet_id: walletData.id,
+            type: 'credit',
+            amount: finalAmount,
+            balance_after: null, // Will be set when verified
+            status: 'pending',
+            description: 'Bank Transfer - Awaiting Verification',
+            created_by: userData.user.id,
+            reference_id: transactionRef,
+            reference_type: 'bank_transfer',
+            meta: { 
+              payment_method: 'bank',
+              transaction_ref: transactionRef,
+              bank_details: bankDetails 
+            }
+          });
+        }
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setStep('pending');
+    } catch (error) {
+      console.error('Failed to create pending transaction:', error);
+      toast.error('Failed to submit. Please try again.');
+      setStep('bank_details');
     }
   };
 
@@ -256,7 +336,13 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
                     <div className="flex-1">
                       <p className="font-medium text-foreground">{method.name}</p>
                     </div>
-                    <Badge variant="outline" className="text-xs">
+                    <Badge 
+                      variant="outline" 
+                      className={cn(
+                        'text-xs',
+                        method.id === 'bank' && 'border-warning/50 text-warning'
+                      )}
+                    >
                       {method.badge}
                     </Badge>
                   </div>
@@ -271,15 +357,116 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
 
               <Button
                 className="w-full bg-orange-gradient hover:opacity-90 text-white h-12"
-                onClick={handlePayment}
+                onClick={handlePaymentMethodSelect}
               >
-                Pay ₹{finalAmount.toLocaleString()}
+                {paymentMethod === 'bank' ? 'View Bank Details' : `Pay ₹${finalAmount.toLocaleString()}`}
               </Button>
             </div>
           </>
         )}
 
-        {/* Step 3: Processing */}
+        {/* Step 3: Bank Details */}
+        {step === 'bank_details' && (
+          <>
+            <DialogHeader>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="icon" onClick={() => setStep('method')}>
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <div>
+                  <DialogTitle className="font-display text-xl">Bank Transfer</DialogTitle>
+                  <DialogDescription>
+                    Transfer ₹{finalAmount.toLocaleString()} to the account below
+                  </DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              {/* Bank Details Card */}
+              <div className="glass-card rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-border">
+                  <span className="font-semibold text-foreground">{bankDetails.accountName}</span>
+                  <Badge variant="outline" className="text-xs">{bankDetails.bankName}</Badge>
+                </div>
+
+                {/* Account Number */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Account Number</p>
+                    <p className="font-mono font-semibold text-foreground">{bankDetails.accountNumber}</p>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8"
+                    onClick={() => handleCopy(bankDetails.accountNumber, 'Account Number')}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {/* IFSC */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">IFSC Code</p>
+                    <p className="font-mono font-semibold text-foreground">{bankDetails.ifsc}</p>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8"
+                    onClick={() => handleCopy(bankDetails.ifsc, 'IFSC Code')}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {/* Other Details */}
+                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Account Type</p>
+                    <p className="text-sm text-foreground">{bankDetails.accountType}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Branch</p>
+                    <p className="text-sm text-foreground">{bankDetails.branchName}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Amount to Transfer */}
+              <div className="bg-primary/10 rounded-lg p-4 text-center">
+                <p className="text-xs text-muted-foreground">Amount to Transfer</p>
+                <p className="text-2xl font-bold text-primary">₹{finalAmount.toLocaleString()}</p>
+              </div>
+
+              {/* Transaction Reference */}
+              <div className="space-y-2">
+                <Label htmlFor="txn-ref">Transaction Reference / UTR Number</Label>
+                <Input
+                  id="txn-ref"
+                  placeholder="Enter UTR or transaction reference"
+                  value={transactionRef}
+                  onChange={(e) => setTransactionRef(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  After payment, enter the UTR/Reference number from your bank
+                </p>
+              </div>
+
+              <Button
+                className="w-full bg-orange-gradient hover:opacity-90 text-white h-12"
+                onClick={handleBankTransferSubmit}
+                disabled={!transactionRef.trim()}
+              >
+                I've Made the Payment
+              </Button>
+            </div>
+          </>
+        )}
+
+        {/* Step 4: Processing */}
         {step === 'processing' && (
           <div className="py-12 text-center space-y-4">
             <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
@@ -304,7 +491,7 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
           </div>
         )}
 
-        {/* Step 4: Success */}
+        {/* Step 5: Success */}
         {step === 'success' && (
           <div className="py-12 text-center space-y-4">
             <div className="h-16 w-16 rounded-full bg-success/10 flex items-center justify-center mx-auto animate-in zoom-in duration-300">
@@ -317,6 +504,36 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
               <p className="text-sm text-muted-foreground mt-1">
                 ₹{finalAmount.toLocaleString()} added to your wallet
               </p>
+            </div>
+            <Button
+              className="w-full bg-orange-gradient hover:opacity-90 text-white"
+              onClick={handleClose}
+            >
+              Done
+            </Button>
+          </div>
+        )}
+
+        {/* Step 6: Pending (Bank Transfer) */}
+        {step === 'pending' && (
+          <div className="py-12 text-center space-y-4">
+            <div className="h-16 w-16 rounded-full bg-warning/10 flex items-center justify-center mx-auto animate-in zoom-in duration-300">
+              <Clock className="h-8 w-8 text-warning" />
+            </div>
+            <div>
+              <h3 className="font-display text-lg font-semibold text-foreground">
+                Payment Pending Verification
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Your payment of ₹{finalAmount.toLocaleString()} is being verified
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Credits will be added within 2-4 hours after verification
+              </p>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-3">
+              <p className="text-xs text-muted-foreground">Reference</p>
+              <p className="font-mono text-sm text-foreground">{transactionRef}</p>
             </div>
             <Button
               className="w-full bg-orange-gradient hover:opacity-90 text-white"
