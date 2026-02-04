@@ -1,3 +1,5 @@
+import { educationSystems } from './educationProducts';
+
 // Category definitions for marketplace
 export const categories = [
   { id: 'upcoming', title: 'UPCOMING', icon: '🚀' },
@@ -139,6 +141,11 @@ const productNames: Record<string, string[]> = {
 
 // Generate products for a category
 export function generateProducts(categoryId: string, count: number = 8) {
+  // Special handling for education - return all 45 real systems
+  if (categoryId === 'education') {
+    return educationSystems;
+  }
+
   const categoryMap: Record<string, keyof typeof businessImages> = {
     'education': 'education',
     'healthcare': 'healthcare',
@@ -186,6 +193,7 @@ export function generateProducts(categoryId: string, count: number = 8) {
       image: images[i % images.length],
       status: 'upcoming' as const,
       price: Math.floor(Math.random() * 50000) + 5000,
+      features: ['Feature 1', 'Feature 2', 'Feature 3', 'Feature 4', 'Feature 5'],
     }));
   }
   
@@ -197,6 +205,7 @@ export function generateProducts(categoryId: string, count: number = 8) {
       image: images[i % images.length],
       status: 'bestseller' as const,
       price: Math.floor(Math.random() * 50000) + 5000,
+      features: ['Feature 1', 'Feature 2', 'Feature 3', 'Feature 4', 'Feature 5'],
     }));
   }
 
@@ -207,5 +216,6 @@ export function generateProducts(categoryId: string, count: number = 8) {
     image: images[i % images.length],
     status: statuses[i % statuses.length],
     price: Math.floor(Math.random() * 50000) + 5000,
+    features: ['Feature 1', 'Feature 2', 'Feature 3', 'Feature 4', 'Feature 5'],
   }));
 }
