@@ -16,6 +16,7 @@ import {
   ChevronRight,
   LogOut,
   Users,
+  Store,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import saasValaLogo from '@/assets/saas-vala-logo.jpg';
@@ -29,7 +30,8 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { title: 'Dashboard', icon: LayoutDashboard, href: '/' },
+  { title: 'Marketplace', icon: Store, href: '/' },
+  { title: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
   { title: 'Products', icon: Package, href: '/products' },
   { title: 'Keys', icon: Key, href: '/keys' },
   { title: 'Servers', icon: Server, href: '/servers' },

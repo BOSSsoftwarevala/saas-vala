@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react";
 // Pages
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
+import Marketplace from "./pages/Marketplace";
 import Products from "./pages/Products";
 import Keys from "./pages/Keys";
 import Servers from "./pages/Servers";
@@ -72,7 +73,23 @@ function AppRoutes() {
         path="/"
         element={
           <ProtectedRoute>
+            <Marketplace />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
             <Dashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/marketplace"
+        element={
+          <ProtectedRoute>
+            <Marketplace />
           </ProtectedRoute>
         }
       />
