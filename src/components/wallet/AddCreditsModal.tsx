@@ -29,6 +29,8 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import softwareValaLogo from '@/assets/softwarevala-logo.png';
 import wiseQrCode from '@/assets/wise-qr-code.png';
+import { RefundPolicyCard } from './RefundPolicyCard';
+import { ConfirmPaymentModal } from './ConfirmPaymentModal';
 
 interface AddCreditsModalProps {
   open: boolean;
@@ -68,6 +70,8 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [retryCount, setRetryCount] = useState(0);
   const [transactionRef, setTransactionRef] = useState('');
+  const [policyAgreed, setPolicyAgreed] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const handleClose = () => {
     setStep('amount');
@@ -76,6 +80,8 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
     setPaymentMethod('card');
     setRetryCount(0);
     setTransactionRef('');
+    setPolicyAgreed(false);
+    setShowConfirmModal(false);
     onOpenChange(false);
   };
 
@@ -107,8 +113,21 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
     if (paymentMethod === 'bank' || paymentMethod === 'wise' || paymentMethod === 'remit') {
       setStep('bank_details');
     } else {
-      handlePayment();
+      // Show confirmation modal for card/UPI payments
+      setShowConfirmModal(true);
     }
+  };
+
+  const handleConfirmAndPay = () => {
+    setShowConfirmModal(false);
+    // Log consent timestamp
+    console.log('Payment consent logged:', {
+      timestamp: new Date().toISOString(),
+      policyVersion: '1.0',
+      amount: finalAmount,
+      method: paymentMethod
+    });
+    handlePayment();
   };
 
   const handleBankTransferSubmit = async () => {
@@ -366,6 +385,12 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
                 ))}
               </RadioGroup>
 
+              {/* Refund Policy Card */}
+              <RefundPolicyCard 
+                agreed={policyAgreed} 
+                onAgreeChange={setPolicyAgreed} 
+              />
+
               {/* Security note */}
               <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-lg p-3">
                 <Shield className="h-4 w-4 text-success" />
@@ -373,12 +398,23 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
               </div>
 
               <Button
-                className="w-full bg-orange-gradient hover:opacity-90 text-white h-12"
+                className="w-full bg-orange-gradient hover:opacity-90 text-white h-12 disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={handlePaymentMethodSelect}
+                disabled={!policyAgreed}
               >
-                {paymentMethod === 'bank' ? 'View Bank Details' : `Pay ₹${finalAmount.toLocaleString()}`}
+                {paymentMethod === 'bank' || paymentMethod === 'wise' || paymentMethod === 'remit' 
+                  ? 'View Bank Details' 
+                  : `Pay ₹${finalAmount.toLocaleString()}`}
               </Button>
             </div>
+
+            {/* Confirm Payment Modal */}
+            <ConfirmPaymentModal
+              open={showConfirmModal}
+              onOpenChange={setShowConfirmModal}
+              onConfirm={handleConfirmAndPay}
+              amount={finalAmount}
+            />
           </>
         )}
 
