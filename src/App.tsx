@@ -12,6 +12,7 @@ import Dashboard from "./pages/Dashboard";
 import Marketplace from "./pages/Marketplace";
 import Products from "./pages/Products";
 import RoleDetail from "./pages/RoleDetail";
+import EducationCategory from "./pages/EducationCategory";
 import Keys from "./pages/Keys";
 import Servers from "./pages/Servers";
 import AiChat from "./pages/AiChat";
@@ -123,6 +124,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <RoleDetail />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/education"
+        element={
+          <ProtectedRoute>
+            <EducationCategory />
           </ProtectedRoute>
         }
       />
