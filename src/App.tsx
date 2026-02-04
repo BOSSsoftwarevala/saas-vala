@@ -13,6 +13,7 @@ import Products from "./pages/Products";
 import Keys from "./pages/Keys";
 import Servers from "./pages/Servers";
 import ServerSetup from "./pages/ServerSetup";
+import DomainOperations from "./pages/DomainOperations";
 import AiChat from "./pages/AiChat";
 import SaasAiDashboard from "./pages/SaasAiDashboard";
 import AiApis from "./pages/AiApis";
@@ -108,6 +109,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <ServerSetup />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/domain-operations"
+        element={
+          <ProtectedRoute>
+            <DomainOperations />
           </ProtectedRoute>
         }
       />

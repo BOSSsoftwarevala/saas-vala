@@ -410,6 +410,32 @@ export function useServerManager() {
     toast.success('Domain removed');
   };
 
+  const updateDomain = async (domainId: string, updates: Partial<Domain>) => {
+    const { error } = await supabase
+      .from('domains')
+      .update(updates as any)
+      .eq('id', domainId);
+
+    if (error) {
+      toast.error('Failed to update domain');
+      throw error;
+    }
+  };
+
+  const deleteDomain = async (domainId: string) => {
+    // Unlink domain instead of hard delete - set to pending to indicate inactive
+    const { error } = await supabase
+      .from('domains')
+      .update({ status: 'pending' as const, server_id: null })
+      .eq('id', domainId);
+
+    if (error) {
+      toast.error('Failed to unlink domain');
+      throw error;
+    }
+    toast.success('Domain unlinked');
+  };
+
   // Git connection actions
   const connectGit = async (connection: Partial<GitConnection>) => {
     const { data: userData } = await supabase.auth.getUser();
@@ -516,6 +542,8 @@ export function useServerManager() {
     rollbackDeploy,
     stopDeploy,
     addDomain,
+    updateDomain,
+    deleteDomain,
     verifyDomain,
     enableSSL,
     removeDomain,

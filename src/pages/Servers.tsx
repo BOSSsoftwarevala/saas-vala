@@ -76,14 +76,8 @@ export default function Servers() {
   };
 
   const openDomainDrawer = () => {
-    if (servers.length > 0) {
-      setSelectedServer(servers[0]);
-      setDrawerMode('view');
-      setDrawerTab('domains');
-      setDrawerOpen(true);
-    } else {
-      toast.error('Create a server first before adding domains');
-    }
+    // Navigate to dedicated Domain Operations page
+    navigate('/domain-operations');
   };
 
   const handleDeployNow = async () => {
