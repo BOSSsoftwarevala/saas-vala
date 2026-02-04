@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,6 +13,7 @@ import { useServerManager, type Server } from '@/hooks/useServerManager';
 import { toast } from 'sonner';
 
 export default function Servers() {
+  const navigate = useNavigate();
   const {
     servers,
     domains,
@@ -52,17 +54,13 @@ export default function Servers() {
   };
 
   const openCreateDrawer = () => {
-    setSelectedServer(null);
-    setDrawerMode('create');
-    setDrawerTab('server');
-    setDrawerOpen(true);
+    // Navigate to server setup page for creating new server
+    navigate('/server-setup');
   };
 
   const openViewDrawer = (server: Server) => {
-    setSelectedServer(server);
-    setDrawerMode('view');
-    setDrawerTab('server');
-    setDrawerOpen(true);
+    // Navigate to server setup page with server ID
+    navigate(`/server-setup?id=${server.id}`);
   };
 
   const openGitDrawer = () => {
