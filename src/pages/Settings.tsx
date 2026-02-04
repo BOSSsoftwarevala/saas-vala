@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,40 +18,56 @@ import {
   AlertTriangle,
   Smartphone,
   Save,
+  Loader2,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/hooks/use-toast';
+import { useProfile } from '@/hooks/useProfile';
+import { toast } from 'sonner';
 
 export default function Settings() {
   const { user, isSuperAdmin, signOut } = useAuth();
-  const { toast } = useToast();
+  const { profile, loading, updateProfile } = useProfile();
   const [activeTab, setActiveTab] = useState('profile');
+  const [saving, setSaving] = useState(false);
 
   // Settings state
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
 
-  const handleSave = () => {
-    toast({
-      title: 'Settings saved',
-      description: 'Your settings have been updated successfully.',
-    });
+  // Form state
+  const [formData, setFormData] = useState({
+    full_name: '',
+    company_name: '',
+    phone: '',
+  });
+
+  // Load profile data into form
+  useEffect(() => {
+    if (profile) {
+      setFormData({
+        full_name: profile.full_name || '',
+        company_name: profile.company_name || '',
+        phone: profile.phone || '',
+      });
+    }
+  }, [profile]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await updateProfile(formData);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleForceLogout = () => {
-    toast({
-      title: 'All sessions logged out',
-      description: 'All other sessions have been terminated.',
-    });
+    toast.success('All other sessions have been terminated');
   };
 
   const handleHardLock = () => {
-    toast({
-      variant: 'destructive',
-      title: 'Panel Locked',
-      description: 'The admin panel has been locked. Contact support to unlock.',
-    });
+    toast.error('Admin panel has been locked. Contact support to unlock.');
   };
 
   return (
@@ -81,12 +97,6 @@ export default function Settings() {
               <Bell className="h-4 w-4" />
               Notifications
             </TabsTrigger>
-            {isSuperAdmin && (
-              <TabsTrigger value="resellers" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <Users className="h-4 w-4" />
-                Resellers
-              </TabsTrigger>
-            )}
           </TabsList>
 
           {/* Profile Tab */}
@@ -97,46 +107,72 @@ export default function Settings() {
                 <CardDescription>Update your personal details</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="flex items-center gap-6">
-                  <Avatar className="h-20 w-20 border-2 border-primary/30">
-                    <AvatarImage src="" />
-                    <AvatarFallback className="bg-muted text-foreground text-xl">
-                      {user?.email?.slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <Button variant="outline" className="border-border">
-                      Change Avatar
+                {loading ? (
+                  <div className="flex items-center justify-center p-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-6">
+                      <Avatar className="h-20 w-20 border-2 border-primary/30">
+                        <AvatarImage src={profile?.avatar_url || ''} />
+                        <AvatarFallback className="bg-muted text-foreground text-xl">
+                          {formData.full_name?.slice(0, 2).toUpperCase() || user?.email?.slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <Button variant="outline" className="border-border">
+                          Change Avatar
+                        </Button>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          JPG, PNG, GIF up to 5MB
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="fullName" className="text-foreground">Full Name</Label>
+                        <Input 
+                          id="fullName" 
+                          placeholder="John Doe" 
+                          value={formData.full_name}
+                          onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                          className="bg-muted/50 border-border" 
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="email" className="text-foreground">Email</Label>
+                        <Input id="email" type="email" value={user?.email || ''} disabled className="bg-muted/50 border-border" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="company" className="text-foreground">Company Name</Label>
+                        <Input 
+                          id="company" 
+                          placeholder="Acme Corp" 
+                          value={formData.company_name}
+                          onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
+                          className="bg-muted/50 border-border" 
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="phone" className="text-foreground">Phone</Label>
+                        <Input 
+                          id="phone" 
+                          placeholder="+91 98765 43210" 
+                          value={formData.phone}
+                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                          className="bg-muted/50 border-border" 
+                        />
+                      </div>
+                    </div>
+
+                    <Button onClick={handleSave} disabled={saving} className="bg-orange-gradient hover:opacity-90 text-white gap-2">
+                      {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      Save Changes
                     </Button>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      JPG, PNG, GIF up to 5MB
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="fullName" className="text-foreground">Full Name</Label>
-                    <Input id="fullName" placeholder="John Doe" className="bg-muted/50 border-border" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="text-foreground">Email</Label>
-                    <Input id="email" type="email" value={user?.email || ''} disabled className="bg-muted/50 border-border" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="company" className="text-foreground">Company Name</Label>
-                    <Input id="company" placeholder="Acme Corp" className="bg-muted/50 border-border" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone" className="text-foreground">Phone</Label>
-                    <Input id="phone" placeholder="+1 (555) 000-0000" className="bg-muted/50 border-border" />
-                  </div>
-                </div>
-
-                <Button onClick={handleSave} className="bg-orange-gradient hover:opacity-90 text-white gap-2">
-                  <Save className="h-4 w-4" />
-                  Save Changes
-                </Button>
+                  </>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -229,54 +265,6 @@ export default function Settings() {
               </CardContent>
             </Card>
           </TabsContent>
-
-          {/* Resellers Tab (Super Admin Only) */}
-          {isSuperAdmin && (
-            <TabsContent value="resellers" className="mt-6 space-y-6">
-              <Card className="glass-card">
-                <CardHeader>
-                  <CardTitle className="text-foreground">Reseller Management</CardTitle>
-                  <CardDescription>Manage reseller accounts and permissions</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10">
-                          <AvatarFallback className="bg-muted text-foreground">TS</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium text-foreground">TechStore Inc</p>
-                          <p className="text-sm text-muted-foreground">techstore@example.com</p>
-                        </div>
-                      </div>
-                      <Badge variant="outline" className="bg-success/20 text-success border-success/30">
-                        Active
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10">
-                          <AvatarFallback className="bg-muted text-foreground">RH</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium text-foreground">RetailHub</p>
-                          <p className="text-sm text-muted-foreground">retailhub@example.com</p>
-                        </div>
-                      </div>
-                      <Badge variant="outline" className="bg-warning/20 text-warning border-warning/30">
-                        Pending
-                      </Badge>
-                    </div>
-                  </div>
-                  <Button className="mt-4 bg-orange-gradient hover:opacity-90 text-white gap-2">
-                    <Users className="h-4 w-4" />
-                    Add Reseller
-                  </Button>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
         </Tabs>
       </div>
     </DashboardLayout>
