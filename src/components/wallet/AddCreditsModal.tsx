@@ -22,6 +22,8 @@ import {
   Building2,
   Copy,
   Clock,
+  Send,
+  Banknote,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -38,8 +40,10 @@ const presetAmounts = [500, 1000, 2000, 5000, 10000];
 const paymentMethods = [
   { id: 'card', name: 'Debit/Credit Card', icon: CreditCard, badge: 'Instant', countries: '🇮🇳' },
   { id: 'upi', name: 'UPI Payment', icon: Wallet, badge: 'Instant', countries: '🇮🇳' },
-  { id: 'bank', name: 'Bank Transfer (NEFT/IMPS/SWIFT)', icon: Building2, badge: 'Manual Verify', countries: '🌍' },
-  { id: 'international', name: 'International Card (Visa/MC)', icon: Globe, badge: 'Worldwide', countries: '🌍 🇺🇸 🇬🇧 🇪🇺 🇦🇺' },
+  { id: 'bank', name: 'Bank Transfer (NEFT/IMPS/SWIFT)', icon: Building2, badge: 'Manual Verify', countries: '🇮🇳 🌍' },
+  { id: 'wise', name: 'Wise (TransferWise)', icon: Send, badge: 'Low Fees', countries: '🌍 🇺🇸 🇬🇧 🇪🇺 🇦🇺 🇨🇦' },
+  { id: 'remit', name: 'Remitly / Western Union', icon: Banknote, badge: 'Fast', countries: '🌍 🇺🇸 🇬🇧 🇦🇪 🇸🇬' },
+  { id: 'international', name: 'International Card (Visa/MC)', icon: Globe, badge: 'Worldwide', countries: '🌍 All Countries' },
 ];
 
 const bankDetails = {
@@ -99,7 +103,7 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
   };
 
   const handlePaymentMethodSelect = () => {
-    if (paymentMethod === 'bank') {
+    if (paymentMethod === 'bank' || paymentMethod === 'wise' || paymentMethod === 'remit') {
       setStep('bank_details');
     } else {
       handlePayment();
@@ -386,7 +390,11 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <div>
-                  <DialogTitle className="font-display text-xl">Bank Transfer</DialogTitle>
+                  <DialogTitle className="font-display text-xl">
+                    {paymentMethod === 'wise' ? 'Wise Transfer' : 
+                     paymentMethod === 'remit' ? 'Remitly / Western Union' : 
+                     'Bank Transfer'}
+                  </DialogTitle>
                   <DialogDescription>
                     Transfer ₹{finalAmount.toLocaleString()} to the account below
                   </DialogDescription>
@@ -395,6 +403,23 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
             </DialogHeader>
 
             <div className="space-y-4 py-4">
+              {/* Transfer Method Badge */}
+              {(paymentMethod === 'wise' || paymentMethod === 'remit') && (
+                <div className="flex items-center justify-center gap-2 bg-cyan-500/10 rounded-lg p-3">
+                  {paymentMethod === 'wise' ? (
+                    <>
+                      <Send className="h-5 w-5 text-cyan-500" />
+                      <span className="text-sm font-medium text-cyan-500">Send via Wise to Indian Bank Account</span>
+                    </>
+                  ) : (
+                    <>
+                      <Banknote className="h-5 w-5 text-cyan-500" />
+                      <span className="text-sm font-medium text-cyan-500">Send via Remitly/WU to Indian Bank</span>
+                    </>
+                  )}
+                </div>
+              )}
+
               {/* Bank Details Card */}
               <div className="glass-card rounded-lg p-4 space-y-3">
                 {/* Brand Logo & Name - Prominent */}
