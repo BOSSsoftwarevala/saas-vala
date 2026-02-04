@@ -1,13 +1,14 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { ChatSidebar } from '@/components/ai-chat/ChatSidebar';
 import { ChatHeader } from '@/components/ai-chat/ChatHeader';
 import { ChatMessage, Message } from '@/components/ai-chat/ChatMessage';
 import { ChatInput } from '@/components/ai-chat/ChatInput';
 import { EmptyState } from '@/components/ai-chat/EmptyState';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+
+const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 
 interface ChatSession {
   id: string;
@@ -20,22 +21,25 @@ export default function AiChat() {
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
     const saved = localStorage.getItem('saas-ai-sessions');
     if (saved) {
-      const parsed = JSON.parse(saved);
-      return parsed.map((s: any) => ({
-        ...s,
-        createdAt: new Date(s.createdAt),
-        messages: s.messages.map((m: any) => ({
-          ...m,
-          timestamp: new Date(m.timestamp)
-        }))
-      }));
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed.map((s: any) => ({
+          ...s,
+          createdAt: new Date(s.createdAt),
+          messages: s.messages.map((m: any) => ({
+            ...m,
+            timestamp: new Date(m.timestamp)
+          }))
+        }));
+      } catch {
+        return [];
+      }
     }
     return [];
   });
   
   const [activeSessionId, setActiveSessionId] = useState<string | null>(() => {
-    const saved = localStorage.getItem('saas-ai-active-session');
-    return saved || null;
+    return localStorage.getItem('saas-ai-active-session') || null;
   });
   
   const [isLoading, setIsLoading] = useState(false);
@@ -83,12 +87,100 @@ export default function AiChat() {
   const deleteSession = (id: string) => {
     setSessions(prev => prev.filter(s => s.id !== id));
     if (activeSessionId === id) {
-      setActiveSessionId(sessions.length > 1 ? sessions.find(s => s.id !== id)?.id || null : null);
+      const remaining = sessions.filter(s => s.id !== id);
+      setActiveSessionId(remaining.length > 0 ? remaining[0].id : null);
     }
   };
 
+  const streamChat = useCallback(async (
+    messages: Message[],
+    sessionId: string,
+    onDelta: (chunk: string) => void,
+    onDone: () => void
+  ) => {
+    const formattedMessages = messages.map(m => ({
+      role: m.role,
+      content: m.content
+    }));
+
+    const resp = await fetch(CHAT_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+      },
+      body: JSON.stringify({ messages: formattedMessages, stream: true }),
+    });
+
+    if (!resp.ok) {
+      const error = await resp.json().catch(() => ({ error: 'Unknown error' }));
+      if (resp.status === 429) {
+        toast.error('Rate limit exceeded. Please wait a moment.');
+      } else if (resp.status === 402) {
+        toast.error('AI credits depleted. Please add funds.');
+      } else {
+        toast.error(error.error || 'Failed to get AI response');
+      }
+      throw new Error(error.error || 'Stream failed');
+    }
+
+    if (!resp.body) throw new Error('No response body');
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      let newlineIndex: number;
+      while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+        let line = buffer.slice(0, newlineIndex);
+        buffer = buffer.slice(newlineIndex + 1);
+
+        if (line.endsWith('\r')) line = line.slice(0, -1);
+        if (line.startsWith(':') || line.trim() === '') continue;
+        if (!line.startsWith('data: ')) continue;
+
+        const jsonStr = line.slice(6).trim();
+        if (jsonStr === '[DONE]') {
+          onDone();
+          return;
+        }
+
+        try {
+          const parsed = JSON.parse(jsonStr);
+          const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+          if (content) onDelta(content);
+        } catch {
+          buffer = line + '\n' + buffer;
+          break;
+        }
+      }
+    }
+
+    // Final flush
+    if (buffer.trim()) {
+      for (let raw of buffer.split('\n')) {
+        if (!raw || raw.startsWith(':') || !raw.startsWith('data: ')) continue;
+        const jsonStr = raw.slice(6).trim();
+        if (jsonStr === '[DONE]') continue;
+        try {
+          const parsed = JSON.parse(jsonStr);
+          const content = parsed.choices?.[0]?.delta?.content;
+          if (content) onDelta(content);
+        } catch { /* ignore */ }
+      }
+    }
+
+    onDone();
+  }, []);
+
   const handleSend = async (content: string) => {
-    if (!content.trim()) return;
+    if (!content.trim() || isLoading) return;
 
     let sessionId = activeSessionId;
     
@@ -96,7 +188,7 @@ export default function AiChat() {
     if (!sessionId) {
       const newSession: ChatSession = {
         id: crypto.randomUUID(),
-        title: content.slice(0, 30) + (content.length > 30 ? '...' : ''),
+        title: content.slice(0, 40) + (content.length > 40 ? '...' : ''),
         createdAt: new Date(),
         messages: []
       };
@@ -116,9 +208,8 @@ export default function AiChat() {
     setSessions(prev => prev.map(s => {
       if (s.id === sessionId) {
         const updatedMessages = [...s.messages, userMessage];
-        // Update title if first message
         const title = s.messages.length === 0 
-          ? content.slice(0, 30) + (content.length > 30 ? '...' : '')
+          ? content.slice(0, 40) + (content.length > 40 ? '...' : '')
           : s.title;
         return { ...s, messages: updatedMessages, title };
       }
@@ -127,47 +218,63 @@ export default function AiChat() {
 
     setIsLoading(true);
 
-    try {
-      const { data, error } = await supabase.functions.invoke('ai-chat', {
-        body: { 
-          message: content,
-          history: activeSession?.messages.slice(-10) || []
-        }
-      });
+    // Create assistant message placeholder
+    const assistantId = crypto.randomUUID();
+    let assistantContent = '';
 
-      if (error) throw error;
-
-      const assistantMessage: Message = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: data.response || 'I apologize, but I encountered an issue processing your request.',
-        timestamp: new Date()
-      };
-
+    const addAssistantMessage = () => {
       setSessions(prev => prev.map(s => {
         if (s.id === sessionId) {
-          return { ...s, messages: [...s.messages, assistantMessage] };
+          const hasAssistant = s.messages.some(m => m.id === assistantId);
+          if (!hasAssistant) {
+            return {
+              ...s,
+              messages: [...s.messages, {
+                id: assistantId,
+                role: 'assistant' as const,
+                content: '',
+                timestamp: new Date()
+              }]
+            };
+          }
         }
         return s;
       }));
+    };
+
+    const updateAssistantMessage = (newContent: string) => {
+      assistantContent = newContent;
+      setSessions(prev => prev.map(s => {
+        if (s.id === sessionId) {
+          return {
+            ...s,
+            messages: s.messages.map(m => 
+              m.id === assistantId ? { ...m, content: newContent } : m
+            )
+          };
+        }
+        return s;
+      }));
+    };
+
+    try {
+      addAssistantMessage();
+      
+      const currentSession = sessions.find(s => s.id === sessionId);
+      const historyMessages = currentSession?.messages.slice(-10) || [];
+      
+      await streamChat(
+        [...historyMessages, userMessage],
+        sessionId,
+        (chunk) => {
+          assistantContent += chunk;
+          updateAssistantMessage(assistantContent);
+        },
+        () => setIsLoading(false)
+      );
     } catch (error) {
       console.error('AI Chat error:', error);
-      toast.error('Failed to get AI response');
-      
-      const errorMessage: Message = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: 'I apologize, but I encountered an error. Please try again.',
-        timestamp: new Date()
-      };
-
-      setSessions(prev => prev.map(s => {
-        if (s.id === sessionId) {
-          return { ...s, messages: [...s.messages, errorMessage] };
-        }
-        return s;
-      }));
-    } finally {
+      updateAssistantMessage('I apologize, but I encountered an error. Please try again.');
       setIsLoading(false);
     }
   };
@@ -210,10 +317,7 @@ export default function AiChat() {
       />
 
       {/* Main Chat Area */}
-      <div className={cn(
-        "flex-1 flex flex-col min-w-0 transition-all duration-300",
-        sidebarOpen && !isMobile ? "ml-0" : "ml-0"
-      )}>
+      <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
         <ChatHeader 
           title={activeSession?.title || 'SaaS VALA AI'} 
@@ -227,21 +331,23 @@ export default function AiChat() {
           {!activeSession || activeSession.messages.length === 0 ? (
             <EmptyState onSuggestionClick={handleSuggestionClick} />
           ) : (
-            <div className="max-w-4xl mx-auto">
+            <div className="pb-4">
               {activeSession.messages.map((message) => (
                 <ChatMessage key={message.id} message={message} />
               ))}
-              {isLoading && (
-                <div className="flex gap-4 py-6 px-4 bg-muted/30">
-                  <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                    <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-sm font-medium text-foreground mb-2">SaaS VALA AI</div>
-                    <div className="flex gap-1">
-                      <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              {isLoading && activeSession.messages[activeSession.messages.length - 1]?.role === 'user' && (
+                <div className="py-6 px-4 md:px-6 bg-muted/20">
+                  <div className="max-w-3xl mx-auto flex gap-4">
+                    <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                      <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-sm font-semibold text-foreground mb-2">SaaS VALA AI</div>
+                      <div className="flex gap-1.5">
+                        <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -252,9 +358,7 @@ export default function AiChat() {
         </div>
 
         {/* Input Area */}
-        <div className="max-w-4xl mx-auto w-full">
-          <ChatInput onSend={handleSend} isLoading={isLoading} />
-        </div>
+        <ChatInput onSend={handleSend} isLoading={isLoading} />
       </div>
     </div>
   );
