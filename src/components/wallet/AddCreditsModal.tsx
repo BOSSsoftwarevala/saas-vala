@@ -24,6 +24,7 @@ import {
   Clock,
   Send,
   Banknote,
+  Bitcoin,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -43,6 +44,7 @@ const paymentMethods = [
   { id: 'bank', name: 'Bank Transfer (NEFT/IMPS/SWIFT)', icon: Building2, badge: 'Manual Verify', countries: '🇮🇳 🌍' },
   { id: 'wise', name: 'Wise (TransferWise)', icon: Send, badge: 'Low Fees', countries: '🌍 🇺🇸 🇬🇧 🇪🇺 🇦🇺 🇨🇦' },
   { id: 'remit', name: 'Remitly / Western Union', icon: Banknote, badge: 'Fast', countries: '🌍 🇺🇸 🇬🇧 🇦🇪 🇸🇬' },
+  { id: 'crypto', name: 'Cryptocurrency (BTC/USDT)', icon: Bitcoin, badge: 'Decentralized', countries: '🌍 Borderless' },
   { id: 'international', name: 'International Card (Visa/MC)', icon: Globe, badge: 'Worldwide', countries: '🌍 All Countries' },
 ];
 
@@ -58,7 +60,18 @@ const bankDetails = {
   branchName: 'KANKAR BAGH',
 };
 
-type Step = 'amount' | 'method' | 'bank_details' | 'processing' | 'success' | 'pending';
+const cryptoDetails = {
+  binanceId: '1078928519',
+  binanceIdMasked: '•••••8519',
+  networks: [
+    { name: 'USDT (TRC20)', network: 'Tron', badge: 'Low Fee', recommended: true },
+    { name: 'USDT (BEP20)', network: 'BSC', badge: 'Fast' },
+    { name: 'Bitcoin (BTC)', network: 'Bitcoin', badge: 'Native' },
+    { name: 'USDT (ERC20)', network: 'Ethereum', badge: 'High Fee' },
+  ],
+};
+
+type Step = 'amount' | 'method' | 'bank_details' | 'crypto_details' | 'processing' | 'success' | 'pending';
 
 export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsModalProps) {
   const [step, setStep] = useState<Step>('amount');
@@ -105,8 +118,58 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
   const handlePaymentMethodSelect = () => {
     if (paymentMethod === 'bank' || paymentMethod === 'wise' || paymentMethod === 'remit') {
       setStep('bank_details');
+    } else if (paymentMethod === 'crypto') {
+      setStep('crypto_details');
     } else {
       handlePayment();
+    }
+  };
+
+  const handleCryptoSubmit = async () => {
+    if (!transactionRef.trim()) {
+      toast.error('Please enter transaction hash or Binance Pay reference');
+      return;
+    }
+
+    setStep('processing');
+
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data: userData } = await supabase.auth.getUser();
+      
+      if (userData.user) {
+        const { data: walletData } = await supabase
+          .from('wallets')
+          .select('id, balance')
+          .eq('user_id', userData.user.id)
+          .maybeSingle();
+
+        if (walletData) {
+          await supabase.from('transactions').insert({
+            wallet_id: walletData.id,
+            type: 'credit',
+            amount: finalAmount,
+            balance_after: null,
+            status: 'pending',
+            description: 'Crypto Payment - Awaiting Verification',
+            created_by: userData.user.id,
+            reference_id: transactionRef,
+            reference_type: 'crypto_transfer',
+            meta: { 
+              payment_method: 'crypto',
+              transaction_hash: transactionRef,
+              binance_id: cryptoDetails.binanceId 
+            }
+          });
+        }
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setStep('pending');
+    } catch (error) {
+      console.error('Failed to create pending transaction:', error);
+      toast.error('Failed to submit. Please try again.');
+      setStep('crypto_details');
     }
   };
 
@@ -513,6 +576,136 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
               >
                 I've Made the Payment
               </Button>
+            </div>
+          </>
+        )}
+
+        {/* Step 3b: Crypto Details */}
+        {step === 'crypto_details' && (
+          <>
+            <DialogHeader>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="icon" onClick={() => setStep('method')}>
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <div>
+                  <DialogTitle className="font-display text-xl">Cryptocurrency Payment</DialogTitle>
+                  <DialogDescription>
+                    Send crypto to our Binance Pay account
+                  </DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              {/* Crypto Banner */}
+              <div className="flex items-center justify-center gap-2 bg-amber-500/10 rounded-lg p-3">
+                <Bitcoin className="h-5 w-5 text-amber-500" />
+                <span className="text-sm font-medium text-amber-500">Decentralized • No Borders • Instant</span>
+                <span className="text-lg">₿</span>
+              </div>
+
+              {/* Binance Pay Card */}
+              <div className="glass-card rounded-lg p-4 space-y-3">
+                {/* Brand Header */}
+                <div className="text-center pb-3 border-b border-border">
+                  <img 
+                    src={softwareValaLogo} 
+                    alt="SOFTWARE VALA" 
+                    className="h-16 w-16 mx-auto mb-2 rounded-full object-contain"
+                  />
+                  <p className="text-xl font-bold font-display text-foreground">SOFTWARE VALA</p>
+                  <div className="flex items-center justify-center gap-2 mt-1">
+                    <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/30">
+                      <Bitcoin className="h-3 w-3 mr-1" />
+                      Binance Pay
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Binance Pay ID */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Binance Pay ID</p>
+                    <p className="font-mono font-semibold text-foreground">{cryptoDetails.binanceIdMasked}</p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="gap-1.5"
+                    onClick={() => handleCopy(cryptoDetails.binanceId, 'Binance Pay ID')}
+                  >
+                    <Copy className="h-3 w-3" />
+                    Copy
+                  </Button>
+                </div>
+
+                {/* Supported Networks */}
+                <div className="pt-2 border-t border-border">
+                  <p className="text-xs text-muted-foreground mb-2">Supported Networks</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {cryptoDetails.networks.map((network, idx) => (
+                      <div 
+                        key={idx}
+                        className={cn(
+                          'p-2 rounded-lg border text-center',
+                          network.recommended 
+                            ? 'border-success/50 bg-success/5' 
+                            : 'border-border bg-muted/30'
+                        )}
+                      >
+                        <p className="text-xs font-medium text-foreground">{network.name}</p>
+                        <Badge 
+                          variant="outline" 
+                          className={cn(
+                            'text-[10px] mt-1',
+                            network.recommended && 'border-success/50 text-success'
+                          )}
+                        >
+                          {network.badge}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Amount to Send */}
+              <div className="bg-amber-500/10 rounded-lg p-4 text-center">
+                <p className="text-xs text-muted-foreground">Equivalent Amount (INR)</p>
+                <p className="text-2xl font-bold text-amber-500">₹{finalAmount.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Convert to USDT/BTC at current market rate
+                </p>
+              </div>
+
+              {/* Transaction Hash */}
+              <div className="space-y-2">
+                <Label htmlFor="crypto-ref">Transaction Hash / Binance Pay Reference</Label>
+                <Input
+                  id="crypto-ref"
+                  placeholder="Enter TxHash or Binance Pay order ID"
+                  value={transactionRef}
+                  onChange={(e) => setTransactionRef(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  After sending crypto, paste the transaction hash or Binance Pay order ID
+                </p>
+              </div>
+
+              <Button
+                className="w-full bg-amber-500 hover:bg-amber-600 text-white h-12"
+                onClick={handleCryptoSubmit}
+                disabled={!transactionRef.trim()}
+              >
+                I've Sent the Crypto
+              </Button>
+
+              {/* Security Note */}
+              <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-lg p-3">
+                <Shield className="h-4 w-4 text-success" />
+                <span>Only send via supported networks • Double-check the Binance Pay ID</span>
+              </div>
             </div>
           </>
         )}
