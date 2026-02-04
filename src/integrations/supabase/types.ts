@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          details: Json | null
+          entity_id: string
+          entity_type: string
+          id: string
+          ip_address: string | null
+          performed_by: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          details?: Json | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          ip_address?: string | null
+          performed_by?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          details?: Json | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          ip_address?: string | null
+          performed_by?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       ai_usage: {
         Row: {
           cost: number | null
@@ -21,6 +57,7 @@ export type Database = {
           endpoint: string | null
           id: string
           model: string
+          product_id: string | null
           session_id: string | null
           tokens_input: number | null
           tokens_output: number | null
@@ -32,6 +69,7 @@ export type Database = {
           endpoint?: string | null
           id?: string
           model: string
+          product_id?: string | null
           session_id?: string | null
           tokens_input?: number | null
           tokens_output?: number | null
@@ -43,18 +81,79 @@ export type Database = {
           endpoint?: string | null
           id?: string
           model?: string
+          product_id?: string | null
           session_id?: string | null
           tokens_input?: number | null
           tokens_output?: number | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      apk_versions: {
+        Row: {
+          apk_id: string
+          checksum: string | null
+          created_at: string | null
+          created_by: string | null
+          file_path: string | null
+          file_size: number | null
+          id: string
+          is_stable: boolean | null
+          release_notes: string | null
+          version_code: number
+          version_name: string
+        }
+        Insert: {
+          apk_id: string
+          checksum?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          id?: string
+          is_stable?: boolean | null
+          release_notes?: string | null
+          version_code: number
+          version_name: string
+        }
+        Update: {
+          apk_id?: string
+          checksum?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          id?: string
+          is_stable?: boolean | null
+          release_notes?: string | null
+          version_code?: number
+          version_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apk_versions_apk_id_fkey"
+            columns: ["apk_id"]
+            isOneToOne: false
+            referencedRelation: "apks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       apks: {
         Row: {
+          architecture: string | null
           changelog: string | null
           created_at: string | null
           created_by: string | null
+          current_version_id: string | null
           download_count: number | null
           file_size: number | null
           file_url: string | null
@@ -67,9 +166,11 @@ export type Database = {
           version: string
         }
         Insert: {
+          architecture?: string | null
           changelog?: string | null
           created_at?: string | null
           created_by?: string | null
+          current_version_id?: string | null
           download_count?: number | null
           file_size?: number | null
           file_url?: string | null
@@ -82,9 +183,11 @@ export type Database = {
           version: string
         }
         Update: {
+          architecture?: string | null
           changelog?: string | null
           created_at?: string | null
           created_by?: string | null
+          current_version_id?: string | null
           download_count?: number | null
           file_size?: number | null
           file_url?: string | null
@@ -97,6 +200,13 @@ export type Database = {
           version?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "apks_current_version_id_fkey"
+            columns: ["current_version_id"]
+            isOneToOne: false
+            referencedRelation: "apk_versions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "apks_product_id_fkey"
             columns: ["product_id"]
@@ -297,6 +407,53 @@ export type Database = {
             columns: ["server_id"]
             isOneToOne: false
             referencedRelation: "servers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      health_checks: {
+        Row: {
+          apk_status: string | null
+          created_at: string | null
+          demo_status: string | null
+          id: string
+          last_checked_at: string | null
+          license_status: string | null
+          overall_status: string | null
+          product_id: string
+          server_status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          apk_status?: string | null
+          created_at?: string | null
+          demo_status?: string | null
+          id?: string
+          last_checked_at?: string | null
+          license_status?: string | null
+          overall_status?: string | null
+          product_id: string
+          server_status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          apk_status?: string | null
+          created_at?: string | null
+          demo_status?: string | null
+          id?: string
+          last_checked_at?: string | null
+          license_status?: string | null
+          overall_status?: string | null
+          product_id?: string
+          server_status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "health_checks_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -561,52 +718,67 @@ export type Database = {
       }
       products: {
         Row: {
+          business_type: string | null
           category_id: string | null
           created_at: string | null
           created_by: string | null
           currency: string | null
           description: string | null
           features: Json | null
+          icon_path: string | null
           id: string
           meta: Json | null
           name: string
           price: number | null
+          product_code: string
+          short_description: string | null
           slug: string
           status: Database["public"]["Enums"]["product_status"] | null
           updated_at: string | null
           version: string | null
+          visibility: string | null
         }
         Insert: {
+          business_type?: string | null
           category_id?: string | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
           description?: string | null
           features?: Json | null
+          icon_path?: string | null
           id?: string
           meta?: Json | null
           name: string
           price?: number | null
+          product_code?: string
+          short_description?: string | null
           slug: string
           status?: Database["public"]["Enums"]["product_status"] | null
           updated_at?: string | null
           version?: string | null
+          visibility?: string | null
         }
         Update: {
+          business_type?: string | null
           category_id?: string | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
           description?: string | null
           features?: Json | null
+          icon_path?: string | null
           id?: string
           meta?: Json | null
           name?: string
           price?: number | null
+          product_code?: string
+          short_description?: string | null
           slug?: string
           status?: Database["public"]["Enums"]["product_status"] | null
           updated_at?: string | null
           version?: string | null
+          visibility?: string | null
         }
         Relationships: [
           {
@@ -767,7 +939,9 @@ export type Database = {
           last_deploy_commit: string | null
           last_deploy_message: string | null
           name: string
+          product_id: string | null
           runtime: Database["public"]["Enums"]["server_runtime"] | null
+          server_type: string | null
           ssl_status: string | null
           status: Database["public"]["Enums"]["server_status"] | null
           subdomain: string | null
@@ -788,7 +962,9 @@ export type Database = {
           last_deploy_commit?: string | null
           last_deploy_message?: string | null
           name: string
+          product_id?: string | null
           runtime?: Database["public"]["Enums"]["server_runtime"] | null
+          server_type?: string | null
           ssl_status?: string | null
           status?: Database["public"]["Enums"]["server_status"] | null
           subdomain?: string | null
@@ -809,14 +985,24 @@ export type Database = {
           last_deploy_commit?: string | null
           last_deploy_message?: string | null
           name?: string
+          product_id?: string | null
           runtime?: Database["public"]["Enums"]["server_runtime"] | null
+          server_type?: string | null
           ssl_status?: string | null
           status?: Database["public"]["Enums"]["server_status"] | null
           subdomain?: string | null
           updated_at?: string | null
           uptime_percent?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "servers_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       support_audit_logs: {
         Row: {
@@ -1128,6 +1314,19 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      log_activity: {
+        Args: {
+          p_action: string
+          p_details?: Json
+          p_entity_id: string
+          p_entity_type: string
+        }
+        Returns: string
+      }
+      update_product_health: {
+        Args: { p_product_id: string }
+        Returns: undefined
       }
     }
     Enums: {
