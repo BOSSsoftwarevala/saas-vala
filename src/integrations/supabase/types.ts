@@ -255,6 +255,56 @@ export type Database = {
         }
         Relationships: []
       }
+      backup_logs: {
+        Row: {
+          backup_type: string | null
+          completed_at: string | null
+          created_at: string | null
+          created_by: string | null
+          error_message: string | null
+          file_path: string | null
+          file_size: number | null
+          id: string
+          server_id: string | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["backup_status"] | null
+        }
+        Insert: {
+          backup_type?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          error_message?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          id?: string
+          server_id?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["backup_status"] | null
+        }
+        Update: {
+          backup_type?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          error_message?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          id?: string
+          server_id?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["backup_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "backup_logs_server_id_fkey"
+            columns: ["server_id"]
+            isOneToOne: false
+            referencedRelation: "servers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           created_at: string | null
@@ -358,6 +408,38 @@ export type Database = {
           },
         ]
       }
+      deployment_logs: {
+        Row: {
+          deployment_id: string | null
+          id: string
+          log_level: string | null
+          message: string
+          timestamp: string | null
+        }
+        Insert: {
+          deployment_id?: string | null
+          id?: string
+          log_level?: string | null
+          message: string
+          timestamp?: string | null
+        }
+        Update: {
+          deployment_id?: string | null
+          id?: string
+          log_level?: string | null
+          message?: string
+          timestamp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deployment_logs_deployment_id_fkey"
+            columns: ["deployment_id"]
+            isOneToOne: false
+            referencedRelation: "deployments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deployments: {
         Row: {
           branch: string | null
@@ -404,6 +486,140 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "deployments_server_id_fkey"
+            columns: ["server_id"]
+            isOneToOne: false
+            referencedRelation: "servers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      domains: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          dns_verified: boolean | null
+          dns_verified_at: string | null
+          domain_name: string
+          domain_type: string
+          id: string
+          is_primary: boolean | null
+          product_id: string | null
+          server_id: string | null
+          ssl_auto_renew: boolean | null
+          ssl_expiry_at: string | null
+          ssl_status: string | null
+          status: Database["public"]["Enums"]["domain_status"] | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          dns_verified?: boolean | null
+          dns_verified_at?: string | null
+          domain_name: string
+          domain_type?: string
+          id?: string
+          is_primary?: boolean | null
+          product_id?: string | null
+          server_id?: string | null
+          ssl_auto_renew?: boolean | null
+          ssl_expiry_at?: string | null
+          ssl_status?: string | null
+          status?: Database["public"]["Enums"]["domain_status"] | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          dns_verified?: boolean | null
+          dns_verified_at?: string | null
+          domain_name?: string
+          domain_type?: string
+          id?: string
+          is_primary?: boolean | null
+          product_id?: string | null
+          server_id?: string | null
+          ssl_auto_renew?: boolean | null
+          ssl_expiry_at?: string | null
+          ssl_status?: string | null
+          status?: Database["public"]["Enums"]["domain_status"] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "domains_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "domains_server_id_fkey"
+            columns: ["server_id"]
+            isOneToOne: false
+            referencedRelation: "servers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      git_connections: {
+        Row: {
+          auto_deploy: boolean | null
+          branch: string | null
+          created_at: string | null
+          created_by: string | null
+          deploy_token: string | null
+          id: string
+          last_commit_message: string | null
+          last_commit_sha: string | null
+          last_sync_at: string | null
+          provider: Database["public"]["Enums"]["git_provider"]
+          repository_name: string | null
+          repository_url: string
+          server_id: string | null
+          status: string | null
+          updated_at: string | null
+          webhook_secret: string | null
+        }
+        Insert: {
+          auto_deploy?: boolean | null
+          branch?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          deploy_token?: string | null
+          id?: string
+          last_commit_message?: string | null
+          last_commit_sha?: string | null
+          last_sync_at?: string | null
+          provider?: Database["public"]["Enums"]["git_provider"]
+          repository_name?: string | null
+          repository_url: string
+          server_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          webhook_secret?: string | null
+        }
+        Update: {
+          auto_deploy?: boolean | null
+          branch?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          deploy_token?: string | null
+          id?: string
+          last_commit_message?: string | null
+          last_commit_sha?: string | null
+          last_sync_at?: string | null
+          provider?: Database["public"]["Enums"]["git_provider"]
+          repository_name?: string | null
+          repository_url?: string
+          server_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          webhook_secret?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "git_connections_server_id_fkey"
             columns: ["server_id"]
             isOneToOne: false
             referencedRelation: "servers"
@@ -924,6 +1140,109 @@ export type Database = {
           },
         ]
       }
+      server_auto_rules: {
+        Row: {
+          auto_backup: boolean | null
+          auto_deploy: boolean | null
+          auto_health_check: boolean | null
+          auto_restart: boolean | null
+          auto_ssl_renewal: boolean | null
+          backup_schedule: string | null
+          created_at: string | null
+          health_check_interval: number | null
+          id: string
+          max_restart_attempts: number | null
+          restart_on_failure: boolean | null
+          server_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          auto_backup?: boolean | null
+          auto_deploy?: boolean | null
+          auto_health_check?: boolean | null
+          auto_restart?: boolean | null
+          auto_ssl_renewal?: boolean | null
+          backup_schedule?: string | null
+          created_at?: string | null
+          health_check_interval?: number | null
+          id?: string
+          max_restart_attempts?: number | null
+          restart_on_failure?: boolean | null
+          server_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          auto_backup?: boolean | null
+          auto_deploy?: boolean | null
+          auto_health_check?: boolean | null
+          auto_restart?: boolean | null
+          auto_ssl_renewal?: boolean | null
+          backup_schedule?: string | null
+          created_at?: string | null
+          health_check_interval?: number | null
+          id?: string
+          max_restart_attempts?: number | null
+          restart_on_failure?: boolean | null
+          server_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "server_auto_rules_server_id_fkey"
+            columns: ["server_id"]
+            isOneToOne: true
+            referencedRelation: "servers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      server_events: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          event_type: Database["public"]["Enums"]["server_event_type"]
+          id: string
+          meta: Json | null
+          resolved: boolean | null
+          resolved_at: string | null
+          server_id: string | null
+          severity: string | null
+          title: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          event_type: Database["public"]["Enums"]["server_event_type"]
+          id?: string
+          meta?: Json | null
+          resolved?: boolean | null
+          resolved_at?: string | null
+          server_id?: string | null
+          severity?: string | null
+          title: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          event_type?: Database["public"]["Enums"]["server_event_type"]
+          id?: string
+          meta?: Json | null
+          resolved?: boolean | null
+          resolved_at?: string | null
+          server_id?: string | null
+          severity?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "server_events_server_id_fkey"
+            columns: ["server_id"]
+            isOneToOne: false
+            referencedRelation: "servers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       servers: {
         Row: {
           auto_deploy: boolean | null
@@ -1000,6 +1319,50 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ssl_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          domain_id: string | null
+          error_message: string | null
+          expires_at: string | null
+          id: string
+          issued_at: string | null
+          provider: string | null
+          status: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          domain_id?: string | null
+          error_message?: string | null
+          expires_at?: string | null
+          id?: string
+          issued_at?: string | null
+          provider?: string | null
+          status?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          domain_id?: string | null
+          error_message?: string | null
+          expires_at?: string | null
+          id?: string
+          issued_at?: string | null
+          provider?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ssl_logs_domain_id_fkey"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "domains"
             referencedColumns: ["id"]
           },
         ]
@@ -1341,6 +1704,7 @@ export type Database = {
         | "logout"
         | "suspend"
         | "activate"
+      backup_status: "pending" | "running" | "success" | "failed"
       category_level: "master" | "sub" | "micro" | "nano"
       demo_status: "active" | "expired" | "disabled"
       deploy_status:
@@ -1350,6 +1714,8 @@ export type Database = {
         | "failed"
         | "cancelled"
         | "rolled_back"
+      domain_status: "pending" | "active" | "failed" | "expired"
+      git_provider: "github" | "gitlab" | "bitbucket"
       key_status: "active" | "expired" | "suspended" | "revoked"
       key_type: "lifetime" | "yearly" | "monthly" | "trial"
       lead_source:
@@ -1362,6 +1728,13 @@ export type Database = {
       lead_status: "new" | "contacted" | "qualified" | "converted" | "lost"
       message_type: "text" | "voice" | "image"
       product_status: "active" | "suspended" | "archived" | "draft"
+      server_event_type:
+        | "restart"
+        | "deploy"
+        | "backup"
+        | "ssl_renewal"
+        | "health_check"
+        | "error"
       server_runtime:
         | "nodejs18"
         | "nodejs20"
@@ -1512,6 +1885,7 @@ export const Constants = {
         "suspend",
         "activate",
       ],
+      backup_status: ["pending", "running", "success", "failed"],
       category_level: ["master", "sub", "micro", "nano"],
       demo_status: ["active", "expired", "disabled"],
       deploy_status: [
@@ -1522,12 +1896,22 @@ export const Constants = {
         "cancelled",
         "rolled_back",
       ],
+      domain_status: ["pending", "active", "failed", "expired"],
+      git_provider: ["github", "gitlab", "bitbucket"],
       key_status: ["active", "expired", "suspended", "revoked"],
       key_type: ["lifetime", "yearly", "monthly", "trial"],
       lead_source: ["website", "referral", "social", "ads", "organic", "other"],
       lead_status: ["new", "contacted", "qualified", "converted", "lost"],
       message_type: ["text", "voice", "image"],
       product_status: ["active", "suspended", "archived", "draft"],
+      server_event_type: [
+        "restart",
+        "deploy",
+        "backup",
+        "ssl_renewal",
+        "health_check",
+        "error",
+      ],
       server_runtime: [
         "nodejs18",
         "nodejs20",
