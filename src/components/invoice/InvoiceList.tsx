@@ -35,6 +35,7 @@ import {
   Download,
   FileText,
   Loader2,
+  PenTool,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Invoice, useInvoices } from '@/hooks/useInvoices';
@@ -44,6 +45,7 @@ interface InvoiceListProps {
   loading: boolean;
   onView: (invoice: Invoice) => void;
   onEdit: (invoice: Invoice) => void;
+  onRequestSignature: (invoice: Invoice) => void;
 }
 
 const statusStyles: Record<string, string> = {
@@ -55,7 +57,7 @@ const statusStyles: Record<string, string> = {
   cancelled: 'bg-muted text-muted-foreground border-muted-foreground/30',
 };
 
-export function InvoiceList({ invoices, loading, onView, onEdit }: InvoiceListProps) {
+export function InvoiceList({ invoices, loading, onView, onEdit, onRequestSignature }: InvoiceListProps) {
   const { deleteInvoice, sendInvoice, markAsPaid } = useInvoices();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -171,6 +173,11 @@ export function InvoiceList({ invoices, loading, onView, onEdit }: InvoiceListPr
                     {(invoice.status === 'pending' || invoice.status === 'signed') && (
                       <DropdownMenuItem className="gap-2 cursor-pointer text-success" onClick={() => handleMarkPaid(invoice.id)}>
                         <CheckCircle className="h-4 w-4" /> Mark as Paid
+                      </DropdownMenuItem>
+                    )}
+                    {(invoice.status === 'pending') && (
+                      <DropdownMenuItem className="gap-2 cursor-pointer text-primary" onClick={() => onRequestSignature(invoice)}>
+                        <PenTool className="h-4 w-4" /> Request Signature
                       </DropdownMenuItem>
                     )}
                     <DropdownMenuItem className="gap-2 cursor-pointer">

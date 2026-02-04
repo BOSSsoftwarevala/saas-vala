@@ -322,6 +322,7 @@ export default function Wallet() {
                   loading={invoicesLoading}
                   onView={(invoice) => setPreviewInvoice(invoice)}
                   onEdit={(invoice) => setPreviewInvoice(invoice)}
+                  onRequestSignature={(invoice) => setSignatureInvoice(invoice)}
                 />
               </div>
             </div>
