@@ -1,11 +1,12 @@
-import { useState, useRef, useEffect, KeyboardEvent, ChangeEvent } from 'react';
+import { useState, useRef, useEffect, KeyboardEvent, ChangeEvent, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Send, Paperclip, Image, Sparkles, X, FileCode, FileArchive, File, Mic, Wand2 } from 'lucide-react';
+import { Send, Paperclip, Image, Sparkles, X, FileCode, FileArchive, File, Mic, MicOff, Wand2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useVoiceInput } from '@/hooks/useVoiceInput';
 
 interface UploadedFile {
   file: File;
@@ -45,6 +46,24 @@ export function ChatInput({ onSend, isLoading, disabled }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+
+  // Voice input - auto-sends when speech is detected
+  const handleVoiceTranscript = useCallback((text: string) => {
+    if (text.trim() && !isLoading && !disabled) {
+      onSend(text.trim(), files.map(f => f.file));
+      setFiles([]);
+    }
+  }, [onSend, files, isLoading, disabled]);
+
+  const { 
+    isListening, 
+    transcript, 
+    isSupported: voiceSupported,
+    toggleListening 
+  } = useVoiceInput({ 
+    onTranscript: handleVoiceTranscript,
+    autoSend: true 
+  });
 
   // Auto-resize textarea
   useEffect(() => {
@@ -291,34 +310,75 @@ export function ChatInput({ onSend, isLoading, disabled }: ChatInputProps) {
           </div>
 
           {/* Text Input */}
-          <Textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
-            placeholder="Message SaaS VALA AI..."
-            disabled={isLoading || disabled}
-            className={cn(
-              'flex-1 min-h-[44px] max-h-[200px] resize-none border-0 bg-transparent px-2 py-2.5',
-              'text-base placeholder:text-muted-foreground/60 focus-visible:ring-0 focus-visible:ring-offset-0'
+          <div className="flex-1 relative">
+            {isListening && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm rounded-lg z-10"
+              >
+                <div className="flex items-center gap-3">
+                  <motion.div
+                    animate={{ scale: [1, 1.3, 1] }}
+                    transition={{ duration: 1, repeat: Infinity }}
+                    className="w-3 h-3 bg-red-500 rounded-full"
+                  />
+                  <span className="text-sm font-medium text-foreground">
+                    {transcript || "Listening... Speak now!"}
+                  </span>
+                </div>
+              </motion.div>
             )}
-            rows={1}
-          />
+            <Textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              placeholder="Message SaaS VALA AI or click 🎤 to speak..."
+              disabled={isLoading || disabled || isListening}
+              className={cn(
+                'flex-1 min-h-[44px] max-h-[200px] resize-none border-0 bg-transparent px-2 py-2.5',
+                'text-base placeholder:text-muted-foreground/60 focus-visible:ring-0 focus-visible:ring-offset-0'
+              )}
+              rows={1}
+            />
+          </div>
 
           {/* Voice & Send Buttons */}
           <div className="flex gap-1">
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            {/* Voice Input Button */}
+            <motion.div 
+              whileHover={{ scale: 1.05 }} 
+              whileTap={{ scale: 0.95 }}
+              animate={isListening ? { scale: [1, 1.1, 1] } : {}}
+              transition={isListening ? { duration: 1, repeat: Infinity } : {}}
+            >
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                disabled={isLoading || disabled}
-                className="h-9 w-9 shrink-0 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-xl transition-colors"
-                title="Voice input (coming soon)"
+                onClick={toggleListening}
+                disabled={isLoading || disabled || !voiceSupported}
+                className={cn(
+                  "h-9 w-9 shrink-0 rounded-xl transition-all duration-300",
+                  isListening 
+                    ? "bg-red-500/20 text-red-500 hover:bg-red-500/30 ring-2 ring-red-500/50 ring-offset-2 ring-offset-background" 
+                    : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                )}
+                title={isListening ? "Stop listening" : "Voice command - speak to AI"}
               >
-                <Mic className="h-5 w-5" />
+                {isListening ? (
+                  <motion.div
+                    animate={{ scale: [1, 1.2, 1] }}
+                    transition={{ duration: 0.5, repeat: Infinity }}
+                  >
+                    <MicOff className="h-5 w-5" />
+                  </motion.div>
+                ) : (
+                  <Mic className="h-5 w-5" />
+                )}
               </Button>
             </motion.div>
             
