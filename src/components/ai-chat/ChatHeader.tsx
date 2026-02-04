@@ -6,7 +6,8 @@ import {
   Download,
   ChevronDown,
   Sparkles,
-  ArrowLeft
+  ArrowLeft,
+  PanelLeft
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -20,15 +21,28 @@ import { useNavigate } from 'react-router-dom';
 interface ChatHeaderProps {
   title: string;
   onExport?: () => void;
+  onToggleSidebar?: () => void;
+  sidebarOpen?: boolean;
 }
 
-export function ChatHeader({ title, onExport }: ChatHeaderProps) {
+export function ChatHeader({ title, onExport, onToggleSidebar, sidebarOpen }: ChatHeaderProps) {
   const navigate = useNavigate();
 
   return (
     <header className="h-14 border-b border-border bg-background/80 backdrop-blur-sm flex items-center justify-between px-4">
       {/* Left */}
       <div className="flex items-center gap-3">
+        {!sidebarOpen && onToggleSidebar && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onToggleSidebar}
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+          >
+            <PanelLeft className="h-4 w-4" />
+          </Button>
+        )}
+
         <Button
           variant="ghost"
           size="icon"
