@@ -11,6 +11,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Marketplace from "./pages/Marketplace";
 import Products from "./pages/Products";
+import RoleDetail from "./pages/RoleDetail";
 import Keys from "./pages/Keys";
 import Servers from "./pages/Servers";
 import AiChat from "./pages/AiChat";
@@ -114,6 +115,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Servers />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/role-detail"
+        element={
+          <ProtectedRoute>
+            <RoleDetail />
           </ProtectedRoute>
         }
       />
