@@ -1,208 +1,265 @@
 import { useState, useRef, useEffect } from 'react';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Send, Bot, User, Sparkles, History, Plus } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { ChatSidebar, ChatSession } from '@/components/ai-chat/ChatSidebar';
+import { ChatHeader } from '@/components/ai-chat/ChatHeader';
+import { ChatMessage, Message } from '@/components/ai-chat/ChatMessage';
+import { ChatInput } from '@/components/ai-chat/ChatInput';
+import { EmptyState } from '@/components/ai-chat/EmptyState';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-}
-
-const initialMessages: Message[] = [
-  {
-    id: '1',
-    role: 'assistant',
-    content: "Hello! I'm your SaaS VALA AI assistant. I can help you with product management, customer support, license key queries, and more. How can I assist you today?",
-    timestamp: new Date(),
-  },
-];
+const STORAGE_KEY = 'saas_vala_chat_sessions';
 
 export default function AiChat() {
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
-  const [input, setInput] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string>('');
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Load sessions from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        const sessionsWithDates = parsed.map((s: any) => ({
+          ...s,
+          createdAt: new Date(s.createdAt),
+          updatedAt: new Date(s.updatedAt),
+        }));
+        setSessions(sessionsWithDates);
+        if (sessionsWithDates.length > 0) {
+          setActiveSessionId(sessionsWithDates[0].id);
+        }
+      } catch (e) {
+        console.error('Failed to parse sessions:', e);
+      }
+    }
+  }, []);
+
+  // Load messages for active session
+  useEffect(() => {
+    if (activeSessionId) {
+      const messagesKey = `saas_vala_messages_${activeSessionId}`;
+      const saved = localStorage.getItem(messagesKey);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          const messagesWithDates = parsed.map((m: any) => ({
+            ...m,
+            timestamp: new Date(m.timestamp),
+          }));
+          setMessages(messagesWithDates);
+        } catch (e) {
+          console.error('Failed to parse messages:', e);
+          setMessages([]);
+        }
+      } else {
+        setMessages([]);
+      }
+    }
+  }, [activeSessionId]);
+
+  // Save sessions
+  useEffect(() => {
+    if (sessions.length > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+    }
+  }, [sessions]);
+
+  // Save messages
+  useEffect(() => {
+    if (activeSessionId && messages.length > 0) {
+      const messagesKey = `saas_vala_messages_${activeSessionId}`;
+      localStorage.setItem(messagesKey, JSON.stringify(messages));
+    }
+  }, [messages, activeSessionId]);
+
+  // Auto-scroll to bottom
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
+  const createNewChat = () => {
+    const newSession: ChatSession = {
+      id: crypto.randomUUID(),
+      title: 'New Chat',
+      preview: 'Start a conversation...',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    setSessions((prev) => [newSession, ...prev]);
+    setActiveSessionId(newSession.id);
+    setMessages([]);
+  };
 
+  const deleteSession = (id: string) => {
+    setSessions((prev) => prev.filter((s) => s.id !== id));
+    localStorage.removeItem(`saas_vala_messages_${id}`);
+    if (activeSessionId === id) {
+      const remaining = sessions.filter((s) => s.id !== id);
+      if (remaining.length > 0) {
+        setActiveSessionId(remaining[0].id);
+      } else {
+        setActiveSessionId('');
+        setMessages([]);
+      }
+    }
+  };
+
+  const handleSend = async (content: string) => {
+    // Create session if none exists
+    if (!activeSessionId) {
+      const newSession: ChatSession = {
+        id: crypto.randomUUID(),
+        title: content.slice(0, 40) + (content.length > 40 ? '...' : ''),
+        preview: content.slice(0, 60),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      setSessions([newSession]);
+      setActiveSessionId(newSession.id);
+    }
+
+    // Add user message
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       role: 'user',
-      content: input,
+      content,
       timestamp: new Date(),
     };
-
     setMessages((prev) => [...prev, userMessage]);
-    setInput('');
-    setIsTyping(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const aiResponses = [
-        "I understand your query. Let me help you with that. Based on your product catalog, I can see you have 24 active products. Would you like me to provide more details?",
-        "Great question! For license key management, you can use the Keys module to generate, suspend, or renew keys. The auto-billing feature integrates with your wallet.",
-        "I can help you analyze your server deployments. Currently, you have 3 servers online, 1 deploying, and 1 offline. Would you like me to investigate the offline server?",
-        "Your revenue has increased by 23% this month! The top-performing products are Enterprise CRM and Inventory Pro. Shall I generate a detailed report?",
-      ];
+    // Update session
+    setSessions((prev) =>
+      prev.map((s) =>
+        s.id === activeSessionId
+          ? {
+              ...s,
+              title: s.title === 'New Chat' ? content.slice(0, 40) : s.title,
+              preview: content.slice(0, 60),
+              updatedAt: new Date(),
+            }
+          : s
+      )
+    );
 
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
+    setIsLoading(true);
+
+    try {
+      // Build messages for API
+      const apiMessages = [...messages, userMessage].map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+
+      const response = await supabase.functions.invoke('ai-chat', {
+        body: { messages: apiMessages },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      const assistantMessage: Message = {
+        id: crypto.randomUUID(),
         role: 'assistant',
-        content: aiResponses[Math.floor(Math.random() * aiResponses.length)],
+        content: response.data.message,
         timestamp: new Date(),
       };
 
-      setMessages((prev) => [...prev, aiMessage]);
-      setIsTyping(false);
-    }, 1500);
+      setMessages((prev) => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error('AI chat error:', error);
+      toast.error('Failed to get AI response', {
+        description: error instanceof Error ? error.message : 'Please try again',
+      });
+      
+      // Add error message
+      const errorMessage: Message = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: 'I apologize, but I encountered an error processing your request. Please try again.',
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
+  const handleExport = () => {
+    const exportData = {
+      session: sessions.find((s) => s.id === activeSessionId),
+      messages,
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `chat-export-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Chat exported successfully');
+  };
+
+  const activeSession = sessions.find((s) => s.id === activeSessionId);
+
   return (
-    <DashboardLayout>
-      <div className="h-[calc(100vh-12rem)] flex gap-6">
-        {/* Sidebar - Chat History */}
-        <div className="hidden lg:block w-64 glass-card rounded-xl p-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-display font-bold text-foreground flex items-center gap-2">
-              <History className="h-4 w-4" />
-              Chat History
-            </h3>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="space-y-2">
-            <Button variant="secondary" className="w-full justify-start gap-2 bg-primary/10 text-primary border-primary/20">
-              <Sparkles className="h-4 w-4" />
-              Current Chat
-            </Button>
-            <Button variant="ghost" className="w-full justify-start gap-2 text-muted-foreground">
-              Product inquiry - 2h ago
-            </Button>
-            <Button variant="ghost" className="w-full justify-start gap-2 text-muted-foreground">
-              License issue - Yesterday
-            </Button>
-            <Button variant="ghost" className="w-full justify-start gap-2 text-muted-foreground">
-              Server help - 2 days ago
-            </Button>
-          </div>
-        </div>
+    <div className="h-screen flex bg-background overflow-hidden">
+      {/* Sidebar */}
+      <ChatSidebar
+        sessions={sessions}
+        activeSessionId={activeSessionId}
+        onSelectSession={setActiveSessionId}
+        onNewChat={createNewChat}
+        onDeleteSession={deleteSession}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+      />
 
-        {/* Chat Area */}
-        <div className="flex-1 glass-card rounded-xl flex flex-col overflow-hidden">
-          {/* Chat Header */}
-          <div className="p-4 border-b border-border flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-orange-gradient flex items-center justify-center">
-              <Bot className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h3 className="font-display font-bold text-foreground">SaaS VALA AI</h3>
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <span className="status-dot status-online" />
-                Always online
-              </p>
-            </div>
-          </div>
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Header */}
+        <ChatHeader
+          title={activeSession?.title || 'SaaS VALA AI'}
+          onExport={messages.length > 0 ? handleExport : undefined}
+        />
 
-          {/* Messages */}
-          <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-            <div className="space-y-4">
+        {/* Messages or Empty State */}
+        {messages.length === 0 ? (
+          <EmptyState onSuggestionClick={handleSend} />
+        ) : (
+          <ScrollArea className="flex-1" ref={scrollRef}>
+            <div className="max-w-4xl mx-auto">
               {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={cn(
-                    'flex gap-3 animate-fade-in',
-                    message.role === 'user' ? 'flex-row-reverse' : ''
-                  )}
-                >
-                  <Avatar className="h-8 w-8 shrink-0">
-                    <AvatarFallback
-                      className={cn(
-                        message.role === 'user'
-                          ? 'bg-secondary text-secondary-foreground'
-                          : 'bg-orange-gradient text-white'
-                      )}
-                    >
-                      {message.role === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div
-                    className={cn(
-                      'max-w-[80%] rounded-xl px-4 py-3',
-                      message.role === 'user'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-foreground'
-                    )}
-                  >
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                    <p className="text-xs opacity-70 mt-1">
-                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  </div>
-                </div>
+                <ChatMessage key={message.id} message={message} />
               ))}
-
-              {isTyping && (
-                <div className="flex gap-3 animate-fade-in">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-orange-gradient text-white">
-                      <Bot className="h-4 w-4" />
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="bg-muted rounded-xl px-4 py-3">
-                    <div className="flex gap-1">
-                      <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <span className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '300ms' }} />
+              
+              {/* Loading indicator */}
+              {isLoading && (
+                <div className="py-6 px-4 bg-muted/30">
+                  <div className="flex gap-4 max-w-4xl mx-auto">
+                    <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                      <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm text-muted-foreground">SaaS VALA AI is thinking...</p>
                     </div>
                   </div>
                 </div>
               )}
             </div>
           </ScrollArea>
+        )}
 
-          {/* Input */}
-          <div className="p-4 border-t border-border">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSend();
-              }}
-              className="flex gap-3"
-            >
-              <Input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask me anything about your SaaS..."
-                className="flex-1 bg-muted/50 border-border"
-              />
-              <Button
-                type="submit"
-                disabled={!input.trim() || isTyping}
-                className="bg-orange-gradient hover:opacity-90 text-white"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            </form>
-            <p className="text-xs text-muted-foreground mt-2 text-center">
-              Powered by <span className="text-primary font-semibold">SoftwareVala™</span> AI
-            </p>
-          </div>
-        </div>
+        {/* Input */}
+        <ChatInput onSend={handleSend} isLoading={isLoading} />
       </div>
-    </DashboardLayout>
+    </div>
   );
 }
