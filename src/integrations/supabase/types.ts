@@ -710,6 +710,13 @@ export type Database = {
             referencedRelation: "invoices"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "invoice_otp_codes_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices_secure"
+            referencedColumns: ["id"]
+          },
         ]
       }
       invoices: {
@@ -1416,6 +1423,13 @@ export type Database = {
             referencedRelation: "support_tickets"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "support_audit_logs_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets_secure"
+            referencedColumns: ["id"]
+          },
         ]
       }
       support_messages: {
@@ -1467,6 +1481,13 @@ export type Database = {
             columns: ["ticket_id"]
             isOneToOne: false
             referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets_secure"
             referencedColumns: ["id"]
           },
         ]
@@ -1590,6 +1611,7 @@ export type Database = {
       user_sessions: {
         Row: {
           browser: string | null
+          consent_given_at: string | null
           created_at: string
           device_name: string | null
           device_type: string | null
@@ -1598,11 +1620,13 @@ export type Database = {
           is_current: boolean | null
           last_active_at: string | null
           location: string | null
+          location_consent: boolean | null
           os: string | null
           user_id: string
         }
         Insert: {
           browser?: string | null
+          consent_given_at?: string | null
           created_at?: string
           device_name?: string | null
           device_type?: string | null
@@ -1611,11 +1635,13 @@ export type Database = {
           is_current?: boolean | null
           last_active_at?: string | null
           location?: string | null
+          location_consent?: boolean | null
           os?: string | null
           user_id: string
         }
         Update: {
           browser?: string | null
+          consent_given_at?: string | null
           created_at?: string
           device_name?: string | null
           device_type?: string | null
@@ -1624,6 +1650,7 @@ export type Database = {
           is_current?: boolean | null
           last_active_at?: string | null
           location?: string | null
+          location_consent?: boolean | null
           os?: string | null
           user_id?: string
         }
@@ -1661,7 +1688,180 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      invoices_secure: {
+        Row: {
+          created_at: string | null
+          currency: string | null
+          customer_address: string | null
+          customer_email: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          discount_amount: number | null
+          discount_percent: number | null
+          due_date: string | null
+          id: string | null
+          invoice_number: string | null
+          items: Json | null
+          notes: string | null
+          otp_verified: boolean | null
+          otp_verified_at: string | null
+          signature_data: string | null
+          signed_at: string | null
+          status: string | null
+          subtotal: number | null
+          tax_amount: number | null
+          tax_percent: number | null
+          terms: string | null
+          total_amount: number | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          currency?: string | null
+          customer_address?: never
+          customer_email?: never
+          customer_name?: never
+          customer_phone?: never
+          discount_amount?: number | null
+          discount_percent?: number | null
+          due_date?: string | null
+          id?: string | null
+          invoice_number?: string | null
+          items?: Json | null
+          notes?: string | null
+          otp_verified?: boolean | null
+          otp_verified_at?: string | null
+          signature_data?: string | null
+          signed_at?: string | null
+          status?: string | null
+          subtotal?: number | null
+          tax_amount?: number | null
+          tax_percent?: number | null
+          terms?: string | null
+          total_amount?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          currency?: string | null
+          customer_address?: never
+          customer_email?: never
+          customer_name?: never
+          customer_phone?: never
+          discount_amount?: number | null
+          discount_percent?: number | null
+          due_date?: string | null
+          id?: string | null
+          invoice_number?: string | null
+          items?: Json | null
+          notes?: string | null
+          otp_verified?: boolean | null
+          otp_verified_at?: string | null
+          signature_data?: string | null
+          signed_at?: string | null
+          status?: string | null
+          subtotal?: number | null
+          tax_amount?: number | null
+          tax_percent?: number | null
+          terms?: string | null
+          total_amount?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      support_tickets_secure: {
+        Row: {
+          assigned_staff_id: string | null
+          created_at: string | null
+          id: string | null
+          ip_hash: string | null
+          resolved_at: string | null
+          status: Database["public"]["Enums"]["support_status"] | null
+          ticket_number: string | null
+          updated_at: string | null
+          user_email: string | null
+          user_id: string | null
+          user_name: string | null
+        }
+        Insert: {
+          assigned_staff_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          ip_hash?: never
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["support_status"] | null
+          ticket_number?: string | null
+          updated_at?: string | null
+          user_email?: string | null
+          user_id?: string | null
+          user_name?: string | null
+        }
+        Update: {
+          assigned_staff_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          ip_hash?: never
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["support_status"] | null
+          ticket_number?: string | null
+          updated_at?: string | null
+          user_email?: string | null
+          user_id?: string | null
+          user_name?: string | null
+        }
+        Relationships: []
+      }
+      user_sessions_secure: {
+        Row: {
+          browser: string | null
+          consent_given_at: string | null
+          created_at: string | null
+          device_name: string | null
+          device_type: string | null
+          id: string | null
+          ip_address: string | null
+          is_current: boolean | null
+          last_active_at: string | null
+          location: string | null
+          location_consent: boolean | null
+          os: string | null
+          user_id: string | null
+        }
+        Insert: {
+          browser?: string | null
+          consent_given_at?: string | null
+          created_at?: string | null
+          device_name?: string | null
+          device_type?: string | null
+          id?: string | null
+          ip_address?: never
+          is_current?: boolean | null
+          last_active_at?: string | null
+          location?: never
+          location_consent?: boolean | null
+          os?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          browser?: string | null
+          consent_given_at?: string | null
+          created_at?: string | null
+          device_name?: string | null
+          device_type?: string | null
+          id?: string | null
+          ip_address?: never
+          is_current?: boolean | null
+          last_active_at?: string | null
+          location?: never
+          location_consent?: boolean | null
+          os?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       generate_invoice_number: { Args: never; Returns: string }
@@ -1671,6 +1871,7 @@ export type Database = {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      has_location_consent: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
