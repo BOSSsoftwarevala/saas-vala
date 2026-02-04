@@ -142,7 +142,7 @@ export function ProductTable({
             </TableHeader>
             <TableBody>
               {filteredProducts.map((product) => {
-                const hasError = product.status === 'suspended';
+                const hasError = product.status === 'suspended' || product.health_status === 'error';
                 
                 return (
                   <TableRow 
@@ -175,28 +175,38 @@ export function ProductTable({
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge variant="secondary" className="text-xs">
-                        <Link2 className="h-3 w-3 mr-1" />0
+                        <Link2 className="h-3 w-3 mr-1" />{product.demo_count || 0}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge variant="secondary" className="text-xs">
-                        <Download className="h-3 w-3 mr-1" />v{product.version}
+                        <Download className="h-3 w-3 mr-1" />v{product.version} ({product.apk_count || 0})
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge variant="secondary" className="text-xs text-muted-foreground">
-                        <Server className="h-3 w-3 mr-1" />—
+                      <Badge 
+                        variant="secondary" 
+                        className={cn(
+                          'text-xs',
+                          (product.server_count || 0) > 0 ? 'text-success' : 'text-muted-foreground'
+                        )}
+                      >
+                        <Server className="h-3 w-3 mr-1" />{(product.server_count || 0) > 0 ? 'Live' : '—'}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge variant="secondary" className="text-xs">
-                        0
+                        {product.license_count || 0}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center">
-                      {hasError ? (
+                      {product.health_status === 'error' ? (
                         <Badge variant="destructive" className="text-xs">
                           <AlertTriangle className="h-3 w-3 mr-1" />Error
+                        </Badge>
+                      ) : product.health_status === 'warning' ? (
+                        <Badge variant="outline" className="text-xs text-warning border-warning/30">
+                          <AlertTriangle className="h-3 w-3 mr-1" />Warning
                         </Badge>
                       ) : (
                         <Badge variant="outline" className="text-xs text-success border-success/30">

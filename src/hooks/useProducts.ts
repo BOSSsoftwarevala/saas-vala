@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { Json } from '@/integrations/supabase/types';
@@ -21,6 +21,12 @@ export interface Product {
   features: Json;
   created_at: string;
   updated_at: string;
+  // Computed counts from related tables
+  demo_count?: number;
+  apk_count?: number;
+  license_count?: number;
+  server_count?: number;
+  health_status?: string;
 }
 
 export interface Category {
@@ -38,23 +44,82 @@ export function useProducts() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .order('created_at', { ascending: false });
+    try {
+      // Fetch products with related counts
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    if (error) {
+      if (productsError) {
+        toast.error('Failed to fetch products');
+        console.error(productsError);
+        setLoading(false);
+        return;
+      }
+
+      if (!productsData || productsData.length === 0) {
+        setProducts([]);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch related counts for each product in parallel
+      const productIds = productsData.map(p => p.id);
+
+      const [demosRes, apksRes, licensesRes, serversRes, healthRes] = await Promise.all([
+        supabase.from('demos').select('product_id').in('product_id', productIds),
+        supabase.from('apks').select('product_id').in('product_id', productIds),
+        supabase.from('license_keys').select('product_id').in('product_id', productIds),
+        supabase.from('servers').select('product_id').in('product_id', productIds),
+        supabase.from('health_checks').select('product_id, overall_status').in('product_id', productIds),
+      ]);
+
+      // Count per product
+      const demoCounts: Record<string, number> = {};
+      const apkCounts: Record<string, number> = {};
+      const licenseCounts: Record<string, number> = {};
+      const serverCounts: Record<string, number> = {};
+      const healthStatuses: Record<string, string> = {};
+
+      (demosRes.data || []).forEach(d => {
+        demoCounts[d.product_id] = (demoCounts[d.product_id] || 0) + 1;
+      });
+      (apksRes.data || []).forEach(a => {
+        apkCounts[a.product_id] = (apkCounts[a.product_id] || 0) + 1;
+      });
+      (licensesRes.data || []).forEach(l => {
+        licenseCounts[l.product_id] = (licenseCounts[l.product_id] || 0) + 1;
+      });
+      (serversRes.data || []).forEach(s => {
+        if (s.product_id) serverCounts[s.product_id] = (serverCounts[s.product_id] || 0) + 1;
+      });
+      (healthRes.data || []).forEach(h => {
+        healthStatuses[h.product_id] = h.overall_status || 'unknown';
+      });
+
+      // Merge counts into products
+      const enrichedProducts = productsData.map(p => ({
+        ...p,
+        demo_count: demoCounts[p.id] || 0,
+        apk_count: apkCounts[p.id] || 0,
+        license_count: licenseCounts[p.id] || 0,
+        server_count: serverCounts[p.id] || 0,
+        health_status: healthStatuses[p.id] || 'ok',
+      })) as Product[];
+
+      setProducts(enrichedProducts);
+    } catch (error) {
+      console.error('Error fetching products:', error);
       toast.error('Failed to fetch products');
-      console.error(error);
-    } else {
-      setProducts((data || []) as Product[]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  };
+  }, []);
 
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     const { data, error } = await supabase
       .from('categories')
       .select('*')
@@ -66,7 +131,7 @@ export function useProducts() {
     } else {
       setCategories((data || []) as Category[]);
     }
-  };
+  }, []);
 
   const createProduct = async (product: Partial<Product>) => {
     const { data: userData } = await supabase.auth.getUser();
@@ -101,13 +166,13 @@ export function useProducts() {
       throw error;
     }
     toast.success('Product created');
-    await fetchProducts();
+    // Real-time will handle the refresh
     return data;
   };
 
   const updateProduct = async (id: string, updates: Partial<Product>) => {
     // Remove fields that shouldn't be updated directly
-    const { id: _, product_code: __, created_at: ___, ...safeUpdates } = updates as any;
+    const { id: _, product_code: __, created_at: ___, demo_count: ____, apk_count: _____, license_count: ______, server_count: _______, health_status: ________, ...safeUpdates } = updates as any;
     
     const { error } = await supabase
       .from('products')
@@ -119,7 +184,7 @@ export function useProducts() {
       throw error;
     }
     toast.success('Product updated');
-    await fetchProducts();
+    // Real-time will handle the refresh
   };
 
   const deleteProduct = async (id: string) => {
@@ -133,7 +198,7 @@ export function useProducts() {
       throw error;
     }
     toast.success('Product deleted');
-    await fetchProducts();
+    // Real-time will handle the refresh
   };
 
   const suspendProduct = async (id: string) => {
@@ -147,7 +212,34 @@ export function useProducts() {
   useEffect(() => {
     fetchProducts();
     fetchCategories();
-  }, []);
+
+    // Real-time subscription for live updates
+    const channel = supabase
+      .channel('products-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+        fetchProducts();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'demos' }, () => {
+        fetchProducts(); // Refresh to update demo counts
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'apks' }, () => {
+        fetchProducts(); // Refresh to update APK counts
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'license_keys' }, () => {
+        fetchProducts(); // Refresh to update license counts
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'servers' }, () => {
+        fetchProducts(); // Refresh to update server counts
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'health_checks' }, () => {
+        fetchProducts(); // Refresh to update health status
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchProducts, fetchCategories]);
 
   return {
     products,
