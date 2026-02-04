@@ -6,7 +6,7 @@ import { ChatInput } from '@/components/ai-chat/ChatInput';
 import { EmptyState } from '@/components/ai-chat/EmptyState';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { cn } from '@/lib/utils';
+
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 
@@ -368,21 +368,26 @@ export default function AiChat() {
             <EmptyState onSuggestionClick={handleSuggestionClick} />
           ) : (
             <div className="pb-4">
-              {activeSession.messages.map((message) => (
-                <ChatMessage key={message.id} message={message} />
+              {activeSession.messages.map((message, index) => (
+                <ChatMessage key={message.id} message={message} index={index} />
               ))}
               {isLoading && activeSession.messages[activeSession.messages.length - 1]?.role === 'user' && (
-                <div className="py-6 px-4 md:px-6 bg-muted/20">
+                <div className="py-6 px-4 md:px-6 bg-muted/10">
                   <div className="max-w-3xl mx-auto flex gap-4">
-                    <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                    <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary/20 to-orange-500/20 flex items-center justify-center shrink-0 ring-2 ring-primary/30 ring-offset-2 ring-offset-background">
                       <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                     </div>
                     <div className="flex-1">
-                      <div className="text-sm font-semibold text-foreground mb-2">SaaS VALA AI</div>
-                      <div className="flex gap-1.5">
-                        <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                        <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                        <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-sm font-semibold text-primary">SaaS VALA AI</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium animate-pulse">
+                          thinking...
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        <span className="w-2.5 h-2.5 bg-gradient-to-br from-primary to-orange-400 rounded-full animate-bounce shadow-lg shadow-primary/30" style={{ animationDelay: '0ms' }} />
+                        <span className="w-2.5 h-2.5 bg-gradient-to-br from-primary to-orange-400 rounded-full animate-bounce shadow-lg shadow-primary/30" style={{ animationDelay: '150ms' }} />
+                        <span className="w-2.5 h-2.5 bg-gradient-to-br from-primary to-orange-400 rounded-full animate-bounce shadow-lg shadow-primary/30" style={{ animationDelay: '300ms' }} />
                       </div>
                     </div>
                   </div>
