@@ -7,7 +7,6 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import {
   User,
   Shield,
@@ -26,6 +25,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { toast } from 'sonner';
+import { DeviceBindingCard } from '@/components/settings/DeviceBindingCard';
 
 export default function Settings() {
   const { user, isSuperAdmin, signOut } = useAuth();
@@ -186,6 +186,9 @@ export default function Settings() {
 
           {/* Security Tab */}
           <TabsContent value="security" className="mt-6 space-y-6">
+            {/* Device Binding Card */}
+            <DeviceBindingCard />
+
             <Card className="glass-card">
               <CardHeader>
                 <CardTitle className="text-foreground">Two-Factor Authentication</CardTitle>

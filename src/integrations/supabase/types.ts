@@ -767,6 +767,48 @@ export type Database = {
         }
         Relationships: []
       }
+      user_sessions: {
+        Row: {
+          browser: string | null
+          created_at: string
+          device_name: string | null
+          device_type: string | null
+          id: string
+          ip_address: string | null
+          is_current: boolean | null
+          last_active_at: string | null
+          location: string | null
+          os: string | null
+          user_id: string
+        }
+        Insert: {
+          browser?: string | null
+          created_at?: string
+          device_name?: string | null
+          device_type?: string | null
+          id?: string
+          ip_address?: string | null
+          is_current?: boolean | null
+          last_active_at?: string | null
+          location?: string | null
+          os?: string | null
+          user_id: string
+        }
+        Update: {
+          browser?: string | null
+          created_at?: string
+          device_name?: string | null
+          device_type?: string | null
+          id?: string
+          ip_address?: string | null
+          is_current?: boolean | null
+          last_active_at?: string | null
+          location?: string | null
+          os?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       wallets: {
         Row: {
           balance: number | null
