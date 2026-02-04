@@ -34,21 +34,33 @@ export function useLeads() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [seoData, setSeoData] = useState<SeoData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
 
-  const fetchLeads = async () => {
+  const fetchLeads = async (page = 1, limit = 25, search = '') => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('leads')
-      .select('*')
-      .order('created_at', { ascending: false });
+    try {
+      let query = supabase
+        .from('leads')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range((page - 1) * limit, page * limit - 1);
 
-    if (error) {
-      toast.error('Failed to fetch leads');
-      console.error(error);
-    } else {
-      setLeads((data || []) as Lead[]);
+      if (search) {
+        query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,company.ilike.%${search}%`);
+      }
+
+      const { data, error, count } = await query;
+
+      if (error) {
+        toast.error('Failed to fetch leads');
+        console.error(error);
+      } else {
+        setLeads((data || []) as Lead[]);
+        setTotal(count || 0);
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const fetchSeoData = async () => {
@@ -126,6 +138,17 @@ export function useLeads() {
     });
   };
 
+  const markContacted = async (id: string) => {
+    await updateLead(id, { status: 'contacted' });
+  };
+
+  const markConverted = async (id: string) => {
+    await updateLead(id, { 
+      status: 'converted', 
+      converted_at: new Date().toISOString() 
+    });
+  };
+
   const createSeoEntry = async (seo: Partial<SeoData>) => {
     const { data, error } = await supabase
       .from('seo_data')
@@ -187,12 +210,15 @@ export function useLeads() {
     leads,
     seoData,
     loading,
+    total,
     fetchLeads,
     fetchSeoData,
     createLead,
     updateLead,
     deleteLead,
     convertLead,
+    markContacted,
+    markConverted,
     createSeoEntry,
     updateSeoEntry,
     deleteSeoEntry

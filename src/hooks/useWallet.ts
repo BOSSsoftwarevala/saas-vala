@@ -29,6 +29,7 @@ export function useWallet() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [allWallets, setAllWallets] = useState<Wallet[]>([]);
   const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
 
   const fetchWallet = async () => {
     setLoading(true);
@@ -66,20 +67,21 @@ export function useWallet() {
     }
   };
 
-  const fetchTransactions = async (walletId?: string) => {
-    if (!walletId && !wallet) return;
+  const fetchTransactions = async (page = 1, limit = 25) => {
+    if (!wallet) return;
     
-    const { data, error } = await supabase
+    const { data, error, count } = await supabase
       .from('transactions')
-      .select('*')
-      .eq('wallet_id', walletId || wallet!.id)
+      .select('*', { count: 'exact' })
+      .eq('wallet_id', wallet.id)
       .order('created_at', { ascending: false })
-      .limit(100);
+      .range((page - 1) * limit, page * limit - 1);
 
     if (error) {
       console.error(error);
     } else {
-      setTransactions(data || []);
+      setTransactions((data || []) as Transaction[]);
+      setTotal(count || 0);
     }
   };
 
@@ -191,6 +193,7 @@ export function useWallet() {
     transactions,
     allWallets,
     loading,
+    total,
     fetchWallet,
     fetchTransactions,
     fetchAllWallets,

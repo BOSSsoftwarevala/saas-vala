@@ -19,36 +19,53 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   FileText,
-  Download,
   Search,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useWallet } from '@/hooks/useWallet';
+import { PaginationControls } from '@/components/ui/pagination-controls';
 
-// Mock data
-const mockTransactions = [
-  { id: '1', type: 'credit', description: 'Added credits', amount: 500, date: '2024-02-15', status: 'completed' },
-  { id: '2', type: 'debit', description: 'License renewal - Enterprise CRM', amount: -299, date: '2024-02-14', status: 'completed' },
-  { id: '3', type: 'debit', description: 'AI API usage', amount: -47.50, date: '2024-02-13', status: 'completed' },
-  { id: '4', type: 'credit', description: 'Refund - Duplicate charge', amount: 149, date: '2024-02-12', status: 'completed' },
-  { id: '5', type: 'debit', description: 'Server deployment', amount: -25, date: '2024-02-11', status: 'pending' },
-];
+const ITEMS_PER_PAGE = 25;
 
-const mockInvoices = [
-  { id: 'INV-001', customer: 'Acme Corp', amount: 299, date: '2024-02-15', status: 'paid' },
-  { id: 'INV-002', customer: 'TechStore Inc', amount: 149, date: '2024-02-14', status: 'paid' },
-  { id: 'INV-003', customer: 'GlobalTech', amount: 498, date: '2024-02-13', status: 'pending' },
-  { id: 'INV-004', customer: 'RetailHub', amount: 99, date: '2024-02-10', status: 'overdue' },
-];
-
-const invoiceStatusStyles = {
-  paid: 'bg-success/20 text-success border-success/30',
+const transactionStatusStyles = {
+  completed: 'bg-success/20 text-success border-success/30',
   pending: 'bg-warning/20 text-warning border-warning/30',
-  overdue: 'bg-destructive/20 text-destructive border-destructive/30',
+  failed: 'bg-destructive/20 text-destructive border-destructive/30',
+  cancelled: 'bg-muted text-muted-foreground border-muted-foreground/30',
 };
 
 export default function Wallet() {
+  const { wallet, transactions, loading, total, fetchTransactions } = useWallet();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('transactions');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
+
+  const filteredTransactions = transactions.filter(
+    (tx) =>
+      tx.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      tx.type.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Calculate stats
+  const thisMonthCredits = transactions
+    .filter(t => t.type === 'credit' && t.status === 'completed')
+    .reduce((sum, t) => sum + t.amount, 0);
+  
+  const thisMonthDebits = transactions
+    .filter(t => t.type === 'debit' && t.status === 'completed')
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+  const pendingAmount = transactions
+    .filter(t => t.status === 'pending')
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    fetchTransactions(page, ITEMS_PER_PAGE);
+  };
 
   return (
     <DashboardLayout>
@@ -83,10 +100,16 @@ export default function Wallet() {
                   <WalletIcon className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <p className="text-3xl font-bold font-display text-foreground">$2,847.50</p>
+                  <p className="text-3xl font-bold font-display text-foreground">
+                    {loading ? (
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    ) : (
+                      `₹${(wallet?.balance || 0).toLocaleString()}`
+                    )}
+                  </p>
                   <p className="text-sm text-success flex items-center gap-1">
                     <ArrowUpRight className="h-4 w-4" />
-                    +$500 this month
+                    +₹{thisMonthCredits.toLocaleString()} this month
                   </p>
                 </div>
               </div>
@@ -105,8 +128,10 @@ export default function Wallet() {
                   <ArrowDownRight className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <p className="text-3xl font-bold font-display text-foreground">$421.50</p>
-                  <p className="text-sm text-muted-foreground">8 transactions</p>
+                  <p className="text-3xl font-bold font-display text-foreground">
+                    ₹{thisMonthDebits.toLocaleString()}
+                  </p>
+                  <p className="text-sm text-muted-foreground">{transactions.filter(t => t.type === 'debit').length} transactions</p>
                 </div>
               </div>
             </CardContent>
@@ -115,7 +140,7 @@ export default function Wallet() {
           <Card className="glass-card-hover">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-muted-foreground font-normal">
-                Pending Invoices
+                Pending Transactions
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -124,8 +149,8 @@ export default function Wallet() {
                   <FileText className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <p className="text-3xl font-bold font-display text-foreground">$597</p>
-                  <p className="text-sm text-warning">2 pending</p>
+                  <p className="text-3xl font-bold font-display text-foreground">₹{pendingAmount.toLocaleString()}</p>
+                  <p className="text-sm text-warning">{transactions.filter(t => t.status === 'pending').length} pending</p>
                 </div>
               </div>
             </CardContent>
@@ -163,105 +188,98 @@ export default function Wallet() {
           {/* Transactions Tab */}
           <TabsContent value="transactions" className="mt-6">
             <div className="glass-card rounded-xl overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-border hover:bg-muted/50">
-                    <TableHead className="text-muted-foreground">Description</TableHead>
-                    <TableHead className="text-muted-foreground">Date</TableHead>
-                    <TableHead className="text-muted-foreground">Status</TableHead>
-                    <TableHead className="text-muted-foreground text-right">Amount</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {mockTransactions.map((tx) => (
-                    <TableRow key={tx.id} className="border-border hover:bg-muted/30">
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div
+              {loading ? (
+                <div className="flex items-center justify-center p-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : filteredTransactions.length === 0 ? (
+                <div className="flex flex-col items-center justify-center p-12 text-center">
+                  <WalletIcon className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="font-semibold text-foreground mb-2">No transactions found</h3>
+                  <p className="text-muted-foreground">Your transaction history will appear here</p>
+                </div>
+              ) : (
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-border hover:bg-muted/50">
+                        <TableHead className="text-muted-foreground">Description</TableHead>
+                        <TableHead className="text-muted-foreground">Type</TableHead>
+                        <TableHead className="text-muted-foreground">Date</TableHead>
+                        <TableHead className="text-muted-foreground">Status</TableHead>
+                        <TableHead className="text-muted-foreground text-right">Amount</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredTransactions.map((tx) => (
+                        <TableRow key={tx.id} className="border-border hover:bg-muted/30">
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <div
+                                className={cn(
+                                  'h-8 w-8 rounded-lg flex items-center justify-center',
+                                  tx.type === 'credit' || tx.type === 'refund' ? 'bg-success/20' : 'bg-muted'
+                                )}
+                              >
+                                {tx.type === 'credit' || tx.type === 'refund' ? (
+                                  <ArrowUpRight className="h-4 w-4 text-success" />
+                                ) : (
+                                  <ArrowDownRight className="h-4 w-4 text-muted-foreground" />
+                                )}
+                              </div>
+                              <span className="text-foreground">{tx.description || 'Transaction'}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="capitalize">
+                              {tx.type}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {new Date(tx.created_at).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={cn(transactionStatusStyles[tx.status])}
+                            >
+                              {tx.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell
                             className={cn(
-                              'h-8 w-8 rounded-lg flex items-center justify-center',
-                              tx.type === 'credit' ? 'bg-success/20' : 'bg-muted'
+                              'text-right font-semibold',
+                              tx.type === 'credit' || tx.type === 'refund' ? 'text-success' : 'text-foreground'
                             )}
                           >
-                            {tx.type === 'credit' ? (
-                              <ArrowUpRight className="h-4 w-4 text-success" />
-                            ) : (
-                              <ArrowDownRight className="h-4 w-4 text-muted-foreground" />
-                            )}
-                          </div>
-                          <span className="text-foreground">{tx.description}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{tx.date}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            tx.status === 'completed'
-                              ? 'bg-success/20 text-success border-success/30'
-                              : 'bg-warning/20 text-warning border-warning/30'
-                          )}
-                        >
-                          {tx.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell
-                        className={cn(
-                          'text-right font-semibold',
-                          tx.amount > 0 ? 'text-success' : 'text-foreground'
-                        )}
-                      >
-                        {tx.amount > 0 ? '+' : ''}${Math.abs(tx.amount).toFixed(2)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                            {tx.type === 'credit' || tx.type === 'refund' ? '+' : '-'}₹{Math.abs(tx.amount).toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  <PaginationControls
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    totalItems={total}
+                    itemsPerPage={ITEMS_PER_PAGE}
+                    onPageChange={handlePageChange}
+                  />
+                </>
+              )}
             </div>
           </TabsContent>
 
           {/* Invoices Tab */}
           <TabsContent value="invoices" className="mt-6">
-            <div className="glass-card rounded-xl overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-border hover:bg-muted/50">
-                    <TableHead className="text-muted-foreground">Invoice</TableHead>
-                    <TableHead className="text-muted-foreground">Customer</TableHead>
-                    <TableHead className="text-muted-foreground">Date</TableHead>
-                    <TableHead className="text-muted-foreground">Status</TableHead>
-                    <TableHead className="text-muted-foreground text-right">Amount</TableHead>
-                    <TableHead className="text-muted-foreground text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {mockInvoices.map((invoice) => (
-                    <TableRow key={invoice.id} className="border-border hover:bg-muted/30">
-                      <TableCell>
-                        <code className="text-sm font-mono text-primary">{invoice.id}</code>
-                      </TableCell>
-                      <TableCell className="text-foreground">{invoice.customer}</TableCell>
-                      <TableCell className="text-muted-foreground">{invoice.date}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={invoiceStatusStyles[invoice.status as keyof typeof invoiceStatusStyles]}
-                        >
-                          {invoice.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-semibold text-foreground">
-                        ${invoice.amount.toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <Download className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            <div className="glass-card rounded-xl p-12 text-center">
+              <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="font-display text-lg font-bold text-foreground mb-2">
+                Invoices Coming Soon
+              </h3>
+              <p className="text-muted-foreground mb-4">
+                Invoice management will be available shortly
+              </p>
             </div>
           </TabsContent>
 

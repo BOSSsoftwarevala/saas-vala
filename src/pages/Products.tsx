@@ -51,6 +51,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useProducts, type Product } from '@/hooks/useProducts';
+import { PaginationControls } from '@/components/ui/pagination-controls';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -224,82 +225,93 @@ export default function Products() {
               </Button>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="border-border hover:bg-muted/50">
-                  <TableHead className="text-muted-foreground">Name</TableHead>
-                  <TableHead className="text-muted-foreground">Price</TableHead>
-                  <TableHead className="text-muted-foreground">Status</TableHead>
-                  <TableHead className="text-muted-foreground">Version</TableHead>
-                  <TableHead className="text-muted-foreground">Created</TableHead>
-                  <TableHead className="text-muted-foreground text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredProducts.map((product) => (
-                  <TableRow key={product.id} className="border-border hover:bg-muted/30">
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
-                          <Package className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                        <div>
-                          <span className="font-medium text-foreground">{product.name}</span>
-                          <p className="text-xs text-muted-foreground">{product.slug}</p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {product.price > 0 ? (
-                        <span className="font-semibold text-primary">₹{product.price}</span>
-                      ) : (
-                        <span className="text-muted-foreground">Free</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={cn('capitalize', statusStyles[product.status])}>
-                        {product.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-muted-foreground font-mono text-sm">{product.version}</span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-muted-foreground">{new Date(product.created_at).toLocaleDateString()}</span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-popover border-border">
-                          <DropdownMenuItem className="gap-2 cursor-pointer">
-                            <Eye className="h-4 w-4" /> View
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => openEditDialog(product)}>
-                            <Edit className="h-4 w-4" /> Edit
-                          </DropdownMenuItem>
-                          {product.status === 'suspended' ? (
-                            <DropdownMenuItem className="gap-2 cursor-pointer text-success" onClick={() => activateProduct(product.id)}>
-                              <Play className="h-4 w-4" /> Activate
-                            </DropdownMenuItem>
-                          ) : (
-                            <DropdownMenuItem className="gap-2 cursor-pointer text-warning" onClick={() => suspendProduct(product.id)}>
-                              <Ban className="h-4 w-4" /> Suspend
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem className="gap-2 cursor-pointer text-destructive" onClick={() => setDeleteId(product.id)}>
-                            <Trash2 className="h-4 w-4" /> Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border hover:bg-muted/50">
+                    <TableHead className="text-muted-foreground">Name</TableHead>
+                    <TableHead className="text-muted-foreground">Price</TableHead>
+                    <TableHead className="text-muted-foreground">Status</TableHead>
+                    <TableHead className="text-muted-foreground">Version</TableHead>
+                    <TableHead className="text-muted-foreground">Created</TableHead>
+                    <TableHead className="text-muted-foreground text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredProducts.map((product) => (
+                    <TableRow key={product.id} className="border-border hover:bg-muted/30">
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                            <Package className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                          <div>
+                            <span className="font-medium text-foreground">{product.name}</span>
+                            <p className="text-xs text-muted-foreground">{product.slug}</p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {product.price > 0 ? (
+                          <span className="font-semibold text-primary">₹{product.price}</span>
+                        ) : (
+                          <span className="text-muted-foreground">Free</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={cn('capitalize', statusStyles[product.status])}>
+                          {product.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-muted-foreground font-mono text-sm">{product.version}</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-muted-foreground">{new Date(product.created_at).toLocaleDateString()}</span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="bg-popover border-border">
+                            <DropdownMenuItem className="gap-2 cursor-pointer">
+                              <Eye className="h-4 w-4" /> View
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => openEditDialog(product)}>
+                              <Edit className="h-4 w-4" /> Edit
+                            </DropdownMenuItem>
+                            {product.status === 'suspended' ? (
+                              <DropdownMenuItem className="gap-2 cursor-pointer text-success" onClick={() => activateProduct(product.id)}>
+                                <Play className="h-4 w-4" /> Activate
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem className="gap-2 cursor-pointer text-warning" onClick={() => suspendProduct(product.id)}>
+                                <Ban className="h-4 w-4" /> Suspend
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem className="gap-2 cursor-pointer text-destructive" onClick={() => setDeleteId(product.id)}>
+                              <Trash2 className="h-4 w-4" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              {products.length > 25 && (
+                <PaginationControls
+                  currentPage={1}
+                  totalPages={Math.ceil(products.length / 25)}
+                  totalItems={products.length}
+                  itemsPerPage={25}
+                  onPageChange={() => {}}
+                />
+              )}
+            </>
           )}
         </div>
       </div>

@@ -17,6 +17,7 @@ import SaasAiDashboard from "./pages/SaasAiDashboard";
 import AiApis from "./pages/AiApis";
 import Wallet from "./pages/Wallet";
 import SeoLeads from "./pages/SeoLeads";
+import Resellers from "./pages/Resellers";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -136,6 +137,16 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <SeoLeads />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/resellers"
+        element={
+          <ProtectedRoute>
+            <AdminRoute>
+              <Resellers />
+            </AdminRoute>
           </ProtectedRoute>
         }
       />
