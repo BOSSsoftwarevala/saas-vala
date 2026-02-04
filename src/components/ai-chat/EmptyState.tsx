@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { motion, Variants } from 'framer-motion';
 import saasValaLogo from '@/assets/saas-vala-logo.jpg';
+import { DeveloperAnimation } from './DeveloperAnimation';
 
 interface EmptyStateProps {
   onSuggestionClick: (suggestion: string) => void;
@@ -162,6 +163,16 @@ export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
             No Developer Required
           </span>
         </motion.div>
+      </motion.div>
+
+      {/* Developer Animation */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="w-full max-w-3xl mb-8 relative z-10"
+      >
+        <DeveloperAnimation />
       </motion.div>
 
       {/* Capabilities Grid */}
