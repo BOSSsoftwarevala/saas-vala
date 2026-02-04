@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { ChatSidebar } from '@/components/ai-chat/ChatSidebar';
 import { ChatHeader } from '@/components/ai-chat/ChatHeader';
-import { ChatMessage, Message } from '@/components/ai-chat/ChatMessage';
+import { ChatMessage, Message, FileAttachment } from '@/components/ai-chat/ChatMessage';
 import { ChatInput } from '@/components/ai-chat/ChatInput';
 import { EmptyState } from '@/components/ai-chat/EmptyState';
 import { toast } from 'sonner';
@@ -16,6 +16,17 @@ interface ChatSession {
   createdAt: Date;
   messages: Message[];
 }
+
+const getFileType = (file: File): FileAttachment['type'] => {
+  const ext = file.name.split('.').pop()?.toLowerCase() || '';
+  const codeExts = ['js', 'ts', 'tsx', 'jsx', 'py', 'php', 'html', 'css', 'json', 'xml', 'md', 'txt'];
+  const archiveExts = ['zip', 'rar', '7z', 'tar', 'gz'];
+  
+  if (file.type.startsWith('image/')) return 'image';
+  if (codeExts.includes(ext)) return 'code';
+  if (archiveExts.includes(ext)) return 'archive';
+  return 'other';
+};
 
 export default function AiChat() {
   const [sessions, setSessions] = useState<ChatSession[]>(() => {
@@ -179,16 +190,19 @@ export default function AiChat() {
     onDone();
   }, []);
 
-  const handleSend = async (content: string) => {
-    if (!content.trim() || isLoading) return;
+  const handleSend = async (content: string, files?: File[]) => {
+    if ((!content.trim() && (!files || files.length === 0)) || isLoading) return;
 
     let sessionId = activeSessionId;
     
     // Create new session if none active
     if (!sessionId) {
+      const title = content.trim() 
+        ? content.slice(0, 40) + (content.length > 40 ? '...' : '')
+        : `${files?.length || 0} file(s) uploaded`;
       const newSession: ChatSession = {
         id: crypto.randomUUID(),
-        title: content.slice(0, 40) + (content.length > 40 ? '...' : ''),
+        title,
         createdAt: new Date(),
         messages: []
       };
@@ -197,19 +211,41 @@ export default function AiChat() {
       setActiveSessionId(sessionId);
     }
 
+    // Convert files to attachments
+    const fileAttachments: FileAttachment[] = files?.map(file => ({
+      name: file.name,
+      size: file.size,
+      type: getFileType(file),
+      preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined
+    })) || [];
+
+    // Build message content including file info
+    let messageContent = content;
+    if (files && files.length > 0) {
+      const fileNames = files.map(f => f.name).join(', ');
+      if (content.trim()) {
+        messageContent = `${content}\n\n[Attached files: ${fileNames}]`;
+      } else {
+        messageContent = `[Uploaded files: ${fileNames}]`;
+      }
+    }
+
     // Add user message
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: 'user',
-      content,
-      timestamp: new Date()
+      content: messageContent,
+      timestamp: new Date(),
+      files: fileAttachments.length > 0 ? fileAttachments : undefined
     };
 
     setSessions(prev => prev.map(s => {
       if (s.id === sessionId) {
         const updatedMessages = [...s.messages, userMessage];
         const title = s.messages.length === 0 
-          ? content.slice(0, 40) + (content.length > 40 ? '...' : '')
+          ? (content.trim() 
+              ? content.slice(0, 40) + (content.length > 40 ? '...' : '')
+              : `${files?.length || 0} file(s) uploaded`)
           : s.title;
         return { ...s, messages: updatedMessages, title };
       }

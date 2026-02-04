@@ -2,19 +2,36 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { User, Sparkles, Copy, Check, ThumbsUp, ThumbsDown, RotateCcw } from 'lucide-react';
+import { User, Sparkles, Copy, Check, ThumbsUp, ThumbsDown, RotateCcw, FileCode, FileArchive, File, Image } from 'lucide-react';
 import { toast } from 'sonner';
+
+export interface FileAttachment {
+  name: string;
+  size: number;
+  type: 'image' | 'code' | 'archive' | 'other';
+  preview?: string;
+}
 
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  files?: FileAttachment[];
 }
 
 interface ChatMessageProps {
   message: Message;
 }
+
+const getFileIcon = (type: FileAttachment['type']) => {
+  switch (type) {
+    case 'image': return Image;
+    case 'code': return FileCode;
+    case 'archive': return FileArchive;
+    default: return File;
+  }
+};
 
 export function ChatMessage({ message }: ChatMessageProps) {
   const [copied, setCopied] = useState(false);
@@ -29,6 +46,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
   // Simple markdown-like rendering for code blocks
   const renderContent = (content: string) => {
+    if (!content) return null;
+    
     const parts = content.split(/(```[\s\S]*?```)/g);
     
     return parts.map((part, index) => {
@@ -86,6 +105,12 @@ export function ChatMessage({ message }: ChatMessageProps) {
     });
   };
 
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   return (
     <div
       className={cn(
@@ -120,13 +145,48 @@ export function ChatMessage({ message }: ChatMessageProps) {
             </span>
           </div>
 
+          {/* File Attachments */}
+          {message.files && message.files.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-2">
+              {message.files.map((file, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-2 bg-muted/50 border border-border rounded-lg p-2 max-w-[200px]"
+                >
+                  {file.type === 'image' && file.preview ? (
+                    <img
+                      src={file.preview}
+                      alt={file.name}
+                      className="h-10 w-10 rounded object-cover"
+                    />
+                  ) : (
+                    <div className="h-10 w-10 rounded bg-muted flex items-center justify-center shrink-0">
+                      {(() => {
+                        const Icon = getFileIcon(file.type);
+                        return <Icon className="h-5 w-5 text-muted-foreground" />;
+                      })()}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium truncate">{file.name}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {formatFileSize(file.size)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Message Content */}
-          <div className="text-[15px] text-foreground leading-relaxed whitespace-pre-wrap">
-            {renderContent(message.content)}
-          </div>
+          {message.content && (
+            <div className="text-[15px] text-foreground leading-relaxed whitespace-pre-wrap">
+              {renderContent(message.content)}
+            </div>
+          )}
 
           {/* Actions - Only for assistant messages */}
-          {!isUser && (
+          {!isUser && message.content && (
             <div className="flex items-center gap-1 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <Button
                 variant="ghost"
