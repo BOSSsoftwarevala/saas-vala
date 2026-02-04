@@ -119,93 +119,95 @@ export default function Marketplace() {
       </footer>
 
       {/* Payment Dialog */}
-      <Dialog open={showPayment} onOpenChange={setShowPayment}>
-        <DialogContent className="sm:max-w-md">
-          {!paymentSuccess ? (
-            <>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <CreditCard className="h-5 w-5 text-primary" />
-                  Complete Purchase
-                </DialogTitle>
-                <DialogDescription>
-                  You're about to purchase {selectedProduct?.title}
-                </DialogDescription>
-              </DialogHeader>
+      {showPayment && (
+        <Dialog open={showPayment} onOpenChange={setShowPayment}>
+          <DialogContent className="sm:max-w-md">
+            {!paymentSuccess ? (
+              <div className="space-y-4">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <CreditCard className="h-5 w-5 text-primary" />
+                    Complete Purchase
+                  </DialogTitle>
+                  <DialogDescription>
+                    You're about to purchase {selectedProduct?.title}
+                  </DialogDescription>
+                </DialogHeader>
 
-              <div className="space-y-4 py-4">
-                {/* Product Summary */}
-                <div className="flex gap-4 p-4 bg-muted/50 rounded-lg">
-                  <img
-                    src={selectedProduct?.image}
-                    alt={selectedProduct?.title}
-                    className="w-20 h-20 rounded-lg object-cover"
-                  />
+                <div className="space-y-4 py-4">
+                  {/* Product Summary */}
+                  <div className="flex gap-4 p-4 bg-muted/50 rounded-lg">
+                    <img
+                      src={selectedProduct?.image}
+                      alt={selectedProduct?.title}
+                      className="w-20 h-20 rounded-lg object-cover"
+                    />
+                    <div>
+                      <h3 className="font-semibold">{selectedProduct?.title}</h3>
+                      <p className="text-sm text-muted-foreground">{selectedProduct?.subtitle}</p>
+                      <p className="text-lg font-bold text-primary mt-1">
+                        ₹{selectedProduct?.price.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Payment Options */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Pay using:</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button variant="outline" size="sm">Wallet Balance</Button>
+                      <Button variant="outline" size="sm">UPI</Button>
+                      <Button variant="outline" size="sm">Card</Button>
+                      <Button variant="outline" size="sm">Net Banking</Button>
+                    </div>
+                  </div>
+
+                  <Button 
+                    className="w-full gap-2" 
+                    onClick={handlePayment}
+                    disabled={processing}
+                  >
+                    {processing ? (
+                      <>Processing...</>
+                    ) : (
+                      <>
+                        <ShoppingCart className="h-4 w-4" />
+                        Pay ₹{selectedProduct?.price.toLocaleString()}
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2 text-success">
+                    <CheckCircle2 className="h-5 w-5" />
+                    Payment Successful!
+                  </DialogTitle>
+                </DialogHeader>
+
+                <div className="space-y-4 py-4 text-center">
+                  <div className="w-16 h-16 rounded-full bg-success/20 flex items-center justify-center mx-auto">
+                    <CheckCircle2 className="h-8 w-8 text-success" />
+                  </div>
                   <div>
-                    <h3 className="font-semibold">{selectedProduct?.title}</h3>
-                    <p className="text-sm text-muted-foreground">{selectedProduct?.subtitle}</p>
-                    <p className="text-lg font-bold text-primary mt-1">
-                      ₹{selectedProduct?.price.toLocaleString()}
-                    </p>
+                    <h3 className="font-semibold text-lg">{selectedProduct?.title}</h3>
+                    <p className="text-sm text-muted-foreground">License automatically activated</p>
                   </div>
+                  <Button className="w-full gap-2">
+                    <Download className="h-4 w-4" />
+                    Download Now
+                  </Button>
+                  <Button variant="outline" className="w-full" onClick={() => setShowPayment(false)}>
+                    Continue Shopping
+                  </Button>
                 </div>
-
-                {/* Payment Options */}
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Pay using:</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button variant="outline" size="sm">Wallet Balance</Button>
-                    <Button variant="outline" size="sm">UPI</Button>
-                    <Button variant="outline" size="sm">Card</Button>
-                    <Button variant="outline" size="sm">Net Banking</Button>
-                  </div>
-                </div>
-
-                <Button 
-                  className="w-full gap-2" 
-                  onClick={handlePayment}
-                  disabled={processing}
-                >
-                  {processing ? (
-                    <>Processing...</>
-                  ) : (
-                    <>
-                      <ShoppingCart className="h-4 w-4" />
-                      Pay ₹{selectedProduct?.price.toLocaleString()}
-                    </>
-                  )}
-                </Button>
               </div>
-            </>
-          ) : (
-            <>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2 text-success">
-                  <CheckCircle2 className="h-5 w-5" />
-                  Payment Successful!
-                </DialogTitle>
-              </DialogHeader>
-
-              <div className="space-y-4 py-4 text-center">
-                <div className="w-16 h-16 rounded-full bg-success/20 flex items-center justify-center mx-auto">
-                  <CheckCircle2 className="h-8 w-8 text-success" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg">{selectedProduct?.title}</h3>
-                  <p className="text-sm text-muted-foreground">License automatically activated</p>
-                </div>
-                <Button className="w-full gap-2">
-                  <Download className="h-4 w-4" />
-                  Download Now
-                </Button>
-                <Button variant="outline" className="w-full" onClick={() => setShowPayment(false)}>
-                  Continue Shopping
-                </Button>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
