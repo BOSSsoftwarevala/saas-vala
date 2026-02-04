@@ -1,1 +1,4 @@
 project_id = "astmdnelnuqwpdbyzecr"
+
+[functions.github-oauth]
+verify_jwt = false
