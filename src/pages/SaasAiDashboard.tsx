@@ -10,7 +10,6 @@ import {
   Globe, 
   Rocket,
   Activity,
-  Sparkles,
   MessageSquare
 } from 'lucide-react';
 import { GitConnectPanel } from '@/components/saas-ai-dashboard/GitConnectPanel';
@@ -20,6 +19,7 @@ import { DomainsPanel } from '@/components/saas-ai-dashboard/DomainsPanel';
 import { DeploymentsPanel } from '@/components/saas-ai-dashboard/DeploymentsPanel';
 import { HealthPanel } from '@/components/saas-ai-dashboard/HealthPanel';
 import { ProjectSelector } from '@/components/saas-ai-dashboard/ProjectSelector';
+import saasValaLogo from '@/assets/saas-vala-logo.jpg';
 
 export default function SaasAiDashboard() {
   const navigate = useNavigate();
@@ -41,9 +41,7 @@ export default function SaasAiDashboard() {
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-primary/20 flex items-center justify-center">
-                <Sparkles className="h-5 w-5 text-primary" />
-              </div>
+              <img src={saasValaLogo} alt="SaaS VALA" className="h-10 w-10 rounded-xl object-cover" />
               <div>
                 <h1 className="font-display font-bold text-foreground">SaaS AI Dashboard</h1>
                 <p className="text-xs text-muted-foreground">

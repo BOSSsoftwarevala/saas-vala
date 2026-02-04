@@ -14,10 +14,10 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  Shield,
   LogOut,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import saasValaLogo from '@/assets/saas-vala-logo.jpg';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface NavItem {
@@ -60,18 +60,14 @@ export function Sidebar() {
         <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
           {!collapsed && (
             <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-orange-gradient flex items-center justify-center">
-                <Shield className="h-4 w-4 text-white" />
-              </div>
+              <img src={saasValaLogo} alt="SaaS VALA" className="h-8 w-8 rounded-lg object-cover" />
               <span className="font-display text-lg font-bold text-foreground">
                 SaaS VALA
               </span>
             </div>
           )}
           {collapsed && (
-            <div className="mx-auto h-8 w-8 rounded-lg bg-orange-gradient flex items-center justify-center">
-              <Shield className="h-4 w-4 text-white" />
-            </div>
+            <img src={saasValaLogo} alt="SaaS VALA" className="mx-auto h-8 w-8 rounded-lg object-cover" />
           )}
         </div>
 

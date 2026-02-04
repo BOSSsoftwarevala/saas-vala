@@ -1,6 +1,7 @@
-import { Sparkles, Upload, Server, Wrench, Zap, Shield, Code, LayoutDashboard } from 'lucide-react';
+import { Upload, Server, Wrench, Zap, Shield, Code, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
+import saasValaLogo from '@/assets/saas-vala-logo.jpg';
 
 interface EmptyStateProps {
   onSuggestionClick: (suggestion: string) => void;
@@ -52,9 +53,11 @@ export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
     <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-8 min-h-[calc(100vh-8rem)]">
       {/* Logo & Title */}
       <div className="mb-8 text-center">
-        <div className="inline-flex items-center justify-center w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-transparent mb-6 border border-primary/20 shadow-lg shadow-primary/10">
-          <Sparkles className="h-8 w-8 md:h-10 md:w-10 text-primary" />
-        </div>
+        <img 
+          src={saasValaLogo} 
+          alt="SaaS VALA" 
+          className="w-20 h-20 md:w-24 md:h-24 rounded-2xl object-cover mx-auto mb-6 border border-primary/20 shadow-lg shadow-primary/10"
+        />
         <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground mb-2">
           SaaS VALA AI
         </h1>
