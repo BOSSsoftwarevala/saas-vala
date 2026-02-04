@@ -13,6 +13,7 @@ import {
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { Loader2, RefreshCw, PenTool, CheckCircle2, Mail } from 'lucide-react';
 import { Invoice, useInvoices } from '@/hooks/useInvoices';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface SignatureModalProps {
@@ -31,7 +32,6 @@ export function SignatureModal({ invoice, open, onOpenChange }: SignatureModalPr
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
-  const [_otpSent, setOtpSent] = useState(false);
 
   useEffect(() => {
     if (invoice) {
@@ -55,42 +55,82 @@ export function SignatureModal({ invoice, open, onOpenChange }: SignatureModalPr
   }, [step]);
 
   const handleSendOTP = async () => {
-    if (!email) {
+    if (!email || !invoice) {
       toast.error('Please enter email');
       return;
     }
     
     setLoading(true);
-    // Simulate OTP send - in production this would call an edge function
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setOtpSent(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('send-invoice-otp', {
+        body: {
+          invoiceId: invoice.id,
+          email: email,
+          invoiceNumber: invoice.invoice_number,
+        },
+      });
+
+      if (error) {
+        console.error('Error sending OTP:', error);
+        toast.error('Failed to send OTP. Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      if (data?.success) {
+        toast.success(`OTP sent to ${email}`);
+        setStep('otp');
+      } else {
+        toast.error(data?.error || 'Failed to send OTP');
+      }
+    } catch (err) {
+      console.error('Error calling send-invoice-otp:', err);
+      toast.error('Failed to send OTP. Please try again.');
+    }
+    
     setLoading(false);
-    toast.success(`OTP sent to ${email}`);
-    setStep('otp');
   };
 
   const handleVerifyOTP = async () => {
-    if (otp.length !== 6) {
+    if (otp.length !== 6 || !invoice) {
       toast.error('Please enter 6-digit OTP');
       return;
     }
 
     setLoading(true);
-    // Simulate OTP verification
-    await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // For demo, accept any 6-digit OTP
-    if (otp.length === 6) {
-      setLoading(false);
-      toast.success('OTP verified');
-      setStep('signature');
-    } else {
-      setLoading(false);
-      toast.error('Invalid OTP');
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-invoice-otp', {
+        body: {
+          invoiceId: invoice.id,
+          email: email,
+          otpCode: otp,
+        },
+      });
+
+      if (error) {
+        console.error('Error verifying OTP:', error);
+        toast.error('Failed to verify OTP. Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      if (data?.success) {
+        toast.success('OTP verified');
+        setStep('signature');
+      } else {
+        toast.error(data?.error || 'Invalid OTP');
+      }
+    } catch (err) {
+      console.error('Error calling verify-invoice-otp:', err);
+      toast.error('Failed to verify OTP. Please try again.');
     }
+    
+    setLoading(false);
   };
 
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     
@@ -100,10 +140,16 @@ export function SignatureModal({ invoice, open, onOpenChange }: SignatureModalPr
 
     setIsDrawing(true);
     ctx.beginPath();
-    ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+    
+    if ('touches' in e) {
+      const touch = e.touches[0];
+      ctx.moveTo(touch.clientX - rect.left, touch.clientY - rect.top);
+    } else {
+      ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+    }
   };
 
-  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     if (!isDrawing) return;
     
     const canvas = canvasRef.current;
@@ -113,7 +159,12 @@ export function SignatureModal({ invoice, open, onOpenChange }: SignatureModalPr
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+    if ('touches' in e) {
+      const touch = e.touches[0];
+      ctx.lineTo(touch.clientX - rect.left, touch.clientY - rect.top);
+    } else {
+      ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+    }
     ctx.stroke();
   };
 
@@ -154,8 +205,15 @@ export function SignatureModal({ invoice, open, onOpenChange }: SignatureModalPr
 
     setLoading(true);
     
-    // Get IP address (simulated for demo)
-    const signerIp = '192.168.1.1'; // In production, get from server
+    // Get IP address (using a public API)
+    let signerIp = 'unknown';
+    try {
+      const ipResponse = await fetch('https://api.ipify.org?format=json');
+      const ipData = await ipResponse.json();
+      signerIp = ipData.ip || 'unknown';
+    } catch (err) {
+      console.log('Could not fetch IP:', err);
+    }
     
     const success = await saveSignature(invoice.id, signatureData, signerIp);
     
@@ -169,7 +227,6 @@ export function SignatureModal({ invoice, open, onOpenChange }: SignatureModalPr
   const handleClose = () => {
     setStep('email');
     setOtp('');
-    setOtpSent(false);
     onOpenChange(false);
   };
 
@@ -266,11 +323,14 @@ export function SignatureModal({ invoice, open, onOpenChange }: SignatureModalPr
                 ref={canvasRef}
                 width={400}
                 height={150}
-                className="w-full cursor-crosshair"
+                className="w-full cursor-crosshair touch-none"
                 onMouseDown={startDrawing}
                 onMouseMove={draw}
                 onMouseUp={stopDrawing}
                 onMouseLeave={stopDrawing}
+                onTouchStart={startDrawing}
+                onTouchMove={draw}
+                onTouchEnd={stopDrawing}
               />
             </div>
 
