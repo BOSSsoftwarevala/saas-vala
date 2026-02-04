@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import softwareValaLogo from '@/assets/softwarevala-logo.png';
 
 interface AddCreditsModalProps {
   open: boolean;
@@ -35,10 +36,10 @@ interface AddCreditsModalProps {
 const presetAmounts = [500, 1000, 2000, 5000, 10000];
 
 const paymentMethods = [
-  { id: 'card', name: 'Debit/Credit Card', icon: CreditCard, badge: 'Instant' },
-  { id: 'upi', name: 'UPI Payment', icon: Wallet, badge: 'Instant' },
-  { id: 'bank', name: 'Bank Transfer (NEFT/IMPS)', icon: Building2, badge: 'Manual Verify' },
-  { id: 'international', name: 'International Card', icon: Globe, badge: 'All Countries' },
+  { id: 'card', name: 'Debit/Credit Card', icon: CreditCard, badge: 'Instant', countries: '🇮🇳' },
+  { id: 'upi', name: 'UPI Payment', icon: Wallet, badge: 'Instant', countries: '🇮🇳' },
+  { id: 'bank', name: 'Bank Transfer (NEFT/IMPS/SWIFT)', icon: Building2, badge: 'Manual Verify', countries: '🌍' },
+  { id: 'international', name: 'International Card (Visa/MC)', icon: Globe, badge: 'Worldwide', countries: '🌍 🇺🇸 🇬🇧 🇪🇺 🇦🇺' },
 ];
 
 const bankDetails = {
@@ -319,6 +320,13 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
             </DialogHeader>
 
             <div className="space-y-4 py-4">
+              {/* Worldwide Support Banner */}
+              <div className="flex items-center justify-center gap-2 bg-success/10 rounded-lg p-3">
+                <Globe className="h-5 w-5 text-success" />
+                <span className="text-sm font-medium text-success">We Accept Payments Worldwide</span>
+                <span className="text-lg">🌍</span>
+              </div>
+
               <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
                 {paymentMethods.map((method) => (
                   <div
@@ -337,12 +345,14 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
                     </div>
                     <div className="flex-1">
                       <p className="font-medium text-foreground">{method.name}</p>
+                      <p className="text-xs text-muted-foreground">{method.countries}</p>
                     </div>
                     <Badge 
                       variant="outline" 
                       className={cn(
                         'text-xs',
-                        method.id === 'bank' && 'border-warning/50 text-warning'
+                        method.id === 'bank' && 'border-warning/50 text-warning',
+                        method.id === 'international' && 'border-success/50 text-success'
                       )}
                     >
                       {method.badge}
@@ -387,10 +397,21 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
             <div className="space-y-4 py-4">
               {/* Bank Details Card */}
               <div className="glass-card rounded-lg p-4 space-y-3">
-                {/* Brand Name - Prominent */}
+                {/* Brand Logo & Name - Prominent */}
                 <div className="text-center pb-3 border-b border-border">
-                  <p className="text-2xl font-bold font-display text-foreground">{bankDetails.accountName}</p>
-                  <Badge variant="outline" className="mt-1">{bankDetails.bankName}</Badge>
+                  <img 
+                    src={softwareValaLogo} 
+                    alt="SOFTWARE VALA" 
+                    className="h-16 w-16 mx-auto mb-2 rounded-full object-contain"
+                  />
+                  <p className="text-xl font-bold font-display text-foreground">{bankDetails.accountName}</p>
+                  <div className="flex items-center justify-center gap-2 mt-1">
+                    <Badge variant="outline">{bankDetails.bankName}</Badge>
+                    <Badge variant="outline" className="bg-success/10 text-success border-success/30">
+                      <Globe className="h-3 w-3 mr-1" />
+                      Worldwide
+                    </Badge>
+                  </div>
                 </div>
 
                 {/* Account Number - Masked with reveal on copy */}
