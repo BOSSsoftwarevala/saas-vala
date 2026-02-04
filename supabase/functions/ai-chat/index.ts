@@ -60,7 +60,7 @@ Keep responses focused and practical. Use markdown formatting when helpful.`
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-3-flash-preview',
+        model: 'openai/gpt-5',
         messages: allMessages,
         max_tokens: 4096,
         temperature: 0.7,
@@ -104,7 +104,7 @@ Keep responses focused and practical. Use markdown formatting when helpful.`
     return new Response(
       JSON.stringify({ 
         response: assistantMessage,
-        model: 'google/gemini-3-flash-preview'
+        model: 'openai/gpt-5'
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
