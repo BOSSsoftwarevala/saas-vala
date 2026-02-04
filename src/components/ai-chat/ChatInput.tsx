@@ -85,14 +85,15 @@ export function ChatInput({ onSend, isLoading, disabled, onVoiceMessage }: ChatI
     
     if (selectedFiles.length === 0) return;
     
-    // File size limits - larger for archives/code
+    // File size limits - increased for large projects
     const getMaxSize = (file: File): number => {
       const ext = file.name.split('.').pop()?.toLowerCase() || '';
-      const largeFileExts = ['zip', 'rar', '7z', 'tar', 'gz', 'tgz'];
-      // 100MB for archives, 50MB for code, 20MB for others
-      if (largeFileExts.includes(ext)) return 100 * 1024 * 1024;
-      if (['js', 'ts', 'tsx', 'jsx', 'py', 'php', 'html', 'css', 'json'].includes(ext)) return 50 * 1024 * 1024;
-      return 20 * 1024 * 1024;
+      const archiveExts = ['zip', 'rar', '7z', 'tar', 'gz', 'tgz', 'apk'];
+      const codeExts = ['js', 'ts', 'tsx', 'jsx', 'py', 'php', 'html', 'css', 'json', 'xml', 'sql', 'java', 'kt', 'swift', 'go', 'rs', 'c', 'cpp', 'h', 'hpp'];
+      // 500MB for archives/APK, 200MB for code, 100MB for others
+      if (archiveExts.includes(ext)) return 500 * 1024 * 1024;
+      if (codeExts.includes(ext)) return 200 * 1024 * 1024;
+      return 100 * 1024 * 1024;
     };
 
     const formatSize = (bytes: number): string => {
