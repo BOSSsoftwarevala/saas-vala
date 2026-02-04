@@ -12,14 +12,17 @@ import {
   User,
   Shield,
   Bell,
-  Users,
   Lock,
   LogOut,
   AlertTriangle,
   Smartphone,
   Save,
   Loader2,
+  FileText,
+  CheckCircle2,
+  ShieldCheck,
 } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { toast } from 'sonner';
@@ -96,6 +99,10 @@ export default function Settings() {
             <TabsTrigger value="notifications" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Bell className="h-4 w-4" />
               Notifications
+            </TabsTrigger>
+            <TabsTrigger value="policies" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <FileText className="h-4 w-4" />
+              Policies
             </TabsTrigger>
           </TabsList>
 
@@ -261,6 +268,131 @@ export default function Settings() {
                     <p className="text-sm text-muted-foreground">Receive push notifications in browser</p>
                   </div>
                   <Switch checked={pushNotifications} onCheckedChange={setPushNotifications} />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Policies Tab */}
+          <TabsContent value="policies" className="mt-6 space-y-6">
+            {/* No Refund Policy */}
+            <Card className="glass-card">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-sky-500" />
+                  <CardTitle className="text-foreground">No Refund Policy</CardTitle>
+                </div>
+                <CardDescription>Digital product refund terms</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-64 rounded-lg border border-border p-4 bg-muted/30">
+                  <div className="space-y-4 text-sm text-foreground">
+                    <h4 className="font-semibold uppercase tracking-wide">No Refund Policy</h4>
+                    <p>This is a digital product. Once access, demo, APK, or source files are delivered, they can be copied or used immediately. Because of this, <strong>refunds are not possible</strong>.</p>
+                    
+                    <h5 className="font-semibold">Key Points:</h5>
+                    <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                      <li>Digital delivery is instant and irreversible</li>
+                      <li>Demo available before payment to test features</li>
+                      <li>License activation happens immediately</li>
+                      <li>Fair pricing without hidden charges</li>
+                      <li>Support provided even after purchase</li>
+                    </ul>
+
+                    <p className="font-semibold text-primary">We ensure full demo access before purchase.</p>
+
+                    <p className="text-xs text-muted-foreground">
+                      By making a purchase, you acknowledge and agree to this policy. All payments are final.
+                    </p>
+                  </div>
+                </ScrollArea>
+                <div className="flex items-center gap-2 mt-4">
+                  <CheckCircle2 className="h-4 w-4 text-success" />
+                  <span className="text-sm text-success">Active Policy</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Terms of Service */}
+            <Card className="glass-card">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-foreground">Terms of Service</CardTitle>
+                </div>
+                <CardDescription>Platform usage terms and conditions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-64 rounded-lg border border-border p-4 bg-muted/30">
+                  <div className="space-y-4 text-sm text-foreground">
+                    <h4 className="font-semibold uppercase tracking-wide">Terms of Service</h4>
+                    
+                    <h5 className="font-semibold">1. Acceptance of Terms</h5>
+                    <p className="text-muted-foreground">By accessing or using SOFTWARE VALA services, you agree to be bound by these Terms of Service.</p>
+                    
+                    <h5 className="font-semibold">2. License Grant</h5>
+                    <p className="text-muted-foreground">We grant you a non-exclusive, non-transferable license to use our software products according to your subscription type.</p>
+                    
+                    <h5 className="font-semibold">3. User Responsibilities</h5>
+                    <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                      <li>Maintain confidentiality of account credentials</li>
+                      <li>Do not share license keys with unauthorized users</li>
+                      <li>Use products only for lawful purposes</li>
+                      <li>Do not reverse engineer or decompile products</li>
+                    </ul>
+
+                    <h5 className="font-semibold">4. Support & Updates</h5>
+                    <p className="text-muted-foreground">Active license holders receive support and product updates during their subscription period.</p>
+
+                    <h5 className="font-semibold">5. Termination</h5>
+                    <p className="text-muted-foreground">We reserve the right to terminate access for violations of these terms without refund.</p>
+                  </div>
+                </ScrollArea>
+                <div className="flex items-center gap-2 mt-4">
+                  <CheckCircle2 className="h-4 w-4 text-success" />
+                  <span className="text-sm text-success">Active Policy</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Privacy Policy */}
+            <Card className="glass-card">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-cyan" />
+                  <CardTitle className="text-foreground">Privacy Policy</CardTitle>
+                </div>
+                <CardDescription>How we collect and use your data</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-64 rounded-lg border border-border p-4 bg-muted/30">
+                  <div className="space-y-4 text-sm text-foreground">
+                    <h4 className="font-semibold uppercase tracking-wide">Privacy Policy</h4>
+                    
+                    <h5 className="font-semibold">1. Data Collection</h5>
+                    <p className="text-muted-foreground">We collect information you provide directly: name, email, company name, and payment details.</p>
+                    
+                    <h5 className="font-semibold">2. Data Usage</h5>
+                    <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                      <li>Process transactions and manage your account</li>
+                      <li>Provide customer support</li>
+                      <li>Send product updates and security alerts</li>
+                      <li>Improve our services</li>
+                    </ul>
+
+                    <h5 className="font-semibold">3. Data Security</h5>
+                    <p className="text-muted-foreground">All data is encrypted in transit and at rest. We use industry-standard security measures.</p>
+
+                    <h5 className="font-semibold">4. Data Sharing</h5>
+                    <p className="text-muted-foreground">We do not sell your personal data. We may share with payment processors and legal authorities when required.</p>
+
+                    <h5 className="font-semibold">5. Your Rights</h5>
+                    <p className="text-muted-foreground">You can request access, correction, or deletion of your data by contacting support.</p>
+                  </div>
+                </ScrollArea>
+                <div className="flex items-center gap-2 mt-4">
+                  <CheckCircle2 className="h-4 w-4 text-success" />
+                  <span className="text-sm text-success">Active Policy</span>
                 </div>
               </CardContent>
             </Card>

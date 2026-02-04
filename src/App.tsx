@@ -18,6 +18,7 @@ import AiApis from "./pages/AiApis";
 import Wallet from "./pages/Wallet";
 import SeoLeads from "./pages/SeoLeads";
 import Resellers from "./pages/Resellers";
+import AuditLogs from "./pages/AuditLogs";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -146,6 +147,16 @@ function AppRoutes() {
           <ProtectedRoute>
             <AdminRoute>
               <Resellers />
+            </AdminRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/audit-logs"
+        element={
+          <ProtectedRoute>
+            <AdminRoute>
+              <AuditLogs />
             </AdminRoute>
           </ProtectedRoute>
         }

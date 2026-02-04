@@ -16,6 +16,7 @@ import {
   ChevronRight,
   LogOut,
   Users,
+  History,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import saasValaLogo from '@/assets/saas-vala-logo.jpg';
@@ -38,6 +39,7 @@ const navItems: NavItem[] = [
   { title: 'Wallet', icon: Wallet, href: '/wallet' },
   { title: 'SEO & Leads', icon: TrendingUp, href: '/seo-leads' },
   { title: 'Resellers', icon: Users, href: '/resellers', adminOnly: true },
+  { title: 'Audit Logs', icon: History, href: '/audit-logs', adminOnly: true },
   { title: 'Settings', icon: Settings, href: '/settings', adminOnly: true },
 ];
 
