@@ -20,6 +20,7 @@ import SeoLeads from "./pages/SeoLeads";
 import Resellers from "./pages/Resellers";
 import AuditLogs from "./pages/AuditLogs";
 import Settings from "./pages/Settings";
+import Support from "./pages/Support";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -138,6 +139,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <SeoLeads />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/support"
+        element={
+          <ProtectedRoute>
+            <Support />
           </ProtectedRoute>
         }
       />

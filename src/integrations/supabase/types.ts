@@ -818,6 +818,152 @@ export type Database = {
         }
         Relationships: []
       }
+      support_audit_logs: {
+        Row: {
+          action: string
+          actor_id: string
+          actor_type: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          ip_hash: string | null
+          message_id: string | null
+          ticket_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id: string
+          actor_type: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          ip_hash?: string | null
+          message_id?: string | null
+          ticket_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string
+          actor_type?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          ip_hash?: string | null
+          message_id?: string | null
+          ticket_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_audit_logs_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "support_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_audit_logs_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_messages: {
+        Row: {
+          content: string | null
+          created_at: string | null
+          delivered_at: string | null
+          id: string
+          is_internal_note: boolean | null
+          media_url: string | null
+          message_type: Database["public"]["Enums"]["message_type"] | null
+          read_at: string | null
+          sender_id: string
+          sender_type: string
+          ticket_id: string
+          voice_duration: number | null
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string | null
+          delivered_at?: string | null
+          id?: string
+          is_internal_note?: boolean | null
+          media_url?: string | null
+          message_type?: Database["public"]["Enums"]["message_type"] | null
+          read_at?: string | null
+          sender_id: string
+          sender_type: string
+          ticket_id: string
+          voice_duration?: number | null
+        }
+        Update: {
+          content?: string | null
+          created_at?: string | null
+          delivered_at?: string | null
+          id?: string
+          is_internal_note?: boolean | null
+          media_url?: string | null
+          message_type?: Database["public"]["Enums"]["message_type"] | null
+          read_at?: string | null
+          sender_id?: string
+          sender_type?: string
+          ticket_id?: string
+          voice_duration?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_tickets: {
+        Row: {
+          assigned_staff_id: string | null
+          created_at: string | null
+          id: string
+          ip_hash: string | null
+          resolved_at: string | null
+          status: Database["public"]["Enums"]["support_status"] | null
+          ticket_number: string
+          updated_at: string | null
+          user_email: string
+          user_id: string
+          user_name: string
+        }
+        Insert: {
+          assigned_staff_id?: string | null
+          created_at?: string | null
+          id?: string
+          ip_hash?: string | null
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["support_status"] | null
+          ticket_number: string
+          updated_at?: string | null
+          user_email: string
+          user_id: string
+          user_name: string
+        }
+        Update: {
+          assigned_staff_id?: string | null
+          created_at?: string | null
+          id?: string
+          ip_hash?: string | null
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["support_status"] | null
+          ticket_number?: string
+          updated_at?: string | null
+          user_email?: string
+          user_id?: string
+          user_name?: string
+        }
+        Relationships: []
+      }
       transactions: {
         Row: {
           amount: number
@@ -971,6 +1117,7 @@ export type Database = {
     Functions: {
       generate_invoice_number: { Args: never; Returns: string }
       generate_license_key: { Args: never; Returns: string }
+      generate_ticket_number: { Args: never; Returns: string }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
@@ -1014,6 +1161,7 @@ export type Database = {
         | "organic"
         | "other"
       lead_status: "new" | "contacted" | "qualified" | "converted" | "lost"
+      message_type: "text" | "voice" | "image"
       product_status: "active" | "suspended" | "archived" | "draft"
       server_runtime:
         | "nodejs18"
@@ -1023,6 +1171,7 @@ export type Database = {
         | "python311"
         | "python312"
       server_status: "deploying" | "live" | "failed" | "stopped" | "suspended"
+      support_status: "pending" | "open" | "resolved" | "escalated"
       transaction_status: "pending" | "completed" | "failed" | "cancelled"
       transaction_type: "credit" | "debit" | "refund" | "adjustment"
     }
@@ -1178,6 +1327,7 @@ export const Constants = {
       key_type: ["lifetime", "yearly", "monthly", "trial"],
       lead_source: ["website", "referral", "social", "ads", "organic", "other"],
       lead_status: ["new", "contacted", "qualified", "converted", "lost"],
+      message_type: ["text", "voice", "image"],
       product_status: ["active", "suspended", "archived", "draft"],
       server_runtime: [
         "nodejs18",
@@ -1188,6 +1338,7 @@ export const Constants = {
         "python312",
       ],
       server_status: ["deploying", "live", "failed", "stopped", "suspended"],
+      support_status: ["pending", "open", "resolved", "escalated"],
       transaction_status: ["pending", "completed", "failed", "cancelled"],
       transaction_type: ["credit", "debit", "refund", "adjustment"],
     },
