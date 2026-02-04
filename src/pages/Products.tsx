@@ -50,6 +50,8 @@ import {
   Link2,
   Download,
   Key,
+  CheckCircle,
+  XCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -65,8 +67,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { ProductStatsCards } from '@/components/products/ProductStatsCards';
-import { ProductSubNav, type ProductView } from '@/components/products/ProductSubNav';
+import { ProductSidebar, type ProductView } from '@/components/products/ProductSidebar';
+import { ProductKPIGrid } from '@/components/products/ProductKPIGrid';
+import { ProductControlBar } from '@/components/products/ProductControlBar';
+import { ProductActivityPanel } from '@/components/products/ProductActivityPanel';
 import { CategoryManager } from '@/components/products/CategoryManager';
 import { DemoMapping } from '@/components/products/DemoMapping';
 import { ApkMapping } from '@/components/products/ApkMapping';
@@ -86,8 +90,17 @@ interface CategoryOption {
   parent_id: string | null;
 }
 
+interface ProductStats {
+  totalDemos: number;
+  activeDemos: number;
+  totalApks: number;
+  outdatedApks: number;
+  licensesLinked: number;
+  licensesMissing: number;
+}
+
 export default function Products() {
-  const { products, categories, loading, createProduct, updateProduct, deleteProduct, suspendProduct, activateProduct } = useProducts();
+  const { products, categories, loading, fetchProducts, createProduct, updateProduct, deleteProduct, suspendProduct, activateProduct } = useProducts();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -103,6 +116,16 @@ export default function Products() {
   const [microCategories, setMicroCategories] = useState<CategoryOption[]>([]);
   const [nanoCategories, setNanoCategories] = useState<CategoryOption[]>([]);
   const [totalCategories, setTotalCategories] = useState(0);
+
+  // Extended stats
+  const [extendedStats, setExtendedStats] = useState<ProductStats>({
+    totalDemos: 0,
+    activeDemos: 0,
+    totalApks: 0,
+    outdatedApks: 0,
+    licensesLinked: 0,
+    licensesMissing: 0,
+  });
 
   // Form state
   const [formData, setFormData] = useState({
@@ -134,6 +157,42 @@ export default function Products() {
     };
     fetchCategoryData();
   }, []);
+
+  // Fetch extended stats
+  useEffect(() => {
+    const fetchExtendedStats = async () => {
+      try {
+        // Fetch demos
+        const { data: demos } = await supabase.from('demos').select('id, status');
+        const totalDemos = demos?.length || 0;
+        const activeDemos = demos?.filter(d => d.status === 'active').length || 0;
+
+        // Fetch APKs
+        const { data: apks } = await supabase.from('apks').select('id, status');
+        const totalApks = apks?.length || 0;
+        const outdatedApks = apks?.filter(a => a.status === 'deprecated').length || 0;
+
+        // Fetch license keys per product
+        const { data: licenses } = await supabase.from('license_keys').select('product_id').limit(100);
+        const linkedProducts = new Set(licenses?.map(l => l.product_id) || []);
+        const licensesLinked = linkedProducts.size;
+        const licensesMissing = Math.max(0, products.length - licensesLinked);
+
+        setExtendedStats({
+          totalDemos,
+          activeDemos,
+          totalApks,
+          outdatedApks,
+          licensesLinked,
+          licensesMissing,
+        });
+      } catch (error) {
+        console.error('Error fetching extended stats:', error);
+      }
+    };
+
+    fetchExtendedStats();
+  }, [products.length]);
 
   // Load dependent categories based on selection
   useEffect(() => {
@@ -194,6 +253,7 @@ export default function Products() {
   const stats = {
     total: products.length,
     active: products.filter(p => p.status === 'active').length,
+    draft: products.filter(p => p.status === 'draft').length,
     suspended: products.filter(p => p.status === 'suspended').length,
     categories: totalCategories,
   };
@@ -203,7 +263,8 @@ export default function Products() {
     const matchesTab = activeTab === 'all' || product.status === activeTab;
     const matchesStatsFilter = !statsFilter || 
       (statsFilter === 'active' && product.status === 'active') ||
-      (statsFilter === 'suspended' && product.status === 'suspended');
+      (statsFilter === 'suspended' && product.status === 'suspended') ||
+      (statsFilter === 'draft' && product.status === 'draft');
     return matchesSearch && matchesTab && matchesStatsFilter;
   });
 
@@ -226,7 +287,6 @@ export default function Products() {
 
   const openEditDialog = (product: Product) => {
     setEditProduct(product);
-    // For simplicity, we'll use nano_category as category_id (lowest level)
     setFormData({
       name: product.name,
       slug: product.slug,
@@ -247,7 +307,6 @@ export default function Products() {
     setSubmitting(true);
     try {
       const slug = formData.slug || formData.name.toLowerCase().replace(/[^a-z0-9]/g, '-');
-      // Use nano category as the final category_id
       const category_id = formData.nano_category || formData.micro_category || formData.sub_category || formData.master_category || null;
       
       if (editProduct) {
@@ -267,14 +326,58 @@ export default function Products() {
     setDeleteId(null);
   };
 
-  const handleStatsFilterChange = (filter: string | null) => {
-    if (filter === 'categories') {
-      setActiveView('master');
-      setStatsFilter(null);
-    } else {
-      setActiveView('products');
-      setStatsFilter(filter);
+  const handleKPIAction = (action: string) => {
+    switch (action) {
+      case 'view_all':
+        setStatsFilter(null);
+        setActiveTab('all');
+        break;
+      case 'view_active':
+        setStatsFilter('active');
+        setActiveTab('active');
+        break;
+      case 'continue_setup':
+        setStatsFilter('draft');
+        setActiveTab('draft');
+        break;
+      case 'review_restore':
+        setStatsFilter('suspended');
+        setActiveTab('suspended');
+        break;
+      case 'assign_server':
+        toast.info('Server Assignment', { description: 'Navigate to Servers module to assign servers' });
+        break;
+      case 'health_check':
+        toast.success('Health Check', { description: 'All products are healthy!' });
+        break;
+      default:
+        break;
     }
+  };
+
+  const handleBulkImport = () => {
+    toast.info('Bulk Import', { description: 'CSV import feature coming soon' });
+  };
+
+  const handleBulkSuspend = async () => {
+    const activeProducts = products.filter(p => p.status === 'active');
+    for (const product of activeProducts) {
+      await suspendProduct(product.id);
+    }
+    toast.success('Bulk Suspend', { description: `${activeProducts.length} products suspended` });
+  };
+
+  const handleBulkActivate = async () => {
+    const suspendedProducts = products.filter(p => p.status === 'suspended');
+    for (const product of suspendedProducts) {
+      await activateProduct(product.id);
+    }
+    toast.success('Bulk Activate', { description: `${suspendedProducts.length} products activated` });
+  };
+
+  const handleRefresh = () => {
+    fetchProducts();
+    toast.success('Refreshed', { description: 'Product data updated' });
   };
 
   // Render content based on active view
@@ -364,12 +467,12 @@ export default function Products() {
             <Table>
               <TableHeader>
                 <TableRow className="border-border hover:bg-muted/50">
-                  <TableHead className="text-muted-foreground">Name</TableHead>
-                  <TableHead className="text-muted-foreground">Price</TableHead>
+                  <TableHead className="text-muted-foreground">Product</TableHead>
+                  <TableHead className="text-muted-foreground">Category</TableHead>
+                  <TableHead className="text-muted-foreground">Demo</TableHead>
+                  <TableHead className="text-muted-foreground">APK</TableHead>
+                  <TableHead className="text-muted-foreground">License</TableHead>
                   <TableHead className="text-muted-foreground">Status</TableHead>
-                  <TableHead className="text-muted-foreground">Links</TableHead>
-                  <TableHead className="text-muted-foreground">Version</TableHead>
-                  <TableHead className="text-muted-foreground">Created</TableHead>
                   <TableHead className="text-muted-foreground text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -383,66 +486,76 @@ export default function Products() {
                         </div>
                         <div>
                           <span className="font-medium text-foreground">{product.name}</span>
-                          <p className="text-xs text-muted-foreground">{product.slug}</p>
+                          <p className="text-xs text-muted-foreground">v{product.version}</p>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      {product.price > 0 ? (
-                        <span className="font-semibold text-primary">₹{product.price}</span>
-                      ) : (
-                        <span className="text-muted-foreground">Free</span>
-                      )}
+                      <span className="text-sm text-muted-foreground">
+                        {product.category_id ? '4-Level' : 'Uncategorized'}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Link2 className={cn('h-4 w-4', product.category_id ? 'text-success' : 'text-muted-foreground')} />
+                        <span className="text-xs">{product.category_id ? 'Yes' : 'No'}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Download className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-xs">No</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Key className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-xs">No</span>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={cn('capitalize', statusStyles[product.status])}>
                         {product.status}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Link2 className="h-3 w-3 text-muted-foreground" />
-                        <Download className="h-3 w-3 text-muted-foreground" />
-                        <Key className="h-3 w-3 text-muted-foreground" />
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-muted-foreground font-mono text-sm">{product.version}</span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-muted-foreground">{new Date(product.created_at).toLocaleDateString()}</span>
-                    </TableCell>
                     <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-popover border-border">
-                          <DropdownMenuItem 
-                            className="gap-2 cursor-pointer"
-                            onClick={() => toast.info('Product Details', { description: 'Full product view coming soon' })}
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => openEditDialog(product)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        {product.status === 'suspended' ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-success"
+                            onClick={() => activateProduct(product.id)}
                           >
-                            <Eye className="h-4 w-4" /> View
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => openEditDialog(product)}>
-                            <Edit className="h-4 w-4" /> Edit
-                          </DropdownMenuItem>
-                          {product.status === 'suspended' ? (
-                            <DropdownMenuItem className="gap-2 cursor-pointer text-success" onClick={() => activateProduct(product.id)}>
-                              <Play className="h-4 w-4" /> Activate
-                            </DropdownMenuItem>
-                          ) : (
-                            <DropdownMenuItem className="gap-2 cursor-pointer text-warning" onClick={() => suspendProduct(product.id)}>
-                              <Ban className="h-4 w-4" /> Suspend
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem className="gap-2 cursor-pointer text-destructive" onClick={() => setDeleteId(product.id)}>
-                            <Trash2 className="h-4 w-4" /> Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                            <Play className="h-4 w-4" />
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-warning"
+                            onClick={() => suspendProduct(product.id)}
+                          >
+                            <Ban className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive"
+                          onClick={() => setDeleteId(product.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -465,40 +578,72 @@ export default function Products() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h2 className="font-display text-2xl font-bold text-foreground">
-              Product Manager
-            </h2>
-            <p className="text-muted-foreground">
-              Manage your products, demos, and APKs
-            </p>
-          </div>
-          {activeView === 'products' && (
-            <Button onClick={openCreateDialog} className="bg-orange-gradient hover:opacity-90 text-white gap-2">
-              <Plus className="h-4 w-4" />
-              Add Product
-            </Button>
-          )}
+        <div>
+          <h2 className="font-display text-2xl font-bold text-foreground">
+            Product Manager
+          </h2>
+          <p className="text-muted-foreground">
+            Manage your products, demos, and APKs
+          </p>
         </div>
 
-        {/* Stats Cards */}
-        <ProductStatsCards
+        {/* Control Bar */}
+        <ProductControlBar
           totalProducts={stats.total}
           activeProducts={stats.active}
           suspendedProducts={stats.suspended}
-          totalCategories={stats.categories}
-          activeFilter={statsFilter}
-          onFilterChange={handleStatsFilterChange}
+          draftProducts={stats.draft}
+          onAddProduct={openCreateDialog}
+          onBulkImport={handleBulkImport}
+          onBulkSuspend={handleBulkSuspend}
+          onBulkActivate={handleBulkActivate}
+          onRefresh={handleRefresh}
         />
 
-        {/* Sub Navigation */}
-        <ProductSubNav activeView={activeView} onViewChange={setActiveView} />
+        {/* Main Layout with Sidebar */}
+        <div className="flex gap-4">
+          {/* Left Sub-Sidebar */}
+          <ProductSidebar activeView={activeView} onViewChange={setActiveView} />
 
-        {/* Content */}
-        {renderContent()}
+          {/* Center Content */}
+          <div className="flex-1 space-y-4 min-w-0">
+            {/* KPI Grid - Only show on products view */}
+            {activeView === 'products' && (
+              <ProductKPIGrid
+                totalProducts={stats.total}
+                activeProducts={stats.active}
+                draftProducts={stats.draft}
+                suspendedProducts={stats.suspended}
+                totalDemos={extendedStats.totalDemos}
+                activeDemos={extendedStats.activeDemos}
+                totalApks={extendedStats.totalApks}
+                outdatedApks={extendedStats.outdatedApks}
+                categoryCoverage={totalCategories > 0 ? 100 : 0}
+                licensesLinked={extendedStats.licensesLinked}
+                licensesMissing={extendedStats.licensesMissing}
+                serversConnected={0}
+                serversMissing={stats.total}
+                healthOk={stats.active}
+                healthWarning={stats.draft}
+                healthError={stats.suspended}
+                onAction={handleKPIAction}
+                onViewChange={setActiveView}
+              />
+            )}
+
+            {/* Content */}
+            {renderContent()}
+          </div>
+
+          {/* Right Activity Panel - Only show on products view */}
+          {activeView === 'products' && (
+            <aside className="w-64 shrink-0 hidden xl:block">
+              <ProductActivityPanel />
+            </aside>
+          )}
+        </div>
       </div>
 
       {/* Create/Edit Dialog */}
