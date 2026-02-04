@@ -1,7 +1,7 @@
-import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { useSidebar } from '@/hooks/useSidebar';
 import {
   LayoutDashboard,
   Package,
@@ -44,7 +44,7 @@ const navItems: NavItem[] = [
 ];
 
 export function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false);
+  const { collapsed, toggle } = useSidebar();
   const location = useLocation();
   const { isSuperAdmin, signOut } = useAuth();
 
@@ -143,7 +143,7 @@ export function Sidebar() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setCollapsed(!collapsed)}
+            onClick={toggle}
             className={cn(
               'mt-2 w-full justify-center text-sidebar-foreground hover:bg-sidebar-accent hover:text-foreground',
               collapsed && 'px-0'
