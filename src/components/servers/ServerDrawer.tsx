@@ -19,6 +19,7 @@ interface ServerDrawerProps {
   gitConnection: GitConnection | null;
   autoRules: ServerAutoRules | null;
   mode: 'create' | 'edit' | 'view';
+  defaultTab?: 'server' | 'git' | 'domains' | 'auto';
   onSave: (server: Partial<ServerType>) => void;
   onConnectGit: (connection: Partial<GitConnection>) => void;
   onAddDomain: (domain: Partial<Domain>) => void;
@@ -33,6 +34,7 @@ export function ServerDrawer({
   gitConnection,
   autoRules,
   mode,
+  defaultTab = 'server',
   onSave,
   onConnectGit,
   onAddDomain,
@@ -40,7 +42,7 @@ export function ServerDrawer({
 }: ServerDrawerProps) {
   const { products } = useProducts();
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('server');
+  const [activeTab, setActiveTab] = useState<string>(defaultTab);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -75,6 +77,12 @@ export function ServerDrawer({
     auto_restart: false,
     auto_backup: false,
   });
+
+  useEffect(() => {
+    if (open) {
+      setActiveTab(defaultTab);
+    }
+  }, [open, defaultTab]);
 
   useEffect(() => {
     if (server) {
