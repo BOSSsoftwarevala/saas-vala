@@ -13,6 +13,7 @@ import Products from "./pages/Products";
 import Keys from "./pages/Keys";
 import Servers from "./pages/Servers";
 import AiChat from "./pages/AiChat";
+import SaasAiDashboard from "./pages/SaasAiDashboard";
 import AiApis from "./pages/AiApis";
 import Wallet from "./pages/Wallet";
 import SeoLeads from "./pages/SeoLeads";
@@ -103,6 +104,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <AiChat />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/saas-ai-dashboard"
+        element={
+          <ProtectedRoute>
+            <SaasAiDashboard />
           </ProtectedRoute>
         }
       />

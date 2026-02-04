@@ -1,10 +1,13 @@
-import { Sparkles, Upload, Server, Wrench, Zap, Shield, Code } from 'lucide-react';
+import { Sparkles, Upload, Server, Wrench, Zap, Shield, Code, LayoutDashboard } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 
 interface EmptyStateProps {
   onSuggestionClick: (suggestion: string) => void;
 }
 
 export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
+  const navigate = useNavigate();
   const capabilities = [
     {
       icon: Upload,
@@ -95,8 +98,18 @@ export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
         </div>
       </div>
 
+      {/* Dashboard Button */}
+      <Button 
+        variant="outline" 
+        onClick={() => navigate('/saas-ai-dashboard')}
+        className="mt-6 gap-2"
+      >
+        <LayoutDashboard className="h-4 w-4" />
+        Open Project Dashboard
+      </Button>
+
       {/* Footer */}
-      <p className="mt-8 text-xs text-muted-foreground">
+      <p className="mt-6 text-xs text-muted-foreground">
         Powered by <span className="font-semibold text-primary">SoftwareVala™</span>
       </p>
     </div>
