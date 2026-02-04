@@ -83,12 +83,28 @@ export function ChatInput({ onSend, isLoading, disabled }: ChatInputProps) {
     
     if (selectedFiles.length === 0) return;
     
-    // Check file size limit (20MB)
-    const maxSize = 20 * 1024 * 1024;
+    // File size limits - larger for archives/code
+    const getMaxSize = (file: File): number => {
+      const ext = file.name.split('.').pop()?.toLowerCase() || '';
+      const largeFileExts = ['zip', 'rar', '7z', 'tar', 'gz', 'tgz'];
+      // 100MB for archives, 50MB for code, 20MB for others
+      if (largeFileExts.includes(ext)) return 100 * 1024 * 1024;
+      if (['js', 'ts', 'tsx', 'jsx', 'py', 'php', 'html', 'css', 'json'].includes(ext)) return 50 * 1024 * 1024;
+      return 20 * 1024 * 1024;
+    };
+
+    const formatSize = (bytes: number): string => {
+      if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+      if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+      return `${(bytes / 1024).toFixed(1)} KB`;
+    };
+
     const validFiles = selectedFiles.filter(file => {
+      const maxSize = getMaxSize(file);
       if (file.size > maxSize) {
         toast.error(`File too large: ${file.name}`, {
-          description: 'Maximum file size is 20MB'
+          description: `Size: ${formatSize(file.size)} | Max: ${formatSize(maxSize)}. Try compressing the file.`,
+          duration: 5000
         });
         return false;
       }
