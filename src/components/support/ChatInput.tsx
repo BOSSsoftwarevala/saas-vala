@@ -1,4 +1,4 @@
-import { useState, useRef, KeyboardEvent } from 'react';
+import { useState, useRef, KeyboardEvent, useCallback } from 'react';
 import { Send, Mic, Image as ImageIcon, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -6,11 +6,17 @@ import { cn } from '@/lib/utils';
 
 interface ChatInputProps {
   onSendMessage: (content: string, type: 'text' | 'voice' | 'image', mediaUrl?: string) => Promise<boolean>;
+  onTyping?: () => void;
   disabled?: boolean;
   placeholder?: string;
 }
 
-export function ChatInput({ onSendMessage, disabled, placeholder = 'Type a message...' }: ChatInputProps) {
+export function ChatInput({ 
+  onSendMessage, 
+  onTyping,
+  disabled, 
+  placeholder = 'Type a message...' 
+}: ChatInputProps) {
   const [message, setMessage] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -66,13 +72,18 @@ export function ChatInput({ onSendMessage, disabled, placeholder = 'Type a messa
     setIsRecording(!isRecording);
   };
 
-  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleTextareaChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessage(e.target.value);
     // Auto-resize
     const textarea = e.target;
     textarea.style.height = 'auto';
     textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
-  };
+    
+    // Notify typing
+    if (e.target.value.length > 0 && onTyping) {
+      onTyping();
+    }
+  }, [onTyping]);
 
   return (
     <div className="bg-[#F0F0F0] border-t border-gray-200">

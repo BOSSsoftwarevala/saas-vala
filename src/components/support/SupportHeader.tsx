@@ -1,5 +1,6 @@
 import { ArrowLeft, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { OnlineStatus } from './OnlineStatus';
 import saasValaLogo from '@/assets/saas-vala-logo.jpg';
 import { SupportTicket } from '@/hooks/useSupportChat';
 
@@ -7,9 +8,10 @@ interface SupportHeaderProps {
   activeTicket: SupportTicket | null;
   onBack?: () => void;
   showBackButton?: boolean;
+  isOtherUserOnline?: boolean;
 }
 
-export function SupportHeader({ activeTicket, onBack, showBackButton }: SupportHeaderProps) {
+export function SupportHeader({ activeTicket, onBack, showBackButton, isOtherUserOnline }: SupportHeaderProps) {
   return (
     <div className="bg-[#075E54] text-white">
       {/* Main header */}
@@ -25,12 +27,20 @@ export function SupportHeader({ activeTicket, onBack, showBackButton }: SupportH
           </Button>
         )}
         
-        <div className="h-10 w-10 rounded-full overflow-hidden bg-white/10 flex-shrink-0">
-          <img 
-            src={saasValaLogo} 
-            alt="SaaS Vala Support" 
-            className="h-full w-full object-cover"
-          />
+        {/* Avatar with online status */}
+        <div className="relative flex-shrink-0">
+          <div className="h-10 w-10 rounded-full overflow-hidden bg-white/10">
+            <img 
+              src={saasValaLogo} 
+              alt="SaaS Vala Support" 
+              className="h-full w-full object-cover"
+            />
+          </div>
+          {activeTicket && (
+            <div className="absolute -bottom-0.5 -right-0.5 p-0.5 bg-[#075E54] rounded-full">
+              <OnlineStatus isOnline={!!isOtherUserOnline} size="sm" />
+            </div>
+          )}
         </div>
         
         <div className="flex-1 min-w-0">
@@ -38,8 +48,13 @@ export function SupportHeader({ activeTicket, onBack, showBackButton }: SupportH
             Support Chat
           </h1>
           {activeTicket && (
-            <p className="text-xs text-white/70 truncate">
-              ID: {activeTicket.ticket_number}
+            <p className="text-xs text-white/70 truncate flex items-center gap-2">
+              <span>ID: {activeTicket.ticket_number}</span>
+              {isOtherUserOnline !== undefined && (
+                <span className={isOtherUserOnline ? 'text-green-300' : 'text-white/50'}>
+                  • {isOtherUserOnline ? 'Online' : 'Offline'}
+                </span>
+              )}
             </p>
           )}
         </div>
