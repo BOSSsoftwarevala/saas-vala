@@ -4,27 +4,26 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   ArrowLeft, 
-  GitBranch, 
-  Terminal, 
-  Settings2, 
-  Globe, 
-  Rocket,
-  Activity,
-  MessageSquare
+  LayoutDashboard,
+  Cpu,
+  Layers,
+  Server,
+  Shield,
+  MessageSquare,
+  Sparkles
 } from 'lucide-react';
-import { GitConnectPanel } from '@/components/saas-ai-dashboard/GitConnectPanel';
-import { BuildLogsPanel } from '@/components/saas-ai-dashboard/BuildLogsPanel';
-import { EnvVarsPanel } from '@/components/saas-ai-dashboard/EnvVarsPanel';
-import { DomainsPanel } from '@/components/saas-ai-dashboard/DomainsPanel';
-import { DeploymentsPanel } from '@/components/saas-ai-dashboard/DeploymentsPanel';
-import { HealthPanel } from '@/components/saas-ai-dashboard/HealthPanel';
-import { ProjectSelector } from '@/components/saas-ai-dashboard/ProjectSelector';
+import { AiStatsCards } from '@/components/saas-ai/AiStatsCards';
+import { AiQuickActions } from '@/components/saas-ai/AiQuickActions';
+import { AiModelManager } from '@/components/saas-ai/AiModelManager';
+import { AiCategoryManager } from '@/components/saas-ai/AiCategoryManager';
+import { ServerAiIntegration } from '@/components/saas-ai/ServerAiIntegration';
+import { SecurityPanel } from '@/components/saas-ai/SecurityPanel';
+import { motion } from 'framer-motion';
 import saasValaLogo from '@/assets/saas-vala-logo.jpg';
 
 export default function SaasAiDashboard() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('git');
-  const [selectedProject, setSelectedProject] = useState<string | null>('demo-project');
+  const [activeTab, setActiveTab] = useState('overview');
 
   return (
     <div className="min-h-screen bg-background">
@@ -41,21 +40,26 @@ export default function SaasAiDashboard() {
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div className="flex items-center gap-3">
-              <img src={saasValaLogo} alt="SaaS VALA" className="h-10 w-10 rounded-xl object-cover" />
+              <motion.img 
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                src={saasValaLogo} 
+                alt="SaaS VALA" 
+                className="h-10 w-10 rounded-xl object-cover border border-primary/20 shadow-lg shadow-primary/10"
+              />
               <div>
-                <h1 className="font-display font-bold text-foreground">SaaS AI Dashboard</h1>
+                <h1 className="font-display font-bold text-foreground flex items-center gap-2">
+                  SaaS AI Dashboard
+                  <Sparkles className="h-4 w-4 text-primary" />
+                </h1>
                 <p className="text-xs text-muted-foreground">
-                  Project Management • Deploy • Monitor
+                  Super Admin • Full Control
                 </p>
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <ProjectSelector 
-              value={selectedProject} 
-              onChange={setSelectedProject} 
-            />
             <Button
               variant="outline"
               size="sm"
@@ -72,61 +76,78 @@ export default function SaasAiDashboard() {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="w-full grid grid-cols-3 md:grid-cols-6 h-auto gap-1 bg-muted/30 p-1.5 rounded-xl">
-            <TabsTrigger value="git" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <GitBranch className="h-4 w-4" />
-              <span className="hidden sm:inline">Git</span>
+          <TabsList className="w-full grid grid-cols-2 md:grid-cols-5 h-auto gap-1 bg-muted/30 p-1.5 rounded-xl">
+            <TabsTrigger 
+              value="overview" 
+              className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              <span className="hidden sm:inline">Overview</span>
             </TabsTrigger>
-            <TabsTrigger value="builds" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Terminal className="h-4 w-4" />
-              <span className="hidden sm:inline">Builds</span>
+            <TabsTrigger 
+              value="models" 
+              className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
+              <Cpu className="h-4 w-4" />
+              <span className="hidden sm:inline">AI Models</span>
             </TabsTrigger>
-            <TabsTrigger value="env" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Settings2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Env Vars</span>
+            <TabsTrigger 
+              value="categories" 
+              className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
+              <Layers className="h-4 w-4" />
+              <span className="hidden sm:inline">Categories</span>
             </TabsTrigger>
-            <TabsTrigger value="domains" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Globe className="h-4 w-4" />
-              <span className="hidden sm:inline">Domains</span>
+            <TabsTrigger 
+              value="server" 
+              className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
+              <Server className="h-4 w-4" />
+              <span className="hidden sm:inline">Server + AI</span>
             </TabsTrigger>
-            <TabsTrigger value="deploys" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Rocket className="h-4 w-4" />
-              <span className="hidden sm:inline">Deploys</span>
-            </TabsTrigger>
-            <TabsTrigger value="health" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Activity className="h-4 w-4" />
-              <span className="hidden sm:inline">Health</span>
+            <TabsTrigger 
+              value="security" 
+              className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
+              <Shield className="h-4 w-4" />
+              <span className="hidden sm:inline">Security</span>
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="git">
-            <GitConnectPanel projectId={selectedProject} />
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-6">
+            <AiStatsCards />
+            <AiQuickActions />
+            <div className="grid grid-cols-1 gap-6">
+              <AiModelManager />
+            </div>
           </TabsContent>
 
-          <TabsContent value="builds">
-            <BuildLogsPanel projectId={selectedProject} />
+          {/* AI Models Tab */}
+          <TabsContent value="models" className="space-y-6">
+            <AiStatsCards />
+            <AiModelManager />
           </TabsContent>
 
-          <TabsContent value="env">
-            <EnvVarsPanel projectId={selectedProject} />
+          {/* Categories Tab */}
+          <TabsContent value="categories" className="space-y-6">
+            <AiCategoryManager />
           </TabsContent>
 
-          <TabsContent value="domains">
-            <DomainsPanel projectId={selectedProject} />
+          {/* Server + AI Tab */}
+          <TabsContent value="server" className="space-y-6">
+            <ServerAiIntegration />
           </TabsContent>
 
-          <TabsContent value="deploys">
-            <DeploymentsPanel projectId={selectedProject} />
-          </TabsContent>
-
-          <TabsContent value="health">
-            <HealthPanel projectId={selectedProject} />
+          {/* Security Tab */}
+          <TabsContent value="security" className="space-y-6">
+            <SecurityPanel />
           </TabsContent>
         </Tabs>
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-border py-4 px-6">
+      <footer className="border-t border-border py-4 px-6 mt-8">
         <p className="text-center text-sm text-muted-foreground">
           Powered by <span className="font-semibold text-primary">SoftwareVala™</span>
         </p>
