@@ -128,7 +128,11 @@ export default function Settings() {
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <Button variant="outline" className="border-border">
+                        <Button 
+                          variant="outline" 
+                          className="border-border"
+                          onClick={() => toast.info('Avatar Upload', { description: 'Avatar upload coming soon. For now, update your profile picture in your email provider.' })}
+                        >
                           Change Avatar
                         </Button>
                         <p className="text-xs text-muted-foreground mt-2">

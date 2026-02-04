@@ -50,6 +50,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 import { useProducts, type Product } from '@/hooks/useProducts';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import {
@@ -164,7 +165,11 @@ export default function Products() {
               <Plus className="h-4 w-4" />
               Add Product
             </Button>
-            <Button variant="outline" className="gap-2 border-border">
+            <Button 
+              variant="outline" 
+              className="gap-2 border-border"
+              onClick={() => toast.info('APK Upload', { description: 'Create a product first, then upload APK from its details page.' })}
+            >
               <Upload className="h-4 w-4" />
               Upload APK
             </Button>
@@ -201,7 +206,12 @@ export default function Products() {
                   className="pl-10 bg-muted/50 border-border"
                 />
               </div>
-              <Button variant="outline" size="icon" className="border-border">
+              <Button 
+                variant="outline" 
+                size="icon" 
+                className="border-border"
+                onClick={() => toast.info('Filter options coming soon')}
+              >
                 <Filter className="h-4 w-4" />
               </Button>
             </div>
@@ -277,7 +287,10 @@ export default function Products() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="bg-popover border-border">
-                            <DropdownMenuItem className="gap-2 cursor-pointer">
+                            <DropdownMenuItem 
+                              className="gap-2 cursor-pointer"
+                              onClick={() => toast.info('Product Details', { description: 'Full product view coming soon' })}
+                            >
                               <Eye className="h-4 w-4" /> View
                             </DropdownMenuItem>
                             <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => openEditDialog(product)}>

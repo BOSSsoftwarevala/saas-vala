@@ -27,6 +27,7 @@ import {
   Globe,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 import { useWallet } from '@/hooks/useWallet';
 import { useInvoices } from '@/hooks/useInvoices';
 import { useAuth } from '@/hooks/useAuth';
@@ -338,7 +339,10 @@ export default function Wallet() {
               <p className="text-muted-foreground mb-4">
                 Upload contracts and agreements with your clients
               </p>
-              <Button className="bg-orange-gradient hover:opacity-90 text-white gap-2">
+              <Button 
+                className="bg-orange-gradient hover:opacity-90 text-white gap-2"
+                onClick={() => toast.info('Agreement Upload', { description: 'Document upload feature coming soon. Contact support to share agreements.' })}
+              >
                 <Plus className="h-4 w-4" />
                 Upload Agreement
               </Button>
