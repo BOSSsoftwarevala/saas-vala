@@ -10,6 +10,9 @@ interface Message {
   content: string;
 }
 
+// Best available model for accuracy and performance
+const AI_MODEL = 'google/gemini-3-flash-preview';
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -20,39 +23,58 @@ serve(async (req) => {
     const { messages, stream = false } = await req.json() as { messages: Message[]; stream?: boolean };
 
     if (!messages || !Array.isArray(messages)) {
-      throw new Error('Messages array is required');
+      return new Response(
+        JSON.stringify({ error: 'Messages array is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
+      console.error('LOVABLE_API_KEY is not configured');
+      return new Response(
+        JSON.stringify({ error: 'AI service not configured. Please contact admin.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    console.log('Processing AI chat request with', messages.length, 'messages, streaming:', stream);
+    console.log(`Processing AI chat: ${messages.length} messages, stream: ${stream}, model: ${AI_MODEL}`);
 
-    // Add system prompt for SaaS VALA assistant
+    // Enhanced system prompt for maximum accuracy
     const systemMessage: Message = {
       role: 'system',
-      content: `You are SaaS VALA AI, a powerful internal assistant for the SaaS VALA platform - an internal power version that's better than Lovable.
+      content: `You are SaaS VALA AI, an advanced internal assistant for the SaaS VALA platform by SoftwareVala™.
 
-Your capabilities include:
-- Unlimited source code upload (any size ZIP, PHP, JS, mixed projects)
-- Auto code analysis and AI-powered fixing
-- One-click server deployment without developer needed
-- Addon integration (payment, wallet, language packs)
-- Security scanning and auto-fix
-- License and branding management
+## Core Capabilities
+- **Source Code Analysis**: Upload any size ZIP, PHP, JS, Python, or mixed projects
+- **AI-Powered Code Fixing**: Auto-detect bugs, security issues, and performance problems
+- **One-Click Deployment**: Deploy to servers without developer knowledge
+- **Addon Integration**: Payment gateways, wallet systems, language packs
+- **Security Scanning**: Real-time threat detection and auto-fix
+- **License Management**: Generate, validate, and manage software licenses
 
-Be concise, helpful, and professional. Always provide actionable advice.
-When discussing code or technical topics, use proper formatting with code blocks.
-You are powered by SoftwareVala™ technology.
+## Response Guidelines
+1. Be precise and accurate - verify information before responding
+2. Use proper code formatting with syntax highlighting
+3. Provide step-by-step instructions for complex tasks
+4. Include error handling and edge cases in code examples
+5. Always explain the "why" behind recommendations
+6. Use markdown tables for structured data
+7. Break complex answers into clear sections
 
-Keep responses focused and practical. Use markdown formatting when helpful.`
+## Code Quality Standards
+- Follow best practices for the language being discussed
+- Include type annotations where applicable
+- Add comments for complex logic
+- Consider security implications
+- Optimize for performance
+
+Powered by SoftwareVala™ Technology | Enterprise Grade AI`
     };
 
     const allMessages = [systemMessage, ...messages];
 
-    // Call Lovable AI Gateway with streaming
+    // Call Lovable AI Gateway
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -60,17 +82,17 @@ Keep responses focused and practical. Use markdown formatting when helpful.`
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'openai/gpt-5',
+        model: AI_MODEL,
         messages: allMessages,
-        max_tokens: 4096,
-        temperature: 0.7,
+        max_tokens: 8192,
+        temperature: 0.3, // Lower temperature for more accurate responses
         stream: stream,
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('AI Gateway error:', response.status, errorText);
+      console.error(`AI Gateway error [${response.status}]:`, errorText);
       
       if (response.status === 429) {
         return new Response(
@@ -84,12 +106,22 @@ Keep responses focused and practical. Use markdown formatting when helpful.`
           { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+      if (response.status === 400) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid request. Please try again with a different message.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
       
-      throw new Error(`AI Gateway error: ${response.status}`);
+      return new Response(
+        JSON.stringify({ error: 'AI service temporarily unavailable. Please try again.' }),
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    // If streaming, return the stream directly
+    // Streaming response
     if (stream) {
+      console.log('Streaming response started');
       return new Response(response.body, {
         headers: { ...corsHeaders, 'Content-Type': 'text/event-stream' },
       });
@@ -97,29 +129,33 @@ Keep responses focused and practical. Use markdown formatting when helpful.`
 
     // Non-streaming response
     const data = await response.json();
-    console.log('AI response received successfully');
+    console.log('AI response received:', data.usage || 'no usage data');
 
-    const assistantMessage = data.choices?.[0]?.message?.content || 'I apologize, but I could not generate a response. Please try again.';
+    const assistantMessage = data.choices?.[0]?.message?.content;
+    
+    if (!assistantMessage) {
+      console.error('No content in AI response:', JSON.stringify(data));
+      return new Response(
+        JSON.stringify({ error: 'AI returned empty response. Please try again.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     return new Response(
       JSON.stringify({ 
         response: assistantMessage,
-        model: 'openai/gpt-5'
+        model: AI_MODEL,
+        usage: data.usage
       }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: unknown) {
     console.error('AI chat error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return new Response(
       JSON.stringify({ error: errorMessage }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
