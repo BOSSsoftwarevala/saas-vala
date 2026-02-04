@@ -30,18 +30,28 @@ export function useVoiceInput({ onTranscript, autoSend = true, language = 'en-US
 
     if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
-      recognition.continuous = true;
+      recognition.continuous = false; // Stop after first result for better UX
       recognition.interimResults = true;
       recognition.lang = language;
+      recognition.maxAlternatives = 1;
 
       recognition.onstart = () => {
-        console.log('Voice recognition started');
+        console.log('🎤 Voice recognition started');
         setIsListening(true);
       };
 
       recognition.onend = () => {
-        console.log('Voice recognition ended');
+        console.log('🎤 Voice recognition ended');
         setIsListening(false);
+      };
+
+      // Handle audio start - user's mic is active
+      recognition.onaudiostart = () => {
+        console.log('🎤 Audio capturing started');
+      };
+
+      recognition.onspeechstart = () => {
+        console.log('🎤 Speech detected!');
       };
 
       recognition.onresult = (event: SpeechRecognitionEvent) => {
@@ -69,18 +79,24 @@ export function useVoiceInput({ onTranscript, autoSend = true, language = 'en-US
       };
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        console.error('Speech recognition error:', event.error);
+        console.error('🎤 Speech recognition error:', event.error);
         setIsListening(false);
 
         switch (event.error) {
           case 'no-speech':
-            toast.error('No speech detected. Please try again.');
+            toast.info('No speech heard. Tap mic and speak clearly into your microphone.', { duration: 4000 });
             break;
           case 'audio-capture':
-            toast.error('No microphone found. Please check your device.');
+            toast.error('No microphone found. Please connect a microphone.');
             break;
           case 'not-allowed':
-            toast.error('Microphone access denied. Please allow microphone access.');
+            toast.error('Microphone blocked! Click the lock 🔒 icon in browser address bar to allow.');
+            break;
+          case 'network':
+            toast.error('Network error. Check your internet connection.');
+            break;
+          case 'aborted':
+            // User stopped - don't show error
             break;
           default:
             toast.error(`Voice error: ${event.error}`);

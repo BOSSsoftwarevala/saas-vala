@@ -84,8 +84,8 @@ Powered by SoftwareVala™ Technology | Enterprise Grade AI`
       body: JSON.stringify({
         model: AI_MODEL,
         messages: allMessages,
-        max_tokens: 8192,
-        temperature: 0.3, // Lower temperature for more accurate responses
+        max_completion_tokens: 8192,
+        temperature: 0.3,
         stream: stream,
       }),
     });
