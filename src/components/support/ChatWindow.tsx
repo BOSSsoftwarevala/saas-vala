@@ -3,7 +3,9 @@ import { SupportHeader } from './SupportHeader';
 import { MessageBubble } from './MessageBubble';
 import { ChatInput } from './ChatInput';
 import { StaffControls } from './StaffControls';
+import { TypingIndicator } from './TypingIndicator';
 import { SupportTicket, SupportMessage } from '@/hooks/useSupportChat';
+import { useSupportPresence } from '@/hooks/useSupportPresence';
 import { Loader2, Lock } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -30,11 +32,34 @@ export function ChatWindow({
 }: ChatWindowProps) {
   const { user, isSuperAdmin } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Presence tracking
+  const { 
+    typingUsers, 
+    setTyping, 
+    isOtherUserOnline,
+    isOtherUserTyping 
+  } = useSupportPresence(ticket?.id || null);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, isOtherUserTyping]);
+
+  // Handle typing status
+  const handleTyping = () => {
+    setTyping(true);
+  };
+
+  // Wrap onSendMessage to clear typing status
+  const handleSendMessage = async (
+    content: string, 
+    type: 'text' | 'voice' | 'image', 
+    mediaUrl?: string
+  ) => {
+    setTyping(false);
+    return onSendMessage(content, type, mediaUrl);
+  };
 
   if (!ticket) {
     return (
@@ -58,13 +83,19 @@ export function ChatWindow({
   const isResolved = ticket.status === 'resolved';
   const canChat = !isPending && !isResolved;
 
+  // Get the name of who's typing
+  const typingUserName = typingUsers.length > 0 
+    ? typingUsers[0].is_staff ? 'Support' : ticket.user_name
+    : 'Someone';
+
   return (
     <div className="flex-1 flex flex-col h-full">
-      {/* Header */}
+      {/* Header with online status */}
       <SupportHeader 
         activeTicket={ticket} 
         onBack={onBack}
         showBackButton={showBackButton}
+        isOtherUserOnline={isOtherUserOnline}
       />
 
       {/* Staff controls */}
@@ -119,6 +150,12 @@ export function ChatWindow({
                 isStaffView={isSuperAdmin}
               />
             ))}
+
+            {/* Typing indicator */}
+            {isOtherUserTyping && (
+              <TypingIndicator userName={typingUserName} />
+            )}
+
             <div ref={messagesEndRef} />
           </>
         )}
@@ -126,7 +163,8 @@ export function ChatWindow({
 
       {/* Input area */}
       <ChatInput
-        onSendMessage={onSendMessage}
+        onSendMessage={handleSendMessage}
+        onTyping={handleTyping}
         disabled={!canChat}
         placeholder={
           isPending 

@@ -4,6 +4,7 @@ import { TicketList } from '@/components/support/TicketList';
 import { ChatWindow } from '@/components/support/ChatWindow';
 import { NewTicketModal } from '@/components/support/NewTicketModal';
 import { useSupportChat } from '@/hooks/useSupportChat';
+import { useGlobalPresence } from '@/hooks/useSupportPresence';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function Support() {
@@ -21,6 +22,7 @@ export default function Support() {
     isSuperAdmin,
   } = useSupportChat();
 
+  const { onlineUsers, isStaffOnline } = useGlobalPresence();
   const [showNewTicketModal, setShowNewTicketModal] = useState(false);
   const isMobile = useIsMobile();
 
@@ -74,6 +76,8 @@ export default function Support() {
               onNewTicket={() => setShowNewTicketModal(true)}
               loading={loading}
               isStaff={isSuperAdmin}
+              onlineUsers={onlineUsers}
+              isStaffOnline={isStaffOnline}
             />
           )}
         </div>
@@ -100,6 +104,8 @@ export default function Support() {
             onNewTicket={() => setShowNewTicketModal(true)}
             loading={loading}
             isStaff={isSuperAdmin}
+            onlineUsers={onlineUsers}
+            isStaffOnline={isStaffOnline}
           />
         </div>
 

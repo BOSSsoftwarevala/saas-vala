@@ -1,6 +1,7 @@
 import { format } from 'date-fns';
 import { MessageSquare, Clock, CheckCircle2, AlertCircle, Plus } from 'lucide-react';
 import { SupportTicket } from '@/hooks/useSupportChat';
+import { OnlineStatus } from './OnlineStatus';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import saasValaLogo from '@/assets/saas-vala-logo.jpg';
@@ -12,6 +13,8 @@ interface TicketListProps {
   onNewTicket: () => void;
   loading?: boolean;
   isStaff: boolean;
+  onlineUsers?: Map<string, boolean>;
+  isStaffOnline?: boolean;
 }
 
 const statusIcons = {
@@ -34,7 +37,9 @@ export function TicketList({
   onSelectTicket, 
   onNewTicket,
   loading,
-  isStaff 
+  isStaff,
+  onlineUsers,
+  isStaffOnline,
 }: TicketListProps) {
   if (loading) {
     return (
@@ -50,15 +55,30 @@ export function TicketList({
       <div className="bg-[#075E54] text-white px-4 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img 
-              src={saasValaLogo} 
-              alt="SaaS Vala" 
-              className="h-10 w-10 rounded-full object-cover"
-            />
+            <div className="relative">
+              <img 
+                src={saasValaLogo} 
+                alt="SaaS Vala" 
+                className="h-10 w-10 rounded-full object-cover"
+              />
+              {!isStaff && (
+                <div className="absolute -bottom-0.5 -right-0.5 p-0.5 bg-[#075E54] rounded-full">
+                  <OnlineStatus isOnline={!!isStaffOnline} size="sm" />
+                </div>
+              )}
+            </div>
             <div>
               <h2 className="font-semibold">Support</h2>
-              <p className="text-xs text-white/70">
-                {isStaff ? 'All Tickets' : 'Your Requests'}
+              <p className="text-xs text-white/70 flex items-center gap-1">
+                {isStaff ? 'All Tickets' : (
+                  <>
+                    {isStaffOnline ? (
+                      <span className="text-green-300">Staff Online</span>
+                    ) : (
+                      <span>Staff Offline</span>
+                    )}
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -96,6 +116,7 @@ export function TicketList({
           tickets.map((ticket) => {
             const StatusIcon = statusIcons[ticket.status];
             const isActive = ticket.id === activeTicketId;
+            const isUserOnline = onlineUsers?.has(ticket.user_id);
 
             return (
               <button
@@ -106,14 +127,24 @@ export function TicketList({
                   isActive && 'bg-[#075E54]/5'
                 )}
               >
-                <div className="h-12 w-12 rounded-full bg-[#075E54]/10 flex items-center justify-center flex-shrink-0">
-                  <MessageSquare className="h-6 w-6 text-[#075E54]" />
+                <div className="relative h-12 w-12 flex-shrink-0">
+                  <div className="h-12 w-12 rounded-full bg-[#075E54]/10 flex items-center justify-center">
+                    <MessageSquare className="h-6 w-6 text-[#075E54]" />
+                  </div>
+                  {isStaff && (
+                    <div className="absolute -bottom-0.5 -right-0.5 p-0.5 bg-white rounded-full">
+                      <OnlineStatus isOnline={!!isUserOnline} size="sm" />
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-semibold text-sm text-gray-900 truncate">
+                    <span className="font-semibold text-sm text-gray-900 truncate flex items-center gap-2">
                       {isStaff ? ticket.user_name : ticket.ticket_number}
+                      {isStaff && isUserOnline && (
+                        <span className="text-[10px] text-green-600 font-normal">online</span>
+                      )}
                     </span>
                     <span className="text-xs text-gray-500 flex-shrink-0">
                       {format(new Date(ticket.updated_at), 'MMM d')}
