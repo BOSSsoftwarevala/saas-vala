@@ -70,8 +70,8 @@ export function useProducts() {
       .insert({
         name: product.name || '',
         slug: product.slug || product.name?.toLowerCase().replace(/[^a-z0-9]/g, '-') || '',
-        description: product.description,
-        category_id: product.category_id,
+        description: product.description || null,
+        category_id: product.category_id && product.category_id.trim() !== '' ? product.category_id : null,
         status: product.status || 'draft',
         price: product.price || 0,
         currency: product.currency || 'INR',
@@ -92,9 +92,17 @@ export function useProducts() {
   };
 
   const updateProduct = async (id: string, updates: Partial<Product>) => {
+    // Sanitize category_id - convert empty string to null for UUID field
+    const sanitizedUpdates = {
+      ...updates,
+      category_id: updates.category_id && String(updates.category_id).trim() !== '' 
+        ? updates.category_id 
+        : null
+    };
+    
     const { error } = await supabase
       .from('products')
-      .update(updates)
+      .update(sanitizedUpdates)
       .eq('id', id);
 
     if (error) {
