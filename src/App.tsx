@@ -22,6 +22,8 @@ import Wallet from "./pages/Wallet";
 import SeoLeads from "./pages/SeoLeads";
 import Resellers from "./pages/Resellers";
 import Settings from "./pages/Settings";
+import AuditLogs from "./pages/AuditLogs";
+import SystemHealth from "./pages/SystemHealth";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -191,6 +193,26 @@ function AppRoutes() {
           <ProtectedRoute>
             <AdminRoute>
               <Settings />
+            </AdminRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/audit-logs"
+        element={
+          <ProtectedRoute>
+            <AdminRoute>
+              <AuditLogs />
+            </AdminRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/system-health"
+        element={
+          <ProtectedRoute>
+            <AdminRoute>
+              <SystemHealth />
             </AdminRoute>
           </ProtectedRoute>
         }
