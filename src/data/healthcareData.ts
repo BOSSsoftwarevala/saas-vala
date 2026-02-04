@@ -6,6 +6,7 @@ export interface HealthcareProduct {
   features: string[];
   price: number;
   originalPrice: number;
+  discount?: number;
   status: 'live' | 'bestseller' | 'upcoming';
 }
 
