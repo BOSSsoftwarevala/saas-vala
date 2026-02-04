@@ -31,12 +31,14 @@ interface NavItem {
 const navItems: NavItem[] = [
   { title: 'Dashboard', icon: LayoutDashboard, href: '/' },
   { title: 'Products', icon: Package, href: '/products' },
+  { title: 'Keys', icon: Key, href: '/keys' },
   { title: 'Servers', icon: Server, href: '/servers' },
   { title: 'SaaS AI', icon: Cpu, href: '/saas-ai-dashboard' },
-  { title: 'AI APIs', icon: MessageSquare, href: '/ai-apis' },
-  { title: 'Wallet & Invoices', icon: Wallet, href: '/wallet' },
+  { title: 'AI Chat', icon: MessageSquare, href: '/ai-chat' },
+  { title: 'AI APIs', icon: MessageSquare, href: '/ai-apis', adminOnly: true },
+  { title: 'Wallet', icon: Wallet, href: '/wallet' },
   { title: 'SEO & Leads', icon: TrendingUp, href: '/seo-leads' },
-  { title: 'Support Chat', icon: Key, href: '/ai-chat' },
+  { title: 'Resellers', icon: Users, href: '/resellers', adminOnly: true },
   { title: 'Settings', icon: Settings, href: '/settings', adminOnly: true },
 ];
 
