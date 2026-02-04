@@ -63,13 +63,13 @@ export function ChatHeader({ title, onExport, onToggleSidebar, sidebarOpen }: Ch
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-sm font-semibold text-foreground truncate max-w-[200px]">
-                {title}
+              <h1 className="text-sm font-semibold text-foreground">
+                Vala AI
               </h1>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-6 px-1.5 gap-1 text-muted-foreground hover:text-foreground">
-                    <span className="text-xs">GPT-5</span>
+                    <span className="text-xs">Gemini 3</span>
                     <ChevronDown className="h-3 w-3" />
                   </Button>
                 </DropdownMenuTrigger>
