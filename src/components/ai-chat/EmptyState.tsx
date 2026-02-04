@@ -1,4 +1,4 @@
-import { Sparkles, Upload, Server, Wrench } from 'lucide-react';
+import { Sparkles, Upload, Server, Wrench, Zap, Shield, Code } from 'lucide-react';
 
 interface EmptyStateProps {
   onSuggestionClick: (suggestion: string) => void;
@@ -8,71 +8,86 @@ export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
   const capabilities = [
     {
       icon: Upload,
-      title: 'Unlimited Source Upload',
-      description: 'Accept any size code - ZIP, PHP, JS, mixed projects'
+      title: 'Unlimited Upload',
+      description: 'Any size ZIP, PHP, JS projects'
     },
     {
       icon: Wrench,
-      title: 'Auto Fix & Upgrade',
-      description: 'AI-powered code analysis, fixing, and modernization'
+      title: 'Auto Fix',
+      description: 'AI-powered code analysis & repair'
     },
     {
       icon: Server,
       title: 'One-Click Deploy',
-      description: 'Auto deploy to any server without developer needed'
+      description: 'Deploy without a developer'
+    },
+    {
+      icon: Zap,
+      title: 'Addon Integration',
+      description: 'Payments, wallets, language packs'
+    },
+    {
+      icon: Shield,
+      title: 'Security Scan',
+      description: 'Malware & backdoor detection'
+    },
+    {
+      icon: Code,
+      title: 'Smart Upgrade',
+      description: 'Modernize legacy code safely'
     }
   ];
 
   const suggestions = [
-    'Upload a new source code project',
-    'Analyze and fix my PHP application',
-    'Deploy my project to a client server',
-    'Add payment integration to my app'
+    'Help me upload and analyze my PHP project',
+    'Deploy my application to a client server',
+    'Scan my source code for security issues',
+    'Add payment integration to my SaaS app'
   ];
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-8 min-h-[calc(100vh-12rem)]">
+    <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-8 min-h-[calc(100vh-8rem)]">
       {/* Logo & Title */}
       <div className="mb-8 text-center">
-        <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 mb-6 border border-primary/20">
-          <Sparkles className="h-10 w-10 text-primary" />
+        <div className="inline-flex items-center justify-center w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-transparent mb-6 border border-primary/20 shadow-lg shadow-primary/10">
+          <Sparkles className="h-8 w-8 md:h-10 md:w-10 text-primary" />
         </div>
-        <h1 className="text-3xl font-display font-bold text-foreground mb-3">
+        <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground mb-2">
           SaaS VALA AI
         </h1>
-        <p className="text-muted-foreground flex items-center justify-center gap-2 text-lg">
+        <p className="text-muted-foreground text-base md:text-lg">
           Internal Power Version
         </p>
-        <p className="text-sm text-muted-foreground mt-2">
-          Better than Lovable • No Limits • No Developer Required
+        <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
+          Better than Lovable • No File Limits • No Developer Required
         </p>
       </div>
 
-      {/* Capabilities */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mb-10">
+      {/* Capabilities Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-w-3xl mb-8">
         {capabilities.map((cap, index) => (
           <div
             key={index}
-            className="p-5 rounded-xl bg-muted/30 border border-border hover:border-primary/30 transition-colors"
+            className="p-4 rounded-xl bg-muted/20 border border-border hover:border-primary/30 hover:bg-muted/30 transition-all group"
           >
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10 mb-4">
-              <cap.icon className="h-6 w-6 text-primary" />
+            <div className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 mb-3 group-hover:bg-primary/20 transition-colors">
+              <cap.icon className="h-5 w-5 text-primary" />
             </div>
-            <h3 className="text-base font-semibold text-foreground mb-2">{cap.title}</h3>
-            <p className="text-sm text-muted-foreground">{cap.description}</p>
+            <h3 className="text-sm font-semibold text-foreground mb-1">{cap.title}</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">{cap.description}</p>
           </div>
         ))}
       </div>
 
       {/* Suggestions */}
-      <div className="max-w-2xl w-full">
-        <p className="text-sm text-muted-foreground mb-4 text-center font-medium">Try asking:</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="w-full max-w-2xl">
+        <p className="text-sm text-muted-foreground mb-3 text-center font-medium">Try asking:</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {suggestions.map((suggestion, index) => (
             <button
               key={index}
               onClick={() => onSuggestionClick(suggestion)}
-              className="p-4 rounded-xl bg-muted/50 hover:bg-muted border border-border hover:border-primary/30 text-left text-sm text-foreground transition-all duration-200 group"
+              className="p-3 md:p-4 rounded-xl bg-muted/30 hover:bg-muted/50 border border-border hover:border-primary/30 text-left text-sm text-foreground transition-all duration-200 group"
             >
               <span className="group-hover:text-primary transition-colors">{suggestion}</span>
             </button>
@@ -81,7 +96,7 @@ export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
       </div>
 
       {/* Footer */}
-      <p className="mt-10 text-xs text-muted-foreground">
+      <p className="mt-8 text-xs text-muted-foreground">
         Powered by <span className="font-semibold text-primary">SoftwareVala™</span>
       </p>
     </div>
