@@ -6,7 +6,7 @@ import { ChatInput } from '@/components/ai-chat/ChatInput';
 import { EmptyState } from '@/components/ai-chat/EmptyState';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
-
+import { supabase } from '@/integrations/supabase/client';
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 
@@ -19,13 +19,20 @@ interface ChatSession {
 
 const getFileType = (file: File): FileAttachment['type'] => {
   const ext = file.name.split('.').pop()?.toLowerCase() || '';
-  const codeExts = ['js', 'ts', 'tsx', 'jsx', 'py', 'php', 'html', 'css', 'json', 'xml', 'md', 'txt'];
-  const archiveExts = ['zip', 'rar', '7z', 'tar', 'gz'];
+  const codeExts = ['js', 'ts', 'tsx', 'jsx', 'py', 'php', 'html', 'css', 'json', 'xml', 'md', 'txt', 'sql', 'java', 'kt', 'swift', 'go', 'rs', 'c', 'cpp'];
+  const archiveExts = ['zip', 'rar', '7z', 'tar', 'gz', 'apk'];
   
   if (file.type.startsWith('image/')) return 'image';
   if (codeExts.includes(ext)) return 'code';
   if (archiveExts.includes(ext)) return 'archive';
   return 'other';
+};
+
+// Check if file is analyzable source code
+const isAnalyzableFile = (file: File): boolean => {
+  const ext = file.name.split('.').pop()?.toLowerCase() || '';
+  const analyzableExts = ['zip', 'apk', 'php', 'js', 'ts', 'tsx', 'jsx', 'py', 'html', 'css', 'json', 'sql', 'java', 'kt', 'xml'];
+  return analyzableExts.includes(ext);
 };
 
 export default function AiChat() {
@@ -221,12 +228,79 @@ export default function AiChat() {
 
     // Build message content including file info
     let messageContent = content;
+    let analysisResults: string[] = [];
+    
+    // Upload and analyze files if present
     if (files && files.length > 0) {
       const fileNames = files.map(f => f.name).join(', ');
+      
+      // Check for analyzable files
+      const analyzableFiles = files.filter(f => isAnalyzableFile(f));
+      
+      if (analyzableFiles.length > 0) {
+        toast.info('Uploading and analyzing files...');
+        
+        // Get user
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          for (const file of analyzableFiles) {
+            try {
+              // Upload to storage
+              const fileId = crypto.randomUUID();
+              const filePath = `${user.id}/${fileId}-${file.name}`;
+              
+              const { error: uploadError } = await supabase.storage
+                .from('source-code')
+                .upload(filePath, file, { cacheControl: '3600', upsert: false });
+              
+              if (!uploadError) {
+                // Trigger auto-deploy pipeline for analysis
+                const { data: pipelineResult, error: pipelineError } = await supabase.functions.invoke('auto-deploy-pipeline', {
+                  body: { filePath, deploymentId: fileId }
+                });
+                
+                if (!pipelineError && pipelineResult) {
+                  // Format analysis results
+                  const result = pipelineResult as any;
+                  analysisResults.push(`
+📦 **${file.name}** Analysis Complete:
+
+**Framework:** ${result.analysis?.framework || 'Unknown'}
+**Language:** ${result.analysis?.language || 'Unknown'}
+**Size:** ${result.analysis?.size || 'N/A'}
+
+**🔒 Security Issues:** ${result.security?.issues || 0}
+${result.security?.remaining?.length > 0 ? result.security.remaining.map((i: string) => `  • ${i}`).join('\n') : '  ✓ No issues found'}
+
+**🔧 Auto-Fixes Applied:** ${result.fixes?.applied || 0}
+${result.fixes?.details?.length > 0 ? result.fixes.details.map((f: string) => `  • ${f}`).join('\n') : '  • None needed'}
+
+**📦 Dependencies:** ${result.analysis?.dependencies?.length || 0}
+${result.analysis?.dependencies?.length > 0 ? result.analysis.dependencies.map((d: string) => `  • ${d}`).join('\n') : '  • None detected'}
+
+**✅ Tests:** ${result.tests?.passed || 0} passed, ${result.tests?.failed || 0} failed
+${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
+
+**📋 Status:** ${result.deployment?.status === 'ready' ? '🟢 Ready to deploy' : result.deployment?.status === 'deployed' ? '🚀 Deployed' : '🔴 Needs attention'}
+`);
+                  toast.success(`${file.name} analyzed successfully`);
+                } else {
+                  console.error('Pipeline error:', pipelineError);
+                }
+              } else {
+                console.error('Upload error:', uploadError);
+              }
+            } catch (err) {
+              console.error('Analysis error:', err);
+            }
+          }
+        }
+      }
+      
       if (content.trim()) {
         messageContent = `${content}\n\n[Attached files: ${fileNames}]`;
       } else {
-        messageContent = `[Uploaded files: ${fileNames}]`;
+        messageContent = `[Uploaded files: ${fileNames}]\n\nPlease analyze these files for missing dependencies, security issues, and database requirements.`;
       }
     }
 
@@ -296,11 +370,20 @@ export default function AiChat() {
     try {
       addAssistantMessage();
       
+      // If we have analysis results, prepend them to the AI context
+      let enhancedUserMessage = userMessage;
+      if (analysisResults.length > 0) {
+        enhancedUserMessage = {
+          ...userMessage,
+          content: `${userMessage.content}\n\n---\n**AUTO-ANALYSIS RESULTS:**\n${analysisResults.join('\n---\n')}\n\nBased on this analysis, please provide recommendations for:\n1. Missing database tables/schema needed\n2. Missing configurations or environment variables\n3. Security fixes required\n4. Dependencies to install\n5. Next steps for deployment`
+        };
+      }
+      
       const currentSession = sessions.find(s => s.id === sessionId);
       const historyMessages = currentSession?.messages.slice(-10) || [];
       
       await streamChat(
-        [...historyMessages, userMessage],
+        [...historyMessages, enhancedUserMessage],
         sessionId,
         (chunk) => {
           assistantContent += chunk;
