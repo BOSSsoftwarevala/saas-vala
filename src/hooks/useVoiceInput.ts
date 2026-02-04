@@ -104,15 +104,43 @@ export function useVoiceInput({ onTranscript, autoSend = true, language = 'en-US
     }
 
     try {
-      // Request microphone permission
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Request microphone permission first
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      // Stop the stream immediately - we just needed permission
+      stream.getTracks().forEach(track => track.stop());
       
       setTranscript('');
-      recognitionRef.current?.start();
-      toast.success('Listening... Speak now!', { duration: 2000 });
-    } catch (error) {
+      
+      // Small delay to ensure recognition is ready
+      setTimeout(() => {
+        try {
+          recognitionRef.current?.start();
+          toast.success('🎤 Listening... Speak now!', { duration: 2000 });
+        } catch (startError: any) {
+          console.error('Recognition start error:', startError);
+          if (startError.message?.includes('already started')) {
+            // Already running, just update state
+            setIsListening(true);
+          } else {
+            toast.error('Could not start voice recognition. Please try again.');
+          }
+        }
+      }, 100);
+    } catch (error: any) {
       console.error('Microphone access error:', error);
-      toast.error('Could not access microphone. Please allow microphone access.');
+      
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        toast.error('Microphone blocked! Click the 🔒 icon in your browser address bar to allow access.', {
+          duration: 5000
+        });
+      } else if (error.name === 'NotFoundError') {
+        toast.error('No microphone found. Please connect a microphone and try again.');
+      } else if (error.name === 'NotSupportedError') {
+        toast.error('Voice input requires HTTPS. Please use a secure connection.');
+      } else {
+        toast.error(`Microphone error: ${error.message || 'Unknown error'}. Please check browser permissions.`);
+      }
     }
   }, [isSupported]);
 
