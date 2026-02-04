@@ -18,6 +18,7 @@ import {
   Users,
   History,
   Headphones,
+  Brain,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import saasValaLogo from '@/assets/saas-vala-logo.jpg';
@@ -35,6 +36,7 @@ const navItems: NavItem[] = [
   { title: 'Products', icon: Package, href: '/products' },
   { title: 'Keys', icon: Key, href: '/keys' },
   { title: 'Servers', icon: Server, href: '/servers' },
+  { title: 'SaaS AI', icon: Brain, href: '/saas-ai-system' },
   { title: 'AI Chat', icon: MessageSquare, href: '/ai-chat' },
   { title: 'AI APIs', icon: Cpu, href: '/ai-apis' },
   { title: 'Wallet', icon: Wallet, href: '/wallet' },

@@ -17,6 +17,7 @@ import DomainOperations from "./pages/DomainOperations";
 import SecurityLogs from "./pages/SecurityLogs";
 import AiChat from "./pages/AiChat";
 import SaasAiDashboard from "./pages/SaasAiDashboard";
+import SaasAiSystem from "./pages/SaasAiSystem";
 import AiApis from "./pages/AiApis";
 import Wallet from "./pages/Wallet";
 import SeoLeads from "./pages/SeoLeads";
@@ -142,6 +143,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <SaasAiDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/saas-ai-system"
+        element={
+          <ProtectedRoute>
+            <SaasAiSystem />
           </ProtectedRoute>
         }
       />

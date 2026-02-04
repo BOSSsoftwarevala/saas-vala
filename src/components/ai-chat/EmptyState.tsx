@@ -102,14 +102,24 @@ export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
       </div>
 
       {/* Dashboard Button */}
-      <Button 
-        variant="outline" 
-        onClick={() => navigate('/saas-ai-dashboard')}
-        className="mt-6 gap-2"
-      >
-        <LayoutDashboard className="h-4 w-4" />
-        Open Project Dashboard
-      </Button>
+      <div className="flex gap-3">
+        <Button 
+          variant="outline" 
+          onClick={() => navigate('/saas-ai-system')}
+          className="gap-2"
+        >
+          <LayoutDashboard className="h-4 w-4" />
+          AI System
+        </Button>
+        <Button 
+          variant="outline" 
+          onClick={() => navigate('/saas-ai-dashboard')}
+          className="gap-2"
+        >
+          <LayoutDashboard className="h-4 w-4" />
+          Project Dashboard
+        </Button>
+      </div>
 
       {/* Footer */}
       <p className="mt-6 text-xs text-muted-foreground">
