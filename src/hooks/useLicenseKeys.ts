@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -23,7 +23,7 @@ export function useLicenseKeys() {
   const [keys, setKeys] = useState<LicenseKey[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchKeys = async () => {
+  const fetchKeys = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('license_keys')
@@ -37,7 +37,7 @@ export function useLicenseKeys() {
       setKeys((data || []) as LicenseKey[]);
     }
     setLoading(false);
-  };
+  }, []);
 
   const generateKeyString = (): string => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -77,7 +77,7 @@ export function useLicenseKeys() {
       throw error;
     }
     toast.success('License key created: ' + licenseKey);
-    await fetchKeys();
+    // Real-time will handle refresh
     return data;
   };
 
@@ -92,7 +92,7 @@ export function useLicenseKeys() {
       throw error;
     }
     toast.success('License key updated');
-    await fetchKeys();
+    // Real-time will handle refresh
   };
 
   const deleteKey = async (id: string) => {
@@ -106,7 +106,7 @@ export function useLicenseKeys() {
       throw error;
     }
     toast.success('License key deleted');
-    await fetchKeys();
+    // Real-time will handle refresh
   };
 
   const suspendKey = async (id: string) => {
@@ -123,7 +123,19 @@ export function useLicenseKeys() {
 
   useEffect(() => {
     fetchKeys();
-  }, []);
+
+    // Real-time subscription for live updates
+    const channel = supabase
+      .channel('license-keys-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'license_keys' }, () => {
+        fetchKeys();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchKeys]);
 
   return {
     keys,

@@ -29,6 +29,7 @@ import { DemoMapping } from '@/components/products/DemoMapping';
 import { ApkMapping } from '@/components/products/ApkMapping';
 import { LicenseMapping } from '@/components/products/LicenseMapping';
 import { ValidationStatusCard } from '@/components/products/ValidationStatusCard';
+import { SystemValidationCard } from '@/components/products/SystemValidationCard';
 
 export default function Products() {
   const { products, loading, fetchProducts, updateProduct, deleteProduct, suspendProduct, activateProduct } = useProducts();
@@ -245,6 +246,9 @@ export default function Products() {
       default:
         return (
           <>
+            {/* System Validation */}
+            <SystemValidationCard />
+
             {/* Validation Status */}
             <ValidationStatusCard />
 
