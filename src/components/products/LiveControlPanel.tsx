@@ -8,7 +8,6 @@ import {
   AlertTriangle,
   Clock,
   ChevronRight,
-  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -117,6 +116,25 @@ export function LiveControlPanel() {
           .select('id, ticket_number, user_name')
           .in('status', ['open', 'pending']);
 
+        // Fetch APK download counts (using apks table)
+        const { data: apkDownloads } = await supabase
+          .from('apks')
+          .select('id, version, download_count, product_id')
+          .eq('status', 'published')
+          .order('download_count', { ascending: false })
+          .limit(10);
+
+        // Calculate total downloads
+        const totalDownloads = apkDownloads?.reduce((sum, apk) => sum + (apk.download_count || 0), 0) || 0;
+
+        // Fetch active user sessions (from today)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const { data: activeSessions } = await supabase
+          .from('user_sessions')
+          .select('id, user_id, device_name, last_active_at')
+          .gt('last_active_at', today.toISOString());
+
         setStats(prev => prev.map(stat => {
           switch (stat.id) {
             case 'live-chats':
@@ -129,6 +147,16 @@ export function LiveControlPanel() {
                   time: 'Active',
                 })) || [],
               };
+            case 'active-users':
+              return {
+                ...stat,
+                count: activeSessions?.length || 0,
+                items: activeSessions?.map(s => ({
+                  id: s.id,
+                  label: s.device_name || 'Unknown Device',
+                  time: s.last_active_at ? new Date(s.last_active_at).toLocaleTimeString() : 'Active',
+                })) || [],
+              };
             case 'demos-running':
               return {
                 ...stat,
@@ -137,6 +165,16 @@ export function LiveControlPanel() {
                   id: d.id,
                   label: d.name,
                   time: 'Live',
+                })) || [],
+              };
+            case 'apk-downloads':
+              return {
+                ...stat,
+                count: totalDownloads,
+                items: apkDownloads?.map(a => ({
+                  id: a.id,
+                  label: `v${a.version}`,
+                  time: `${a.download_count || 0} downloads`,
                 })) || [],
               };
             case 'server-alerts':
@@ -176,10 +214,16 @@ export function LiveControlPanel() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'support_tickets' }, fetchLiveStats)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'demos' }, fetchLiveStats)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'servers' }, fetchLiveStats)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'apks' }, fetchLiveStats)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_sessions' }, fetchLiveStats)
       .subscribe();
+
+    // Auto refresh every 30 seconds
+    const interval = setInterval(fetchLiveStats, 30000);
 
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(interval);
     };
   }, []);
 

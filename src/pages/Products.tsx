@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { toast } from 'sonner';
 import { useProducts, type Product } from '@/hooks/useProducts';
-import { supabase } from '@/integrations/supabase/client';
+import { useRealTimeStats } from '@/hooks/useRealTimeStats';
+import { logProductActivity } from '@/hooks/useProductActions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,34 +28,12 @@ import { CategoryManager } from '@/components/products/CategoryManager';
 import { DemoMapping } from '@/components/products/DemoMapping';
 import { ApkMapping } from '@/components/products/ApkMapping';
 import { LicenseMapping } from '@/components/products/LicenseMapping';
-
-interface ExtendedStats {
-  totalDemos: number;
-  liveDemos: number;
-  totalApks: number;
-  stableApks: number;
-  licensesIssued: number;
-  expiringLicenses: number;
-  serverDeployments: number;
-  productErrors: number;
-}
+import { ValidationStatusCard } from '@/components/products/ValidationStatusCard';
 
 export default function Products() {
   const { products, loading, fetchProducts, updateProduct, deleteProduct, suspendProduct, activateProduct } = useProducts();
+  const { stats: realTimeStats, refetch: refetchStats } = useRealTimeStats();
   const [activeView, setActiveView] = useState<ProductView>('products');
-  const [totalCategories, setTotalCategories] = useState(0);
-
-  // Extended stats
-  const [extendedStats, setExtendedStats] = useState<ExtendedStats>({
-    totalDemos: 0,
-    liveDemos: 0,
-    totalApks: 0,
-    stableApks: 0,
-    licensesIssued: 0,
-    expiringLicenses: 0,
-    serverDeployments: 0,
-    productErrors: 0,
-  });
 
   // Slide panel states
   const [productPanelOpen, setProductPanelOpen] = useState(false);
@@ -63,57 +42,13 @@ export default function Products() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [deleteProductId, setDeleteProductId] = useState<string | null>(null);
 
-  // Stats calculations
+  // Stats from products (local fallback merged with realtime)
   const stats = {
-    total: products.length,
-    active: products.filter(p => p.status === 'active').length,
-    draft: products.filter(p => p.status === 'draft').length,
-    suspended: products.filter(p => p.status === 'suspended').length,
+    total: realTimeStats.totalProducts || products.length,
+    active: realTimeStats.activeProducts || products.filter(p => p.status === 'active').length,
+    draft: realTimeStats.draftProducts || products.filter(p => p.status === 'draft').length,
+    suspended: realTimeStats.suspendedProducts || products.filter(p => p.status === 'suspended').length,
   };
-
-  // Fetch category count
-  useEffect(() => {
-    const fetchCategories = async () => {
-      const { count } = await supabase
-        .from('categories')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_active', true);
-      setTotalCategories(count || 0);
-    };
-    fetchCategories();
-  }, []);
-
-  // Fetch extended stats
-  useEffect(() => {
-    const fetchExtendedStats = async () => {
-      try {
-        const { data: demos } = await supabase.from('demos').select('id, status');
-        const { data: apks } = await supabase.from('apks').select('id, status');
-        const { data: licenses } = await supabase.from('license_keys').select('id, status, expires_at');
-        const { data: servers } = await supabase.from('servers').select('id, status').eq('status', 'live');
-
-        const thirtyDaysFromNow = new Date();
-        thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-
-        setExtendedStats({
-          totalDemos: demos?.length || 0,
-          liveDemos: demos?.filter(d => d.status === 'active').length || 0,
-          totalApks: apks?.length || 0,
-          stableApks: apks?.filter(a => a.status === 'published').length || 0,
-          licensesIssued: licenses?.length || 0,
-          expiringLicenses: licenses?.filter(l => 
-            l.expires_at && new Date(l.expires_at) < thirtyDaysFromNow && new Date(l.expires_at) > new Date()
-          ).length || 0,
-          serverDeployments: servers?.length || 0,
-          productErrors: stats.suspended,
-        });
-      } catch (error) {
-        console.error('Error fetching extended stats:', error);
-      }
-    };
-
-    fetchExtendedStats();
-  }, [products.length, stats.suspended]);
 
   // KPI action handlers
   const handleKPIAction = (action: string) => {
@@ -200,24 +135,30 @@ export default function Products() {
     const activeProducts = products.filter(p => p.status === 'active');
     for (const product of activeProducts) {
       await suspendProduct(product.id);
+      await logProductActivity('suspend', product.id, { bulk: true });
     }
     toast.success(`${activeProducts.length} products suspended`);
+    refetchStats();
   };
 
   const handleBulkActivate = async () => {
     const suspendedProducts = products.filter(p => p.status === 'suspended');
     for (const product of suspendedProducts) {
       await activateProduct(product.id);
+      await logProductActivity('activate', product.id, { bulk: true });
     }
     toast.success(`${suspendedProducts.length} products activated`);
+    refetchStats();
   };
 
   const handleApproveDrafts = async () => {
     const draftProducts = products.filter(p => p.status === 'draft');
     for (const product of draftProducts) {
       await updateProduct(product.id, { status: 'active' });
+      await logProductActivity('approve', product.id, { from: 'draft', to: 'active' });
     }
     toast.success(`${draftProducts.length} products approved`);
+    refetchStats();
   };
 
   const handleBulkImport = () => {
@@ -226,6 +167,7 @@ export default function Products() {
 
   const handleRefresh = () => {
     fetchProducts();
+    refetchStats();
     toast.success('Data refreshed');
   };
 
@@ -237,20 +179,28 @@ export default function Products() {
 
   const handleApprove = async (product: Product) => {
     await updateProduct(product.id, { status: 'active' });
+    await logProductActivity('approve', product.id, { from: product.status, to: 'active' });
+    refetchStats();
   };
 
   const handleSuspend = async (product: Product) => {
     await suspendProduct(product.id);
+    await logProductActivity('suspend', product.id, { from: product.status, to: 'suspended' });
+    refetchStats();
   };
 
   const handleActivate = async (product: Product) => {
     await activateProduct(product.id);
+    await logProductActivity('activate', product.id, { from: product.status, to: 'active' });
+    refetchStats();
   };
 
   const handleDelete = async () => {
     if (!deleteProductId) return;
+    await logProductActivity('delete', deleteProductId, { action: 'permanent_delete' });
     await deleteProduct(deleteProductId);
     setDeleteProductId(null);
+    refetchStats();
   };
 
   const handleAddDemo = (product: Product) => {
@@ -295,20 +245,23 @@ export default function Products() {
       default:
         return (
           <>
+            {/* Validation Status */}
+            <ValidationStatusCard />
+
             {/* KPI Boxes */}
             <ProductKPIBoxes
               totalProducts={stats.total}
               activeProducts={stats.active}
               draftProducts={stats.draft}
               suspendedProducts={stats.suspended}
-              totalDemos={extendedStats.totalDemos}
-              liveDemos={extendedStats.liveDemos}
-              totalApks={extendedStats.totalApks}
-              stableApks={extendedStats.stableApks}
-              licensesIssued={extendedStats.licensesIssued}
-              expiringLicenses={extendedStats.expiringLicenses}
-              serverDeployments={extendedStats.serverDeployments}
-              productErrors={extendedStats.productErrors}
+              totalDemos={realTimeStats.totalDemos}
+              liveDemos={realTimeStats.liveDemos}
+              totalApks={realTimeStats.totalApks}
+              stableApks={realTimeStats.stableApks}
+              licensesIssued={realTimeStats.licensesIssued}
+              expiringLicenses={realTimeStats.expiringLicenses}
+              serverDeployments={realTimeStats.serverDeployments}
+              productErrors={realTimeStats.productErrors}
               onAction={handleKPIAction}
             />
 
@@ -381,7 +334,7 @@ export default function Products() {
         open={productPanelOpen}
         onOpenChange={setProductPanelOpen}
         product={selectedProduct}
-        onSave={fetchProducts}
+        onSave={() => { fetchProducts(); refetchStats(); }}
       />
 
       <DemoSlidePanel
@@ -389,7 +342,7 @@ export default function Products() {
         onOpenChange={setDemoPanelOpen}
         productId={selectedProduct?.id || null}
         demo={null}
-        onSave={fetchProducts}
+        onSave={() => { fetchProducts(); refetchStats(); }}
       />
 
       <ApkSlidePanel
@@ -397,7 +350,7 @@ export default function Products() {
         onOpenChange={setApkPanelOpen}
         productId={selectedProduct?.id || null}
         apk={null}
-        onSave={fetchProducts}
+        onSave={() => { fetchProducts(); refetchStats(); }}
       />
 
       {/* Delete Confirmation */}
