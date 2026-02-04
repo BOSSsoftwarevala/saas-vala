@@ -125,7 +125,7 @@ export function useSupportChat() {
     mediaUrl?: string,
     voiceDuration?: number,
     isInternalNote: boolean = false
-  ) => {
+  ): Promise<boolean> => {
     if (!user) return false;
 
     try {

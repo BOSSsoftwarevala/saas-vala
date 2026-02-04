@@ -29,10 +29,11 @@ export default function Support() {
   const handleSendMessage = async (
     content: string,
     type: 'text' | 'voice' | 'image',
-    mediaUrl?: string
+    mediaUrl?: string,
+    voiceDuration?: number
   ) => {
     if (!activeTicket) return false;
-    return sendMessage(activeTicket.id, content, type, mediaUrl);
+    return sendMessage(activeTicket.id, content, type, mediaUrl, voiceDuration);
   };
 
   const handleSendInternalNote = async (content: string) => {

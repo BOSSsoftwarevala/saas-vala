@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Check, CheckCheck, Play, Pause, Lock, Image as ImageIcon, Mic } from 'lucide-react';
 import { SupportMessage } from '@/hooks/useSupportChat';
 import { format } from 'date-fns';
@@ -13,14 +13,54 @@ interface MessageBubbleProps {
 export function MessageBubble({ message, isOwnMessage, isStaffView }: MessageBubbleProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [audioProgress, setAudioProgress] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+    const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const isInternalNote = message.is_internal_note && isStaffView;
+
+  // Handle audio playback
+  useEffect(() => {
+    if (message.message_type === 'voice' && message.media_url) {
+      const audio = new Audio(message.media_url);
+      audioRef.current = audio;
+
+      audio.ontimeupdate = () => {
+        if (audio.duration) {
+          setAudioProgress((audio.currentTime / audio.duration) * 100);
+          setCurrentTime(audio.currentTime);
+        }
+      };
+
+      audio.onended = () => {
+        setIsPlaying(false);
+        setAudioProgress(0);
+        setCurrentTime(0);
+      };
+
+      return () => {
+        audio.pause();
+        audio.src = '';
+      };
+    }
+  }, [message.media_url, message.message_type]);
+
+  const togglePlayback = () => {
+    if (!audioRef.current) return;
+
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play();
+    }
+    setIsPlaying(!isPlaying);
+  };
 
   return (
     <div
@@ -55,10 +95,10 @@ export function MessageBubble({ message, isOwnMessage, isStaffView }: MessageBub
         )}
 
         {/* Voice message */}
-        {message.message_type === 'voice' && (
+        {message.message_type === 'voice' && message.media_url && (
           <div className="flex items-center gap-3 min-w-[200px]">
             <button
-              onClick={() => setIsPlaying(!isPlaying)}
+              onClick={togglePlayback}
               className={cn(
                 'h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0',
                 isOwnMessage ? 'bg-[#25D366] text-white' : 'bg-[#075E54] text-white'
@@ -68,11 +108,18 @@ export function MessageBubble({ message, isOwnMessage, isStaffView }: MessageBub
             </button>
             <div className="flex-1">
               <div className="h-1 bg-gray-300 rounded-full overflow-hidden">
-                <div className="h-full w-0 bg-[#25D366] transition-all duration-300" />
+                <div 
+                  className="h-full bg-[#25D366] transition-all duration-100" 
+                  style={{ width: `${audioProgress}%` }}
+                />
               </div>
               <div className="flex items-center justify-between mt-1">
                 <span className="text-xs text-gray-500">
-                  {message.voice_duration ? formatDuration(message.voice_duration) : '0:00'}
+                  {isPlaying || currentTime > 0
+                    ? formatDuration(currentTime)
+                    : message.voice_duration 
+                    ? formatDuration(message.voice_duration) 
+                    : '0:00'}
                 </span>
                 <Mic className="h-3 w-3 text-[#25D366]" />
               </div>

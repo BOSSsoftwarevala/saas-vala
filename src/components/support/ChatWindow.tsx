@@ -13,7 +13,7 @@ interface ChatWindowProps {
   ticket: SupportTicket | null;
   messages: SupportMessage[];
   loading?: boolean;
-  onSendMessage: (content: string, type: 'text' | 'voice' | 'image', mediaUrl?: string) => Promise<boolean>;
+  onSendMessage: (content: string, type: 'text' | 'voice' | 'image', mediaUrl?: string, voiceDuration?: number) => Promise<boolean>;
   onBack?: () => void;
   showBackButton?: boolean;
   onUpdateStatus?: (status: SupportTicket['status']) => Promise<boolean>;
@@ -55,10 +55,11 @@ export function ChatWindow({
   const handleSendMessage = async (
     content: string, 
     type: 'text' | 'voice' | 'image', 
-    mediaUrl?: string
+    mediaUrl?: string,
+    voiceDuration?: number
   ) => {
     setTyping(false);
-    return onSendMessage(content, type, mediaUrl);
+    return onSendMessage(content, type, mediaUrl, voiceDuration);
   };
 
   if (!ticket) {
