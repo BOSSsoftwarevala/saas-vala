@@ -1,16 +1,15 @@
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { cn } from '@/lib/utils';
 import { 
   Plus, 
   MessageSquare, 
   Trash2, 
-  ChevronLeft,
-  ChevronRight,
   Sparkles,
+  PanelLeftClose,
+  PanelLeft,
   MoreHorizontal
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,157 +20,176 @@ import {
 export interface ChatSession {
   id: string;
   title: string;
-  preview: string;
   createdAt: Date;
-  updatedAt: Date;
+  messages: any[];
 }
 
 interface ChatSidebarProps {
   sessions: ChatSession[];
-  activeSessionId: string;
+  activeSessionId: string | null;
   onSelectSession: (id: string) => void;
-  onNewChat: () => void;
+  onNewSession: () => void;
   onDeleteSession: (id: string) => void;
-  collapsed: boolean;
-  onToggleCollapse: () => void;
+  isOpen: boolean;
+  onToggle: () => void;
 }
 
 export function ChatSidebar({
   sessions,
   activeSessionId,
   onSelectSession,
-  onNewChat,
+  onNewSession,
   onDeleteSession,
-  collapsed,
-  onToggleCollapse,
+  isOpen,
+  onToggle
 }: ChatSidebarProps) {
+  // Group sessions by date
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const lastWeek = new Date(today);
+  lastWeek.setDate(lastWeek.getDate() - 7);
+
+  const groupedSessions = {
+    today: sessions.filter(s => s.createdAt.toDateString() === today.toDateString()),
+    yesterday: sessions.filter(s => s.createdAt.toDateString() === yesterday.toDateString()),
+    lastWeek: sessions.filter(s => 
+      s.createdAt > lastWeek && 
+      s.createdAt.toDateString() !== today.toDateString() &&
+      s.createdAt.toDateString() !== yesterday.toDateString()
+    ),
+    older: sessions.filter(s => s.createdAt <= lastWeek)
+  };
+
+  const SessionGroup = ({ title, items }: { title: string; items: ChatSession[] }) => {
+    if (items.length === 0) return null;
+    
+    return (
+      <div className="mb-4">
+        <div className="px-3 py-2">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            {title}
+          </span>
+        </div>
+        <div className="space-y-1">
+          {items.map((session) => (
+            <div
+              key={session.id}
+              className={cn(
+                "group flex items-center gap-2 px-3 py-2.5 mx-2 rounded-lg cursor-pointer transition-colors",
+                activeSessionId === session.id
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              )}
+              onClick={() => onSelectSession(session.id)}
+            >
+              <MessageSquare className="h-4 w-4 shrink-0" />
+              <span className="flex-1 truncate text-sm">{session.title}</span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <MoreHorizontal className="h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteSession(session.id);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <aside
-      className={cn(
-        'h-full bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300',
-        collapsed ? 'w-16' : 'w-72'
-      )}
-    >
-      {/* Header */}
-      <div className="p-3 border-b border-sidebar-border">
-        <Button
-          onClick={onNewChat}
-          className={cn(
-            'w-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 gap-2',
-            collapsed && 'px-0'
-          )}
-        >
-          <Plus className="h-4 w-4" />
-          {!collapsed && <span>New Chat</span>}
-        </Button>
+    <>
+      {/* Sidebar */}
+      <div
+        className={cn(
+          "h-full bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300 shrink-0",
+          isOpen ? "w-64" : "w-0 overflow-hidden"
+        )}
+      >
+        {/* Header */}
+        <div className="p-4 border-b border-sidebar-border">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-9 w-9 rounded-xl bg-primary/20 flex items-center justify-center">
+              <Sparkles className="h-5 w-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="font-display font-bold text-sidebar-foreground text-sm truncate">SaaS VALA AI</h2>
+              <p className="text-xs text-muted-foreground truncate">Internal Power</p>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onToggle}
+              className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
+            >
+              <PanelLeftClose className="h-4 w-4" />
+            </Button>
+          </div>
+          <Button
+            onClick={onNewSession}
+            className="w-full gap-2 bg-primary hover:bg-primary/90"
+          >
+            <Plus className="h-4 w-4" />
+            New Chat
+          </Button>
+        </div>
+
+        {/* Sessions List */}
+        <ScrollArea className="flex-1">
+          <div className="py-2">
+            <SessionGroup title="Today" items={groupedSessions.today} />
+            <SessionGroup title="Yesterday" items={groupedSessions.yesterday} />
+            <SessionGroup title="Last 7 days" items={groupedSessions.lastWeek} />
+            <SessionGroup title="Older" items={groupedSessions.older} />
+            
+            {sessions.length === 0 && (
+              <div className="px-4 py-12 text-center">
+                <MessageSquare className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
+                <p className="text-sm text-muted-foreground font-medium">No conversations yet</p>
+                <p className="text-xs text-muted-foreground mt-1">Start a new chat to begin</p>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-sidebar-border">
+          <p className="text-xs text-center text-muted-foreground">
+            Powered by <span className="font-semibold text-primary">SoftwareVala™</span>
+          </p>
+        </div>
       </div>
 
-      {/* Chat List */}
-      <ScrollArea className="flex-1">
-        <div className="p-2 space-y-1">
-          {sessions.map((session) => {
-            const isActive = session.id === activeSessionId;
-            
-            return (
-              <div
-                key={session.id}
-                className={cn(
-                  'group relative rounded-lg transition-all duration-200',
-                  isActive 
-                    ? 'bg-sidebar-accent' 
-                    : 'hover:bg-sidebar-accent/50'
-                )}
-              >
-                <button
-                  onClick={() => onSelectSession(session.id)}
-                  className={cn(
-                    'w-full text-left p-3 flex items-start gap-3',
-                    collapsed && 'justify-center px-0'
-                  )}
-                >
-                  <MessageSquare 
-                    className={cn(
-                      'h-4 w-4 shrink-0 mt-0.5',
-                      isActive ? 'text-primary' : 'text-muted-foreground'
-                    )} 
-                  />
-                  {!collapsed && (
-                    <div className="flex-1 min-w-0">
-                      <p className={cn(
-                        'text-sm font-medium truncate',
-                        isActive ? 'text-foreground' : 'text-sidebar-foreground'
-                      )}>
-                        {session.title}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate mt-0.5">
-                        {session.preview}
-                      </p>
-                    </div>
-                  )}
-                </button>
-
-                {/* Actions */}
-                {!collapsed && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-2 top-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <MoreHorizontal className="h-3 w-3" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-40">
-                      <DropdownMenuItem
-                        onClick={() => onDeleteSession(session.id)}
-                        className="text-destructive focus:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </ScrollArea>
-
-      {/* Footer */}
-      <div className="p-2 border-t border-sidebar-border">
+      {/* Toggle Button (when sidebar is closed) */}
+      {!isOpen && (
         <Button
           variant="ghost"
-          size="sm"
-          onClick={onToggleCollapse}
-          className={cn(
-            'w-full text-sidebar-foreground hover:bg-sidebar-accent hover:text-foreground',
-            collapsed && 'px-0'
-          )}
+          size="icon"
+          onClick={onToggle}
+          className="fixed top-4 left-4 z-50 h-10 w-10 bg-background border border-border shadow-lg hover:bg-muted"
         >
-          {collapsed ? (
-            <ChevronRight className="h-4 w-4" />
-          ) : (
-            <>
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              <span>Collapse</span>
-            </>
-          )}
+          <PanelLeft className="h-5 w-5" />
         </Button>
-
-        {!collapsed && (
-          <div className="mt-3 px-2 py-2 rounded-lg bg-muted/30 border border-border">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <span className="text-xs font-medium text-foreground">SaaS VALA AI</span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Powered by SoftwareVala™
-            </p>
-          </div>
-        )}
-      </div>
-    </aside>
+      )}
+    </>
   );
 }
