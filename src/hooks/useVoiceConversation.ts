@@ -142,48 +142,52 @@ export function useVoiceConversation({
       updateState('speaking');
       console.log('🔊 Converting to speech...');
       
-      const ttsResponse = await fetch(TTS_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({
-          text: responseText.length > 500 ? responseText.substring(0, 500) + '...' : responseText,
-          returnBase64: true
-        }),
-        signal: abortControllerRef.current.signal
-      });
+      // Try ElevenLabs TTS first, fall back to browser TTS
+      try {
+        const ttsResponse = await fetch(TTS_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            text: responseText.length > 500 ? responseText.substring(0, 500) + '...' : responseText,
+            returnBase64: true
+          }),
+          signal: abortControllerRef.current.signal
+        });
 
-      if (!ttsResponse.ok) {
-        console.error('TTS failed:', ttsResponse.status);
-        // Fallback to browser TTS
-        speakWithBrowser(responseText);
-        return;
-      }
-
-      const ttsData = await ttsResponse.json();
-      
-      if (ttsData.audioContent) {
-        // Play the audio
-        const audioUrl = `data:audio/mpeg;base64,${ttsData.audioContent}`;
-        const audio = new Audio(audioUrl);
-        audioRef.current = audio;
-        
-        audio.onended = () => {
-          console.log('🔊 Audio finished');
-          updateState('idle');
-        };
-        
-        audio.onerror = (e) => {
-          console.error('🔊 Audio playback error:', e);
+        if (!ttsResponse.ok) {
+          console.log('🔊 ElevenLabs unavailable, using browser TTS');
           speakWithBrowser(responseText);
-        };
+          return;
+        }
+
+        const ttsData = await ttsResponse.json();
         
-        await audio.play();
-      } else {
-        throw new Error('No audio content');
+        if (ttsData.audioContent) {
+          const audioUrl = `data:audio/mpeg;base64,${ttsData.audioContent}`;
+          const audio = new Audio(audioUrl);
+          audioRef.current = audio;
+          
+          audio.onended = () => {
+            console.log('🔊 Audio finished');
+            updateState('idle');
+          };
+          
+          audio.onerror = () => {
+            console.log('🔊 Audio error, falling back to browser TTS');
+            speakWithBrowser(responseText);
+          };
+          
+          await audio.play();
+        } else {
+          speakWithBrowser(responseText);
+        }
+      } catch (ttsError) {
+        console.log('🔊 TTS error, using browser fallback:', ttsError);
+        speakWithBrowser(responseText);
       }
 
     } catch (error: any) {
