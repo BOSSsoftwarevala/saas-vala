@@ -91,12 +91,6 @@ export function GitConnect() {
     try {
       const redirectUri = `${window.location.origin}${window.location.pathname}`;
       
-      const { data, error } = await supabase.functions.invoke('github-oauth', {
-        body: { data: { redirectUri } },
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      // Handle query param style
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/github-oauth?action=auth-url`,
         {
