@@ -319,6 +319,51 @@ export default function AiChat() {
     handleSend(suggestion);
   };
 
+  // Handle voice conversation messages
+  const handleVoiceMessage = useCallback((userText: string, aiResponse: string) => {
+    let sessionId = activeSessionId;
+    
+    // Create new session if none active
+    if (!sessionId) {
+      const title = userText.slice(0, 40) + (userText.length > 40 ? '...' : '');
+      const newSession: ChatSession = {
+        id: crypto.randomUUID(),
+        title,
+        createdAt: new Date(),
+        messages: []
+      };
+      setSessions(prev => [newSession, ...prev]);
+      sessionId = newSession.id;
+      setActiveSessionId(sessionId);
+    }
+
+    // Add both messages
+    const userMessage: Message = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: `🎤 ${userText}`,
+      timestamp: new Date()
+    };
+
+    const assistantMessage: Message = {
+      id: crypto.randomUUID(),
+      role: 'assistant',
+      content: aiResponse,
+      timestamp: new Date()
+    };
+
+    setSessions(prev => prev.map(s => {
+      if (s.id === sessionId) {
+        const updatedMessages = [...s.messages, userMessage, assistantMessage];
+        const title = s.messages.length === 0 
+          ? userText.slice(0, 40) + (userText.length > 40 ? '...' : '')
+          : s.title;
+        return { ...s, messages: updatedMessages, title };
+      }
+      return s;
+    }));
+  }, [activeSessionId]);
+
   const handleExport = () => {
     if (!activeSession) return;
     
@@ -399,7 +444,7 @@ export default function AiChat() {
         </div>
 
         {/* Input Area */}
-        <ChatInput onSend={handleSend} isLoading={isLoading} />
+        <ChatInput onSend={handleSend} isLoading={isLoading} onVoiceMessage={handleVoiceMessage} />
       </div>
     </div>
   );

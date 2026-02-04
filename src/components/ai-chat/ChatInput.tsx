@@ -1,12 +1,12 @@
-import { useState, useRef, useEffect, KeyboardEvent, ChangeEvent, useCallback } from 'react';
+import { useState, useRef, useEffect, KeyboardEvent, ChangeEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Send, Paperclip, Image, Sparkles, X, FileCode, FileArchive, File, Mic, MicOff, Wand2 } from 'lucide-react';
+import { Send, Paperclip, Image, Sparkles, X, FileCode, FileArchive, File, Mic, MicOff, Wand2, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useVoiceInput } from '@/hooks/useVoiceInput';
+import { useVoiceConversation } from '@/hooks/useVoiceConversation';
 
 interface UploadedFile {
   file: File;
@@ -18,6 +18,7 @@ interface ChatInputProps {
   onSend: (message: string, files?: File[]) => void;
   isLoading: boolean;
   disabled?: boolean;
+  onVoiceMessage?: (userText: string, aiResponse: string) => void;
 }
 
 const getFileType = (file: File): UploadedFile['type'] => {
@@ -39,30 +40,31 @@ const getFileIcon = (type: UploadedFile['type']) => {
   }
 };
 
-export function ChatInput({ onSend, isLoading, disabled }: ChatInputProps) {
+export function ChatInput({ onSend, isLoading, disabled, onVoiceMessage }: ChatInputProps) {
   const [input, setInput] = useState('');
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isFocused, setIsFocused] = useState(false);
+  const [lastVoiceTranscript, setLastVoiceTranscript] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
-  // Voice input - auto-sends when speech is detected
-  const handleVoiceTranscript = useCallback((text: string) => {
-    if (text.trim() && !isLoading && !disabled) {
-      onSend(text.trim(), files.map(f => f.file));
-      setFiles([]);
-    }
-  }, [onSend, files, isLoading, disabled]);
-
+  // Full voice conversation with ElevenLabs
   const { 
-    isListening, 
-    transcript, 
+    state: voiceState,
+    transcript,
     isSupported: voiceSupported,
-    toggleListening 
-  } = useVoiceInput({ 
-    onTranscript: handleVoiceTranscript,
-    autoSend: true 
+    toggle: toggleVoice,
+  } = useVoiceConversation({
+    onTranscript: (text) => {
+      setLastVoiceTranscript(text);
+    },
+    onAiResponse: (response) => {
+      // Add both messages to chat
+      if (lastVoiceTranscript && onVoiceMessage) {
+        onVoiceMessage(lastVoiceTranscript, response);
+      }
+    }
   });
 
   // Auto-resize textarea
@@ -327,7 +329,7 @@ export function ChatInput({ onSend, isLoading, disabled }: ChatInputProps) {
 
           {/* Text Input */}
           <div className="flex-1 relative">
-            {isListening && (
+            {voiceState !== 'idle' && (
               <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -337,10 +339,17 @@ export function ChatInput({ onSend, isLoading, disabled }: ChatInputProps) {
                   <motion.div
                     animate={{ scale: [1, 1.3, 1] }}
                     transition={{ duration: 1, repeat: Infinity }}
-                    className="w-3 h-3 bg-red-500 rounded-full"
+                    className={cn(
+                      "w-3 h-3 rounded-full",
+                      voiceState === 'listening' && "bg-destructive",
+                      voiceState === 'processing' && "bg-amber-500",
+                      voiceState === 'speaking' && "bg-primary"
+                    )}
                   />
                   <span className="text-sm font-medium text-foreground">
-                    {transcript || "Listening... Speak now!"}
+                    {voiceState === 'listening' && (transcript || "🎤 Listening... Speak now!")}
+                    {voiceState === 'processing' && "🤖 Processing your request..."}
+                    {voiceState === 'speaking' && "🔊 AI is speaking..."}
                   </span>
                 </div>
               </motion.div>
@@ -353,7 +362,7 @@ export function ChatInput({ onSend, isLoading, disabled }: ChatInputProps) {
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
               placeholder="Message SaaS VALA AI or click 🎤 to speak..."
-              disabled={isLoading || disabled || isListening}
+              disabled={isLoading || disabled || voiceState !== 'idle'}
               className={cn(
                 'flex-1 min-h-[44px] max-h-[200px] resize-none border-0 bg-transparent px-2 py-2.5',
                 'text-base placeholder:text-muted-foreground/60 focus-visible:ring-0 focus-visible:ring-offset-0'
@@ -368,30 +377,49 @@ export function ChatInput({ onSend, isLoading, disabled }: ChatInputProps) {
             <motion.div 
               whileHover={{ scale: 1.05 }} 
               whileTap={{ scale: 0.95 }}
-              animate={isListening ? { scale: [1, 1.1, 1] } : {}}
-              transition={isListening ? { duration: 1, repeat: Infinity } : {}}
+              animate={voiceState !== 'idle' ? { scale: [1, 1.1, 1] } : {}}
+              transition={voiceState !== 'idle' ? { duration: 1, repeat: Infinity } : {}}
             >
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                onClick={toggleListening}
+                onClick={toggleVoice}
                 disabled={isLoading || disabled || !voiceSupported}
                 className={cn(
                   "h-9 w-9 shrink-0 rounded-xl transition-all duration-300",
-                  isListening 
-                    ? "bg-red-500/20 text-red-500 hover:bg-red-500/30 ring-2 ring-red-500/50 ring-offset-2 ring-offset-background" 
-                    : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                  voiceState === 'listening' && "bg-destructive/20 text-destructive hover:bg-destructive/30 ring-2 ring-destructive/50 ring-offset-2 ring-offset-background",
+                  voiceState === 'processing' && "bg-amber-500/20 text-amber-500 hover:bg-amber-500/30 ring-2 ring-amber-500/50",
+                  voiceState === 'speaking' && "bg-primary/20 text-primary hover:bg-primary/30 ring-2 ring-primary/50",
+                  voiceState === 'idle' && "text-muted-foreground hover:text-primary hover:bg-primary/10"
                 )}
-                title={isListening ? "Stop listening" : "Voice command - speak to AI"}
+                title={
+                  voiceState === 'idle' ? "🎤 Voice mode - speak to AI" :
+                  voiceState === 'listening' ? "Listening... (click to stop)" :
+                  voiceState === 'processing' ? "Processing..." :
+                  "AI is speaking... (click to stop)"
+                }
               >
-                {isListening ? (
+                {voiceState === 'listening' ? (
                   <motion.div
                     animate={{ scale: [1, 1.2, 1] }}
                     transition={{ duration: 0.5, repeat: Infinity }}
                   >
                     <MicOff className="h-5 w-5" />
                   </motion.div>
+                ) : voiceState === 'speaking' ? (
+                  <motion.div
+                    animate={{ scale: [1, 1.1, 1] }}
+                    transition={{ duration: 0.3, repeat: Infinity }}
+                  >
+                    <Volume2 className="h-5 w-5" />
+                  </motion.div>
+                ) : voiceState === 'processing' ? (
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    className="h-5 w-5 border-2 border-current border-t-transparent rounded-full"
+                  />
                 ) : (
                   <Mic className="h-5 w-5" />
                 )}
