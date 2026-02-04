@@ -5,14 +5,6 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Progress } from '@/components/ui/progress';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
 import { 
   GitBranch, 
   Hammer, 
@@ -23,17 +15,12 @@ import {
   Bug, 
   RotateCcw, 
   RefreshCw,
-  CheckCircle2,
-  AlertTriangle,
-  Upload,
-  FolderArchive,
-  Scan,
-  Wrench,
   Play,
   ExternalLink
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { OneClickDeploy } from './OneClickDeploy';
 
 interface FeatureToggle {
   id: string;
@@ -57,16 +44,8 @@ const serverFeatures: FeatureToggle[] = [
   { id: 'ai-restart', name: 'AI Restart', description: 'Auto restart on crash', icon: RefreshCw, enabled: true, status: 'active' }
 ];
 
-interface UploadProgress {
-  filename: string;
-  progress: number;
-  status: 'uploading' | 'extracting' | 'scanning' | 'fixing' | 'deploying' | 'complete' | 'error';
-}
-
 export function ServerAiIntegration() {
   const [features, setFeatures] = useState(serverFeatures);
-  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const [gitUrl, setGitUrl] = useState('');
 
   const toggleFeature = (id: string) => {
@@ -74,32 +53,6 @@ export function ServerAiIntegration() {
       f.id === id ? { ...f, enabled: !f.enabled } : f
     ));
     toast.success('Feature updated');
-  };
-
-  const simulateUpload = async (filename: string) => {
-    const stages: UploadProgress['status'][] = ['uploading', 'extracting', 'scanning', 'fixing', 'deploying', 'complete'];
-    
-    for (let i = 0; i < stages.length; i++) {
-      setUploadProgress({
-        filename,
-        progress: ((i + 1) / stages.length) * 100,
-        status: stages[i]
-      });
-      await new Promise(resolve => setTimeout(resolve, 1500));
-    }
-
-    toast.success('Deployment complete!', {
-      description: `${filename} has been deployed successfully`
-    });
-    
-    setTimeout(() => {
-      setUploadProgress(null);
-      setIsUploadDialogOpen(false);
-    }, 1000);
-  };
-
-  const handleFileUpload = () => {
-    simulateUpload('project.zip');
   };
 
   const handleGitConnect = () => {
@@ -112,30 +65,6 @@ export function ServerAiIntegration() {
     });
   };
 
-  const getStatusIcon = (status: UploadProgress['status']) => {
-    switch (status) {
-      case 'uploading': return <Upload className="h-4 w-4 animate-pulse" />;
-      case 'extracting': return <FolderArchive className="h-4 w-4 animate-pulse" />;
-      case 'scanning': return <Scan className="h-4 w-4 animate-pulse" />;
-      case 'fixing': return <Wrench className="h-4 w-4 animate-pulse" />;
-      case 'deploying': return <Rocket className="h-4 w-4 animate-pulse" />;
-      case 'complete': return <CheckCircle2 className="h-4 w-4 text-success" />;
-      case 'error': return <AlertTriangle className="h-4 w-4 text-destructive" />;
-    }
-  };
-
-  const getStatusLabel = (status: UploadProgress['status']) => {
-    switch (status) {
-      case 'uploading': return 'Uploading...';
-      case 'extracting': return 'Auto Extract...';
-      case 'scanning': return 'Auto Scan...';
-      case 'fixing': return 'Auto Fix...';
-      case 'deploying': return 'Auto Deploy...';
-      case 'complete': return 'Complete!';
-      case 'error': return 'Error';
-    }
-  };
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -143,6 +72,11 @@ export function ServerAiIntegration() {
       transition={{ delay: 0.5 }}
       className="grid grid-cols-1 lg:grid-cols-2 gap-6"
     >
+      {/* One-Click Deploy - THE MAIN FEATURE */}
+      <div className="lg:col-span-2">
+        <OneClickDeploy />
+      </div>
+
       {/* Server + AI Features */}
       <Card className="border-border">
         <CardHeader>
@@ -197,93 +131,17 @@ export function ServerAiIntegration() {
         </CardContent>
       </Card>
 
-      {/* File Upload & Git Connect */}
+      {/* Git Connect */}
       <Card className="border-border">
         <CardHeader>
-          <CardTitle className="text-lg">Deploy Source</CardTitle>
+          <CardTitle className="text-lg">Git Repository</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Upload files or connect Git repository
+            Connect Git for continuous deployment
           </p>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* File Upload Section */}
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">File Upload</Label>
-            <div className="border-2 border-dashed border-border rounded-xl p-6 text-center hover:border-primary/50 transition-colors">
-              <Upload className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground mb-2">
-                Upload ZIP, PHP, APK, or Git Repo
-              </p>
-              <p className="text-xs text-muted-foreground mb-4">
-                Unlimited size • Auto Extract • Auto Scan • Auto Fix • Auto Deploy
-              </p>
-              <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="gap-2">
-                    <Upload className="h-4 w-4" />
-                    Select Files
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Upload & Deploy</DialogTitle>
-                  </DialogHeader>
-                  {uploadProgress ? (
-                    <div className="space-y-4 py-4">
-                      <div className="flex items-center gap-3">
-                        {getStatusIcon(uploadProgress.status)}
-                        <div className="flex-1">
-                          <p className="text-sm font-medium">{uploadProgress.filename}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {getStatusLabel(uploadProgress.status)}
-                          </p>
-                        </div>
-                      </div>
-                      <Progress value={uploadProgress.progress} className="h-2" />
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Progress</span>
-                        <span>{Math.round(uploadProgress.progress)}%</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-4 py-4">
-                      <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
-                        <FolderArchive className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                        <p className="text-sm text-muted-foreground mb-4">
-                          Drop files here or click to browse
-                        </p>
-                        <Button onClick={handleFileUpload}>
-                          Choose Files
-                        </Button>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className="h-3 w-3 text-success" />
-                          Auto Extract
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className="h-3 w-3 text-success" />
-                          Auto Scan
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className="h-3 w-3 text-success" />
-                          Auto Fix
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className="h-3 w-3 text-success" />
-                          Auto Deploy
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </DialogContent>
-              </Dialog>
-            </div>
-          </div>
-
           {/* Git Connect Section */}
           <div className="space-y-3">
-            <Label className="text-sm font-medium">Git Repository</Label>
             <div className="flex gap-2">
               <Input
                 placeholder="https://github.com/username/repo.git"
