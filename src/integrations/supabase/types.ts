@@ -301,6 +301,131 @@ export type Database = {
           },
         ]
       }
+      invoice_otp_codes: {
+        Row: {
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invoice_id: string
+          otp_code: string
+          verified: boolean | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          expires_at: string
+          id?: string
+          invoice_id: string
+          otp_code: string
+          verified?: boolean | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invoice_id?: string
+          otp_code?: string
+          verified?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_otp_codes_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          created_at: string
+          currency: string | null
+          customer_address: string | null
+          customer_email: string
+          customer_name: string
+          customer_phone: string | null
+          discount_amount: number | null
+          discount_percent: number | null
+          due_date: string | null
+          id: string
+          invoice_number: string
+          items: Json
+          notes: string | null
+          otp_verified: boolean | null
+          otp_verified_at: string | null
+          signature_data: string | null
+          signed_at: string | null
+          signer_ip: string | null
+          status: string | null
+          subtotal: number
+          tax_amount: number | null
+          tax_percent: number | null
+          terms: string | null
+          total_amount: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: string | null
+          customer_address?: string | null
+          customer_email: string
+          customer_name: string
+          customer_phone?: string | null
+          discount_amount?: number | null
+          discount_percent?: number | null
+          due_date?: string | null
+          id?: string
+          invoice_number: string
+          items?: Json
+          notes?: string | null
+          otp_verified?: boolean | null
+          otp_verified_at?: string | null
+          signature_data?: string | null
+          signed_at?: string | null
+          signer_ip?: string | null
+          status?: string | null
+          subtotal?: number
+          tax_amount?: number | null
+          tax_percent?: number | null
+          terms?: string | null
+          total_amount?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string | null
+          customer_address?: string | null
+          customer_email?: string
+          customer_name?: string
+          customer_phone?: string | null
+          discount_amount?: number | null
+          discount_percent?: number | null
+          due_date?: string | null
+          id?: string
+          invoice_number?: string
+          items?: Json
+          notes?: string | null
+          otp_verified?: boolean | null
+          otp_verified_at?: string | null
+          signature_data?: string | null
+          signed_at?: string | null
+          signer_ip?: string | null
+          status?: string | null
+          subtotal?: number
+          tax_amount?: number | null
+          tax_percent?: number | null
+          terms?: string | null
+          total_amount?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           assigned_to: string | null
@@ -844,6 +969,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_invoice_number: { Args: never; Returns: string }
       generate_license_key: { Args: never; Returns: string }
       get_user_role: {
         Args: { _user_id: string }
