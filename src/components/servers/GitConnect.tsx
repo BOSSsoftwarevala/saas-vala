@@ -112,8 +112,62 @@ export function GitConnect() {
       if (result.authUrl) {
         // Store state for verification
         sessionStorage.setItem('github_oauth_state', result.state);
-        // Redirect to GitHub
-        window.location.href = result.authUrl;
+        
+        // Open GitHub OAuth in a popup window to avoid iframe restrictions
+        const width = 600;
+        const height = 700;
+        const left = window.screenX + (window.outerWidth - width) / 2;
+        const top = window.screenY + (window.outerHeight - height) / 2;
+        
+        const popup = window.open(
+          result.authUrl,
+          'github-oauth',
+          `width=${width},height=${height},left=${left},top=${top},popup=yes,toolbar=no,menubar=no`
+        );
+
+        // Listen for the popup to complete OAuth and send back the code
+        if (popup) {
+          const checkPopup = setInterval(() => {
+            try {
+              // Check if popup is closed
+              if (popup.closed) {
+                clearInterval(checkPopup);
+                setIsConnecting(false);
+                return;
+              }
+              
+              // Check if we're back on our origin
+              if (popup.location.origin === window.location.origin) {
+                const popupUrl = new URL(popup.location.href);
+                const code = popupUrl.searchParams.get('code');
+                
+                if (code) {
+                  clearInterval(checkPopup);
+                  popup.close();
+                  handleOAuthCallback(code);
+                }
+              }
+            } catch (e) {
+              // Cross-origin access error - popup is still on GitHub, continue waiting
+            }
+          }, 500);
+          
+          // Timeout after 5 minutes
+          setTimeout(() => {
+            clearInterval(checkPopup);
+            if (!popup.closed) {
+              popup.close();
+            }
+            setIsConnecting(false);
+          }, 300000);
+        } else {
+          // Popup blocked - fallback to redirect (will work if opened in new tab)
+          toast.error('Popup blocked!', {
+            description: 'Please allow popups for this site, or click the link below',
+          });
+          window.open(result.authUrl, '_blank');
+          setIsConnecting(false);
+        }
       }
     } catch (error) {
       console.error('GitHub OAuth error:', error);
