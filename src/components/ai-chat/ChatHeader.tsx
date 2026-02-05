@@ -3,7 +3,6 @@
    Settings, 
    Share2, 
    Download,
-   Sparkles,
    ArrowLeft,
    PanelLeft,
    MoreVertical,
@@ -22,6 +21,7 @@
  } from '@/components/ui/dropdown-menu';
  import { useNavigate } from 'react-router-dom';
  import { ModelSelector } from './ModelSelector';
+ import { ProjectMenu } from './ProjectMenu';
 
 interface ChatHeaderProps {
   title: string;
@@ -76,7 +76,7 @@ interface ChatHeaderProps {
 
         <div className="h-6 w-px bg-border mx-1" />
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <img 
             src="/vala-ai-logo.jpg" 
             alt="VALA AI" 
@@ -84,9 +84,7 @@ interface ChatHeaderProps {
           />
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-sm font-semibold text-foreground">
-                VALA AI
-              </h1>
+              <ProjectMenu projectName="VALA AI" />
              {onModelChange && (
                <ModelSelector
                  selectedModel={selectedModel}
