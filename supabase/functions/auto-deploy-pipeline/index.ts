@@ -57,6 +57,11 @@ interface PipelineResult {
     failed: number;
     details: string[];
   };
+   demoCredentials?: {
+     username: string;
+     password: string;
+     note: string;
+   };
 }
 
 // Framework detection patterns
@@ -326,54 +331,80 @@ Respond ONLY with valid JSON, no markdown.`;
     let deploymentUrl: string | undefined;
     let deploymentErrors: string[] = [];
 
-    if (hostingCredentials && hostingCredentials.host) {
-      addLog('deploy', 'running', 'Connecting to hosting...');
-      
-      const creds = hostingCredentials as HostingCredentials;
-      
-      // Simulate deployment steps (actual FTP/SSH would require native Deno libraries)
-      addLog('deploy-connect', 'running', `Connecting to ${creds.host}...`);
-      
-      // In production, you would use:
-      // - FTP: Deno's fetch with ftp:// or a library
-      // - SSH: External service or Deno FFI
-      // For now, we simulate the flow
-      
-      try {
-        // Simulate connection test
-        addLog('deploy-connect', 'success', 'Connected to hosting server');
-        
-        // Simulate folder creation
-        addLog('deploy-folders', 'running', 'Creating required folders...');
-        addLog('deploy-folders', 'success', 'Created: public_html, logs, tmp');
-        
-        // Simulate DB creation
-        if (creds.dbName) {
-          addLog('deploy-db', 'running', 'Setting up database...');
-          addLog('deploy-db', 'success', `Database ${creds.dbName} configured`);
-        }
-        
-        // Simulate file upload
-        addLog('deploy-upload', 'running', 'Uploading files...');
-        addLog('deploy-upload', 'success', 'Files uploaded successfully');
-        
-        // Simulate env setup
-        addLog('deploy-env', 'running', 'Configuring environment...');
-        addLog('deploy-env', 'success', '.env file created with database credentials');
-        
-        deploymentStatus = 'deployed';
-        deploymentUrl = `https://${creds.host}${creds.path || ''}`;
-        
-        addLog('deploy', 'success', 'Deployment complete!', deploymentUrl);
-        
-      } catch (deployErr: any) {
-        deploymentStatus = 'failed';
-        deploymentErrors.push(deployErr.message || 'Deployment failed');
-        addLog('deploy', 'failed', 'Deployment failed', deployErr.message);
-      }
-    } else {
-      addLog('deploy', 'skipped', 'No hosting credentials provided - project ready for manual deploy');
-    }
+ 
+     // ========== GENERATE DEMO CREDENTIALS ==========
+     const demoUsername = `demo_${Math.random().toString(36).substring(2, 8)}`;
+     const demoPassword = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 6).toUpperCase();
+ 
+     if (hostingCredentials && hostingCredentials.host) {
+       addLog('deploy', 'running', 'Connecting to hosting...');
+       
+       const creds = hostingCredentials as HostingCredentials;
+       
+       // Note: Actual FTP/SSH requires external service (n8n, custom backend)
+       // Edge runtime doesn't have native FTP/SSH libraries
+       addLog('deploy-connect', 'running', `Connecting to ${creds.host}...`);
+       
+       try {
+         // Test TCP connectivity using Deno.connect (basic check)
+         try {
+           const portNum = creds.port || (creds.type === 'ftp' ? 21 : 22);
+           const conn = await Deno.connect({ hostname: creds.host, port: portNum });
+           conn.close();
+           addLog('deploy-connect', 'success', `Server reachable on port ${portNum}`);
+         } catch (connErr) {
+           addLog('deploy-connect', 'failed', 'Cannot reach server', `Host ${creds.host} unreachable. Check IP/firewall.`);
+           throw new Error(`Cannot connect to ${creds.host}`);
+         }
+ 
+         // For actual FTP transfer, we need external automation
+         // Store credentials for external webhook/n8n to pick up
+         addLog('deploy-prepare', 'running', 'Preparing deployment package...');
+         
+         // Get public URL for the uploaded file
+         const { data: urlData } = await supabase.storage
+           .from('source-code')
+           .createSignedUrl(filePath, 3600 * 24); // 24 hour link
+         
+         const downloadUrl = urlData?.signedUrl || '';
+         
+         addLog('deploy-prepare', 'success', 'Package ready for transfer');
+ 
+         // Log deployment request for external processing
+         await supabase.from('deployments').insert({
+           server_id: null, // Will be linked later
+           status: 'queued',
+           commit_message: `Auto-deploy: ${fileName}`,
+           build_logs: JSON.stringify({
+             host: creds.host,
+             type: creds.type,
+             path: creds.path,
+             downloadUrl,
+             framework: detectedFramework,
+             demoCredentials: { username: demoUsername, password: demoPassword },
+           }),
+           triggered_by: user.id,
+         });
+ 
+         addLog('deploy-queue', 'success', 'Deployment queued for server transfer');
+         
+         // Since we can't do actual FTP in edge runtime, mark as ready
+         deploymentStatus = 'ready';
+         deploymentUrl = `https://${creds.host}${creds.path || ''}`;
+         
+         addLog('deploy', 'success', 
+           `✅ File analyzed & ready! Manual transfer needed to ${creds.host}`,
+           `Download: ${downloadUrl?.substring(0, 50)}...`
+         );
+         
+       } catch (deployErr: any) {
+         deploymentStatus = 'failed';
+         deploymentErrors.push(deployErr.message || 'Deployment failed');
+         addLog('deploy', 'failed', 'Deployment preparation failed', deployErr.message);
+       }
+     } else {
+       addLog('deploy', 'skipped', 'No hosting credentials - project ready for manual deploy');
+     }
 
     // ========== STAGE 7: AUTO-TEST ==========
     addLog('test', 'running', 'Running automated tests...');
@@ -385,7 +416,7 @@ Respond ONLY with valid JSON, no markdown.`;
     };
 
     // Simulate tests based on framework
-    if (deploymentStatus === 'deployed' && deploymentUrl) {
+     if (deploymentStatus === 'ready' && deploymentUrl) {
       // Test 1: HTTP connectivity
       try {
         const httpTest = await fetch(deploymentUrl, { method: 'HEAD' });
@@ -452,6 +483,11 @@ Respond ONLY with valid JSON, no markdown.`;
         errors: deploymentErrors,
       },
       tests: testResults,
+       demoCredentials: {
+         username: demoUsername,
+         password: demoPassword,
+         note: 'Use these for testing after manual server upload',
+       },
     };
 
     // Log to audit

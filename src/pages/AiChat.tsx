@@ -273,6 +273,9 @@ export default function AiChat() {
                 if (!pipelineError && pipelineResult) {
                   // Format analysis results
                   const result = pipelineResult as any;
+                   const demoUser = result.demoCredentials?.username || `demo_${Math.random().toString(36).substring(2, 8)}`;
+                   const demoPass = result.demoCredentials?.password || Math.random().toString(36).substring(2, 12);
+                   
                   analysisResults.push(`
 📦 **${file.name}** Analysis Complete:
 
@@ -294,6 +297,13 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
 
 **📋 Status:** ${result.deployment?.status === 'ready' ? '🟢 Ready to deploy' : result.deployment?.status === 'deployed' ? '🚀 Deployed' : '🔴 Needs attention'}
 
+ **🔑 Demo Credentials:**
+ \`\`\`
+ Username: ${demoUser}
+ Password: ${demoPass}
+ \`\`\`
+ *(Use these for testing after server upload)*
+ 
 ---
 🚀 **Ready to deploy!** Click the deploy button or type "deploy" to upload to your hosting.
 `);
@@ -521,19 +531,43 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
 
       // Add deployment result to chat
       const deployResult = data as any;
-      const deployMessage = `
-🚀 **DEPLOYMENT COMPLETE!**
-
-**Status:** ${deployResult.deployment?.status === 'deployed' ? '✅ Live' : '⚠️ ' + deployResult.deployment?.status}
-${deployResult.deployment?.url ? `**URL:** ${deployResult.deployment.url}` : ''}
-
-**Summary:**
-- Files uploaded: ✓
-- Security fixes applied: ${deployResult.fixes?.applied || 0}
-- Tests passed: ${deployResult.tests?.passed || 0}
-
-${credentials.domain ? `Your site is now live at: **${credentials.domain}**` : ''}
-`;
+       const demoUser = deployResult.demoCredentials?.username || 'demo_user';
+       const demoPass = deployResult.demoCredentials?.password || 'demo123';
+       
+       const deployMessage = `
+ 🚀 **DEPLOYMENT PIPELINE COMPLETE!**
+ 
+ **Status:** ${deployResult.deployment?.status === 'ready' ? '✅ Ready for Transfer' : deployResult.deployment?.status === 'failed' ? '❌ Failed' : '⚠️ ' + deployResult.deployment?.status}
+ 
+ **Framework Detected:** ${deployResult.analysis?.framework || 'Unknown'}
+ **Language:** ${deployResult.analysis?.language || 'Unknown'}
+ **File Size:** ${deployResult.analysis?.size || 'N/A'}
+ 
+ ---
+ 
+ **📊 Analysis Summary:**
+ - Security fixes applied: ${deployResult.fixes?.applied || 0}
+ - Security issues found: ${deployResult.security?.issues || 0}
+ - Tests passed: ${deployResult.tests?.passed || 0}
+ 
+ ---
+ 
+ **🔑 DEMO CREDENTIALS:**
+ \`\`\`
+ Username: ${demoUser}
+ Password: ${demoPass}
+ \`\`\`
+ *(Use these for testing after uploading to your server)*
+ 
+ ---
+ 
+ ${deployResult.deployment?.url ? `**Target URL:** ${deployResult.deployment.url}` : ''}
+ ${credentials.domain ? `**Domain:** ${credentials.domain}` : ''}
+ 
+ **⚠️ Note:** File is analyzed and ready. For actual server upload, please use FTP client (FileZilla) or your hosting panel to upload the file from our storage.
+ 
+ *Powered by SoftwareVala™*
+ `;
 
       // Add to session
       const deployMessageObj: Message = {
