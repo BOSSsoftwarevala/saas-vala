@@ -1,17 +1,18 @@
 import { useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  LayoutDashboard,
-  Cpu,
-  FileText,
-  Globe2,
-  Sparkles,
-  Users,
-  Link2,
-  BarChart3,
-  Settings,
-} from 'lucide-react';
+ import {
+   LayoutDashboard,
+   Cpu,
+   FileText,
+   Globe2,
+   Sparkles,
+   Users,
+   Link2,
+   BarChart3,
+   Settings,
+   Zap,
+ } from 'lucide-react';
 import { SeoDashboard } from '@/components/seo-leads/SeoDashboard';
 import { AutoSeoEngine } from '@/components/seo-leads/AutoSeoEngine';
 import { MetaTagManager } from '@/components/seo-leads/MetaTagManager';
@@ -21,6 +22,7 @@ import { LeadsManager } from '@/components/seo-leads/LeadsManager';
 import { LeadSources } from '@/components/seo-leads/LeadSources';
 import { SeoAnalytics } from '@/components/seo-leads/SeoAnalytics';
 import { SeoSettings } from '@/components/seo-leads/SeoSettings';
+ import { EnterpriseSeoEngine } from '@/components/seo-leads/EnterpriseSeoEngine';
 
 export default function SeoLeads() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -40,7 +42,7 @@ export default function SeoLeads() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="w-full grid grid-cols-3 md:grid-cols-9 h-auto gap-1 bg-muted/30 p-1.5 rounded-xl">
+           <TabsList className="w-full grid grid-cols-5 md:grid-cols-10 h-auto gap-1 bg-muted/30 p-1.5 rounded-xl">
             <TabsTrigger value="dashboard" className="gap-1 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <LayoutDashboard className="h-3 w-3" />
               <span className="hidden sm:inline">Dashboard</span>
@@ -49,6 +51,10 @@ export default function SeoLeads() {
               <Cpu className="h-3 w-3" />
               <span className="hidden sm:inline">Auto SEO</span>
             </TabsTrigger>
+             <TabsTrigger value="enterprise" className="gap-1 text-xs data-[state=active]:bg-secondary data-[state=active]:text-secondary-foreground">
+               <Zap className="h-3 w-3" />
+               <span className="hidden sm:inline">Enterprise AI</span>
+             </TabsTrigger>
             <TabsTrigger value="meta" className="gap-1 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <FileText className="h-3 w-3" />
               <span className="hidden sm:inline">Meta Tags</span>
@@ -87,6 +93,10 @@ export default function SeoLeads() {
             <AutoSeoEngine />
           </TabsContent>
 
+           <TabsContent value="enterprise" className="mt-6">
+             <EnterpriseSeoEngine />
+           </TabsContent>
+ 
           <TabsContent value="meta" className="mt-6">
             <MetaTagManager />
           </TabsContent>
