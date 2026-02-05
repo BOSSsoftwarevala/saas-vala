@@ -16,7 +16,7 @@
  } from '@/components/ui/accordion';
  import { cn } from '@/lib/utils';
  import { DashboardLayout } from '@/components/layout/DashboardLayout';
- import { manufacturingRole, manufacturingTechStack, manufacturingSubCategories } from '@/data/manufacturingData';
+ import { manufacturingRole, manufacturingTechStack, manufacturingMasterTechStack, manufacturingSubCategories } from '@/data/manufacturingData';
  
  const techStack = [
    { name: 'FRONTEND', icon: Monitor, tech: manufacturingTechStack[0].tech },
@@ -117,6 +117,111 @@
                    <span className="text-[9px] text-muted-foreground mt-1">{tech.tech}</span>
                  </div>
                ))}
+             </div>
+           </div>
+         </motion.section>
+ 
+         {/* MASTER TECHNOLOGY STACK (DETAILED) */}
+         <motion.section 
+           initial={{ opacity: 0, y: 20 }}
+           animate={{ opacity: 1, y: 0 }}
+           transition={{ delay: 0.15 }}
+           className="mb-8"
+         >
+           <div className="bg-card border border-border rounded-2xl p-6">
+             <h3 className="text-sm font-bold text-muted-foreground mb-6 uppercase tracking-wide">
+               MASTER TECHNOLOGY STACK (GLOBAL)
+             </h3>
+             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+               {/* Frontend */}
+               <div className="bg-muted/20 border border-border rounded-xl p-4">
+                 <div className="flex items-center gap-2 mb-3">
+                   <Monitor className="h-4 w-4 text-primary" />
+                   <span className="text-xs font-bold text-foreground uppercase">FRONTEND</span>
+                 </div>
+                 <ul className="space-y-1">
+                   {manufacturingMasterTechStack.frontend.map((item, idx) => (
+                     <li key={idx} className="text-xs text-muted-foreground flex items-center gap-2">
+                       <span className="w-1 h-1 rounded-full bg-primary" /> {item}
+                     </li>
+                   ))}
+                 </ul>
+               </div>
+               
+               {/* Backend */}
+               <div className="bg-muted/20 border border-border rounded-xl p-4">
+                 <div className="flex items-center gap-2 mb-3">
+                   <Server className="h-4 w-4 text-primary" />
+                   <span className="text-xs font-bold text-foreground uppercase">BACKEND</span>
+                 </div>
+                 <ul className="space-y-1">
+                   {manufacturingMasterTechStack.backend.map((item, idx) => (
+                     <li key={idx} className="text-xs text-muted-foreground flex items-center gap-2">
+                       <span className="w-1 h-1 rounded-full bg-primary" /> {item}
+                     </li>
+                   ))}
+                 </ul>
+               </div>
+               
+               {/* Database */}
+               <div className="bg-muted/20 border border-border rounded-xl p-4">
+                 <div className="flex items-center gap-2 mb-3">
+                   <Database className="h-4 w-4 text-primary" />
+                   <span className="text-xs font-bold text-foreground uppercase">DATABASE</span>
+                 </div>
+                 <ul className="space-y-1">
+                   {manufacturingMasterTechStack.database.map((item, idx) => (
+                     <li key={idx} className="text-xs text-muted-foreground flex items-center gap-2">
+                       <span className="w-1 h-1 rounded-full bg-primary" /> {item}
+                     </li>
+                   ))}
+                 </ul>
+               </div>
+               
+               {/* Server / Deployment */}
+               <div className="bg-muted/20 border border-border rounded-xl p-4">
+                 <div className="flex items-center gap-2 mb-3">
+                   <Cloud className="h-4 w-4 text-primary" />
+                   <span className="text-xs font-bold text-foreground uppercase">SERVER / DEPLOYMENT</span>
+                 </div>
+                 <ul className="space-y-1">
+                   {manufacturingMasterTechStack.server.map((item, idx) => (
+                     <li key={idx} className="text-xs text-muted-foreground flex items-center gap-2">
+                       <span className="w-1 h-1 rounded-full bg-primary" /> {item}
+                     </li>
+                   ))}
+                 </ul>
+               </div>
+               
+               {/* AI / Automation */}
+               <div className="bg-muted/20 border border-border rounded-xl p-4">
+                 <div className="flex items-center gap-2 mb-3">
+                   <Brain className="h-4 w-4 text-primary" />
+                   <span className="text-xs font-bold text-foreground uppercase">AI / AUTOMATION</span>
+                 </div>
+                 <ul className="space-y-1">
+                   {manufacturingMasterTechStack.ai.map((item, idx) => (
+                     <li key={idx} className="text-xs text-muted-foreground flex items-center gap-2">
+                       <span className="w-1 h-1 rounded-full bg-primary" /> {item}
+                     </li>
+                   ))}
+                 </ul>
+               </div>
+               
+               {/* Security */}
+               <div className="bg-muted/20 border border-border rounded-xl p-4">
+                 <div className="flex items-center gap-2 mb-3">
+                   <Shield className="h-4 w-4 text-primary" />
+                   <span className="text-xs font-bold text-foreground uppercase">SECURITY</span>
+                 </div>
+                 <ul className="space-y-1">
+                   {manufacturingMasterTechStack.security.map((item, idx) => (
+                     <li key={idx} className="text-xs text-muted-foreground flex items-center gap-2">
+                       <span className="w-1 h-1 rounded-full bg-primary" /> {item}
+                     </li>
+                   ))}
+                 </ul>
+               </div>
              </div>
            </div>
          </motion.section>
