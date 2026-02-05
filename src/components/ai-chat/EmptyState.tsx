@@ -116,7 +116,7 @@ export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
           <img 
             src={softwareValaLogo} 
             alt="VALA AI" 
-            className="relative w-24 h-24 md:w-28 md:h-28 rounded-full object-cover mx-auto border-2 border-primary/30 shadow-2xl shadow-primary/20"
+            className="relative w-24 h-24 md:w-28 md:h-28 rounded-full object-cover mx-auto shadow-2xl shadow-primary/20"
           />
           <motion.div
             initial={{ scale: 0 }}
