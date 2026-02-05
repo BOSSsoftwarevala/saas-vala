@@ -31,6 +31,11 @@
  import { toast } from 'sonner';
 import { motion } from 'framer-motion';
  import { LiveSeoActivityPanel, SeoActivityItem } from './LiveSeoActivityPanel';
+ import { 
+   addGlobalActivity, 
+   updateGlobalActivity, 
+   removeGlobalActivity 
+ } from '@/components/global/GlobalActivityPanel';
  import {
    decideSeoAction,
    analyzeCompetitorGaps,
@@ -87,10 +92,21 @@ import { motion } from 'framer-motion';
      setProgress(0);
      setActivities([]);
      
+     // Add global activity
+     const globalId = 'seo-optimization-' + Date.now();
+     addGlobalActivity({
+       id: globalId,
+       type: 'seo',
+       title: 'SEO Optimization Running',
+       status: 'processing',
+       progress: 0,
+     });
+     
      try {
        // Step 1: Optimize all products
        toast.info('Step 1/4: Optimizing products...');
        setCurrentStep('Optimizing Products');
+       updateGlobalActivity(globalId, { details: 'Optimizing products...' });
        
        // Add product activities
        const productActivities: SeoActivityItem[] = products.map(p => ({
@@ -105,7 +121,12 @@ import { motion } from 'framer-motion';
          market,
          cities,
          (current, total) => {
-           setProgress((current / total) * 25);
+           const prog = (current / total) * 25;
+           setProgress(prog);
+           updateGlobalActivity(globalId, { 
+             progress: prog, 
+             details: `Optimizing product ${current}/${total}` 
+           });
            // Update activity status
            setActivities(prev => prev.map((act, idx) => ({
              ...act,
@@ -131,6 +152,7 @@ import { motion } from 'framer-motion';
        toast.info('Step 2/4: Analyzing competitors...');
        setCurrentStep('Analyzing Competitors');
        setProgress(50);
+       updateGlobalActivity(globalId, { progress: 50, details: 'Analyzing competitors...' });
        
        // Add competitor activity
        setActivities(prev => [
@@ -150,6 +172,7 @@ import { motion } from 'framer-motion';
        toast.info('Step 3/4: Voice search optimization...');
        setCurrentStep('Voice Search Optimization');
        setProgress(75);
+       updateGlobalActivity(globalId, { progress: 75, details: 'Voice search optimization...' });
        
        setActivities(prev => [
          ...prev,
@@ -170,6 +193,7 @@ import { motion } from 'framer-motion';
        toast.info('Step 4/4: AI decision analysis...');
        setCurrentStep('AI Decision Analysis');
        setProgress(90);
+       updateGlobalActivity(globalId, { progress: 90, details: 'AI decision analysis...' });
        
        setActivities(prev => [
          ...prev,
@@ -205,12 +229,23 @@ import { motion } from 'framer-motion';
  
        setProgress(100);
        setCurrentStep('Complete!');
+       updateGlobalActivity(globalId, { 
+         status: 'completed', 
+         progress: 100, 
+         title: 'SEO Optimization Complete',
+         details: `${successCount} products optimized` 
+       });
+       
+       // Remove after delay
+       setTimeout(() => removeGlobalActivity(globalId), 5000);
+ 
        toast.success('Full SEO optimization complete!', {
          description: `Optimized ${successCount} products, Avg Score: ${Math.round(avgScore)}`,
        });
      } catch (err: any) {
        toast.error('Optimization failed: ' + err.message);
        setCurrentStep('Failed');
+       updateGlobalActivity(globalId, { status: 'failed', details: err.message });
      } finally {
        setIsProcessing(false);
      }

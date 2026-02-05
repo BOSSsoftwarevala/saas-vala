@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { Loader2 } from "lucide-react";
+ import { GlobalActivityPanel } from "@/components/global/GlobalActivityPanel";
 
 // Pages
 import Auth from "./pages/Auth";
@@ -256,6 +257,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+       <GlobalActivityPanel />
       <BrowserRouter>
         <AuthProvider>
           <AppRoutes />

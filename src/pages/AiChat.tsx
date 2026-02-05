@@ -14,6 +14,11 @@ import { KeyboardShortcuts, useKeyboardShortcuts } from '@/components/ai-chat/Ke
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
+ import { 
+   addGlobalActivity, 
+   updateGlobalActivity, 
+   removeGlobalActivity 
+ } from '@/components/global/GlobalActivityPanel';
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 
@@ -465,6 +470,17 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
     }));
 
     setIsLoading(true);
+ 
+   // Add global activity for AI processing
+   const aiActivityId = 'ai-chat-' + Date.now();
+   addGlobalActivity({
+     id: aiActivityId,
+     type: 'ai',
+     title: 'AI Processing',
+     status: 'processing',
+     progress: 0,
+     details: messageContent.slice(0, 50) + '...',
+   });
 
     // Create assistant message placeholder
     const assistantId = crypto.randomUUID();
@@ -492,6 +508,11 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
 
     const updateAssistantMessage = (newContent: string) => {
       assistantContent = newContent;
+     // Update global activity progress
+     updateGlobalActivity(aiActivityId, { 
+       progress: Math.min(95, assistantContent.length / 10),
+       details: 'Generating response...'
+     });
       setSessions(prev => prev.map(s => {
         if (s.id === sessionId) {
           return {
@@ -527,10 +548,20 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
           assistantContent += chunk;
           updateAssistantMessage(assistantContent);
         },
-        () => setIsLoading(false)
+       () => {
+         setIsLoading(false);
+         updateGlobalActivity(aiActivityId, { 
+           status: 'completed', 
+           progress: 100,
+           title: 'Response Generated',
+           details: 'Complete'
+         });
+         setTimeout(() => removeGlobalActivity(aiActivityId), 3000);
+       }
       );
     } catch (error) {
       console.error('AI Chat error:', error);
+     updateGlobalActivity(aiActivityId, { status: 'failed', details: 'Error occurred' });
       updateAssistantMessage('I apologize, but I encountered an error. Please try again.');
       setIsLoading(false);
     }
@@ -755,10 +786,7 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
               ))}
               {/* Typing / Thinking Indicator */}
               {isLoading && activeSession.messages[activeSession.messages.length - 1]?.role === 'user' && (
-                <>
-                  <TypingIndicator isVisible={true} />
-                  <ThinkingIndicator isActive={true} context={thinkingContext} />
-                </>
+               <ThinkingIndicator isActive={true} context={thinkingContext} />
               )}
               <div ref={messagesEndRef} />
             </div>
