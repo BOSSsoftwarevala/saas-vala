@@ -66,7 +66,7 @@
    const [businessType, setBusinessType] = useState('SaaS');
    const [pageName, setPageName] = useState('');
    const [content, setContent] = useState('');
-   const [targetCity, setTargetCity] = useState('');
+ const [targetCity, setTargetCity] = useState('auto');
    const [isProcessing, setIsProcessing] = useState(false);
    const [result, setResult] = useState<SeoResult | null>(null);
    const [seoScore, setSeoScore] = useState<number>(0);
@@ -84,7 +84,7 @@
            pageName,
            businessType,
            market,
-           targetCities: targetCity ? [targetCity] : cities.slice(0, 3),
+           targetCities: targetCity && targetCity !== 'auto' ? [targetCity] : cities.slice(0, 3),
            language,
          }
        });
@@ -264,7 +264,7 @@
                    <SelectValue placeholder="Auto-detect" />
                  </SelectTrigger>
                  <SelectContent>
-                   <SelectItem value="">Auto-detect</SelectItem>
+                   <SelectItem value="auto">Auto-detect</SelectItem>
                    {cities.map(city => (
                      <SelectItem key={city} value={city}>{city}</SelectItem>
                    ))}
