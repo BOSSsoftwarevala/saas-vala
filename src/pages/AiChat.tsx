@@ -98,6 +98,16 @@ export default function AiChat() {
   const [thinkingContext, setThinkingContext] = useState<'analyzing' | 'fixing' | 'deploying' | 'general'>('general');
 
   const activeSession = sessions.find(s => s.id === activeSessionId);
+ 
+   // AI Model selection
+   const [selectedModel, setSelectedModel] = useState<string>(() => {
+     return localStorage.getItem('saas-ai-model') || 'google/gemini-3-flash-preview';
+   });
+ 
+   // Save selected model to localStorage
+   useEffect(() => {
+     localStorage.setItem('saas-ai-model', selectedModel);
+   }, [selectedModel]);
 
   // Pin/Unpin message handlers
   const handlePinMessage = useCallback((messageId: string) => {
@@ -221,7 +231,11 @@ export default function AiChat() {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
       },
-      body: JSON.stringify({ messages: formattedMessages, stream: true }),
+       body: JSON.stringify({ 
+         messages: formattedMessages, 
+         stream: true,
+         model: selectedModel,
+       }),
     });
 
     if (!resp.ok) {
@@ -289,7 +303,7 @@ export default function AiChat() {
     }
 
     onDone();
-  }, []);
+   }, [selectedModel]);
 
   const handleSend = async (content: string, files?: File[]) => {
     if ((!content.trim() && (!files || files.length === 0)) || isLoading) return;
@@ -718,6 +732,8 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
           onClearChat={clearCurrentChat}
           onOpenSearch={() => setShowSearchPanel(true)}
           onOpenShortcuts={() => setShowShortcuts(true)}
+           selectedModel={selectedModel}
+           onModelChange={setSelectedModel}
         />
 
         {/* Messages Area */}

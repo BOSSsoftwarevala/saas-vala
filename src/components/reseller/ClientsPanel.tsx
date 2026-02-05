@@ -1,4 +1,5 @@
  import { useState } from 'react';
+ import { MaskedField } from '@/components/ui/masked-field';
  import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
  import { Input } from '@/components/ui/input';
  import { Badge } from '@/components/ui/badge';
@@ -132,14 +133,14 @@
                      </TableCell>
                      <TableCell>
                        <div className="flex flex-col gap-1">
-                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                           <Mail className="h-3 w-3" />
-                           {client.email}
-                         </div>
-                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                           <Phone className="h-3 w-3" />
-                           {client.phone}
-                         </div>
+                           <div className="flex items-center gap-1 text-sm">
+                             <Mail className="h-3 w-3 text-muted-foreground" />
+                             <MaskedField value={client.email} type="email" />
+                           </div>
+                           <div className="flex items-center gap-1 text-sm">
+                             <Phone className="h-3 w-3 text-muted-foreground" />
+                             <MaskedField value={client.phone} type="phone" />
+                           </div>
                        </div>
                      </TableCell>
                      <TableCell className="text-center">

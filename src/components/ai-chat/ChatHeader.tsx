@@ -1,28 +1,27 @@
-import { Button } from '@/components/ui/button';
-import { 
-  Settings, 
-  Share2, 
-  Download,
-  ChevronDown,
-  Sparkles,
-  ArrowLeft,
-  PanelLeft,
-  MoreVertical,
-  Trash2,
-  Copy,
-  History,
-  Search,
-  Keyboard
-} from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { useNavigate } from 'react-router-dom';
-import { Badge } from '@/components/ui/badge';
+ import { Button } from '@/components/ui/button';
+ import { 
+   Settings, 
+   Share2, 
+   Download,
+   Sparkles,
+   ArrowLeft,
+   PanelLeft,
+   MoreVertical,
+   Trash2,
+   Copy,
+   History,
+   Search,
+   Keyboard
+ } from 'lucide-react';
+ import {
+   DropdownMenu,
+   DropdownMenuContent,
+   DropdownMenuItem,
+   DropdownMenuSeparator,
+   DropdownMenuTrigger,
+ } from '@/components/ui/dropdown-menu';
+ import { useNavigate } from 'react-router-dom';
+ import { ModelSelector } from './ModelSelector';
 
 interface ChatHeaderProps {
   title: string;
@@ -33,9 +32,22 @@ interface ChatHeaderProps {
   onClearChat?: () => void;
   onOpenSearch?: () => void;
   onOpenShortcuts?: () => void;
+   selectedModel?: string;
+   onModelChange?: (model: string) => void;
 }
 
-export function ChatHeader({ title, onExport, onToggleSidebar, sidebarOpen, onOpenHistory, onClearChat, onOpenSearch, onOpenShortcuts }: ChatHeaderProps) {
+ export function ChatHeader({ 
+   title, 
+   onExport, 
+   onToggleSidebar, 
+   sidebarOpen, 
+   onOpenHistory, 
+   onClearChat, 
+   onOpenSearch, 
+   onOpenShortcuts,
+   selectedModel = 'google/gemini-3-flash-preview',
+   onModelChange,
+ }: ChatHeaderProps) {
   const navigate = useNavigate();
 
   return (
@@ -73,38 +85,12 @@ export function ChatHeader({ title, onExport, onToggleSidebar, sidebarOpen, onOp
               <h1 className="text-sm font-semibold text-foreground">
                 Vala AI
               </h1>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-6 px-1.5 gap-1 text-muted-foreground hover:text-foreground">
-                    <span className="text-xs">Gemini 3</span>
-                    <ChevronDown className="h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
-                  <DropdownMenuItem className="gap-2">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    <div className="flex-1">
-                      <div className="font-medium">GPT-5</div>
-                      <div className="text-xs text-muted-foreground">OpenAI's most capable</div>
-                    </div>
-                    <Badge variant="secondary" className="text-[10px]">Active</Badge>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="gap-2" disabled>
-                    <Sparkles className="h-4 w-4 text-muted-foreground" />
-                    <div className="flex-1">
-                      <div className="font-medium">Gemini 3 Flash</div>
-                      <div className="text-xs text-muted-foreground">Fast & efficient</div>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="gap-2" disabled>
-                    <Sparkles className="h-4 w-4 text-muted-foreground" />
-                    <div className="flex-1">
-                      <div className="font-medium">Gemini 2.5 Pro</div>
-                      <div className="text-xs text-muted-foreground">Most capable Gemini</div>
-                    </div>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+             {onModelChange && (
+               <ModelSelector
+                 selectedModel={selectedModel}
+                 onModelChange={onModelChange}
+               />
+             )}
             </div>
             <div className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />

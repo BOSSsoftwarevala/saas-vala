@@ -10,8 +10,6 @@ interface Message {
   content: string;
 }
 
-// Best available model for accuracy and performance
-const AI_MODEL = 'google/gemini-3-flash-preview';
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -20,7 +18,27 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, stream = false } = await req.json() as { messages: Message[]; stream?: boolean };
+     const { messages, stream = false, model } = await req.json() as { 
+       messages: Message[]; 
+       stream?: boolean;
+       model?: string;
+     };
+ 
+     // Supported models with fallback
+     const SUPPORTED_MODELS = [
+       'google/gemini-3-flash-preview',
+       'google/gemini-2.5-flash',
+       'google/gemini-2.5-pro',
+       'google/gemini-3-pro-preview',
+       'openai/gpt-5',
+       'openai/gpt-5-mini',
+       'openai/gpt-5.2',
+     ];
+ 
+     // Use provided model or default
+     const AI_MODEL = model && SUPPORTED_MODELS.includes(model) 
+       ? model 
+       : 'google/gemini-3-flash-preview';
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(
@@ -38,7 +56,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Processing AI chat: ${messages.length} messages, stream: ${stream}, model: ${AI_MODEL}`);
+     console.log(`Processing AI chat: ${messages.length} messages, stream: ${stream}, model: ${AI_MODEL}${model ? ' (requested)' : ' (default)'}`);
 
     // Enhanced system prompt for maximum accuracy
     const systemMessage: Message = {
