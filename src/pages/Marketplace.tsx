@@ -6,6 +6,7 @@ import { categories, generateProducts } from '@/data/marketplaceData';
 import { toast } from 'sonner';
 import { useMarketplacePurchase } from '@/hooks/useMarketplacePurchase';
 import { useAuth } from '@/hooks/useAuth';
+import saasValaBanner from '@/assets/saas-vala-banner.jpg';
 import {
   Dialog,
   DialogContent,
@@ -80,29 +81,12 @@ export default function Marketplace() {
           animate={{ opacity: 1, y: 0 }}
           className="px-4 md:px-8 mb-6"
         >
-          <div className="relative h-[200px] md:h-[300px] rounded-2xl overflow-hidden">
+          <div className="relative rounded-2xl overflow-hidden">
             <img
-              src="https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=1600&h=600&fit=crop"
-              alt="Business Software Marketplace"
-              className="w-full h-full object-cover"
+              src={saasValaBanner}
+              alt="SaaS VALA - All Software Only $5 per month"
+              className="w-full h-auto object-contain rounded-2xl"
             />
-            <div className="absolute inset-0 bg-gradient-to-r from-background via-background/60 to-transparent flex items-center">
-              <div className="px-6 md:px-12 max-w-xl">
-                <Badge className="mb-3 bg-primary/20 text-primary border-primary/30">
-                  ENTERPRISE SOFTWARE
-                </Badge>
-                <h1 className="text-2xl md:text-4xl font-display font-bold text-foreground mb-2">
-                  Business Software Marketplace
-                </h1>
-                <p className="text-sm md:text-base text-muted-foreground mb-4">
-                  One-click install. Lifetime license. Instant support.
-                </p>
-                <Button className="gap-2">
-                  <ShoppingCart className="h-4 w-4" />
-                  Browse All
-                </Button>
-              </div>
-            </div>
           </div>
         </motion.div>
 
