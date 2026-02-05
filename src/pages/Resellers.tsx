@@ -58,11 +58,13 @@ import { cn } from '@/lib/utils';
 import { useResellers, type Reseller } from '@/hooks/useResellers';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { Switch } from '@/components/ui/switch';
+ import { ResellerActivityPanel } from '@/components/reseller/ResellerActivityPanel';
+ import { ResellerQuickActions } from '@/components/reseller/ResellerQuickActions';
 
 const ITEMS_PER_PAGE = 25;
 
 export default function Resellers() {
-  const { resellers, loading, total, fetchResellers, createReseller, updateReseller, deleteReseller, suspendReseller, activateReseller, verifyReseller } = useResellers();
+   const { resellers, loading, total, fetchResellers, updateReseller, deleteReseller } = useResellers();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -246,8 +248,10 @@ export default function Resellers() {
           </div>
         </div>
 
-        {/* Resellers Table */}
-        <div className="glass-card rounded-xl overflow-hidden">
+         {/* Main Grid: Table + Activity */}
+         <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+           {/* Resellers Table */}
+           <div className="xl:col-span-3 glass-card rounded-xl overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center p-12">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -274,6 +278,7 @@ export default function Resellers() {
                     <TableHead className="text-muted-foreground">Status</TableHead>
                     <TableHead className="text-muted-foreground">Verified</TableHead>
                     <TableHead className="text-muted-foreground">Created</TableHead>
+                     <TableHead className="text-muted-foreground">Quick Actions</TableHead>
                     <TableHead className="text-muted-foreground text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -330,6 +335,9 @@ export default function Resellers() {
                       <TableCell>
                         <span className="text-muted-foreground">{new Date(reseller.created_at).toLocaleDateString()}</span>
                       </TableCell>
+                       <TableCell>
+                         <ResellerQuickActions reseller={reseller} onAction={() => fetchResellers()} />
+                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -341,20 +349,6 @@ export default function Resellers() {
                             <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => openEditDialog(reseller)}>
                               <Edit className="h-4 w-4" /> Edit
                             </DropdownMenuItem>
-                            {!reseller.is_verified && (
-                              <DropdownMenuItem className="gap-2 cursor-pointer text-cyan" onClick={() => verifyReseller(reseller.id)}>
-                                <Shield className="h-4 w-4" /> Verify
-                              </DropdownMenuItem>
-                            )}
-                            {reseller.is_active ? (
-                              <DropdownMenuItem className="gap-2 cursor-pointer text-warning" onClick={() => suspendReseller(reseller.id)}>
-                                <Ban className="h-4 w-4" /> Suspend
-                              </DropdownMenuItem>
-                            ) : (
-                              <DropdownMenuItem className="gap-2 cursor-pointer text-success" onClick={() => activateReseller(reseller.id)}>
-                                <Play className="h-4 w-4" /> Activate
-                              </DropdownMenuItem>
-                            )}
                             <DropdownMenuItem className="gap-2 cursor-pointer text-destructive" onClick={() => setDeleteId(reseller.id)}>
                               <Trash2 className="h-4 w-4" /> Delete
                             </DropdownMenuItem>
@@ -365,15 +359,21 @@ export default function Resellers() {
                   ))}
                 </TableBody>
               </Table>
-              <PaginationControls
-                currentPage={currentPage}
-                totalPages={totalPages}
-                totalItems={total}
-                itemsPerPage={ITEMS_PER_PAGE}
-                onPageChange={handlePageChange}
-              />
-            </>
-          )}
+                 <PaginationControls
+                   currentPage={currentPage}
+                   totalPages={totalPages}
+                   totalItems={total}
+                   itemsPerPage={ITEMS_PER_PAGE}
+                   onPageChange={handlePageChange}
+                 />
+               </>
+             )}
+           </div>
+ 
+           {/* Activity Panel */}
+           <div className="xl:col-span-1">
+             <ResellerActivityPanel />
+           </div>
         </div>
       </div>
 
