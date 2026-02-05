@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
    BarChart3,
    Settings,
    Zap,
+  Brain,
  } from 'lucide-react';
 import { SeoDashboard } from '@/components/seo-leads/SeoDashboard';
 import { AutoSeoEngine } from '@/components/seo-leads/AutoSeoEngine';
@@ -23,6 +24,7 @@ import { LeadSources } from '@/components/seo-leads/LeadSources';
 import { SeoAnalytics } from '@/components/seo-leads/SeoAnalytics';
 import { SeoSettings } from '@/components/seo-leads/SeoSettings';
  import { EnterpriseSeoEngine } from '@/components/seo-leads/EnterpriseSeoEngine';
+import { WorldClassSeoEngine } from '@/components/seo-leads/WorldClassSeoEngine';
 
 export default function SeoLeads() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -42,7 +44,7 @@ export default function SeoLeads() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-           <TabsList className="w-full grid grid-cols-5 md:grid-cols-10 h-auto gap-1 bg-muted/30 p-1.5 rounded-xl">
+           <TabsList className="w-full grid grid-cols-6 md:grid-cols-11 h-auto gap-1 bg-muted/30 p-1.5 rounded-xl">
             <TabsTrigger value="dashboard" className="gap-1 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <LayoutDashboard className="h-3 w-3" />
               <span className="hidden sm:inline">Dashboard</span>
@@ -50,6 +52,10 @@ export default function SeoLeads() {
             <TabsTrigger value="auto-seo" className="gap-1 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Cpu className="h-3 w-3" />
               <span className="hidden sm:inline">Auto SEO</span>
+            </TabsTrigger>
+            <TabsTrigger value="world-class" className="gap-1 text-xs data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-secondary data-[state=active]:text-primary-foreground">
+              <Brain className="h-3 w-3" />
+              <span className="hidden sm:inline">World-Class</span>
             </TabsTrigger>
              <TabsTrigger value="enterprise" className="gap-1 text-xs data-[state=active]:bg-secondary data-[state=active]:text-secondary-foreground">
                <Zap className="h-3 w-3" />
@@ -91,6 +97,10 @@ export default function SeoLeads() {
 
           <TabsContent value="auto-seo" className="mt-6">
             <AutoSeoEngine />
+          </TabsContent>
+
+          <TabsContent value="world-class" className="mt-6">
+            <WorldClassSeoEngine />
           </TabsContent>
 
            <TabsContent value="enterprise" className="mt-6">
