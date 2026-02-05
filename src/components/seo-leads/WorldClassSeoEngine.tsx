@@ -30,6 +30,7 @@
  } from 'lucide-react';
  import { toast } from 'sonner';
 import { motion } from 'framer-motion';
+ import { LiveSeoActivityPanel, SeoActivityItem } from './LiveSeoActivityPanel';
  import {
    decideSeoAction,
    analyzeCompetitorGaps,
@@ -62,6 +63,10 @@ import { motion } from 'framer-motion';
      avgScore: 0,
      costSaved: 0,
    });
+   
+   // Live activity state
+   const [activities, setActivities] = useState<SeoActivityItem[]>([]);
+   const [currentStep, setCurrentStep] = useState('Idle');
  
    const cities = market === 'india' ? INDIA_CITIES : AFRICA_CITIES;
  
@@ -80,36 +85,97 @@ import { motion } from 'framer-motion';
    const runFullOptimization = async () => {
      setIsProcessing(true);
      setProgress(0);
+     setActivities([]);
      
      try {
        // Step 1: Optimize all products
        toast.info('Step 1/4: Optimizing products...');
+       setCurrentStep('Optimizing Products');
+       
+       // Add product activities
+       const productActivities: SeoActivityItem[] = products.map(p => ({
+         id: p.productId,
+         type: 'product',
+         name: p.productName,
+         status: 'pending',
+       }));
+       setActivities(productActivities);
+ 
        const results = await bulkOptimizeProducts(
          market,
          cities,
-         (current, total) => setProgress((current / total) * 25)
+         (current, total) => {
+           setProgress((current / total) * 25);
+           // Update activity status
+           setActivities(prev => prev.map((act, idx) => ({
+             ...act,
+             status: idx < current ? 'completed' : idx === current ? 'processing' : 'pending',
+             progress: idx === current ? Math.random() * 100 : undefined,
+             details: idx < current ? `Optimized ✓` : undefined,
+           })));
+         }
        );
        setSeoResults(results);
  
+       // Mark all product activities as completed
+       setActivities(prev => prev.map((act, idx) => {
+         const result = results[idx];
+         return {
+           ...act,
+           status: 'completed' as const,
+           details: result ? `Score: ${result.score}` : 'Optimized ✓',
+         };
+       }));
+ 
        // Step 2: Analyze competitor gaps
        toast.info('Step 2/4: Analyzing competitors...');
+       setCurrentStep('Analyzing Competitors');
        setProgress(50);
+       
+       // Add competitor activity
+       setActivities(prev => [
+         ...prev,
+         { id: 'competitor', type: 'competitor', name: 'Competitor Gap Analysis', status: 'processing' }
+       ]);
+ 
        const allKeywords = results.flatMap(r => r.meta.keywords).slice(0, 50);
        const gaps = analyzeCompetitorGaps(allKeywords, market);
        setCompetitorGaps(gaps);
  
+       setActivities(prev => prev.map(act => 
+         act.id === 'competitor' ? { ...act, status: 'completed', details: `${gaps.length} gaps found` } : act
+       ));
+ 
        // Step 3: Voice search optimization
        toast.info('Step 3/4: Voice search optimization...');
+       setCurrentStep('Voice Search Optimization');
        setProgress(75);
+       
+       setActivities(prev => [
+         ...prev,
+         { id: 'voice', type: 'voice', name: 'Voice Search Queries', status: 'processing' }
+       ]);
+ 
        const voiceOpts: VoiceSearchOptimization[] = [];
        BUSINESS_CATEGORIES.slice(0, 5).forEach(category => {
          voiceOpts.push(...generateVoiceSearchOptimizations(category, market, cities[0]));
        });
        setVoiceOptimizations(voiceOpts);
  
+       setActivities(prev => prev.map(act => 
+         act.id === 'voice' ? { ...act, status: 'completed', details: `${voiceOpts.length} queries` } : act
+       ));
+ 
        // Step 4: AI decisions
        toast.info('Step 4/4: AI decision analysis...');
+       setCurrentStep('AI Decision Analysis');
        setProgress(90);
+       
+       setActivities(prev => [
+         ...prev,
+         { id: 'ai-brain', type: 'security', name: 'AI Decision Brain', status: 'processing' }
+       ]);
+ 
        const aiDecisions: SeoDecision[] = products.map(p => decideSeoAction({
          pageUrl: `/products/${p.productCode}`,
          pageName: p.productName,
@@ -123,6 +189,10 @@ import { motion } from 'framer-motion';
        }));
        setDecisions(aiDecisions);
  
+       setActivities(prev => prev.map(act => 
+         act.id === 'ai-brain' ? { ...act, status: 'completed', details: `${aiDecisions.length} decisions` } : act
+       ));
+ 
        // Update stats
        const successCount = results.filter(r => r.status === 'success').length;
        const avgScore = results.reduce((sum, r) => sum + r.score, 0) / results.length;
@@ -134,11 +204,13 @@ import { motion } from 'framer-motion';
        });
  
        setProgress(100);
+       setCurrentStep('Complete!');
        toast.success('Full SEO optimization complete!', {
          description: `Optimized ${successCount} products, Avg Score: ${Math.round(avgScore)}`,
        });
      } catch (err: any) {
        toast.error('Optimization failed: ' + err.message);
+       setCurrentStep('Failed');
      } finally {
        setIsProcessing(false);
      }
@@ -146,6 +218,15 @@ import { motion } from 'framer-motion';
  
    return (
      <div className="space-y-6">
+       {/* Live Activity Panel - Shows during processing */}
+       <LiveSeoActivityPanel
+         isActive={isProcessing}
+         activities={activities}
+         currentStep={currentStep}
+         overallProgress={progress}
+         market={market}
+       />
+ 
        {/* Header Stats */}
        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
          <Card className="glass-card col-span-1">
