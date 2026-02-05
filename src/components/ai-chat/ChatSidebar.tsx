@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -31,6 +32,7 @@ interface ChatSidebarProps {
   onDeleteSession: (id: string) => void;
   isOpen: boolean;
   onToggle: () => void;
+  chatSlot?: ReactNode;
 }
 
 export function ChatSidebar({
@@ -41,6 +43,7 @@ export function ChatSidebar({
   onDeleteSession,
   isOpen,
   onToggle,
+  chatSlot,
 }: ChatSidebarProps) {
 
   // Group sessions by date
@@ -119,11 +122,11 @@ export function ChatSidebar({
 
   return (
     <>
-      {/* Sidebar - Lovable style narrow width */}
+      {/* Sidebar */}
       <div
         className={cn(
           'h-full bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300 shrink-0',
-          isOpen ? 'w-64' : 'w-0 overflow-hidden',
+          isOpen ? 'w-[380px] min-w-[320px] max-w-[44vw]' : 'w-0 overflow-hidden',
         )}
       >
         {/* Header - compact */}
@@ -144,22 +147,31 @@ export function ChatSidebar({
 
         {/* Body */}
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-          {/* Sessions List - full height now since chat moved to main area */}
-          <ScrollArea className="flex-1">
-            <div className="py-1">
-              <SessionGroup title="Today" items={groupedSessions.today} />
-              <SessionGroup title="Yesterday" items={groupedSessions.yesterday} />
-              <SessionGroup title="Last 7 days" items={groupedSessions.lastWeek} />
-              <SessionGroup title="Older" items={groupedSessions.older} />
+          {/* Sessions List (compact) */}
+          <div className="shrink-0">
+            <ScrollArea className={cn(chatSlot ? 'h-[240px]' : 'flex-1')}>
+              <div className="py-1">
+                <SessionGroup title="Today" items={groupedSessions.today} />
+                <SessionGroup title="Yesterday" items={groupedSessions.yesterday} />
+                <SessionGroup title="Last 7 days" items={groupedSessions.lastWeek} />
+                <SessionGroup title="Older" items={groupedSessions.older} />
 
-              {sessions.length === 0 && (
-                <div className="px-4 py-4 text-center">
-                  <MessageSquare className="h-6 w-6 mx-auto mb-1 text-muted-foreground/30" />
-                  <p className="text-xs text-muted-foreground">No chats yet</p>
-                </div>
-              )}
+                {sessions.length === 0 && (
+                  <div className="px-4 py-4 text-center">
+                    <MessageSquare className="h-6 w-6 mx-auto mb-1 text-muted-foreground/30" />
+                    <p className="text-xs text-muted-foreground">No chats yet</p>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+
+          {/* Conversation */}
+          {chatSlot && (
+            <div className="flex-1 min-h-0 border-t border-sidebar-border">
+              {chatSlot}
             </div>
-          </ScrollArea>
+          )}
 
           {/* Footer - compact */}
           <div className="shrink-0 py-2 px-3 border-t border-sidebar-border bg-sidebar">

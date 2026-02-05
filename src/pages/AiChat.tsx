@@ -8,6 +8,7 @@ import { HostingCredentialsModal, HostingCredentials } from '@/components/ai-cha
 import { ThinkingIndicator } from '@/components/ai-chat/ThinkingIndicator';
 import { ChatHistoryPanel } from '@/components/ai-chat/ChatHistoryPanel';
 import { SmartSuggestions } from '@/components/ai-chat/SmartSuggestions';
+import { ChatResultPanel } from '@/components/ai-chat/ChatResultPanel';
 
 import { ChatSearch } from '@/components/ai-chat/ChatSearch';
 import { KeyboardShortcuts, useKeyboardShortcuts } from '@/components/ai-chat/KeyboardShortcuts';
@@ -737,7 +738,7 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
 
   return (
     <div className="h-screen flex bg-background overflow-hidden">
-      {/* Left Sidebar - Sessions list only */}
+      {/* Left Sidebar - Chat (Lovable style) */}
       <ChatSidebar
         sessions={sessions}
         activeSessionId={activeSessionId}
@@ -749,9 +750,52 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
         onDeleteSession={deleteSession}
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
+        chatSlot={
+          <div className="h-full flex flex-col min-h-0">
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto">
+              {activeSession && activeSession.messages.length > 0 ? (
+                <div className="pb-4">
+                  {activeSession.messages.map((message, index) => (
+                    <div key={message.id} id={`message-${message.id}`}>
+                      <ChatMessage
+                        message={message}
+                        index={index}
+                        isPinned={pinnedMessages.has(message.id)}
+                        onPin={handlePinMessage}
+                        onUnpin={handleUnpinMessage}
+                      />
+                    </div>
+                  ))}
+                  {isLoading && activeSession.messages[activeSession.messages.length - 1]?.role === 'user' && (
+                    <ThinkingIndicator isActive={true} context={thinkingContext} />
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+              ) : (
+                <div className="h-full flex items-center justify-center px-6">
+                  <p className="text-sm text-muted-foreground">Type below to start a chat…</p>
+                </div>
+              )}
+            </div>
+
+            {/* Smart Suggestions - Collapsible above input */}
+            {activeSession && activeSession.messages.length > 0 && !isLoading && (
+              <SmartSuggestions
+                lastMessage={activeSession.messages[activeSession.messages.length - 1]?.content}
+                isLoading={isLoading}
+                onSelect={handleSuggestionClick}
+                hasFiles={activeSession.messages.some((m) => m.files && m.files.length > 0)}
+              />
+            )}
+
+            {/* Chat Input */}
+            <ChatInput onSend={handleSend} isLoading={isLoading} onVoiceMessage={handleVoiceMessage} />
+          </div>
+        }
       />
 
-      {/* Main Screen Area - Chat + Output (Lovable style) */}
+      {/* Main Screen Area - Result (Lovable preview style) */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <ChatHeader
           title={activeSession?.title || 'SaaS VALA AI'}
@@ -766,45 +810,12 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
           onModelChange={setSelectedModel}
         />
 
-        {/* Chat Messages Area - 85% of screen */}
-        <div className="flex-1 overflow-y-auto">
-          {activeSession && activeSession.messages.length > 0 ? (
-            <div className="max-w-4xl mx-auto pb-4">
-              {activeSession.messages.map((message, index) => (
-                <div key={message.id} id={`message-${message.id}`}>
-                  <ChatMessage
-                    message={message}
-                    index={index}
-                    isPinned={pinnedMessages.has(message.id)}
-                    onPin={handlePinMessage}
-                    onUnpin={handleUnpinMessage}
-                  />
-                </div>
-              ))}
-              {isLoading && activeSession.messages[activeSession.messages.length - 1]?.role === 'user' && (
-                <ThinkingIndicator isActive={true} context={thinkingContext} />
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-          ) : (
-            <EmptyState onSuggestionClick={handleSuggestionClick} />
-          )}
-        </div>
-
-        {/* Smart Suggestions - Collapsible above input */}
-        {activeSession && activeSession.messages.length > 0 && !isLoading && (
-          <SmartSuggestions
-            lastMessage={activeSession.messages[activeSession.messages.length - 1]?.content}
-            isLoading={isLoading}
-            onSelect={handleSuggestionClick}
-            hasFiles={activeSession.messages.some((m) => m.files && m.files.length > 0)}
-          />
-        )}
-
-        {/* Chat Input - Compact at bottom */}
-        <ChatInput onSend={handleSend} isLoading={isLoading} onVoiceMessage={handleVoiceMessage} />
+        <ChatResultPanel
+          messages={activeSession?.messages || []}
+          isLoading={isLoading}
+          onSuggestionClick={handleSuggestionClick}
+        />
       </div>
-
 
       {/* History Panel */}
       <ChatHistoryPanel
