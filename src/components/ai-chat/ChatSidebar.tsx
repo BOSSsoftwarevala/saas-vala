@@ -132,28 +132,19 @@ export function ChatSidebar({
           isOpen ? 'w-[380px]' : 'w-0 overflow-hidden',
         )}
       >
-        {/* Header */}
-        <div className="p-4 border-b border-sidebar-border">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="h-9 w-9 rounded-xl bg-primary/20 flex items-center justify-center">
-              <Sparkles className="h-5 w-5 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="font-display font-bold text-sidebar-foreground text-sm truncate">SaaS VALA AI</h2>
-              <p className="text-xs text-muted-foreground truncate">Internal Power</p>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onToggle}
-              className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
-            >
-              <PanelLeftClose className="h-4 w-4" />
-            </Button>
-          </div>
-          <Button onClick={onNewSession} className="w-full gap-2 bg-primary hover:bg-primary/90">
+        {/* Header - compact */}
+        <div className="p-3 border-b border-sidebar-border flex items-center gap-2">
+          <Button onClick={onNewSession} className="flex-1 gap-2 bg-primary hover:bg-primary/90 h-9">
             <Plus className="h-4 w-4" />
             New Chat
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onToggle}
+            className="h-9 w-9 text-muted-foreground hover:text-foreground shrink-0"
+          >
+            <PanelLeftClose className="h-4 w-4" />
           </Button>
         </div>
 
