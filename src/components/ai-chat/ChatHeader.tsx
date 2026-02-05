@@ -80,7 +80,7 @@ interface ChatHeaderProps {
           <img 
             src="/softwarevala-logo.png" 
             alt="VALA AI" 
-            className="h-8 w-8 rounded-lg object-cover border border-primary/20"
+            className="h-8 w-8 rounded-full object-cover border border-primary/20"
             onError={(e) => {
               e.currentTarget.style.display = 'none';
             }}
