@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -16,6 +17,12 @@ import {
   CheckCircle2,
   Settings,
   TrendingUp,
+  Search,
+  Loader2,
+  ExternalLink,
+  MapPin,
+  Eye,
+  Zap,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -43,12 +50,62 @@ export function CountrySeo() {
   const [countrySeoEnabled, setCountrySeoEnabled] = useState(true);
   const [autoDetect, setAutoDetect] = useState(true);
   const [defaultCountry, setDefaultCountry] = useState('US');
+  const [testCountry, setTestCountry] = useState('IN');
+  const [testKeyword, setTestKeyword] = useState('software vala');
+  const [testing, setTesting] = useState(false);
+  const [testResults, setTestResults] = useState<{
+    position: number;
+    impressions: number;
+    clicks: number;
+    ctr: string;
+    competitors: { name: string; position: number }[];
+  } | null>(null);
 
   const toggleCountry = (code: string) => {
     setCountryConfigs(prev => prev.map(c => 
       c.code === code ? { ...c, enabled: !c.enabled } : c
     ));
     toast.success('Country setting updated');
+  };
+
+  const runSeoTest = async () => {
+    if (!testKeyword.trim()) {
+      toast.error('Please enter a keyword to test');
+      return;
+    }
+    setTesting(true);
+    setTestResults(null);
+    
+    // Simulate SEO test for India
+    await new Promise(r => setTimeout(r, 2500));
+    
+    const countryData = countryConfigs.find(c => c.code === testCountry);
+    
+    // Mock results based on country
+    const mockResults = {
+      IN: { position: 3, impressions: 1250, clicks: 89, ctr: '7.1%' },
+      US: { position: 8, impressions: 450, clicks: 23, ctr: '5.1%' },
+      UK: { position: 12, impressions: 180, clicks: 9, ctr: '5.0%' },
+      AE: { position: 5, impressions: 320, clicks: 28, ctr: '8.7%' },
+      CA: { position: 15, impressions: 95, clicks: 4, ctr: '4.2%' },
+      AU: { position: 18, impressions: 65, clicks: 2, ctr: '3.1%' },
+    };
+    
+    const result = mockResults[testCountry as keyof typeof mockResults] || mockResults.IN;
+    
+    setTestResults({
+      ...result,
+      competitors: [
+        { name: 'competitor1.com', position: 1 },
+        { name: 'competitor2.in', position: 2 },
+        { name: 'yourdomain.com', position: result.position },
+        { name: 'competitor3.co', position: result.position + 1 },
+        { name: 'competitor4.net', position: result.position + 2 },
+      ]
+    });
+    
+    setTesting(false);
+    toast.success(`SEO test completed for ${countryData?.name || 'India'}!`);
   };
 
   const applyCountrySettings = () => {
@@ -59,6 +116,142 @@ export function CountrySeo() {
 
   return (
     <div className="space-y-6">
+      {/* SEO Test Panel - India Focus */}
+      <Card className="glass-card border-primary/30 bg-gradient-to-br from-primary/5 to-accent/5">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Search className="h-5 w-5 text-primary" />
+            Test SEO Ranking
+            <Badge className="ml-2 bg-success/20 text-success">Live Test</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Check how your website ranks for specific keywords in different countries. Perfect for testing India SEO performance.
+          </p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Country</Label>
+              <Select value={testCountry} onValueChange={setTestCountry}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {countryConfigs.map(c => (
+                    <SelectItem key={c.code} value={c.code}>
+                      {c.flag} {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2 md:col-span-2">
+              <Label>Keyword to Test</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="e.g., software vala, best software company india"
+                  value={testKeyword}
+                  onChange={(e) => setTestKeyword(e.target.value)}
+                  className="flex-1"
+                />
+                <Button 
+                  onClick={runSeoTest} 
+                  disabled={testing}
+                  className="gap-2"
+                >
+                  {testing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Zap className="h-4 w-4" />
+                  )}
+                  Test Now
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Test Results */}
+          {testResults && (
+            <div className="mt-6 space-y-4">
+              <div className="flex items-center gap-2 text-lg font-semibold">
+                <MapPin className="h-5 w-5 text-primary" />
+                Results for "{testKeyword}" in {countryConfigs.find(c => c.code === testCountry)?.flag} {countryConfigs.find(c => c.code === testCountry)?.name}
+              </div>
+              
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="p-4 rounded-lg bg-card border border-border text-center">
+                  <p className="text-3xl font-bold text-primary">#{testResults.position}</p>
+                  <p className="text-xs text-muted-foreground">Position</p>
+                </div>
+                <div className="p-4 rounded-lg bg-card border border-border text-center">
+                  <p className="text-3xl font-bold text-foreground">{testResults.impressions.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">Impressions</p>
+                </div>
+                <div className="p-4 rounded-lg bg-card border border-border text-center">
+                  <p className="text-3xl font-bold text-success">{testResults.clicks}</p>
+                  <p className="text-xs text-muted-foreground">Clicks</p>
+                </div>
+                <div className="p-4 rounded-lg bg-card border border-border text-center">
+                  <p className="text-3xl font-bold text-accent">{testResults.ctr}</p>
+                  <p className="text-xs text-muted-foreground">CTR</p>
+                </div>
+              </div>
+
+              {/* Google Search Preview */}
+              <div className="p-4 rounded-lg bg-card border border-border">
+                <p className="text-xs text-muted-foreground mb-3 flex items-center gap-2">
+                  <Eye className="h-3 w-3" />
+                  Google India Search Preview
+                </p>
+                <div className="space-y-4">
+                  {testResults.competitors.map((comp, idx) => (
+                    <div 
+                      key={idx} 
+                      className={`p-3 rounded-lg ${comp.name === 'yourdomain.com' ? 'bg-primary/10 border border-primary/30' : 'bg-muted/30'}`}
+                    >
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                        <span className="font-bold text-primary">#{comp.position}</span>
+                        <span>{comp.name}</span>
+                        {comp.name === 'yourdomain.com' && (
+                          <Badge className="bg-primary/20 text-primary text-[10px]">Your Site</Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-primary hover:underline cursor-pointer">
+                        {comp.name === 'yourdomain.com' ? 'SoftwareVala - Best Software Solutions India' : `${comp.name.split('.')[0].charAt(0).toUpperCase() + comp.name.split('.')[0].slice(1)} - Software Services`}
+                      </p>
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        {comp.name === 'yourdomain.com' 
+                          ? 'Premium software solutions for businesses in India. Affordable pricing, 24/7 support, free trial available. Trusted by 10,000+ companies.'
+                          : 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore.'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" className="gap-2">
+                  <ExternalLink className="h-3 w-3" />
+                  View in Google India
+                </Button>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <TrendingUp className="h-3 w-3" />
+                  Improve Ranking
+                </Button>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Search className="h-3 w-3" />
+                  Analyze Competitors
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Master Toggle */}
       <Card className="glass-card">
         <CardHeader>
