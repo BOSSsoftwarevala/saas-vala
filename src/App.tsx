@@ -13,6 +13,7 @@ import Marketplace from "./pages/Marketplace";
 import Products from "./pages/Products";
 import RoleDetail from "./pages/RoleDetail";
  import TransportRoleDetail from "./pages/TransportRoleDetail";
+ import ManufacturingRoleDetail from "./pages/ManufacturingRoleDetail";
 import EducationCategory from "./pages/EducationCategory";
 import Keys from "./pages/Keys";
 import Servers from "./pages/Servers";
@@ -138,6 +139,14 @@ function AppRoutes() {
            </ProtectedRoute>
          }
        />
+      <Route
+        path="/manufacturing-role-detail"
+        element={
+          <ProtectedRoute>
+            <ManufacturingRoleDetail />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/education"
         element={
