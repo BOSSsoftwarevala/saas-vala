@@ -3,8 +3,7 @@ import { motion } from 'framer-motion';
 import { MarketplaceHeader } from '@/components/marketplace/MarketplaceHeader';
 import { ProductSlider } from '@/components/marketplace/ProductSlider';
 import { categories, generateProducts } from '@/data/marketplaceData';
- import { mostUsedSoftware } from '@/data/mostUsedData';
- import { retailLocalSoftware } from '@/data/retailLocalData';
+ import { row1Software, row2Software, row3Software, row4Software } from '@/data/topSoftwareData';
 import { toast } from 'sonner';
 import { useMarketplacePurchase } from '@/hooks/useMarketplacePurchase';
 import { useAuth } from '@/hooks/useAuth';
@@ -107,8 +106,8 @@ export default function Marketplace() {
            transition={{ delay: 0.1 }}
          >
            <ProductSlider
-             title="🔥 MOST USED SOFTWARE"
-             products={mostUsedSoftware}
+              title="🔥 TOP SOFTWARE ROW 1"
+              products={row1Software}
              onBuyNow={handleBuyNow}
              onFavorite={handleFavorite}
              onNotify={handleNotify}
@@ -117,15 +116,49 @@ export default function Marketplace() {
            />
          </motion.div>
  
-          {/* Row 3: Retail & Local Business Software */}
+          {/* Row 2 */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
             <ProductSlider
-              title="🏪 RETAIL & LOCAL BUSINESS SOFTWARE"
-              products={retailLocalSoftware}
+              title="⚡ TOP SOFTWARE ROW 2"
+              products={row2Software}
+              onBuyNow={handleBuyNow}
+              onFavorite={handleFavorite}
+              onNotify={handleNotify}
+              onDownloadApk={handleDownloadApk}
+              showTechStack={true}
+            />
+          </motion.div>
+ 
+          {/* Row 3 */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            <ProductSlider
+              title="💼 TOP SOFTWARE ROW 3"
+              products={row3Software}
+              onBuyNow={handleBuyNow}
+              onFavorite={handleFavorite}
+              onNotify={handleNotify}
+              onDownloadApk={handleDownloadApk}
+              showTechStack={true}
+            />
+          </motion.div>
+ 
+          {/* Row 4 */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <ProductSlider
+              title="🚀 TOP SOFTWARE ROW 4"
+              products={row4Software}
               onBuyNow={handleBuyNow}
               onFavorite={handleFavorite}
               onNotify={handleNotify}

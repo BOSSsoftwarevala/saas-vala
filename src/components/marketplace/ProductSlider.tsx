@@ -16,7 +16,7 @@ interface Product {
   icon?: string;
   category?: string;
   description?: string;
-  features?: string[];
+  features?: string[] | { icon: string; text: string }[];
   originalPrice?: number;
   discount?: number;
    techStack?: string[];
@@ -193,15 +193,21 @@ export function ProductSlider({ title, products, onBuyNow, onFavorite, onNotify,
 
                     {/* Feature Tags */}
                     <div className="flex flex-wrap gap-1.5 mb-4">
-                       {features.slice(0, showTechStack ? 5 : 4).map((feature, i) => (
-                        <Badge 
-                          key={i} 
-                          variant="outline" 
-                           className={cn("bg-muted/50 border-border text-foreground", showTechStack ? "text-[9px]" : "text-[10px]")}
-                        >
-                          {feature}
-                        </Badge>
-                      ))}
+                       {features.slice(0, showTechStack ? 5 : 4).map((feature, i) => {
+                        const featureText = typeof feature === 'string' ? feature : feature.text;
+                        const featureIcon = typeof feature === 'object' && feature.icon ? feature.icon : null;
+                        const FeatureIconComponent = featureIcon ? (LucideIcons[featureIcon as keyof typeof LucideIcons] as React.ComponentType<{ className?: string }>) : null;
+                        return (
+                          <Badge 
+                            key={i} 
+                            variant="outline" 
+                            className={cn("bg-muted/50 border-border text-foreground flex items-center gap-1", showTechStack ? "text-[9px]" : "text-[10px]")}
+                          >
+                            {FeatureIconComponent && <FeatureIconComponent className="h-2.5 w-2.5" />}
+                            {featureText}
+                          </Badge>
+                        );
+                      })}
                     </div>
 
                      {/* Tech Stack Strip */}
