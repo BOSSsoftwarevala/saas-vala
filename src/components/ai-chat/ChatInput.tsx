@@ -372,11 +372,11 @@ export function ChatInput({ onSend, isLoading, disabled, onVoiceMessage, onTempl
               onKeyDown={handleKeyDown}
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
-              placeholder="Message SaaS VALA AI or click 🎤 to speak..."
+              placeholder="Message AI..."
               disabled={isLoading || disabled || voiceState !== 'idle'}
               className={cn(
-                'flex-1 min-h-[44px] max-h-[200px] resize-none border-0 bg-transparent px-2 py-2.5',
-                'text-base placeholder:text-muted-foreground/60 focus-visible:ring-0 focus-visible:ring-offset-0'
+                'flex-1 min-h-[36px] max-h-[80px] resize-none border-0 bg-transparent px-2 py-2',
+                'text-sm placeholder:text-muted-foreground/60 focus-visible:ring-0 focus-visible:ring-offset-0'
               )}
               rows={1}
             />
