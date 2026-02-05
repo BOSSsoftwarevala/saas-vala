@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, ChevronRight, Bell, ShoppingCart, Play, Clock } from 'lucide-react';
+ import { ChevronLeft, ChevronRight, Bell, ShoppingCart, Play, Clock, Download, Heart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import * as LucideIcons from 'lucide-react';
@@ -19,6 +19,7 @@ interface Product {
   features?: string[];
   originalPrice?: number;
   discount?: number;
+   techStack?: string[];
 }
 
 interface ProductSliderProps {
@@ -28,6 +29,8 @@ interface ProductSliderProps {
   onFavorite?: (product: Product) => void;
   onNotify?: (product: Product) => void;
   onLiveDemo?: (product: Product) => void;
+   onDownloadApk?: (product: Product) => void;
+   showTechStack?: boolean;
 }
 
 const statusConfig = {
@@ -71,7 +74,7 @@ function getIconComponent(category: string) {
   return IconComponent || LucideIcons.Box;
 }
 
-export function ProductSlider({ title, products, onBuyNow, onFavorite, onNotify, onLiveDemo }: ProductSliderProps) {
+export function ProductSlider({ title, products, onBuyNow, onFavorite, onNotify, onLiveDemo, onDownloadApk, showTechStack = false }: ProductSliderProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
@@ -190,32 +193,51 @@ export function ProductSlider({ title, products, onBuyNow, onFavorite, onNotify,
 
                     {/* Feature Tags */}
                     <div className="flex flex-wrap gap-1.5 mb-4">
-                      {features.slice(0, 4).map((feature, i) => (
+                       {features.slice(0, showTechStack ? 5 : 4).map((feature, i) => (
                         <Badge 
                           key={i} 
                           variant="outline" 
-                          className="text-[10px] bg-muted/50 border-border text-foreground"
+                           className={cn("bg-muted/50 border-border text-foreground", showTechStack ? "text-[9px]" : "text-[10px]")}
                         >
                           {feature}
                         </Badge>
                       ))}
                     </div>
 
+                     {/* Tech Stack Strip */}
+                     {showTechStack && product.techStack && (
+                       <div className="flex flex-wrap gap-1 mb-3">
+                         {product.techStack.map((tech, i) => (
+                           <Badge 
+                             key={i} 
+                             variant="secondary" 
+                             className="text-[8px] bg-primary/10 text-primary border-0 px-1.5 py-0"
+                           >
+                             {tech}
+                           </Badge>
+                         ))}
+                       </div>
+                     )}
+ 
                     {/* Price */}
                     <div className="flex items-center gap-2 mb-4 mt-auto">
-                      <span className="text-xs text-muted-foreground line-through">
-                        ₹{originalPrice.toLocaleString()}
-                      </span>
-                      <span className="font-bold text-lg text-primary">
-                        ₹{product.price.toLocaleString()}
-                      </span>
-                      <Badge className="bg-destructive/20 text-destructive border-0 text-[10px]">
-                        {discount}% OFF
-                      </Badge>
+                       {showTechStack ? (
+                         <>
+                           <span className="text-xs text-muted-foreground line-through">${Math.round(originalPrice / 80)}</span>
+                           <span className="font-bold text-lg text-primary">$5</span>
+                           <Badge className="bg-destructive/20 text-destructive border-0 text-[10px]">90% OFF</Badge>
+                         </>
+                       ) : (
+                         <>
+                           <span className="text-xs text-muted-foreground line-through">₹{originalPrice.toLocaleString()}</span>
+                           <span className="font-bold text-lg text-primary">₹{product.price.toLocaleString()}</span>
+                           <Badge className="bg-destructive/20 text-destructive border-0 text-[10px]">{discount}% OFF</Badge>
+                         </>
+                       )}
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex gap-2">
+                     <div className={cn("flex", showTechStack ? "gap-1.5" : "gap-2")}>
                       {product.status === 'upcoming' ? (
                         <>
                           <Button 
@@ -238,22 +260,44 @@ export function ProductSlider({ title, products, onBuyNow, onFavorite, onNotify,
                         </>
                       ) : (
                         <>
+                           {showTechStack && (
+                             <Button 
+                               variant="outline"
+                               size="sm"
+                               className="h-8 w-8 p-0 border-primary/30 text-primary hover:bg-primary/10"
+                               onClick={(e) => { e.stopPropagation(); onDownloadApk?.(product); }}
+                               title="Download APK"
+                             >
+                               <Download className="h-3.5 w-3.5" />
+                             </Button>
+                           )}
                           <Button 
                             variant="outline"
                             size="sm"
-                            className="flex-1 h-9 text-xs gap-1.5 border-primary text-primary hover:bg-primary/10"
-                            onClick={() => onLiveDemo?.(product)}
+                             className={cn("flex-1 border-primary text-primary hover:bg-primary/10", showTechStack ? "h-8 text-[10px] gap-1" : "h-9 text-xs gap-1.5")}
+                             onClick={(e) => { e.stopPropagation(); onLiveDemo?.(product); }}
                           >
                             <Play className="h-3.5 w-3.5" />
-                            LIVE DEMO
+                             DEMO
                           </Button>
+                           {showTechStack && (
+                             <Button 
+                               variant="outline"
+                               size="sm"
+                               className="h-8 w-8 p-0 border-pink-500/30 text-pink-500 hover:bg-pink-500/10"
+                               onClick={(e) => { e.stopPropagation(); onFavorite?.(product); }}
+                               title="Favourite"
+                             >
+                               <Heart className="h-3.5 w-3.5" />
+                             </Button>
+                           )}
                           <Button 
                             size="sm"
-                            className="flex-1 h-9 text-xs gap-1.5"
-                            onClick={() => onBuyNow?.(product)}
+                             className={cn("flex-1", showTechStack ? "h-8 text-[10px] gap-1" : "h-9 text-xs gap-1.5")}
+                             onClick={(e) => { e.stopPropagation(); onBuyNow?.(product); }}
                           >
                             <ShoppingCart className="h-3.5 w-3.5" />
-                            BUY NOW
+                             {showTechStack ? "BUY $5" : "BUY NOW"}
                           </Button>
                         </>
                       )}

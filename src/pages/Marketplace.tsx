@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { MarketplaceHeader } from '@/components/marketplace/MarketplaceHeader';
 import { ProductSlider } from '@/components/marketplace/ProductSlider';
 import { categories, generateProducts } from '@/data/marketplaceData';
+ import { mostUsedSoftware } from '@/data/mostUsedData';
 import { toast } from 'sonner';
 import { useMarketplacePurchase } from '@/hooks/useMarketplacePurchase';
 import { useAuth } from '@/hooks/useAuth';
@@ -15,7 +16,6 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, Download, ShoppingCart, CreditCard } from 'lucide-react';
 
 interface Product {
@@ -68,6 +68,15 @@ export default function Marketplace() {
     toast.success(`You'll be notified when ${product.title} launches`);
   };
 
+   const handleDownloadApk = (product: Product) => {
+     if (!user) {
+       toast.error('Please sign in to download APK');
+       return;
+     }
+     // Check wallet → Pay $5 → Download APK → Auto attach license
+     handleBuyNow(product);
+   };
+ 
   return (
     <div className="min-h-screen bg-background">
       {/* Fixed Header */}
@@ -90,13 +99,30 @@ export default function Marketplace() {
           </div>
         </motion.div>
 
+         {/* Row 1: Most Used / Daily Business Software */}
+         <motion.div
+           initial={{ opacity: 0, y: 20 }}
+           animate={{ opacity: 1, y: 0 }}
+           transition={{ delay: 0.1 }}
+         >
+           <ProductSlider
+             title="🔥 MOST USED SOFTWARE"
+             products={mostUsedSoftware}
+             onBuyNow={handleBuyNow}
+             onFavorite={handleFavorite}
+             onNotify={handleNotify}
+             onDownloadApk={handleDownloadApk}
+             showTechStack={true}
+           />
+         </motion.div>
+ 
         {/* Category Rows - All 29 categories */}
         {categories.map((category, index) => (
           <motion.div
             key={category.id}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.05 }}
+             transition={{ delay: (index + 1) * 0.05 }}
           >
             <ProductSlider
               title={`${category.icon} ${category.title}`}
