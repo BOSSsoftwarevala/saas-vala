@@ -27,6 +27,7 @@ import Settings from "./pages/Settings";
 import AuditLogs from "./pages/AuditLogs";
 import SystemHealth from "./pages/SystemHealth";
 import NotFound from "./pages/NotFound";
+import ResellerDashboard from "./pages/ResellerDashboard";
 
 const queryClient = new QueryClient();
 
@@ -232,6 +233,14 @@ function AppRoutes() {
             <AdminRoute>
               <SystemHealth />
             </AdminRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reseller-dashboard"
+        element={
+          <ProtectedRoute>
+            <ResellerDashboard />
           </ProtectedRoute>
         }
       />
