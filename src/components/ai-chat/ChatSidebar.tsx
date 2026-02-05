@@ -158,9 +158,9 @@ export function ChatSidebar({
         </div>
 
         {/* Body */}
-        <div className="flex-1 min-h-0 flex flex-col">
-          {/* Sessions List */}
-          <ScrollArea className={cn(hasChatPanel ? 'shrink-0 max-h-[40vh]' : 'flex-1')}>
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          {/* Sessions List - smaller when chat panel exists */}
+          <ScrollArea className={cn(hasChatPanel ? 'shrink-0 max-h-[30vh]' : 'flex-1')}>
             <div className="py-2">
               <SessionGroup title="Today" items={groupedSessions.today} />
               <SessionGroup title="Yesterday" items={groupedSessions.yesterday} />
@@ -168,26 +168,27 @@ export function ChatSidebar({
               <SessionGroup title="Older" items={groupedSessions.older} />
 
               {sessions.length === 0 && (
-                <div className="px-4 py-12 text-center">
-                  <MessageSquare className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
+                <div className="px-4 py-8 text-center">
+                  <MessageSquare className="h-8 w-8 mx-auto mb-2 text-muted-foreground/30" />
                   <p className="text-sm text-muted-foreground font-medium">No conversations yet</p>
-                  <p className="text-xs text-muted-foreground mt-1">Start a new chat to begin</p>
                 </div>
               )}
             </div>
           </ScrollArea>
 
-          {/* Footer (kept) */}
-          <div className="p-4 border-t border-sidebar-border">
+          {/* Chat Panel - takes more space */}
+          {hasChatPanel && (
+            <div className="flex-1 min-h-0 overflow-hidden flex flex-col bg-background border-t border-sidebar-border">
+              {children}
+            </div>
+          )}
+
+          {/* Footer - always at bottom */}
+          <div className="shrink-0 p-3 border-t border-sidebar-border bg-sidebar">
             <p className="text-xs text-center text-muted-foreground">
               Powered by <span className="font-semibold text-primary">SoftwareVala™</span>
             </p>
           </div>
-
-          {/* Chat Panel */}
-          {hasChatPanel && (
-            <div className="flex-1 min-h-0 overflow-hidden flex flex-col">{children}</div>
-          )}
         </div>
       </div>
 

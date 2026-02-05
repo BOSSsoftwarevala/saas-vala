@@ -468,20 +468,6 @@ export function ChatInput({ onSend, isLoading, disabled, onVoiceMessage, onTempl
             </motion.div>
           </div>
         </motion.div>
-
-        {/* Footer */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="flex items-center justify-center gap-2 mt-4"
-        >
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/30 border border-border">
-            <Sparkles className="h-3 w-3 text-primary" />
-            <p className="text-xs text-muted-foreground">
-              Powered by <span className="text-primary font-semibold">SoftwareVala™</span>
-            </p>
-          </div>
-        </motion.div>
       </div>
     </div>
   );
