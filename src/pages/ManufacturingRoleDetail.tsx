@@ -446,6 +446,18 @@
              </Accordion>
            </div>
          </motion.section>
+
+         {/* FOOTER */}
+         <motion.footer 
+           initial={{ opacity: 0 }}
+           animate={{ opacity: 1 }}
+           transition={{ delay: 0.3 }}
+           className="mt-8 py-6 text-center border-t border-border"
+         >
+           <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+             POWERED BY SOFTWARE VALA™
+           </span>
+         </motion.footer>
        </div>
      </DashboardLayout>
    );
