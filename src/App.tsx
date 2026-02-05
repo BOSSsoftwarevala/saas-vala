@@ -12,6 +12,7 @@ import Dashboard from "./pages/Dashboard";
 import Marketplace from "./pages/Marketplace";
 import Products from "./pages/Products";
 import RoleDetail from "./pages/RoleDetail";
+ import TransportRoleDetail from "./pages/TransportRoleDetail";
 import EducationCategory from "./pages/EducationCategory";
 import Keys from "./pages/Keys";
 import Servers from "./pages/Servers";
@@ -129,6 +130,14 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+       <Route
+         path="/transport-role-detail"
+         element={
+           <ProtectedRoute>
+             <TransportRoleDetail />
+           </ProtectedRoute>
+         }
+       />
       <Route
         path="/education"
         element={
