@@ -40,6 +40,11 @@ export interface DeploymentResult {
     failed: number;
     details: string[];
   };
+  demoCredentials?: {
+    username: string;
+    password: string;
+    note: string;
+  };
 }
 
 export interface HostingCredentials {
