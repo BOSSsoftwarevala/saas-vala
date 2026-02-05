@@ -128,7 +128,7 @@
          console.error('[SoftwareVala] Allowed: ' + this.domains.join(', '));
          
          // Report unauthorized usage
-         fetch('https://api.softwarevala.com/v1/report-violation', {
+         fetch('https://api.lovable.app/v1/report-violation', {
            method: 'POST',
            headers: { 'Content-Type': 'application/json' },
            body: JSON.stringify({
@@ -140,7 +140,7 @@
          }).catch(() => {});
          
          // Block application
-         document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#1a1a2e;color:#fff;font-family:system-ui;flex-direction:column;"><h1 style="color:#ff4757">⛔ License Violation</h1><p style="color:#aaa;max-width:400px;text-align:center">This software is not licensed for use on this domain. Please contact SoftwareVala™ to update your license.</p><a href="https://softwarevala.com/support" style="color:#4ecdc4;margin-top:20px">Contact Support →</a></div>';
+         document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#1a1a2e;color:#fff;font-family:system-ui;flex-direction:column;"><h1 style="color:#ff4757">⛔ License Violation</h1><p style="color:#aaa;max-width:400px;text-align:center">This software is not licensed for use on this domain. Please contact support to update your license.</p><a href="https://lovable.dev/support" style="color:#4ecdc4;margin-top:20px">Contact Support →</a></div>';
          throw new Error('License domain violation');
        }
        

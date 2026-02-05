@@ -68,11 +68,11 @@ const activeSessions: Session[] = [
 ];
 
 const recentAuditLogs: AuditLog[] = [
-  { id: '1', action: 'AI Model Enabled', user: 'admin@saasvala.com', timestamp: '2 min ago', details: 'Enabled GPT-5 Nano', status: 'success' },
-  { id: '2', action: 'Deployment Started', user: 'admin@saasvala.com', timestamp: '15 min ago', details: 'Project: demo-app', status: 'success' },
+  { id: '1', action: 'AI Model Enabled', user: 'admin@lovable.app', timestamp: '2 min ago', details: 'Enabled GPT-5 Nano', status: 'success' },
+  { id: '2', action: 'Deployment Started', user: 'admin@lovable.app', timestamp: '15 min ago', details: 'Project: demo-app', status: 'success' },
   { id: '3', action: 'Security Scan', user: 'System', timestamp: '1 hour ago', details: 'No threats detected', status: 'success' },
   { id: '4', action: 'Failed Login Attempt', user: 'unknown', timestamp: '3 hours ago', details: 'IP: 203.xxx.xxx.xxx', status: 'warning' },
-  { id: '5', action: 'API Key Rotated', user: 'admin@saasvala.com', timestamp: '1 day ago', details: 'OpenAI API key', status: 'success' }
+  { id: '5', action: 'API Key Rotated', user: 'admin@lovable.app', timestamp: '1 day ago', details: 'OpenAI API key', status: 'success' }
 ];
 
 export function SecurityPanel() {

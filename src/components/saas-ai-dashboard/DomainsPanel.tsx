@@ -41,7 +41,7 @@ interface Domain {
 
 export function DomainsPanel({ projectId: _projectId }: DomainsPanelProps) {
   const [domains, setDomains] = useState<Domain[]>([
-    { id: '1', domain: 'demo-app.saasvala.com', type: 'subdomain', sslStatus: 'active', verified: true },
+    { id: '1', domain: 'demo-app.lovable.app', type: 'subdomain', sslStatus: 'active', verified: true },
     { id: '2', domain: 'myapp.example.com', type: 'custom', sslStatus: 'active', verified: true },
     { id: '3', domain: 'staging.myapp.example.com', type: 'custom', sslStatus: 'pending', verified: false },
   ]);

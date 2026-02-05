@@ -50,12 +50,12 @@ export function SeoSettings() {
   const [schemaMarkup, setSchemaMarkup] = useState(`{
   "@context": "https://schema.org",
   "@type": "Organization",
-  "name": "SoftwareVala",
-  "url": "https://softwarevala.com",
-  "logo": "https://softwarevala.com/logo.png",
+  "name": "SaaS VALA",
+  "url": "https://id-preview--2dbe056f-e58d-4a25-ac47-b8b9c5f67907.lovable.app",
+  "logo": "https://id-preview--2dbe056f-e58d-4a25-ac47-b8b9c5f67907.lovable.app/favicon.png",
   "sameAs": [
-    "https://facebook.com/softwarevala",
-    "https://twitter.com/softwarevala"
+    "https://facebook.com/saasvala",
+    "https://twitter.com/saasvala"
   ]
 }`);
 

@@ -36,7 +36,7 @@ const serverFeatures: FeatureToggle[] = [
   { id: 'git-connect', name: 'Git Connect', description: 'GitHub/GitLab/Bitbucket', icon: GitBranch, enabled: true, status: 'active' },
   { id: 'auto-build', name: 'Auto Build', description: 'On push to main', icon: Hammer, enabled: true, status: 'active' },
   { id: 'auto-deploy', name: 'Auto Deploy', description: 'After successful build', icon: Rocket, enabled: true, status: 'active' },
-  { id: 'auto-subdomain', name: 'Auto Subdomain', description: 'project.saasvala.com', icon: Globe, enabled: true, status: 'active' },
+  { id: 'auto-subdomain', name: 'Auto Subdomain', description: 'project.lovable.app', icon: Globe, enabled: true, status: 'active' },
   { id: 'custom-domain', name: 'Custom Domain', description: 'Your own domain', icon: Globe, enabled: false, status: 'pending' },
   { id: 'ssl-auto', name: 'SSL Auto', description: 'Let\'s Encrypt', icon: Lock, enabled: true, status: 'active' },
   { id: 'live-logs', name: 'Live Logs', description: 'Real-time streaming', icon: FileText, enabled: true, status: 'active' },

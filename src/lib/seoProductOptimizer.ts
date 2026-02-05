@@ -172,7 +172,7 @@
      description: product.description,
      applicationCategory: 'BusinessApplication',
      operatingSystem: 'Web, Android, iOS',
-     url: `https://softwarevala.com/products/${product.productCode}`,
+    url: `https://id-preview--2dbe056f-e58d-4a25-ac47-b8b9c5f67907.lovable.app/products/${product.productCode}`,
      offers: {
        '@type': 'Offer',
        price: product.price.toString(),
@@ -185,7 +185,7 @@
        name: 'SoftwareVala™',
        logo: {
          '@type': 'ImageObject',
-         url: 'https://softwarevala.com/logo.png',
+        url: 'https://id-preview--2dbe056f-e58d-4a25-ac47-b8b9c5f67907.lovable.app/favicon.png',
        },
      },
      aggregateRating: {

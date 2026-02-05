@@ -100,7 +100,7 @@ export function useServers() {
       toast.error('Failed to create server');
       throw error;
     }
-    toast.success('Server created: ' + subdomain + '.saasvala.com');
+    toast.success('Server created: ' + subdomain + '.lovable.app');
     await fetchServers();
     return data;
   };

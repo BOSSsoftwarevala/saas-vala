@@ -40,7 +40,7 @@ const mockDeployments: Deployment[] = [
     message: 'feat: add payment integration',
     deployedAt: '10 minutes ago',
     runtime: 'Node.js 18',
-    url: 'https://demo-app.saasvala.com'
+    url: 'https://demo-app.lovable.app'
   },
   {
     id: 'deploy-002',
@@ -50,7 +50,7 @@ const mockDeployments: Deployment[] = [
     message: 'fix: database connection issue',
     deployedAt: '2 hours ago',
     runtime: 'Node.js 18',
-    url: 'https://demo-app.saasvala.com'
+    url: 'https://demo-app.lovable.app'
   },
   {
     id: 'deploy-003',

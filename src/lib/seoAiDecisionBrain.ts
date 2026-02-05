@@ -205,7 +205,7 @@
      case 'how':
        return `${businessType} software from SoftwareVala™ costs only ${currency}${price}/month. No hidden charges, pay only when you use.`;
      case 'where':
-       return `You can buy affordable ${businessType} software at SoftwareVala.com. Available in ${city} and all ${market === 'india' ? 'India' : 'Africa'}.`;
+      return `You can buy affordable ${businessType} software at our platform. Available in ${city} and all ${market === 'india' ? 'India' : 'Africa'}.`;
      case 'which':
        return `For small business, SoftwareVala™ ${businessType} is the best choice. Enterprise features, budget price, trusted by 10,000+ businesses.`;
      case 'why':
