@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, useRef, createContext, useContext, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -8,6 +8,9 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   role: AppRole | null;
+  /** True only during the very first boot session check. */
+  initializing: boolean;
+  /** True while auth + role checks are in progress (used for route guards). */
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
@@ -22,8 +25,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [initializing, setInitializing] = useState(true);
   const [roleLoading, setRoleLoading] = useState(false);
+
+  // Prevent repeated role fetches (token refresh / multiple auth events)
+  const roleRef = useRef<AppRole | null>(null);
+  const lastRoleUserIdRef = useRef<string | null>(null);
+  const inFlightRoleFetchRef = useRef<Promise<void> | null>(null);
+
+  useEffect(() => {
+    roleRef.current = role;
+  }, [role]);
 
   useEffect(() => {
     let isMounted = true;
@@ -40,13 +52,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session?.user) {
           setTimeout(() => {
             if (isMounted) {
-              fetchUserRole(session.user.id);
+              ensureUserRole(session.user.id);
             }
           }, 0);
         } else {
           setRole(null);
-          setLoading(false);
+          lastRoleUserIdRef.current = null;
         }
+
+        // At this point, auth state is known; the boot phase can end.
+        setInitializing(false);
       }
     );
 
@@ -60,15 +75,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          await fetchUserRole(session.user.id);
+          await ensureUserRole(session.user.id);
         } else {
-          setLoading(false);
+          setRole(null);
+          lastRoleUserIdRef.current = null;
         }
       } catch (err) {
         console.error('Error initializing session:', err);
-        if (isMounted) {
-          setLoading(false);
-        }
+      } finally {
+        if (isMounted) setInitializing(false);
       }
     };
 
@@ -80,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const fetchUserRole = async (userId: string) => {
+  const fetchUserRole = async (userId: string): Promise<void> => {
     setRoleLoading(true);
     try {
       const { data, error } = await supabase
@@ -92,8 +107,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) {
         console.error('Error fetching role:', error);
         setRole(null);
-        setLoading(false);
-        setRoleLoading(false);
         return;
       }
 
@@ -102,17 +115,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Error in fetchUserRole:', err);
       setRole(null);
     } finally {
-      setLoading(false);
       setRoleLoading(false);
     }
   };
 
-  const signIn = async (email: string, password: string) => {
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      setLoading(false);
+  const ensureUserRole = (userId: string): Promise<void> => {
+    // If we already have a role for this user, don't refetch.
+    if (lastRoleUserIdRef.current === userId && roleRef.current) {
+      return Promise.resolve();
     }
+
+    // If a fetch is already in-flight, reuse it.
+    if (inFlightRoleFetchRef.current) {
+      return inFlightRoleFetchRef.current;
+    }
+
+    lastRoleUserIdRef.current = userId;
+    inFlightRoleFetchRef.current = fetchUserRole(userId).finally(() => {
+      inFlightRoleFetchRef.current = null;
+    });
+
+    return inFlightRoleFetchRef.current;
+  };
+
+  const signIn = async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+    // Safety net: if onAuthStateChange is delayed/missed, set state from returned session.
+    if (!error) {
+      const nextSession = data.session ?? (await supabase.auth.getSession()).data.session;
+      setSession(nextSession);
+      setUser(nextSession?.user ?? null);
+      if (nextSession?.user) {
+        setTimeout(() => ensureUserRole(nextSession.user.id), 0);
+      }
+    }
+
     return { error: error as Error | null };
   };
 
@@ -133,18 +171,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    setLoading(true);
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
     setRole(null);
-    setLoading(false);
   };
+
+  const loading = initializing || roleLoading;
 
   const value = {
     user,
     session,
     role,
+    initializing,
     loading,
     signIn,
     signUp,

@@ -25,7 +25,7 @@ const signupSchema = loginSchema.extend({
 
 export default function Auth() {
   const navigate = useNavigate();
-  const { user, signIn, signUp, loading } = useAuth();
+  const { user, signIn, signUp, loading, initializing } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -79,7 +79,8 @@ export default function Auth() {
         title: 'Welcome back!',
         description: 'You have been logged in successfully.',
       });
-      navigate('/', { replace: true });
+      // Do not navigate immediately; wait for role loading to complete so we don't
+      // land on a protected route spinner and appear "stuck".
     }
   };
 
@@ -127,7 +128,7 @@ export default function Auth() {
     }
   };
 
-  if (loading) {
+  if (initializing) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
