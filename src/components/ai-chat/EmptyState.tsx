@@ -113,11 +113,13 @@ export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
           className="relative inline-block"
         >
           <div className="absolute -inset-4 bg-gradient-to-br from-primary/20 via-secondary/10 to-accent/20 rounded-full blur-xl opacity-60" />
-          <img 
-            src={softwareValaLogo} 
-            alt="VALA AI" 
-            className="relative w-24 h-24 md:w-28 md:h-28 rounded-full object-cover mx-auto shadow-2xl shadow-primary/20"
-          />
+          <div className="relative w-24 h-24 md:w-28 md:h-28 rounded-full bg-background border-4 border-primary shadow-2xl shadow-primary/20 flex items-center justify-center overflow-hidden">
+            <img 
+              src={softwareValaLogo} 
+              alt="VALA AI" 
+              className="w-16 h-16 md:w-20 md:h-20 object-contain"
+            />
+          </div>
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
