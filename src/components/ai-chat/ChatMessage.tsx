@@ -304,7 +304,7 @@ export function ChatMessage({ message, index = 0 }: ChatMessageProps) {
 
           {/* Message Content */}
           {message.content && (
-            <div className="text-[15px] text-foreground/90 leading-relaxed whitespace-pre-wrap">
+            <div className="text-[15px] text-foreground/90 leading-relaxed prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground/90 prose-strong:text-foreground prose-code:text-primary prose-a:text-primary">
               {renderContent(message.content)}
             </div>
           )}
