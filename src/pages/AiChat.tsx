@@ -5,6 +5,9 @@ import { ChatMessage, Message, FileAttachment } from '@/components/ai-chat/ChatM
 import { ChatInput } from '@/components/ai-chat/ChatInput';
 import { EmptyState } from '@/components/ai-chat/EmptyState';
 import { HostingCredentialsModal, HostingCredentials } from '@/components/ai-chat/HostingCredentialsModal';
+import { ThinkingIndicator } from '@/components/ai-chat/ThinkingIndicator';
+import { ChatHistoryPanel } from '@/components/ai-chat/ChatHistoryPanel';
+import { SmartSuggestions } from '@/components/ai-chat/SmartSuggestions';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
@@ -76,6 +79,12 @@ export default function AiChat() {
     analysisResult: any;
   } | null>(null);
 
+  // History panel state
+  const [showHistoryPanel, setShowHistoryPanel] = useState(false);
+  
+  // Context for thinking indicator
+  const [thinkingContext, setThinkingContext] = useState<'analyzing' | 'fixing' | 'deploying' | 'general'>('general');
+
   const activeSession = sessions.find(s => s.id === activeSessionId);
 
   // Save to localStorage
@@ -119,6 +128,43 @@ export default function AiChat() {
       const remaining = sessions.filter(s => s.id !== id);
       setActiveSessionId(remaining.length > 0 ? remaining[0].id : null);
     }
+  };
+
+  // Restore chat to a specific message index
+  const restoreToMessage = useCallback((messageIndex: number) => {
+    if (!activeSessionId) return;
+    
+    setSessions(prev => prev.map(s => {
+      if (s.id === activeSessionId) {
+        return {
+          ...s,
+          messages: s.messages.slice(0, messageIndex + 1)
+        };
+      }
+      return s;
+    }));
+  }, [activeSessionId]);
+
+  // Clear current chat
+  const clearCurrentChat = useCallback(() => {
+    if (!activeSessionId) return;
+    
+    setSessions(prev => prev.map(s => {
+      if (s.id === activeSessionId) {
+        return { ...s, messages: [] };
+      }
+      return s;
+    }));
+    toast.success('Chat cleared');
+  }, [activeSessionId]);
+
+  // Detect context from message content
+  const detectThinkingContext = (content: string): 'analyzing' | 'fixing' | 'deploying' | 'general' => {
+    const lower = content.toLowerCase();
+    if (lower.includes('deploy') || lower.includes('server') || lower.includes('upload')) return 'deploying';
+    if (lower.includes('fix') || lower.includes('error') || lower.includes('bug')) return 'fixing';
+    if (lower.includes('analyze') || lower.includes('scan') || lower.includes('check') || lower.includes('security')) return 'analyzing';
+    return 'general';
   };
 
   const streamChat = useCallback(async (
@@ -341,6 +387,9 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
         messageContent = `[Uploaded files: ${fileNames}]\n\nPlease analyze these files for missing dependencies, security issues, and database requirements.`;
       }
     }
+    
+    // Set thinking context based on message
+    setThinkingContext(detectThinkingContext(messageContent));
 
     // Add user message
     const userMessage: Message = {
@@ -617,6 +666,8 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
           onExport={handleExport}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
           sidebarOpen={sidebarOpen}
+          onOpenHistory={() => setShowHistoryPanel(true)}
+          onClearChat={clearCurrentChat}
         />
 
         {/* Messages Area */}
@@ -628,36 +679,37 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
               {activeSession.messages.map((message, index) => (
                 <ChatMessage key={message.id} message={message} index={index} />
               ))}
-              {isLoading && activeSession.messages[activeSession.messages.length - 1]?.role === 'user' && (
-                <div className="py-6 px-4 md:px-6 bg-muted/10">
-                  <div className="max-w-3xl mx-auto flex gap-4">
-                    <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary/20 to-orange-500/20 flex items-center justify-center shrink-0 ring-2 ring-primary/30 ring-offset-2 ring-offset-background">
-                      <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="text-sm font-semibold text-primary">SaaS VALA AI</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium animate-pulse">
-                          thinking...
-                        </span>
-                      </div>
-                      <div className="flex gap-2">
-                        <span className="w-2.5 h-2.5 bg-gradient-to-br from-primary to-orange-400 rounded-full animate-bounce shadow-lg shadow-primary/30" style={{ animationDelay: '0ms' }} />
-                        <span className="w-2.5 h-2.5 bg-gradient-to-br from-primary to-orange-400 rounded-full animate-bounce shadow-lg shadow-primary/30" style={{ animationDelay: '150ms' }} />
-                        <span className="w-2.5 h-2.5 bg-gradient-to-br from-primary to-orange-400 rounded-full animate-bounce shadow-lg shadow-primary/30" style={{ animationDelay: '300ms' }} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+              {/* Enhanced Thinking Indicator */}
+              <ThinkingIndicator 
+                isActive={isLoading && activeSession.messages[activeSession.messages.length - 1]?.role === 'user'} 
+                context={thinkingContext}
+              />
               <div ref={messagesEndRef} />
             </div>
           )}
         </div>
 
+        {/* Smart Suggestions */}
+        {activeSession && activeSession.messages.length > 0 && !isLoading && (
+          <SmartSuggestions
+            lastMessage={activeSession.messages[activeSession.messages.length - 1]?.content}
+            isLoading={isLoading}
+            onSelect={handleSuggestionClick}
+            hasFiles={activeSession.messages.some(m => m.files && m.files.length > 0)}
+          />
+        )}
+
         {/* Input Area */}
         <ChatInput onSend={handleSend} isLoading={isLoading} onVoiceMessage={handleVoiceMessage} />
       </div>
+
+      {/* History Panel */}
+      <ChatHistoryPanel
+        isOpen={showHistoryPanel}
+        onClose={() => setShowHistoryPanel(false)}
+        messages={activeSession?.messages || []}
+        onRestore={restoreToMessage}
+      />
 
       {/* Hosting Credentials Modal */}
       <HostingCredentialsModal

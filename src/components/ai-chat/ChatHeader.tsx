@@ -9,7 +9,8 @@ import {
   PanelLeft,
   MoreVertical,
   Trash2,
-  Copy
+  Copy,
+  History
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -26,9 +27,11 @@ interface ChatHeaderProps {
   onExport?: () => void;
   onToggleSidebar?: () => void;
   sidebarOpen?: boolean;
+  onOpenHistory?: () => void;
+  onClearChat?: () => void;
 }
 
-export function ChatHeader({ title, onExport, onToggleSidebar, sidebarOpen }: ChatHeaderProps) {
+export function ChatHeader({ title, onExport, onToggleSidebar, sidebarOpen, onOpenHistory, onClearChat }: ChatHeaderProps) {
   const navigate = useNavigate();
 
   return (
@@ -112,6 +115,16 @@ export function ChatHeader({ title, onExport, onToggleSidebar, sidebarOpen }: Ch
         <Button
           variant="ghost"
           size="icon"
+          onClick={onOpenHistory}
+          className="h-9 w-9 text-muted-foreground hover:text-foreground"
+          title="View History"
+        >
+          <History className="h-4 w-4" />
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
           className="h-9 w-9 text-muted-foreground hover:text-foreground"
         >
           <Share2 className="h-4 w-4" />
@@ -142,7 +155,7 @@ export function ChatHeader({ title, onExport, onToggleSidebar, sidebarOpen }: Ch
               Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="gap-2 text-destructive focus:text-destructive">
+            <DropdownMenuItem className="gap-2 text-destructive focus:text-destructive" onClick={onClearChat}>
               <Trash2 className="h-4 w-4" />
               Clear Chat
             </DropdownMenuItem>

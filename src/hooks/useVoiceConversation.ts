@@ -26,6 +26,8 @@ export function useVoiceConversation({
   const recognitionRef = useRef<any>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const retryCountRef = useRef(0);
+  const MAX_RETRIES = 2;
 
   // Update state and notify
   const updateState = useCallback((newState: VoiceState) => {
@@ -40,7 +42,7 @@ export function useVoiceConversation({
 
     if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
-      recognition.continuous = false;
+      recognition.continuous = true; // Keep listening
       recognition.interimResults = true;
       recognition.lang = language;
       recognition.maxAlternatives = 1;
@@ -48,12 +50,26 @@ export function useVoiceConversation({
       recognition.onstart = () => {
         console.log('🎤 Listening...');
         updateState('listening');
+        retryCountRef.current = 0;
       };
 
       recognition.onend = () => {
         console.log('🎤 Recognition ended');
-        if (state === 'listening') {
-          updateState('idle');
+        // Only go back to idle if we're still in listening state and not processing
+        if (recognitionRef.current && state === 'listening') {
+          // Auto-restart if no speech detected but user hasn't stopped
+          if (retryCountRef.current < MAX_RETRIES) {
+            retryCountRef.current++;
+            console.log('🎤 Restarting recognition...');
+            try {
+              recognition.start();
+            } catch (e) {
+              console.log('Could not restart recognition');
+              updateState('idle');
+            }
+          } else {
+            updateState('idle');
+          }
         }
       };
 
@@ -74,6 +90,7 @@ export function useVoiceConversation({
           console.log('🎤 Final transcript:', finalText);
           setTranscript(finalText);
           onTranscript?.(finalText);
+          retryCountRef.current = MAX_RETRIES; // Prevent restart
           recognition.stop();
           // Process the speech
           processVoiceInput(finalText);
@@ -84,14 +101,21 @@ export function useVoiceConversation({
 
       recognition.onerror = (event: any) => {
         console.error('🎤 Recognition error:', event.error);
-        updateState('idle');
         
         if (event.error === 'no-speech') {
-          toast.info('No speech detected. Try speaking closer to your microphone.');
+          // Don't show error on no-speech, just keep listening
+          if (retryCountRef.current < MAX_RETRIES) {
+            console.log('🎤 No speech detected, continuing...');
+            return; // Let onend handle restart
+          }
+          toast.info('No speech detected. Tap the mic again to try.');
+          updateState('idle');
         } else if (event.error === 'not-allowed') {
           toast.error('Microphone blocked. Click the 🔒 icon in your browser to allow.');
+          updateState('idle');
         } else if (event.error !== 'aborted') {
           toast.error(`Voice error: ${event.error}`);
+          updateState('idle');
         }
       };
 
@@ -234,11 +258,12 @@ export function useVoiceConversation({
       await navigator.mediaDevices.getUserMedia({ audio: true });
       
       setTranscript('');
+      retryCountRef.current = 0;
       
       setTimeout(() => {
         try {
           recognitionRef.current?.start();
-          toast.success('🎤 Listening... Speak now!', { duration: 2000 });
+          toast.success('🎤 Speak now! I\'m listening...', { duration: 3000 });
         } catch (e: any) {
           if (!e.message?.includes('already started')) {
             console.error('Start error:', e);
@@ -259,6 +284,7 @@ export function useVoiceConversation({
 
   // Stop everything
   const stop = useCallback(() => {
+    retryCountRef.current = MAX_RETRIES; // Prevent restart
     recognitionRef.current?.stop();
     abortControllerRef.current?.abort();
     if (audioRef.current) {
