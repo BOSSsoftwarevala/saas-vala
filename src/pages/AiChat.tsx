@@ -737,7 +737,7 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
 
   return (
     <div className="h-screen flex bg-background overflow-hidden">
-      {/* Sidebar */}
+      {/* Left Sidebar - Chat History */}
       <ChatSidebar
         sessions={sessions}
         activeSessionId={activeSessionId}
@@ -751,8 +751,8 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
       />
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Main Screen Area - Takes remaining space */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
         <ChatHeader 
           title={activeSession?.title || 'SaaS VALA AI'} 
@@ -763,15 +763,44 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
           onClearChat={clearCurrentChat}
           onOpenSearch={() => setShowSearchPanel(true)}
           onOpenShortcuts={() => setShowShortcuts(true)}
-           selectedModel={selectedModel}
-           onModelChange={setSelectedModel}
+          selectedModel={selectedModel}
+          onModelChange={setSelectedModel}
         />
 
-        {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto">
+        {/* Main Content - Empty State or Output Preview */}
+        <div className="flex-1 overflow-hidden flex items-center justify-center">
           {!activeSession || activeSession.messages.length === 0 ? (
             <EmptyState onSuggestionClick={handleSuggestionClick} />
           ) : (
+            <div className="w-full h-full flex items-center justify-center p-6">
+              <div className="text-center text-muted-foreground">
+                <div className="h-16 w-16 mx-auto mb-4 rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <span className="text-3xl">🖥️</span>
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-2">Output Preview</h3>
+                <p className="text-sm max-w-md">
+                  Your deployed applications and analysis results will appear here.
+                  <br />
+                  <span className="text-primary font-medium">Chat with AI on the right panel →</span>
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="border-t border-border py-3 px-6 text-center">
+          <p className="text-xs text-muted-foreground">
+            Powered by <span className="font-semibold text-primary">SoftwareVala™</span>
+          </p>
+        </div>
+      </div>
+
+      {/* Right Sidebar - Chat Panel (Fixed Width) */}
+      <div className="w-[380px] shrink-0 border-l border-border flex flex-col bg-background h-full overflow-hidden">
+        {/* Chat Messages Area */}
+        <div className="flex-1 overflow-y-auto">
+          {activeSession && activeSession.messages.length > 0 ? (
             <div className="pb-4">
               {activeSession.messages.map((message, index) => (
                 <div key={message.id} id={`message-${message.id}`}>
@@ -786,9 +815,16 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
               ))}
               {/* Typing / Thinking Indicator */}
               {isLoading && activeSession.messages[activeSession.messages.length - 1]?.role === 'user' && (
-               <ThinkingIndicator isActive={true} context={thinkingContext} />
+                <ThinkingIndicator isActive={true} context={thinkingContext} />
               )}
               <div ref={messagesEndRef} />
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-full p-6 text-center text-muted-foreground">
+              <div>
+                <p className="text-sm">Start a conversation</p>
+                <p className="text-xs mt-1">Type your message below</p>
+              </div>
             </div>
           )}
         </div>
