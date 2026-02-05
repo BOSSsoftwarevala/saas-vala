@@ -1,15 +1,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
-  Eye, Plus, Edit, Trash2, Download, Settings, History,
-  Monitor, Server, Database, Cloud, Brain, Shield, CreditCard, Mail, MessageCircle,
-  Link, Users, Package, ShoppingCart, Truck,
-  GraduationCap, Heart, Landmark, Store, Utensils, Car, Plane, Home, Briefcase,
-  Camera, Calendar, MapPin, Lock, Globe, Zap, BarChart3, FileCheck, Wallet,
-  Receipt, ClipboardList, Bell, Search, Tag, Star, Clock,
-  CheckCircle2, Layers, Grid3X3,
-  QrCode, Printer, Phone, Video, Mic, Image, FolderOpen, Archive,
-  Send, RefreshCw
+  Eye, Plus, Edit, Trash2, Download, Settings, History, CheckCircle2, Zap,
+  Monitor, Server, Database, Cloud, Brain, Shield, CreditCard, Mail, MessageCircle, Link
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,73 +16,26 @@ import {
 } from '@/components/ui/accordion';
 import { cn } from '@/lib/utils';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-
-const subCategories = [
-  { id: 1, name: 'USER MANAGEMENT', icon: Users, description: 'Complete user lifecycle control from registration to deactivation' },
-  { id: 2, name: 'PRODUCT CATALOG', icon: Package, description: 'Full product inventory with variants and pricing' },
-  { id: 3, name: 'ORDER PROCESSING', icon: ShoppingCart, description: 'End-to-end order management from cart to delivery' },
-  { id: 4, name: 'INVENTORY CONTROL', icon: ClipboardList, description: 'Stock management with auto-reorder alerts' },
-  { id: 5, name: 'SHIPPING & LOGISTICS', icon: Truck, description: 'Multi-carrier shipping with real-time tracking' },
-  { id: 6, name: 'PAYMENT GATEWAY', icon: CreditCard, description: 'Secure payment processing with multiple methods' },
-  { id: 7, name: 'INVOICE MANAGEMENT', icon: Receipt, description: 'Automated invoicing with tax calculations' },
-  { id: 8, name: 'CUSTOMER SUPPORT', icon: MessageCircle, description: 'Ticket-based support with SLA tracking' },
-  { id: 9, name: 'ANALYTICS DASHBOARD', icon: BarChart3, description: 'Real-time business intelligence and reporting' },
-  { id: 10, name: 'MARKETING AUTOMATION', icon: Send, description: 'Campaign management with audience segmentation' },
-  { id: 11, name: 'EDUCATION MODULE', icon: GraduationCap, description: 'Learning management with course delivery' },
-  { id: 12, name: 'HEALTHCARE RECORDS', icon: Heart, description: 'Patient data management with compliance' },
-  { id: 13, name: 'GOVERNMENT SERVICES', icon: Landmark, description: 'Public service delivery with citizen portal' },
-  { id: 14, name: 'RETAIL OPERATIONS', icon: Store, description: 'POS integration with store management' },
-  { id: 15, name: 'FOOD & HOSPITALITY', icon: Utensils, description: 'Restaurant and hotel management system' },
-  { id: 16, name: 'TRANSPORT BOOKING', icon: Car, description: 'Vehicle booking with driver assignment' },
-  { id: 17, name: 'TRAVEL MANAGEMENT', icon: Plane, description: 'Travel booking with itinerary planning' },
-  { id: 18, name: 'REAL ESTATE LISTING', icon: Home, description: 'Property management with virtual tours' },
-  { id: 19, name: 'PROFESSIONAL SERVICES', icon: Briefcase, description: 'Service booking with consultant matching' },
-  { id: 20, name: 'MEDIA MANAGEMENT', icon: Camera, description: 'Content management with CDN delivery' },
-  { id: 21, name: 'EVENT MANAGEMENT', icon: Calendar, description: 'Event planning with registration system' },
-  { id: 22, name: 'LOCATION SERVICES', icon: MapPin, description: 'Geo-tracking with route optimization' },
-  { id: 23, name: 'ACCESS CONTROL', icon: Lock, description: 'Role-based permissions with audit trail' },
-  { id: 24, name: 'MULTI-LANGUAGE', icon: Globe, description: 'Localization with auto-translation' },
-  { id: 25, name: 'AUTOMATION ENGINE', icon: Zap, description: 'Workflow automation with triggers' },
-  { id: 26, name: 'REPORTING MODULE', icon: FileCheck, description: 'Custom reports with export options' },
-  { id: 27, name: 'WALLET SYSTEM', icon: Wallet, description: 'Digital wallet with transaction history' },
-  { id: 28, name: 'NOTIFICATION CENTER', icon: Bell, description: 'Multi-channel notifications with preferences' },
-  { id: 29, name: 'SEARCH & FILTER', icon: Search, description: 'Advanced search with smart filters' },
-  { id: 30, name: 'TAGGING SYSTEM', icon: Tag, description: 'Dynamic tagging with auto-categorization' },
-  { id: 31, name: 'RATING & REVIEWS', icon: Star, description: 'Customer feedback with moderation' },
-  { id: 32, name: 'SCHEDULING', icon: Clock, description: 'Appointment booking with calendar sync' },
-  { id: 33, name: 'APPROVAL WORKFLOW', icon: CheckCircle2, description: 'Multi-level approval with escalation' },
-  { id: 34, name: 'DATA IMPORT/EXPORT', icon: RefreshCw, description: 'Bulk data operations with validation' },
-  { id: 35, name: 'API MANAGEMENT', icon: Layers, description: 'API gateway with rate limiting' },
-  { id: 36, name: 'DASHBOARD BUILDER', icon: Grid3X3, description: 'Custom dashboard with drag-drop widgets' },
-  { id: 37, name: 'DOCUMENT MANAGER', icon: FolderOpen, description: 'File storage with version control' },
-  { id: 38, name: 'ARCHIVE SYSTEM', icon: Archive, description: 'Data archival with retention policies' },
-  { id: 39, name: 'COMMUNICATION HUB', icon: Phone, description: 'Unified communication with VoIP' },
-  { id: 40, name: 'VIDEO CONFERENCING', icon: Video, description: 'Virtual meetings with recording' },
-  { id: 41, name: 'VOICE ASSISTANT', icon: Mic, description: 'AI voice commands with NLP' },
-  { id: 42, name: 'IMAGE PROCESSING', icon: Image, description: 'Image optimization with AI enhancement' },
-  { id: 43, name: 'QR CODE SYSTEM', icon: QrCode, description: 'QR generation with scan tracking' },
-  { id: 44, name: 'PRINT MANAGEMENT', icon: Printer, description: 'Print queue with template designer' },
-  { id: 45, name: 'SYSTEM SETTINGS', icon: Settings, description: 'Global configuration with backup' },
-];
+import { foodHospitalityRole, foodTechStack, foodSubCategories } from '@/data/foodHospitalityData';
 
 const techStack = [
-  { name: 'FRONTEND', icon: Monitor, tech: 'React + TypeScript' },
-  { name: 'BACKEND', icon: Server, tech: 'Node.js + Express' },
-  { name: 'DATABASE', icon: Database, tech: 'PostgreSQL + Redis' },
-  { name: 'SERVER / CLOUD', icon: Cloud, tech: 'AWS + Vercel' },
-  { name: 'AI ENGINE', icon: Brain, tech: 'GPT-4 + Custom ML' },
-  { name: 'SECURITY LAYER', icon: Shield, tech: 'OAuth 2.0 + AES-256' },
+  { name: 'FRONTEND', icon: Monitor, tech: foodTechStack[0].tech },
+  { name: 'BACKEND', icon: Server, tech: foodTechStack[1].tech },
+  { name: 'DATABASE', icon: Database, tech: foodTechStack[2].tech },
+  { name: 'SERVER / CLOUD', icon: Cloud, tech: foodTechStack[3].tech },
+  { name: 'AI ENGINE', icon: Brain, tech: foodTechStack[4].tech },
+  { name: 'SECURITY LAYER', icon: Shield, tech: foodTechStack[5].tech },
 ];
 
 export default function RoleDetail() {
   const [enabledCategories, setEnabledCategories] = useState<Record<number, boolean>>(
-    Object.fromEntries(subCategories.map(c => [c.id, true]))
+    Object.fromEntries(foodSubCategories.map(c => [c.id, true]))
   );
   const [permissions, setPermissions] = useState<Record<number, Record<string, boolean>>>(
-    Object.fromEntries(subCategories.map(c => [c.id, { view: true, add: true, edit: true, delete: false, export: true }]))
+    Object.fromEntries(foodSubCategories.map(c => [c.id, { view: true, add: true, edit: true, delete: false, export: true }]))
   );
   const [integrations, setIntegrations] = useState<Record<number, Record<string, boolean>>>(
-    Object.fromEntries(subCategories.map(c => [c.id, { payment: true, sms: true, whatsapp: false, ai: true, thirdParty: false }]))
+    Object.fromEntries(foodSubCategories.map(c => [c.id, { payment: true, sms: true, whatsapp: false, ai: true, thirdParty: false }]))
   );
 
   const toggleCategory = (id: number) => {
@@ -124,21 +70,26 @@ export default function RoleDetail() {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
                 <h2 className="text-2xl md:text-3xl font-bold text-foreground uppercase tracking-wide">
-                  SUPER ADMIN ROLE
+                  {foodHospitalityRole.name}
                 </h2>
                 <p className="text-muted-foreground mt-2">
-                  Complete system control with all modules and permissions enabled
+                  {foodHospitalityRole.purpose}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
-                <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 font-bold">
-                  ACTIVE
+                <Badge className={cn(
+                  "font-bold",
+                  foodHospitalityRole.status === 'active' 
+                    ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                    : "bg-red-500/20 text-red-400 border-red-500/30"
+                )}>
+                  {foodHospitalityRole.status.toUpperCase()}
                 </Badge>
                 <Badge variant="outline" className="font-semibold">
-                  v3.2.1
+                  {foodHospitalityRole.version}
                 </Badge>
                 <span className="text-xs text-muted-foreground">
-                  Updated: Feb 04, 2026
+                  Updated: {foodHospitalityRole.lastUpdated}
                 </span>
               </div>
             </div>
@@ -179,7 +130,7 @@ export default function RoleDetail() {
           <div className="bg-card border border-border rounded-2xl p-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wide">
-                SUB-CATEGORIES ({subCategories.length})
+                SUB-CATEGORIES ({foodSubCategories.length})
               </h3>
               <Badge variant="outline" className="font-semibold">
                 {Object.values(enabledCategories).filter(Boolean).length} ENABLED
@@ -187,7 +138,7 @@ export default function RoleDetail() {
             </div>
 
             <Accordion type="single" collapsible className="space-y-3">
-              {subCategories.map((category) => (
+              {foodSubCategories.map((category) => (
                 <AccordionItem 
                   key={category.id} 
                   value={`category-${category.id}`}
@@ -235,37 +186,31 @@ export default function RoleDetail() {
                           <div>
                             <span className="text-[10px] font-semibold text-primary uppercase">CORE FEATURES</span>
                             <ul className="mt-1 space-y-1">
-                              <li className="text-xs text-foreground flex items-center gap-2">
-                                <CheckCircle2 className="h-3 w-3 text-emerald-400" /> Full CRUD Operations
-                              </li>
-                              <li className="text-xs text-foreground flex items-center gap-2">
-                                <CheckCircle2 className="h-3 w-3 text-emerald-400" /> Real-time Updates
-                              </li>
-                              <li className="text-xs text-foreground flex items-center gap-2">
-                                <CheckCircle2 className="h-3 w-3 text-emerald-400" /> Data Validation
-                              </li>
+                              {category.coreFeatures.map((feature, idx) => (
+                                <li key={idx} className="text-xs text-foreground flex items-center gap-2">
+                                  <CheckCircle2 className="h-3 w-3 text-emerald-400" /> {feature}
+                                </li>
+                              ))}
                             </ul>
                           </div>
                           <div>
                             <span className="text-[10px] font-semibold text-amber-400 uppercase">ADVANCED</span>
                             <ul className="mt-1 space-y-1">
-                              <li className="text-xs text-foreground flex items-center gap-2">
-                                <CheckCircle2 className="h-3 w-3 text-emerald-400" /> Bulk Operations
-                              </li>
-                              <li className="text-xs text-foreground flex items-center gap-2">
-                                <CheckCircle2 className="h-3 w-3 text-emerald-400" /> Custom Fields
-                              </li>
+                              {category.advancedFeatures.map((feature, idx) => (
+                                <li key={idx} className="text-xs text-foreground flex items-center gap-2">
+                                  <CheckCircle2 className="h-3 w-3 text-emerald-400" /> {feature}
+                                </li>
+                              ))}
                             </ul>
                           </div>
                           <div>
                             <span className="text-[10px] font-semibold text-cyan-400 uppercase">AUTOMATION</span>
                             <ul className="mt-1 space-y-1">
-                              <li className="text-xs text-foreground flex items-center gap-2">
-                                <Zap className="h-3 w-3 text-cyan-400" /> Auto-sync
-                              </li>
-                              <li className="text-xs text-foreground flex items-center gap-2">
-                                <Zap className="h-3 w-3 text-cyan-400" /> Scheduled Tasks
-                              </li>
+                              {category.automationFeatures.map((feature, idx) => (
+                                <li key={idx} className="text-xs text-foreground flex items-center gap-2">
+                                  <Zap className="h-3 w-3 text-cyan-400" /> {feature}
+                                </li>
+                              ))}
                             </ul>
                           </div>
                         </div>
@@ -277,27 +222,27 @@ export default function RoleDetail() {
                         <div className="space-y-2">
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-muted-foreground">FRONTEND</span>
-                            <span className="text-foreground font-medium">React</span>
+                            <span className="text-foreground font-medium">{category.tech.frontend}</span>
                           </div>
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-muted-foreground">BACKEND</span>
-                            <span className="text-foreground font-medium">Node.js</span>
+                            <span className="text-foreground font-medium">{category.tech.backend}</span>
                           </div>
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-muted-foreground">DATABASE</span>
-                            <span className="text-foreground font-medium">PostgreSQL</span>
+                            <span className="text-foreground font-medium">{category.tech.database}</span>
                           </div>
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-muted-foreground">SERVER</span>
-                            <span className="text-foreground font-medium">AWS Lambda</span>
+                            <span className="text-foreground font-medium">{category.tech.server}</span>
                           </div>
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-muted-foreground">AI / ML</span>
-                            <span className="text-foreground font-medium">GPT-4 API</span>
+                            <span className="text-foreground font-medium">{category.tech.ai}</span>
                           </div>
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-muted-foreground">SECURITY</span>
-                            <span className="text-foreground font-medium">OAuth + JWT</span>
+                            <span className="text-foreground font-medium">{category.tech.security}</span>
                           </div>
                         </div>
                       </div>
@@ -370,8 +315,15 @@ export default function RoleDetail() {
                       <div className="bg-background border border-border rounded-xl p-4">
                         <h4 className="text-xs font-bold text-muted-foreground uppercase mb-3">SUPPORT STATUS</h4>
                         <div className="flex flex-wrap gap-2">
-                          <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[10px]">
-                            SUPPORTED
+                          <Badge className={cn(
+                            "text-[10px]",
+                            category.supportStatus === 'SUPPORTED' 
+                              ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                              : category.supportStatus === 'ON DEMAND'
+                              ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
+                              : "bg-blue-500/20 text-blue-400 border-blue-500/30"
+                          )}>
+                            {category.supportStatus}
                           </Badge>
                           <Badge variant="outline" className="text-[10px]">
                             24/7 AVAILABLE
