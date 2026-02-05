@@ -4,6 +4,7 @@ import { MarketplaceHeader } from '@/components/marketplace/MarketplaceHeader';
 import { ProductSlider } from '@/components/marketplace/ProductSlider';
 import { categories, generateProducts } from '@/data/marketplaceData';
  import { mostUsedSoftware } from '@/data/mostUsedData';
+ import { retailLocalSoftware } from '@/data/retailLocalData';
 import { toast } from 'sonner';
 import { useMarketplacePurchase } from '@/hooks/useMarketplacePurchase';
 import { useAuth } from '@/hooks/useAuth';
@@ -115,6 +116,23 @@ export default function Marketplace() {
              showTechStack={true}
            />
          </motion.div>
+ 
+          {/* Row 3: Retail & Local Business Software */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <ProductSlider
+              title="🏪 RETAIL & LOCAL BUSINESS SOFTWARE"
+              products={retailLocalSoftware}
+              onBuyNow={handleBuyNow}
+              onFavorite={handleFavorite}
+              onNotify={handleNotify}
+              onDownloadApk={handleDownloadApk}
+              showTechStack={true}
+            />
+          </motion.div>
  
         {/* Category Rows - All 29 categories */}
         {categories.map((category, index) => (
