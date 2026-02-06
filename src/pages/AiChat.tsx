@@ -258,50 +258,68 @@ export default function AiChat() {
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let streamDone = false;
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+    try {
+      while (!streamDone) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-      buffer += decoder.decode(value, { stream: true });
+        buffer += decoder.decode(value, { stream: true });
 
-      let newlineIndex: number;
-      while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
-        let line = buffer.slice(0, newlineIndex);
-        buffer = buffer.slice(newlineIndex + 1);
+        // Process all complete lines
+        let newlineIndex: number;
+        while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+          let line = buffer.slice(0, newlineIndex);
+          buffer = buffer.slice(newlineIndex + 1);
 
-        if (line.endsWith('\r')) line = line.slice(0, -1);
-        if (line.startsWith(':') || line.trim() === '') continue;
-        if (!line.startsWith('data: ')) continue;
+          // Clean up line
+          if (line.endsWith('\r')) line = line.slice(0, -1);
+          
+          // Skip SSE comments (: OPENROUTER PROCESSING) and empty lines
+          if (line.startsWith(':') || line.trim() === '') continue;
+          
+          // Skip non-data lines
+          if (!line.startsWith('data: ')) continue;
 
-        const jsonStr = line.slice(6).trim();
-        if (jsonStr === '[DONE]') {
-          onDone();
-          return;
-        }
+          const jsonStr = line.slice(6).trim();
+          
+          // Check for stream end
+          if (jsonStr === '[DONE]') {
+            streamDone = true;
+            break;
+          }
 
-        try {
-          const parsed = JSON.parse(jsonStr);
-          const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-          if (content) onDelta(content);
-        } catch {
-          buffer = line + '\n' + buffer;
-          break;
+          // Parse and extract content
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content;
+            if (content && typeof content === 'string') {
+              onDelta(content);
+            }
+          } catch (parseError) {
+            // JSON might be split across chunks - this is normal, skip invalid chunks
+            console.debug('Skipping incomplete SSE chunk');
+          }
         }
       }
+    } catch (streamError) {
+      console.error('Stream reading error:', streamError);
     }
 
-    // Final flush
+    // Final flush for any remaining buffer content
     if (buffer.trim()) {
-      for (let raw of buffer.split('\n')) {
+      for (const raw of buffer.split('\n')) {
         if (!raw || raw.startsWith(':') || !raw.startsWith('data: ')) continue;
         const jsonStr = raw.slice(6).trim();
         if (jsonStr === '[DONE]') continue;
         try {
           const parsed = JSON.parse(jsonStr);
           const content = parsed.choices?.[0]?.delta?.content;
-          if (content) onDelta(content);
-        } catch { /* ignore */ }
+          if (content && typeof content === 'string') {
+            onDelta(content);
+          }
+        } catch { /* ignore incomplete final chunks */ }
       }
     }
 
