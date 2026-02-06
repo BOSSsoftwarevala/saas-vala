@@ -360,6 +360,59 @@ export type Database = {
           },
         ]
       }
+      apk_downloads: {
+        Row: {
+          blocked_reason: string | null
+          created_at: string
+          device_info: Json | null
+          download_ip: string | null
+          id: string
+          is_blocked: boolean | null
+          is_verified: boolean | null
+          license_key: string
+          product_id: string
+          transaction_id: string | null
+          user_id: string
+          verification_attempts: number | null
+        }
+        Insert: {
+          blocked_reason?: string | null
+          created_at?: string
+          device_info?: Json | null
+          download_ip?: string | null
+          id?: string
+          is_blocked?: boolean | null
+          is_verified?: boolean | null
+          license_key: string
+          product_id: string
+          transaction_id?: string | null
+          user_id: string
+          verification_attempts?: number | null
+        }
+        Update: {
+          blocked_reason?: string | null
+          created_at?: string
+          device_info?: Json | null
+          download_ip?: string | null
+          id?: string
+          is_blocked?: boolean | null
+          is_verified?: boolean | null
+          license_key?: string
+          product_id?: string
+          transaction_id?: string | null
+          user_id?: string
+          verification_attempts?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apk_downloads_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       apk_versions: {
         Row: {
           apk_id: string
@@ -1638,15 +1691,18 @@ export type Database = {
       }
       products: {
         Row: {
+          apk_url: string | null
           business_type: string | null
           category_id: string | null
           created_at: string | null
           created_by: string | null
           currency: string | null
           description: string | null
+          download_count: number | null
           features: Json | null
           icon_path: string | null
           id: string
+          is_apk: boolean | null
           meta: Json | null
           name: string
           price: number | null
@@ -1659,15 +1715,18 @@ export type Database = {
           visibility: string | null
         }
         Insert: {
+          apk_url?: string | null
           business_type?: string | null
           category_id?: string | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
           description?: string | null
+          download_count?: number | null
           features?: Json | null
           icon_path?: string | null
           id?: string
+          is_apk?: boolean | null
           meta?: Json | null
           name: string
           price?: number | null
@@ -1680,15 +1739,18 @@ export type Database = {
           visibility?: string | null
         }
         Update: {
+          apk_url?: string | null
           business_type?: string | null
           category_id?: string | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
           description?: string | null
+          download_count?: number | null
           features?: Json | null
           icon_path?: string | null
           id?: string
+          is_apk?: boolean | null
           meta?: Json | null
           name?: string
           price?: number | null
@@ -2558,6 +2620,54 @@ export type Database = {
           location_consent?: boolean | null
           os?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      user_violations: {
+        Row: {
+          blocked_at: string | null
+          created_at: string
+          details: Json | null
+          email: string
+          fine_amount: number
+          id: string
+          is_blocked: boolean
+          last_violation_at: string | null
+          total_fines_paid: number
+          updated_at: string
+          user_id: string
+          violation_count: number
+          violation_type: string
+        }
+        Insert: {
+          blocked_at?: string | null
+          created_at?: string
+          details?: Json | null
+          email: string
+          fine_amount?: number
+          id?: string
+          is_blocked?: boolean
+          last_violation_at?: string | null
+          total_fines_paid?: number
+          updated_at?: string
+          user_id: string
+          violation_count?: number
+          violation_type?: string
+        }
+        Update: {
+          blocked_at?: string | null
+          created_at?: string
+          details?: Json | null
+          email?: string
+          fine_amount?: number
+          id?: string
+          is_blocked?: boolean
+          last_violation_at?: string | null
+          total_fines_paid?: number
+          updated_at?: string
+          user_id?: string
+          violation_count?: number
+          violation_type?: string
         }
         Relationships: []
       }
