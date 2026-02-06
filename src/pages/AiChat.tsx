@@ -11,11 +11,12 @@ import { KeyboardShortcuts, useKeyboardShortcuts } from '@/components/ai-chat/Ke
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
- import { 
-   addGlobalActivity, 
-   updateGlobalActivity, 
-   removeGlobalActivity 
- } from '@/components/global/GlobalActivityPanel';
+import { 
+  addGlobalActivity, 
+  updateGlobalActivity, 
+  removeGlobalActivity 
+} from '@/components/global/GlobalActivityPanel';
+import { setGlobalWorking, WorkingDeveloperIndicator } from '@/components/global/WorkingDeveloperIndicator';
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 
@@ -467,6 +468,7 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
     }));
 
     setIsLoading(true);
+    setGlobalWorking(true);
  
    // Add global activity for AI processing
    const aiActivityId = 'ai-chat-' + Date.now();
@@ -547,6 +549,7 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
         },
        () => {
          setIsLoading(false);
+         setGlobalWorking(false);
          updateGlobalActivity(aiActivityId, { 
            status: 'completed', 
            progress: 100,
@@ -558,9 +561,10 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
       );
     } catch (error) {
       console.error('AI Chat error:', error);
-     updateGlobalActivity(aiActivityId, { status: 'failed', details: 'Error occurred' });
+      updateGlobalActivity(aiActivityId, { status: 'failed', details: 'Error occurred' });
       updateAssistantMessage('I apologize, but I encountered an error. Please try again.');
       setIsLoading(false);
+      setGlobalWorking(false);
     }
   };
 
@@ -827,6 +831,9 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
         isOpen={showShortcuts}
         onClose={() => setShowShortcuts(false)}
       />
+
+      {/* Working Developer Indicator */}
+      <WorkingDeveloperIndicator />
     </div>
   );
 }
