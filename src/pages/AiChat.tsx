@@ -7,8 +7,6 @@ import { EmptyState } from '@/components/ai-chat/EmptyState';
 import { HostingCredentialsModal, HostingCredentials } from '@/components/ai-chat/HostingCredentialsModal';
 import { ThinkingIndicator } from '@/components/ai-chat/ThinkingIndicator';
 import { ChatHistoryPanel } from '@/components/ai-chat/ChatHistoryPanel';
-import { SmartSuggestions } from '@/components/ai-chat/SmartSuggestions';
-import { TypingIndicator } from '@/components/ai-chat/TypingIndicator';
 import { ChatSearch } from '@/components/ai-chat/ChatSearch';
 import { KeyboardShortcuts, useKeyboardShortcuts } from '@/components/ai-chat/KeyboardShortcuts';
 import { toast } from 'sonner';
@@ -773,15 +771,6 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
               </div>
             ) : null}
           </div>
-
-          {activeSession && activeSession.messages.length > 0 && !isLoading && (
-            <SmartSuggestions
-              lastMessage={activeSession.messages[activeSession.messages.length - 1]?.content}
-              isLoading={isLoading}
-              onSelect={handleSuggestionClick}
-              hasFiles={activeSession.messages.some((m) => m.files && m.files.length > 0)}
-            />
-          )}
 
           <ChatInput onSend={handleSend} isLoading={isLoading} onVoiceMessage={handleVoiceMessage} />
         </div>
