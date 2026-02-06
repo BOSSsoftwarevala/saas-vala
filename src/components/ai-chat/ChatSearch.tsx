@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, forwardRef } from 'react';
 import { motion } from 'framer-motion';
 import { Search, MessageSquare } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -26,7 +26,8 @@ interface SearchResult {
   preview: string;
 }
 
-export function ChatSearch({ isOpen, onClose, messages, onNavigateToMessage }: ChatSearchProps) {
+export const ChatSearch = forwardRef<HTMLDivElement, ChatSearchProps>(
+  function ChatSearch({ isOpen, onClose, messages, onNavigateToMessage }, ref) {
    const [query, setQuery] = useState('');
    const [selectedIndex, setSelectedIndex] = useState(0);
  
@@ -205,4 +206,6 @@ export function ChatSearch({ isOpen, onClose, messages, onNavigateToMessage }: C
       </DialogContent>
     </Dialog>
   );
-}
+});
+
+ChatSearch.displayName = 'ChatSearch';

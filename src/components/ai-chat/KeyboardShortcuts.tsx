@@ -1,41 +1,42 @@
- import { useEffect } from 'react';
- import { motion } from 'framer-motion';
+import { useEffect, forwardRef } from 'react';
+import { motion } from 'framer-motion';
 import { Keyboard } from 'lucide-react';
- import {
-   Dialog,
-   DialogContent,
-   DialogHeader,
-   DialogTitle,
- } from '@/components/ui/dialog';
- 
- interface Shortcut {
-   keys: string[];
-   description: string;
-   category: string;
- }
- 
- interface KeyboardShortcutsProps {
-   isOpen: boolean;
-   onClose: () => void;
- }
- 
- const shortcuts: Shortcut[] = [
-   { keys: ['Ctrl', 'K'], description: 'Search in chat', category: 'Navigation' },
-   { keys: ['Ctrl', 'N'], description: 'New chat', category: 'Navigation' },
-   { keys: ['Ctrl', 'E'], description: 'Export chat', category: 'Actions' },
-   { keys: ['Ctrl', 'H'], description: 'Show history', category: 'Navigation' },
-   { keys: ['Ctrl', '/'], description: 'Show shortcuts', category: 'Help' },
-   { keys: ['Ctrl', 'L'], description: 'Clear current chat', category: 'Actions' },
-   { keys: ['Ctrl', 'B'], description: 'Toggle sidebar', category: 'Navigation' },
-   { keys: ['Ctrl', 'T'], description: 'Open templates', category: 'Actions' },
-   { keys: ['Escape'], description: 'Close dialogs', category: 'Navigation' },
-   { keys: ['Enter'], description: 'Send message', category: 'Actions' },
-   { keys: ['Shift', 'Enter'], description: 'New line in message', category: 'Actions' },
- ];
- 
- const categories = ['Navigation', 'Actions', 'Help'];
- 
- export function KeyboardShortcuts({ isOpen, onClose }: KeyboardShortcutsProps) {
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+
+interface Shortcut {
+  keys: string[];
+  description: string;
+  category: string;
+}
+
+interface KeyboardShortcutsProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+const shortcuts: Shortcut[] = [
+  { keys: ['Ctrl', 'K'], description: 'Search in chat', category: 'Navigation' },
+  { keys: ['Ctrl', 'N'], description: 'New chat', category: 'Navigation' },
+  { keys: ['Ctrl', 'E'], description: 'Export chat', category: 'Actions' },
+  { keys: ['Ctrl', 'H'], description: 'Show history', category: 'Navigation' },
+  { keys: ['Ctrl', '/'], description: 'Show shortcuts', category: 'Help' },
+  { keys: ['Ctrl', 'L'], description: 'Clear current chat', category: 'Actions' },
+  { keys: ['Ctrl', 'B'], description: 'Toggle sidebar', category: 'Navigation' },
+  { keys: ['Ctrl', 'T'], description: 'Open templates', category: 'Actions' },
+  { keys: ['Escape'], description: 'Close dialogs', category: 'Navigation' },
+  { keys: ['Enter'], description: 'Send message', category: 'Actions' },
+  { keys: ['Shift', 'Enter'], description: 'New line in message', category: 'Actions' },
+];
+
+const categories = ['Navigation', 'Actions', 'Help'];
+
+export const KeyboardShortcuts = forwardRef<HTMLDivElement, KeyboardShortcutsProps>(
+  function KeyboardShortcuts({ isOpen, onClose }, ref) {
    return (
      <Dialog open={isOpen} onOpenChange={onClose}>
        <DialogContent className="sm:max-w-md">
@@ -91,10 +92,12 @@ import { Keyboard } from 'lucide-react';
              <kbd className="px-1.5 py-0.5 text-[10px] bg-muted rounded mx-1">/</kbd> anytime to view
            </p>
          </div>
-       </DialogContent>
-     </Dialog>
-   );
- }
+      </DialogContent>
+    </Dialog>
+  );
+});
+
+KeyboardShortcuts.displayName = 'KeyboardShortcuts';
  
  // Hook for global keyboard shortcuts
  export function useKeyboardShortcuts({
