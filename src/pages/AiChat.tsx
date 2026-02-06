@@ -447,10 +447,11 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
                     analysisResult: result
                   });
                   
-                  // Auto-show hosting modal after short delay
-                  setTimeout(() => {
-                    setShowHostingModal(true);
-                  }, 1500);
+                  // OLD: Auto-show hosting modal - DISABLED (Using VALA Server Agent now)
+                  // The old FTP/SFTP modal is deprecated in favor of the new VALA Agent system
+                  // setTimeout(() => {
+                  //   setShowHostingModal(true);
+                  // }, 1500);
                   
                 } else {
                   console.error('Pipeline error:', pipelineError);
