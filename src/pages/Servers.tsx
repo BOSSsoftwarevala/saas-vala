@@ -1,5 +1,6 @@
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { StatusCards } from '@/components/servers/StatusCards';
+import { ServerListPanel } from '@/components/servers/ServerListPanel';
 import { GitConnect } from '@/components/servers/GitConnect';
 import { ProjectDeploy } from '@/components/servers/ProjectDeploy';
 import { AutoSubdomain } from '@/components/servers/AutoSubdomain';
@@ -23,6 +24,9 @@ export default function Servers() {
 
         {/* Status Cards */}
         <StatusCards />
+
+        {/* Server List with Pay Now */}
+        <ServerListPanel />
 
         {/* Main Grid - Two Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
