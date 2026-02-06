@@ -102,23 +102,27 @@ export function AiStatusBar({
             animate={{ opacity: 1 }}
             className="flex items-center gap-4"
           >
-            {/* Tokens received */}
-            <div className="flex items-center gap-1.5 text-muted-foreground">
-              <Zap className="h-3 w-3 text-primary" />
-              <span>
-                <span className="text-foreground font-medium">{tokensReceived}</span> tokens
-              </span>
-            </div>
+            {/* Tokens received - only show if > 0 */}
+            {tokensReceived > 0 && (
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <Zap className="h-3 w-3 text-primary" />
+                <span>
+                  <span className="text-foreground font-medium">{tokensReceived}</span> tokens
+                </span>
+              </div>
+            )}
 
-            {/* Elapsed time */}
-            <div className="flex items-center gap-1.5 text-muted-foreground">
-              <Clock className="h-3 w-3" />
-              <span>
-                <span className="text-foreground font-medium">{elapsedTime.toFixed(1)}</span>s
-              </span>
-            </div>
+            {/* Elapsed time - only show if > 0 */}
+            {elapsedTime > 0 && (
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                <span>
+                  <span className="text-foreground font-medium">{elapsedTime.toFixed(1)}</span>s
+                </span>
+              </div>
+            )}
 
-            {/* Progress animation */}
+            {/* Progress animation - always show when working */}
             <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden">
               <motion.div
                 className="h-full bg-gradient-to-r from-primary to-orange-500 rounded-full"
@@ -127,6 +131,8 @@ export function AiStatusBar({
                 transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }}
               />
             </div>
+            
+            <span className="text-xs text-muted-foreground animate-pulse">Generating...</span>
           </motion.div>
         )}
 

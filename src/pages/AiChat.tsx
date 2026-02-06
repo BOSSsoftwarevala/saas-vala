@@ -85,6 +85,7 @@ export default function AiChat() {
   });
   const aiTimerRef = useRef<number | null>(null);
   const aiStartTimeRef = useRef<number | null>(null);
+  const aiTokensRef = useRef<number>(0); // Track tokens in real-time
   
   // Hosting modal state
   const [showHostingModal, setShowHostingModal] = useState(false);
@@ -501,14 +502,16 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
     // Reset and start AI status tracking
     setAiStatus({ tokensReceived: 0, elapsedTime: 0, error: null });
     aiStartTimeRef.current = Date.now();
+    aiTokensRef.current = 0;
     
-    // Start elapsed time timer
+    // Start elapsed time timer - updates both time AND tokens
     aiTimerRef.current = window.setInterval(() => {
       if (aiStartTimeRef.current) {
-        setAiStatus(prev => ({
-          ...prev,
-          elapsedTime: (Date.now() - aiStartTimeRef.current!) / 1000
-        }));
+        setAiStatus({
+          tokensReceived: aiTokensRef.current,
+          elapsedTime: (Date.now() - aiStartTimeRef.current!) / 1000,
+          error: null,
+        });
       }
     }, 100);
  
@@ -526,7 +529,6 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
     // Create assistant message placeholder
     const assistantId = crypto.randomUUID();
     let assistantContent = '';
-    let tokenCount = 0;
 
     const addAssistantMessage = () => {
       setSessions(prev => prev.map(s => {
@@ -551,18 +553,13 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
     const updateAssistantMessage = (newContent: string) => {
       assistantContent = newContent;
       // Count approximate tokens (rough estimate: 1 token ≈ 4 chars)
-      tokenCount = Math.floor(assistantContent.length / 4);
-      
-      // Update AI status with token count
-      setAiStatus(prev => ({
-        ...prev,
-        tokensReceived: tokenCount,
-      }));
+      const currentTokens = Math.floor(assistantContent.length / 4);
+      aiTokensRef.current = currentTokens; // Update ref for timer to read
       
      // Update global activity progress
      updateGlobalActivity(aiActivityId, { 
        progress: Math.min(95, assistantContent.length / 10),
-       details: `${tokenCount} tokens received...`
+       details: `${currentTokens} tokens received...`
      });
       setSessions(prev => prev.map(s => {
         if (s.id === sessionId) {
@@ -611,7 +608,7 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
            status: 'completed', 
            progress: 100,
            title: 'Response Generated',
-           details: `Complete (${tokenCount} tokens)`
+           details: `Complete (${aiTokensRef.current} tokens)`
          });
          setTimeout(() => removeGlobalActivity(aiActivityId), 3000);
        }
