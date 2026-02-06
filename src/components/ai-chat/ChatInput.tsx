@@ -95,15 +95,17 @@ export function ChatInput({ onSend, isLoading, disabled, onVoiceMessage, onTempl
     
     if (selectedFiles.length === 0) return;
     
-    // File size limits - increased for large projects
+    // File size limits - MEGA INCREASED for large project uploads
     const getMaxSize = (file: File): number => {
       const ext = file.name.split('.').pop()?.toLowerCase() || '';
       const archiveExts = ['zip', 'rar', '7z', 'tar', 'gz', 'tgz', 'apk'];
       const codeExts = ['js', 'ts', 'tsx', 'jsx', 'py', 'php', 'html', 'css', 'json', 'xml', 'sql', 'java', 'kt', 'swift', 'go', 'rs', 'c', 'cpp', 'h', 'hpp'];
-      // 500MB for archives/APK, 200MB for code, 100MB for others
-      if (archiveExts.includes(ext)) return 500 * 1024 * 1024;
-      if (codeExts.includes(ext)) return 200 * 1024 * 1024;
-      return 100 * 1024 * 1024;
+      const textExts = ['txt', 'csv', 'md', 'log'];
+      // 5GB for archives/APK, 1GB for code, 500MB for text, 200MB for others
+      if (archiveExts.includes(ext)) return 5 * 1024 * 1024 * 1024; // 5GB
+      if (codeExts.includes(ext)) return 1024 * 1024 * 1024; // 1GB
+      if (textExts.includes(ext)) return 500 * 1024 * 1024; // 500MB for txt files
+      return 200 * 1024 * 1024; // 200MB for others
     };
 
     const formatSize = (bytes: number): string => {
