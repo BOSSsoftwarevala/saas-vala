@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { UserRound } from "lucide-react";
 
@@ -13,37 +13,71 @@ export const setGlobalWorking = (working: boolean) => {
 
 export const getGlobalWorking = () => isWorking;
 
-export function WorkingDeveloperIndicator() {
+export function WorkingDeveloperIndicator({
+  forceWorking,
+}: {
+  forceWorking?: boolean;
+}) {
   const [working, setWorking] = useState(false);
 
+  // Subscribe to global state only when not forced by parent
   useEffect(() => {
+    if (typeof forceWorking === "boolean") return;
+
     const listener = (w: boolean) => setWorking(w);
     workingListeners.add(listener);
     listener(isWorking);
+
     return () => {
       workingListeners.delete(listener);
     };
-  }, []);
+  }, [forceWorking]);
+
+  const effectiveWorking = typeof forceWorking === "boolean" ? forceWorking : working;
+
+  // Keep it visible a bit longer so users can actually notice it
+  const [show, setShow] = useState(false);
+  const hideTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (effectiveWorking) {
+      if (hideTimer.current) {
+        window.clearTimeout(hideTimer.current);
+        hideTimer.current = null;
+      }
+      setShow(true);
+      return;
+    }
+
+    hideTimer.current = window.setTimeout(() => setShow(false), 650);
+
+    return () => {
+      if (hideTimer.current) {
+        window.clearTimeout(hideTimer.current);
+        hideTimer.current = null;
+      }
+    };
+  }, [effectiveWorking]);
 
   return (
     <AnimatePresence>
-      {working && (
+      {show && (
         <motion.div
           initial={{ opacity: 0, y: 10, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 10, scale: 0.98 }}
-          className="pointer-events-none fixed left-4 bottom-20 sm:bottom-4 z-[110]"
+          // Main screen (right side) so it’s not hidden by the left sidebar
+          className="pointer-events-none fixed right-6 bottom-24 sm:bottom-28 z-[110]"
+          aria-label="Working developer indicator"
         >
           <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-card/80 px-2.5 py-1.5 shadow-lg backdrop-blur-sm">
-            {/* Human-ish avatar */}
+            {/* Small, realistic avatar */}
             <motion.div
               className="relative grid h-7 w-7 place-items-center rounded-full bg-gradient-to-br from-primary/20 via-secondary/10 to-accent/20 ring-1 ring-border/50"
               animate={{ scale: [1, 1.04, 1] }}
               transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
             >
               <UserRound className="h-4 w-4 text-foreground/80" />
-
-              {/* Online dot (uses semantic success token) */}
               <span className="absolute -bottom-0.5 -right-0.5 status-dot status-online border border-background" />
             </motion.div>
 
