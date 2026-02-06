@@ -746,6 +746,7 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
         onDeleteSession={deleteSession}
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
+        onOpenHistory={() => setShowHistoryPanel(true)}
       >
         {/* Chat Panel (messages + input) */}
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
