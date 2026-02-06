@@ -757,12 +757,16 @@ Password: ${pendingDeployFile.analysisResult?.demoCredentials?.password || 'demo
     <div
       className="h-screen w-screen flex bg-background overflow-hidden main-layout app-root ai-chat-force"
       style={{
+        position: 'fixed',
+        inset: 0,
         display: 'flex',
         flexDirection: 'row',
-        width: '100vw',
-        height: '100vh',
+        flexWrap: 'nowrap',
+        width: '100%',
+        height: '100%',
         maxWidth: 'none',
         overflow: 'hidden',
+        minWidth: 0,
       }}
     >
       {/* ==================== LEFT PANEL: AI CHAT ==================== */}
