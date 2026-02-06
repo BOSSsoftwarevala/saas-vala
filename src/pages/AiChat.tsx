@@ -10,11 +10,13 @@ import { KeyboardShortcuts, useKeyboardShortcuts } from '@/components/ai-chat/Ke
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
- import { 
-   addGlobalActivity, 
-   updateGlobalActivity, 
-   removeGlobalActivity 
- } from '@/components/global/GlobalActivityPanel';
+import { 
+  addGlobalActivity, 
+  updateGlobalActivity, 
+  removeGlobalActivity 
+} from '@/components/global/GlobalActivityPanel';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 
@@ -731,8 +733,14 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
     onShowShortcuts: () => setShowShortcuts(true),
   });
 
+  // Derive last assistant content for Live Result panel
+  const lastAssistantContent = activeSession?.messages
+    .slice()
+    .reverse()
+    .find(m => m.role === 'assistant')?.content || '';
+
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div className="fixed inset-0 flex flex-col overflow-hidden bg-background">
       {/* Header */}
       <ChatHeader
         title={activeSession?.title || 'SaaS VALA AI'}
@@ -747,32 +755,57 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
         onModelChange={setSelectedModel}
       />
 
-      {/* Chat Messages Area - Full Width, starts from screen edge */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
-        {activeSession && activeSession.messages.length > 0 ? (
-          <div className="pb-4 max-w-4xl mx-auto px-4">
-            {activeSession.messages.map((message, index) => (
-              <div key={message.id} id={`message-${message.id}`}>
-                <ChatMessage
-                  message={message}
-                  index={index}
-                  isPinned={pinnedMessages.has(message.id)}
-                  onPin={handlePinMessage}
-                  onUnpin={handleUnpinMessage}
-                />
+      {/* Main Content: 20% chat | 80% Live Result */}
+      <div className="flex-1 flex min-h-0 overflow-hidden">
+        {/* Left Chat Panel - exactly 20% */}
+        <aside className="w-[20%] min-w-[280px] max-w-[360px] flex flex-col border-r border-border bg-card/50">
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto px-3 py-2">
+            {activeSession && activeSession.messages.length > 0 ? (
+              <div className="space-y-2">
+                {activeSession.messages.map((message, index) => (
+                  <div key={message.id} id={`message-${message.id}`}>
+                    <ChatMessage
+                      message={message}
+                      index={index}
+                      isPinned={pinnedMessages.has(message.id)}
+                      onPin={handlePinMessage}
+                      onUnpin={handleUnpinMessage}
+                    />
+                  </div>
+                ))}
+                {isLoading && activeSession.messages[activeSession.messages.length - 1]?.role === 'user' && (
+                  <ThinkingIndicator isActive={true} context={thinkingContext} />
+                )}
+                <div ref={messagesEndRef} />
               </div>
-            ))}
-            {isLoading && activeSession.messages[activeSession.messages.length - 1]?.role === 'user' && (
-              <ThinkingIndicator isActive={true} context={thinkingContext} />
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                Start a conversation...
+              </div>
             )}
-            <div ref={messagesEndRef} />
           </div>
-        ) : null}
+
+          {/* Chat Input */}
+          <ChatInput onSend={handleSend} isLoading={isLoading} onVoiceMessage={handleVoiceMessage} />
+        </aside>
+
+        {/* Right Live Result Panel - takes remaining 80% */}
+        <main className="flex-1 overflow-y-auto bg-background">
+          {lastAssistantContent ? (
+            <article className="p-6 prose prose-invert prose-sm max-w-none">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{lastAssistantContent}</ReactMarkdown>
+            </article>
+          ) : (
+            <div className="flex items-center justify-center h-full text-muted-foreground">
+              <div className="text-center space-y-2">
+                <p className="text-lg font-medium">Live Result</p>
+                <p className="text-sm opacity-70">AI output will appear here</p>
+              </div>
+            </div>
+          )}
+        </main>
       </div>
-
-      {/* Chat Input - Fixed at bottom */}
-      <ChatInput onSend={handleSend} isLoading={isLoading} onVoiceMessage={handleVoiceMessage} />
-
 
       {/* History Panel */}
       <ChatHistoryPanel

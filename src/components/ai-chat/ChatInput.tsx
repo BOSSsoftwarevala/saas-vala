@@ -212,7 +212,7 @@ export function ChatInput({ onSend, isLoading, disabled, onVoiceMessage, onTempl
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="px-2 pt-2 max-w-3xl mx-auto overflow-hidden"
+            className="px-2 pt-2 w-full overflow-hidden"
           >
             <div className="flex flex-wrap gap-2">
               {files.map((uploadedFile, index) => (
@@ -264,7 +264,7 @@ export function ChatInput({ onSend, isLoading, disabled, onVoiceMessage, onTempl
       </AnimatePresence>
 
       {/* Action Icons Row - Above Input */}
-      <div className="px-2 pt-2 max-w-3xl mx-auto">
+      <div className="px-2 pt-2 w-full">
         <div className="flex items-center justify-between gap-2 mb-1">
           {/* Left icons */}
           <div className="flex items-center gap-1">
@@ -387,7 +387,7 @@ export function ChatInput({ onSend, isLoading, disabled, onVoiceMessage, onTempl
       </div>
 
       {/* Clean Input Bar */}
-      <div className="px-2 pb-2 max-w-3xl mx-auto">
+      <div className="px-2 pb-2 w-full">
         <div 
           className="flex items-center gap-2 bg-muted/20 rounded-xl border border-border px-3 py-1.5 transition-all duration-200"
           style={{
