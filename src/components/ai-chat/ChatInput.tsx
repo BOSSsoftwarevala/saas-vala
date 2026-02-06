@@ -266,13 +266,13 @@ export function ChatInput({ onSend, isLoading, disabled, onVoiceMessage, onTempl
       {/* Input Area with stacked buttons */}
       <div className="p-2 max-w-3xl mx-auto">
         <motion.div 
-          animate={{ 
-            borderColor: isFocused ? 'hsl(var(--primary) / 0.5)' : 'hsl(var(--border))',
+          className="relative flex items-end gap-2 bg-muted/20 rounded-2xl border border-border p-2 transition-all duration-300"
+          style={{
+            borderColor: isFocused ? 'hsl(var(--primary) / 0.5)' : undefined,
             boxShadow: isFocused 
               ? '0 0 0 2px hsl(var(--primary) / 0.1), 0 8px 32px -8px hsl(var(--primary) / 0.2)' 
-              : '0 0 0 0px transparent'
+              : undefined
           }}
-          className="relative flex items-end gap-2 bg-muted/20 rounded-2xl border border-border p-2 transition-all duration-300"
         >
           {/* Suggestions popup (opens only when pin is clicked) */}
           <AnimatePresence>
