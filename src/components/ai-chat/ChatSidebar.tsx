@@ -121,7 +121,7 @@ export function ChatSidebar({
     <>
       <div
         className={cn(
-          'h-full border-r border-sidebar-border flex flex-col transition-all duration-300 shrink-0',
+          'h-full border-r border-sidebar-border flex flex-col transition-all duration-300 shrink-0 bg-sidebar',
           isOpen ? 'w-[20%] min-w-[280px]' : 'w-0 overflow-hidden',
         )}
       >
