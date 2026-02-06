@@ -2023,6 +2023,8 @@ export type Database = {
       }
       servers: {
         Row: {
+          agent_token: string | null
+          agent_url: string | null
           auto_deploy: boolean | null
           created_at: string | null
           created_by: string | null
@@ -2046,6 +2048,8 @@ export type Database = {
           uptime_percent: number | null
         }
         Insert: {
+          agent_token?: string | null
+          agent_url?: string | null
           auto_deploy?: boolean | null
           created_at?: string | null
           created_by?: string | null
@@ -2069,6 +2073,8 @@ export type Database = {
           uptime_percent?: number | null
         }
         Update: {
+          agent_token?: string | null
+          agent_url?: string | null
           auto_deploy?: boolean | null
           created_at?: string | null
           created_by?: string | null

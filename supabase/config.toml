@@ -17,3 +17,9 @@ verify_jwt = false
 
 [functions.auto-deploy-pipeline]
 verify_jwt = false
+
+[functions.server-agent]
+verify_jwt = false
+
+[functions.seo-optimize]
+verify_jwt = false

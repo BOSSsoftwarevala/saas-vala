@@ -294,7 +294,7 @@ async function executeListServers(args: any, supabase: any): Promise<ToolResult>
   
   const { data: servers, error } = await supabase
     .from('servers')
-    .select('id, name, status, subdomain, custom_domain, server_type, runtime, health_status, uptime_percent, created_at')
+    .select('id, name, status, subdomain, custom_domain, server_type, runtime, health_status, uptime_percent, created_at, agent_url, agent_token')
     .order('created_at', { ascending: false })
     .limit(20);
 
@@ -312,7 +312,8 @@ async function executeListServers(args: any, supabase: any): Promise<ToolResult>
       domain: s.custom_domain || `${s.subdomain}.saasvala.com`,
       type: s.server_type || s.runtime || 'web',
       health: s.health_status || 'unknown',
-      uptime: s.uptime_percent ? `${s.uptime_percent}%` : 'N/A'
+      uptime: s.uptime_percent ? `${s.uptime_percent}%` : 'N/A',
+      agent_connected: !!s.agent_url
     })) || []
   };
 
@@ -337,11 +338,63 @@ async function executeServerStatus(args: any, supabase: any): Promise<ToolResult
     return { tool_call_id: '', content: `Server not found: ${server_id}`, success: false };
   }
 
-  // Simulated metrics (in real scenario, these would come from monitoring agent)
+  // If agent is connected, get REAL status from the agent
+  if (server.agent_url && server.agent_token) {
+    try {
+      console.log(`[TOOL] Calling agent at ${server.agent_url}`);
+      const agentResponse = await fetch(server.agent_url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${server.agent_token}`
+        },
+        body: JSON.stringify({ command: 'status' })
+      });
+
+      if (agentResponse.ok) {
+        const liveData = await agentResponse.json();
+        
+        const status = {
+          server_name: server.name,
+          status: server.status,
+          agent_connected: true,
+          live_data: true,
+          hostname: liveData.data?.hostname,
+          uptime: liveData.data?.uptime_human,
+          metrics: {
+            cpu_usage: liveData.data?.cpu?.usage,
+            memory_usage: liveData.data?.memory?.usage,
+            memory_details: `${liveData.data?.memory?.used} / ${liveData.data?.memory?.total}`,
+            disk: liveData.data?.disk
+          },
+          system: {
+            platform: liveData.data?.platform,
+            distro: liveData.data?.distro,
+            kernel: liveData.data?.kernel,
+            cpu_model: liveData.data?.cpu?.model,
+            cpu_cores: liveData.data?.cpu?.cores
+          }
+        };
+
+        return {
+          tool_call_id: '',
+          content: JSON.stringify(status, null, 2),
+          success: true
+        };
+      }
+    } catch (e) {
+      console.log(`[TOOL] Agent call failed: ${e.message}`);
+    }
+  }
+
+  // Fallback to simulated metrics if agent not available
   const status = {
     server_name: server.name,
     status: server.status,
-    uptime: '15 days, 4 hours',
+    agent_connected: false,
+    live_data: false,
+    message: server.agent_url ? 'Agent not reachable' : 'No agent installed. Install VALA Agent for live metrics.',
+    uptime: '15 days, 4 hours (estimated)',
     metrics: {
       cpu_usage: Math.floor(Math.random() * 30) + 10 + '%',
       memory_usage: Math.floor(Math.random() * 40) + 30 + '%',
