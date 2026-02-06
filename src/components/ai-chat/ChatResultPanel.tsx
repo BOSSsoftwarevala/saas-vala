@@ -110,8 +110,8 @@ export function ChatResultPanel({ messages, isLoading }: ChatResultPanelProps) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="max-w-4xl mx-auto">
+    <div className="flex-1 overflow-y-auto min-w-0">
+      <div className="w-full min-w-0">
         <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border px-4 py-3 flex items-center gap-2">
           <FileText className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm font-medium text-foreground">Result</span>

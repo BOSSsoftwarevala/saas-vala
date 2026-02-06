@@ -122,6 +122,15 @@ export default function AiChat() {
     localStorage.setItem('saas-ai-model', selectedModel);
   }, [selectedModel]);
 
+  useEffect(() => {
+    document.documentElement.classList.add('ai-chat-force');
+    document.body.classList.add('ai-chat-force');
+    return () => {
+      document.documentElement.classList.remove('ai-chat-force');
+      document.body.classList.remove('ai-chat-force');
+    };
+  }, []);
+
   const handlePinMessage = useCallback((messageId: string) => {
     setPinnedMessages((prev) => new Set([...prev, messageId]));
   }, []);
@@ -745,9 +754,9 @@ Password: ${pendingDeployFile.analysisResult?.demoCredentials?.password || 'demo
     );
   };
   return (
-    <div className="h-screen flex bg-background overflow-hidden">
+    <div className="h-screen flex bg-background overflow-hidden main-layout app-root">
       {/* ==================== LEFT PANEL: AI CHAT ==================== */}
-      <div className="w-[420px] min-w-[360px] max-w-[45vw] h-full flex flex-col border-r border-border bg-sidebar shrink-0">
+      <div className="w-[420px] min-w-[360px] max-w-[45vw] h-full flex flex-col border-r border-border bg-sidebar shrink-0 left-chat chat-panel ai-chat">
         {/* New Chat Button */}
         <div className="p-3 border-b border-border">
           <Button onClick={createNewSession} className="w-full gap-2 bg-primary hover:bg-primary/90 h-10">
@@ -813,7 +822,7 @@ Password: ${pendingDeployFile.analysisResult?.demoCredentials?.password || 'demo
       </div>
 
       {/* ==================== RIGHT PANEL: RESULT ==================== */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden live-result preview-panel output-screen">
         {/* Header */}
         <header className="h-14 border-b border-border bg-background/95 backdrop-blur-sm flex items-center justify-between px-4 shrink-0">
           <div className="flex items-center gap-3">

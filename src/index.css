@@ -482,3 +482,76 @@
   background: hsl(var(--primary) / 0.3);
   color: hsl(var(--foreground));
 }
+
+/* FORCE FIX: AI Chat split layout (kills half-screen width) */
+html.ai-chat-force,
+body.ai-chat-force {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+body.ai-chat-force *,
+body.ai-chat-force *::before,
+body.ai-chat-force *::after {
+  box-sizing: border-box;
+}
+
+body.ai-chat-force #root {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  overflow: hidden !important;
+}
+
+body.ai-chat-force .main-layout {
+  display: flex !important;
+  flex-direction: row !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  overflow: hidden !important;
+}
+
+body.ai-chat-force .left-chat,
+body.ai-chat-force .chat-panel,
+body.ai-chat-force .ai-chat {
+  flex: 0 0 auto !important;
+  width: var(--chat-width, 420px) !important;
+  height: 100vh !important;
+  overflow-y: auto !important;
+}
+
+body.ai-chat-force .live-result,
+body.ai-chat-force .preview-panel,
+body.ai-chat-force .output-screen {
+  flex: 1 1 0% !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: 100vh !important;
+  overflow: auto !important;
+  align-self: stretch !important;
+}
+
+body.ai-chat-force .center-wrapper,
+body.ai-chat-force .container,
+body.ai-chat-force .wrapper,
+body.ai-chat-force .content,
+body.ai-chat-force .page,
+body.ai-chat-force .col,
+body.ai-chat-force .column {
+  max-width: none !important;
+  width: auto !important;
+}
+
+body.ai-chat-force [style*="50%"],
+body.ai-chat-force [style*="width:50"],
+body.ai-chat-force [class*="w-1/2"],
+body.ai-chat-force [class*="col-6"] {
+  width: auto !important;
+  max-width: none !important;
+}
+
