@@ -3,7 +3,8 @@ import { ChatSidebar } from '@/components/ai-chat/ChatSidebar';
 import { ChatHeader } from '@/components/ai-chat/ChatHeader';
 import { ChatMessage, Message, FileAttachment } from '@/components/ai-chat/ChatMessage';
 import { ChatInput } from '@/components/ai-chat/ChatInput';
-import { HostingCredentialsModal, HostingCredentials } from '@/components/ai-chat/HostingCredentialsModal';
+// DEPRECATED: Legacy FTP modal removed - Using VALA Server Agent
+// import { HostingCredentialsModal, HostingCredentials } from '@/components/ai-chat/HostingCredentialsModal';
 import { ThinkingIndicator } from '@/components/ai-chat/ThinkingIndicator';
 import { AiStatusBar } from '@/components/ai-chat/AiStatusBar';
 import { ChatHistoryPanel } from '@/components/ai-chat/ChatHistoryPanel';
@@ -88,14 +89,9 @@ export default function AiChat() {
   const aiStartTimeRef = useRef<number | null>(null);
   const aiTokensRef = useRef<number>(0); // Track tokens in real-time
   
-  // Hosting modal state
-  const [showHostingModal, setShowHostingModal] = useState(false);
-  const [pendingDeployFile, setPendingDeployFile] = useState<{
-    filePath: string;
-    fileName: string;
-    fileId: string;
-    analysisResult: any;
-  } | null>(null);
+  // DEPRECATED: Legacy hosting modal removed - Using VALA Server Agent system
+  // const [showHostingModal, setShowHostingModal] = useState(false);
+  // const [pendingDeployFile, setPendingDeployFile] = useState<...>(null);
 
   // History panel state
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
@@ -439,19 +435,8 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
 `);
                   toast.success(`${file.name} analyzed successfully`);
                   
-                  // Save for deployment
-                  setPendingDeployFile({
-                    filePath,
-                    fileName: file.name,
-                    fileId,
-                    analysisResult: result
-                  });
-                  
-                  // OLD: Auto-show hosting modal - DISABLED (Using VALA Server Agent now)
-                  // The old FTP/SFTP modal is deprecated in favor of the new VALA Agent system
-                  // setTimeout(() => {
-                  //   setShowHostingModal(true);
-                  // }, 1500);
+                  // VALA Agent System - No legacy modal needed
+                  console.log('[VALA] File ready for deployment via Server Agent:', file.name);
                   
                 } else {
                   console.error('Pipeline error:', pipelineError);
@@ -696,96 +681,8 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
     toast.success('Chat exported successfully');
   };
 
-  // Handle hosting credentials submission and deploy
-  const handleHostingDeploy = async (credentials: HostingCredentials) => {
-    if (!pendingDeployFile) return;
-    
-    toast.info('🚀 Starting deployment to your server...');
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('auto-deploy-pipeline', {
-        body: {
-          filePath: pendingDeployFile.filePath,
-          deploymentId: pendingDeployFile.fileId,
-          hostingCredentials: {
-            type: credentials.type,
-            host: credentials.host,
-            username: credentials.username,
-            password: credentials.password,
-            port: parseInt(credentials.port),
-            path: credentials.path,
-          }
-        }
-      });
-
-      if (error) {
-        toast.error('Deployment failed: ' + error.message);
-        return;
-      }
-
-      // Add deployment result to chat
-      const deployResult = data as any;
-       const demoUser = deployResult.demoCredentials?.username || 'demo_user';
-       const demoPass = deployResult.demoCredentials?.password || 'demo123';
-       
-       const deployMessage = `
- 🚀 **DEPLOYMENT PIPELINE COMPLETE!**
- 
- **Status:** ${deployResult.deployment?.status === 'ready' ? '✅ Ready for Transfer' : deployResult.deployment?.status === 'failed' ? '❌ Failed' : '⚠️ ' + deployResult.deployment?.status}
- 
- **Framework Detected:** ${deployResult.analysis?.framework || 'Unknown'}
- **Language:** ${deployResult.analysis?.language || 'Unknown'}
- **File Size:** ${deployResult.analysis?.size || 'N/A'}
- 
- ---
- 
- **📊 Analysis Summary:**
- - Security fixes applied: ${deployResult.fixes?.applied || 0}
- - Security issues found: ${deployResult.security?.issues || 0}
- - Tests passed: ${deployResult.tests?.passed || 0}
- 
- ---
- 
- **🔑 DEMO CREDENTIALS:**
- \`\`\`
- Username: ${demoUser}
- Password: ${demoPass}
- \`\`\`
- *(Use these for testing after uploading to your server)*
- 
- ---
- 
- ${deployResult.deployment?.url ? `**Target URL:** ${deployResult.deployment.url}` : ''}
- ${credentials.domain ? `**Domain:** ${credentials.domain}` : ''}
- 
- **⚠️ Note:** File is analyzed and ready. For actual server upload, please use FTP client (FileZilla) or your hosting panel to upload the file from our storage.
- 
- *Powered by SoftwareVala™*
- `;
-
-      // Add to session
-      const deployMessageObj: Message = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: deployMessage,
-        timestamp: new Date()
-      };
-
-      setSessions(prev => prev.map(s => {
-        if (s.id === activeSessionId) {
-          return { ...s, messages: [...s.messages, deployMessageObj] };
-        }
-        return s;
-      }));
-
-      toast.success('🎉 Deployment successful!');
-      
-    } catch (err: any) {
-      toast.error('Deploy failed: ' + err.message);
-    }
-    
-    setPendingDeployFile(null);
-  };
+  // DEPRECATED: Legacy FTP hosting deploy removed - Using VALA Server Agent system
+  // All deployments now go through the server-agent edge function with token-based auth
 
   // Keyboard shortcuts - must be after all function definitions
   useKeyboardShortcuts({
@@ -882,13 +779,7 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
         onRestore={restoreToMessage}
       />
 
-      {/* Hosting Credentials Modal */}
-      <HostingCredentialsModal
-        open={showHostingModal}
-        onOpenChange={setShowHostingModal}
-        onSubmit={handleHostingDeploy}
-        fileName={pendingDeployFile?.fileName}
-      />
+      {/* DEPRECATED: Legacy hosting modal removed - Using VALA Server Agent */}
 
       {/* Search Dialog */}
       <ChatSearch
