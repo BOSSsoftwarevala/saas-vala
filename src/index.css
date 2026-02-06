@@ -505,6 +505,15 @@ body.ai-chat-force *::after,
   box-sizing: border-box;
 }
 
+#root {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
 html.ai-chat-force #root,
 body.ai-chat-force #root {
   width: 100vw !important;
