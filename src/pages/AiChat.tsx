@@ -19,7 +19,8 @@ import {
 } from '@/components/global/GlobalActivityPanel';
 import { setGlobalWorking, WorkingDeveloperIndicator } from '@/components/global/WorkingDeveloperIndicator';
 
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
+// Use AI Developer for full-stack capabilities with tool calling
+const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-developer`;
 
 interface ChatSession {
   id: string;

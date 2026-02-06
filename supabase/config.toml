@@ -6,6 +6,9 @@ verify_jwt = false
 [functions.ai-chat]
 verify_jwt = false
 
+[functions.ai-developer]
+verify_jwt = false
+
 [functions.elevenlabs-tts]
 verify_jwt = false
 
