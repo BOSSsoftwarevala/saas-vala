@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { ChatMessage, Message, FileAttachment } from '@/components/ai-chat/ChatMessage';
 import { ChatInput } from '@/components/ai-chat/ChatInput';
 import { HostingCredentialsModal, HostingCredentials } from '@/components/ai-chat/HostingCredentialsModal';
@@ -122,7 +122,7 @@ export default function AiChat() {
     localStorage.setItem('saas-ai-model', selectedModel);
   }, [selectedModel]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     document.documentElement.classList.add('ai-chat-force');
     document.body.classList.add('ai-chat-force');
     return () => {
@@ -754,7 +754,7 @@ Password: ${pendingDeployFile.analysisResult?.demoCredentials?.password || 'demo
     );
   };
   return (
-    <div className="h-screen flex bg-background overflow-hidden main-layout app-root">
+    <div className="h-screen w-screen flex bg-background overflow-hidden main-layout app-root ai-chat-force">
       {/* ==================== LEFT PANEL: AI CHAT ==================== */}
       <div className="w-[420px] min-w-[360px] max-w-[45vw] h-full flex flex-col border-r border-border bg-sidebar shrink-0 left-chat chat-panel ai-chat">
         {/* New Chat Button */}
@@ -822,7 +822,7 @@ Password: ${pendingDeployFile.analysisResult?.demoCredentials?.password || 'demo
       </div>
 
       {/* ==================== RIGHT PANEL: RESULT ==================== */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden live-result preview-panel output-screen">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden w-auto max-w-none live-result preview-panel output-screen">
         {/* Header */}
         <header className="h-14 border-b border-border bg-background/95 backdrop-blur-sm flex items-center justify-between px-4 shrink-0">
           <div className="flex items-center gap-3">

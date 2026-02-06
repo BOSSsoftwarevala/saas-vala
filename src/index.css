@@ -493,20 +493,30 @@ body.ai-chat-force {
   overflow: hidden;
 }
 
+html.ai-chat-force *,
+html.ai-chat-force *::before,
+html.ai-chat-force *::after,
 body.ai-chat-force *,
 body.ai-chat-force *::before,
-body.ai-chat-force *::after {
+body.ai-chat-force *::after,
+.ai-chat-force *,
+.ai-chat-force *::before,
+.ai-chat-force *::after {
   box-sizing: border-box;
 }
 
+html.ai-chat-force #root,
 body.ai-chat-force #root {
   width: 100vw !important;
   height: 100vh !important;
   max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
   overflow: hidden !important;
 }
 
-body.ai-chat-force .main-layout {
+body.ai-chat-force .main-layout,
+.ai-chat-force.main-layout {
   display: flex !important;
   flex-direction: row !important;
   width: 100vw !important;
@@ -517,7 +527,10 @@ body.ai-chat-force .main-layout {
 
 body.ai-chat-force .left-chat,
 body.ai-chat-force .chat-panel,
-body.ai-chat-force .ai-chat {
+body.ai-chat-force .ai-chat,
+.ai-chat-force .left-chat,
+.ai-chat-force .chat-panel,
+.ai-chat-force .ai-chat {
   flex: 0 0 auto !important;
   width: var(--chat-width, 420px) !important;
   height: 100vh !important;
@@ -526,7 +539,10 @@ body.ai-chat-force .ai-chat {
 
 body.ai-chat-force .live-result,
 body.ai-chat-force .preview-panel,
-body.ai-chat-force .output-screen {
+body.ai-chat-force .output-screen,
+.ai-chat-force .live-result,
+.ai-chat-force .preview-panel,
+.ai-chat-force .output-screen {
   flex: 1 1 0% !important;
   width: auto !important;
   min-width: 0 !important;
@@ -542,7 +558,14 @@ body.ai-chat-force .wrapper,
 body.ai-chat-force .content,
 body.ai-chat-force .page,
 body.ai-chat-force .col,
-body.ai-chat-force .column {
+body.ai-chat-force .column,
+.ai-chat-force .center-wrapper,
+.ai-chat-force .container,
+.ai-chat-force .wrapper,
+.ai-chat-force .content,
+.ai-chat-force .page,
+.ai-chat-force .col,
+.ai-chat-force .column {
   max-width: none !important;
   width: auto !important;
 }
@@ -550,7 +573,11 @@ body.ai-chat-force .column {
 body.ai-chat-force [style*="50%"],
 body.ai-chat-force [style*="width:50"],
 body.ai-chat-force [class*="w-1/2"],
-body.ai-chat-force [class*="col-6"] {
+body.ai-chat-force [class*="col-6"],
+.ai-chat-force [style*="50%"],
+.ai-chat-force [style*="width:50"],
+.ai-chat-force [class*="w-1/2"],
+.ai-chat-force [class*="col-6"] {
   width: auto !important;
   max-width: none !important;
 }
