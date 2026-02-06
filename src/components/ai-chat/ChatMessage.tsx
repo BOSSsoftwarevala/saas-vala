@@ -304,44 +304,6 @@ export function ChatMessage({ message, index = 0, isPinned, onPin, onUnpin }: Ch
               {renderContent(message.content)}
             </div>
           )}
-
-          {/* Actions - Only for assistant messages */}
-          {!isUser && message.content && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.3 }}
-              className="flex items-center gap-1 pt-3 opacity-0 group-hover:opacity-100 transition-all duration-300"
-            >
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleCopy}
-                className="h-8 px-2.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg"
-              >
-                {copied ? (
-                  <Check className="h-4 w-4 text-success" />
-                ) : (
-                  <Copy className="h-4 w-4" />
-                )}
-              </Button>
-              <div className="w-px h-4 bg-border mx-1" />
-              <MessageReactions 
-                messageId={message.id} 
-                isPinned={isPinned}
-                onPin={onPin}
-                onUnpin={onUnpin}
-              />
-              <div className="w-px h-4 bg-border mx-1" />
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 px-2.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg"
-              >
-                <RotateCcw className="h-4 w-4" />
-              </Button>
-            </motion.div>
-          )}
         </div>
       </div>
     </motion.div>
