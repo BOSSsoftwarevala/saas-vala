@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAutomation } from '@/hooks/useAutoMation';
 import { GitHubMultiAccountPanel } from './GitHubMultiAccountPanel';
+import { SourceCodeCatalogPanel } from './SourceCodeCatalogPanel';
 import { 
   Bot, 
   Zap, 
@@ -22,7 +23,8 @@ import {
   Package,
   Loader2,
   Plus,
-  GitBranch
+  GitBranch,
+  FolderCode
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -133,19 +135,27 @@ export function AutoPilotDashboard() {
 
   return (
     <Tabs defaultValue="autopilot" className="space-y-6">
-      <TabsList className="grid w-full grid-cols-2 lg:w-auto lg:inline-flex">
+      <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-flex">
         <TabsTrigger value="autopilot" className="gap-2">
           <Bot className="h-4 w-4" />
           Auto-Pilot
         </TabsTrigger>
         <TabsTrigger value="github" className="gap-2">
           <GitBranch className="h-4 w-4" />
-          GitHub Multi-Account
+          GitHub Accounts
+        </TabsTrigger>
+        <TabsTrigger value="catalog" className="gap-2">
+          <FolderCode className="h-4 w-4" />
+          Source Catalog
         </TabsTrigger>
       </TabsList>
 
       <TabsContent value="github">
         <GitHubMultiAccountPanel />
+      </TabsContent>
+
+      <TabsContent value="catalog">
+        <SourceCodeCatalogPanel />
       </TabsContent>
 
       <TabsContent value="autopilot" className="space-y-6">

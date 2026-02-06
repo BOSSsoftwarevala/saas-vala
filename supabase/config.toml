@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.github-multi-account]
 verify_jwt = false
+
+[functions.source-code-manager]
+verify_jwt = false
