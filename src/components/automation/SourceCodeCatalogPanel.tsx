@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,9 +18,11 @@ import {
   ShoppingCart,
   BarChart3,
   Loader2,
-  Code2
+  Code2,
+  FileUp
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { toast } from 'sonner';
 
 export function SourceCodeCatalogPanel() {
   const {
@@ -42,11 +44,71 @@ export function SourceCodeCatalogPanel() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [bulkAddText, setBulkAddText] = useState('');
   const [selectedAccount, setSelectedAccount] = useState('SaaSVala');
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     getStats();
     searchCatalog();
   }, [getStats, searchCatalog]);
+
+  // Handle file upload - parse txt file and add projects
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const text = await file.text();
+      const lines = text.split('\n').filter(line => line.trim());
+      
+      // Clean up folder paths - extract just the folder name
+      const projects = lines.map(line => {
+        // Handle full paths like D:\Projects\MyApp or /home/user/projects/myapp
+        const cleanLine = line.trim();
+        const pathParts = cleanLine.split(/[\\\/]/);
+        const folderName = pathParts[pathParts.length - 1] || pathParts[pathParts.length - 2] || cleanLine;
+        
+        return {
+          project_name: folderName,
+          file_path: cleanLine,
+          github_account: selectedAccount,
+        };
+      }).filter(p => p.project_name);
+
+      if (projects.length === 0) {
+        toast.error('No valid project names found in file');
+        return;
+      }
+
+      toast.info(`Processing ${projects.length} projects...`);
+      
+      // Add in batches of 100
+      const batchSize = 100;
+      let added = 0;
+      
+      for (let i = 0; i < projects.length; i += batchSize) {
+        const batch = projects.slice(i, i + batchSize);
+        await addToCatalog(batch);
+        added += batch.length;
+        toast.success(`Added ${added}/${projects.length} projects`);
+      }
+
+      toast.success(`✅ Successfully added ${projects.length} projects!`);
+      await searchCatalog();
+      await getStats();
+      
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (error) {
+      console.error('File upload error:', error);
+      toast.error('Failed to process file');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleSearch = () => {
     searchCatalog(searchQuery || undefined, filterIndustry || undefined, filterStatus || undefined);
@@ -195,9 +257,32 @@ export function SourceCodeCatalogPanel() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-3">
+            {/* Hidden file input */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              accept=".txt,.csv"
+              className="hidden"
+            />
+            
+            {/* Upload TXT File - Main action */}
+            <Button 
+              onClick={() => fileInputRef.current?.click()} 
+              disabled={uploading}
+              className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+            >
+              {uploading ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <FileUp className="h-4 w-4 mr-1" />
+              )}
+              📁 Upload TXT File
+            </Button>
+            
             <Button onClick={() => setShowAddForm(!showAddForm)} variant="outline">
               <Plus className="h-4 w-4 mr-1" />
-              Add Projects
+              Add Manually
             </Button>
             <Button onClick={bulkAnalyze} disabled={loading} variant="secondary">
               {loading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Search className="h-4 w-4 mr-1" />}
