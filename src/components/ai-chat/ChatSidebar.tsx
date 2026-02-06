@@ -206,16 +206,16 @@ export function ChatSidebar({
           </div>
 
           {/* Row 2: Project Icons (scrollable) */}
-          <div className="h-9 flex items-center px-2 gap-1 border-b border-sidebar-border shrink-0">
+          <div className="h-11 flex items-center px-3 gap-1.5 border-b border-sidebar-border shrink-0">
             {canScrollLeft && (
-              <button onClick={() => scroll('left')} className="h-6 w-6 shrink-0 flex items-center justify-center text-muted-foreground hover:text-foreground">
-                <ChevronLeft className="h-3.5 w-3.5" />
+              <button onClick={() => scroll('left')} className="h-7 w-7 shrink-0 flex items-center justify-center text-muted-foreground hover:text-foreground">
+                <ChevronLeft className="h-4 w-4" />
               </button>
             )}
 
             <div 
               ref={scrollRef}
-              className="flex-1 flex items-center gap-1 overflow-x-auto"
+              className="flex-1 flex items-center gap-2 overflow-x-auto"
               style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
               {sortedProjects.map((project) => (
@@ -224,11 +224,11 @@ export function ChatSidebar({
                     <button
                       onClick={() => setActiveProjectId(project.id)}
                       className={cn(
-                        "shrink-0 h-6 w-6 rounded-md flex items-center justify-center text-white text-[10px] font-bold transition-all",
+                        "shrink-0 h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold transition-all shadow-sm",
                         project.color,
                         activeProjectId === project.id
-                          ? "ring-2 ring-primary ring-offset-1 ring-offset-sidebar"
-                          : "opacity-70 hover:opacity-100"
+                          ? "ring-2 ring-primary ring-offset-2 ring-offset-sidebar scale-110"
+                          : "opacity-80 hover:opacity-100 hover:scale-105"
                       )}
                     >
                       {getInitial(project.name)}
@@ -247,9 +247,9 @@ export function ChatSidebar({
                 <TooltipTrigger asChild>
                   <button
                     onClick={handleAddProject}
-                    className="shrink-0 h-6 w-6 rounded-md border border-dashed border-muted-foreground/30 flex items-center justify-center text-muted-foreground hover:border-primary hover:text-primary"
+                    className="shrink-0 h-8 w-8 rounded-full border-2 border-dashed border-muted-foreground/40 flex items-center justify-center text-muted-foreground hover:border-primary hover:text-primary transition-all"
                   >
-                    <Plus className="h-3 w-3" />
+                    <Plus className="h-4 w-4" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="text-xs">Add Project</TooltipContent>
@@ -257,8 +257,8 @@ export function ChatSidebar({
             </div>
 
             {canScrollRight && (
-              <button onClick={() => scroll('right')} className="h-6 w-6 shrink-0 flex items-center justify-center text-muted-foreground hover:text-foreground">
-                <ChevronRight className="h-3.5 w-3.5" />
+              <button onClick={() => scroll('right')} className="h-7 w-7 shrink-0 flex items-center justify-center text-muted-foreground hover:text-foreground">
+                <ChevronRight className="h-4 w-4" />
               </button>
             )}
           </div>
