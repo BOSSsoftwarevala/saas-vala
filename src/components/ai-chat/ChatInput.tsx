@@ -372,11 +372,11 @@ export function ChatInput({ onSend, isLoading, disabled, onVoiceMessage, onTempl
               onKeyDown={handleKeyDown}
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
-              placeholder="Message AI..."
+              placeholder="Message SaaS VALA AI or click 🎤 to speak..."
               disabled={isLoading || disabled || voiceState !== 'idle'}
               className={cn(
-                'flex-1 min-h-[36px] max-h-[80px] resize-none border-0 bg-transparent px-2 py-2',
-                'text-sm placeholder:text-muted-foreground/60 focus-visible:ring-0 focus-visible:ring-offset-0'
+                'flex-1 min-h-[44px] max-h-[200px] resize-none border-0 bg-transparent px-2 py-2.5',
+                'text-base placeholder:text-muted-foreground/60 focus-visible:ring-0 focus-visible:ring-offset-0'
               )}
               rows={1}
             />
@@ -466,6 +466,20 @@ export function ChatInput({ onSend, isLoading, disabled, onVoiceMessage, onTempl
                 )}
               </Button>
             </motion.div>
+          </div>
+        </motion.div>
+
+        {/* Footer */}
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex items-center justify-center gap-2 mt-4"
+        >
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/30 border border-border">
+            <Sparkles className="h-3 w-3 text-primary" />
+            <p className="text-xs text-muted-foreground">
+              Powered by <span className="text-primary font-semibold">SoftwareVala™</span>
+            </p>
           </div>
         </motion.div>
       </div>

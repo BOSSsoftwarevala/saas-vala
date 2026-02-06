@@ -737,7 +737,7 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
 
   return (
     <div className="h-screen flex bg-background overflow-hidden">
-      {/* Left Sidebar - Sessions + Chat */}
+      {/* Left Sidebar - Chat History */}
       <ChatSidebar
         sessions={sessions}
         activeSessionId={activeSessionId}
@@ -749,48 +749,13 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
         onDeleteSession={deleteSession}
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
-      >
-        {/* Chat Panel (messages + input) */}
-        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            {activeSession && activeSession.messages.length > 0 ? (
-              <div className="pb-4">
-                {activeSession.messages.map((message, index) => (
-                  <div key={message.id} id={`message-${message.id}`}>
-                    <ChatMessage
-                      message={message}
-                      index={index}
-                      isPinned={pinnedMessages.has(message.id)}
-                      onPin={handlePinMessage}
-                      onUnpin={handleUnpinMessage}
-                    />
-                  </div>
-                ))}
-                {isLoading && activeSession.messages[activeSession.messages.length - 1]?.role === 'user' && (
-                  <ThinkingIndicator isActive={true} context={thinkingContext} />
-                )}
-                <div ref={messagesEndRef} />
-              </div>
-            ) : null}
-          </div>
+      />
 
-          {activeSession && activeSession.messages.length > 0 && !isLoading && (
-            <SmartSuggestions
-              lastMessage={activeSession.messages[activeSession.messages.length - 1]?.content}
-              isLoading={isLoading}
-              onSelect={handleSuggestionClick}
-              hasFiles={activeSession.messages.some((m) => m.files && m.files.length > 0)}
-            />
-          )}
-
-          <ChatInput onSend={handleSend} isLoading={isLoading} onVoiceMessage={handleVoiceMessage} />
-        </div>
-      </ChatSidebar>
-
-      {/* Main Screen Area - Output/Display only */}
+      {/* Main Screen Area - Takes remaining space */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <ChatHeader
-          title={activeSession?.title || 'SaaS VALA AI'}
+        {/* Header */}
+        <ChatHeader 
+          title={activeSession?.title || 'SaaS VALA AI'} 
           onExport={handleExport}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
           sidebarOpen={sidebarOpen}
@@ -802,11 +767,81 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
           onModelChange={setSelectedModel}
         />
 
-        <div className="flex-1 overflow-y-auto">
-          <EmptyState onSuggestionClick={handleSuggestionClick} />
+        {/* Main Content - Empty State or Output Preview */}
+        <div className="flex-1 overflow-hidden flex items-center justify-center">
+          {!activeSession || activeSession.messages.length === 0 ? (
+            <EmptyState onSuggestionClick={handleSuggestionClick} />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center p-6">
+              <div className="text-center text-muted-foreground">
+                <div className="h-16 w-16 mx-auto mb-4 rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <span className="text-3xl">🖥️</span>
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-2">Output Preview</h3>
+                <p className="text-sm max-w-md">
+                  Your deployed applications and analysis results will appear here.
+                  <br />
+                  <span className="text-primary font-medium">Chat with AI on the right panel →</span>
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="border-t border-border py-3 px-6 text-center">
+          <p className="text-xs text-muted-foreground">
+            Powered by <span className="font-semibold text-primary">SoftwareVala™</span>
+          </p>
         </div>
       </div>
 
+      {/* Right Sidebar - Chat Panel (Fixed Width) */}
+      <div className="w-[380px] shrink-0 border-l border-border flex flex-col bg-background h-full overflow-hidden">
+        {/* Chat Messages Area */}
+        <div className="flex-1 overflow-y-auto">
+          {activeSession && activeSession.messages.length > 0 ? (
+            <div className="pb-4">
+              {activeSession.messages.map((message, index) => (
+                <div key={message.id} id={`message-${message.id}`}>
+                  <ChatMessage 
+                    message={message} 
+                    index={index}
+                    isPinned={pinnedMessages.has(message.id)}
+                    onPin={handlePinMessage}
+                    onUnpin={handleUnpinMessage}
+                  />
+                </div>
+              ))}
+              {/* Typing / Thinking Indicator */}
+              {isLoading && activeSession.messages[activeSession.messages.length - 1]?.role === 'user' && (
+                <ThinkingIndicator isActive={true} context={thinkingContext} />
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-full p-6 text-center text-muted-foreground">
+              <div>
+                <p className="text-sm">Start a conversation</p>
+                <p className="text-xs mt-1">Type your message below</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Smart Suggestions */}
+        {activeSession && activeSession.messages.length > 0 && !isLoading && (
+          <SmartSuggestions
+            lastMessage={activeSession.messages[activeSession.messages.length - 1]?.content}
+            isLoading={isLoading}
+            onSelect={handleSuggestionClick}
+            hasFiles={activeSession.messages.some(m => m.files && m.files.length > 0)}
+          />
+        )}
+
+        {/* Input Area */}
+        <ChatInput onSend={handleSend} isLoading={isLoading} onVoiceMessage={handleVoiceMessage} />
+      </div>
 
       {/* History Panel */}
       <ChatHistoryPanel

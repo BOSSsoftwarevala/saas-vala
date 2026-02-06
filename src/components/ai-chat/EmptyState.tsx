@@ -2,7 +2,7 @@ import { Upload, Server, Wrench, Zap, Shield, Code, LayoutDashboard, Sparkles, A
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { motion, Variants } from 'framer-motion';
-import valaAiLogo from '@/assets/vala-ai-logo.jpg';
+import saasValaLogo from '@/assets/saas-vala-logo.jpg';
 import { DeveloperAnimation } from './DeveloperAnimation';
 
 interface EmptyStateProps {
@@ -112,11 +112,11 @@ export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
           animate={floatingAnimation}
           className="relative inline-block"
         >
-          <div className="absolute -inset-4 bg-gradient-to-br from-primary/20 via-secondary/10 to-accent/20 rounded-full blur-xl opacity-60" />
+          <div className="absolute -inset-4 bg-gradient-to-br from-primary/20 via-secondary/10 to-accent/20 rounded-3xl blur-xl opacity-60" />
           <img 
-            src={valaAiLogo} 
-            alt="VALA AI" 
-            className="relative w-24 h-24 md:w-28 md:h-28 rounded-full object-cover mx-auto shadow-2xl shadow-primary/20"
+            src={saasValaLogo} 
+            alt="SaaS VALA" 
+            className="relative w-24 h-24 md:w-28 md:h-28 rounded-2xl object-cover mx-auto border-2 border-primary/30 shadow-2xl shadow-primary/20"
           />
           <motion.div
             initial={{ scale: 0 }}
@@ -134,7 +134,7 @@ export function EmptyState({ onSuggestionClick }: EmptyStateProps) {
           transition={{ delay: 0.2, duration: 0.5 }}
           className="text-3xl md:text-4xl font-display font-bold mt-6 mb-2"
         >
-          <span className="text-gradient-primary">VALA</span>{' '}
+          <span className="text-gradient-primary">SaaS VALA</span>{' '}
           <span className="text-foreground">AI</span>
         </motion.h1>
         
