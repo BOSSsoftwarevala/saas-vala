@@ -52,7 +52,7 @@ const getFileIcon = (type: UploadedFile['type']) => {
 export function ChatInput({ onSend, isLoading, disabled, onVoiceMessage, onTemplateSelect, showSuggestions = true }: ChatInputProps) {
   const [input, setInput] = useState('');
   const [files, setFiles] = useState<UploadedFile[]>([]);
-  const [suggestionsExpanded, setSuggestionsExpanded] = useState(true);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [lastVoiceTranscript, setLastVoiceTranscript] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -204,53 +204,6 @@ export function ChatInput({ onSend, isLoading, disabled, onVoiceMessage, onTempl
         className="hidden"
       />
 
-      {/* Compact Suggestions above input */}
-      <AnimatePresence>
-        {showSuggestions && suggestionsExpanded && !isLoading && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="px-2 pt-2 max-w-3xl mx-auto"
-          >
-            <div className="flex items-center gap-1.5 mb-2">
-              <Sparkles className="h-3.5 w-3.5 text-primary" />
-              <span className="text-[11px] font-medium text-muted-foreground">Suggested next steps</span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {compactSuggestions.map((suggestion, index) => (
-                <motion.button
-                  key={suggestion.id}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: index * 0.03 }}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => {
-                    if (onTemplateSelect) {
-                      onTemplateSelect(suggestion.text);
-                    } else {
-                      setInput(suggestion.text);
-                    }
-                  }}
-                  className={cn(
-                    "group flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg",
-                    "bg-card/50 hover:bg-primary/10 border border-border hover:border-primary/30",
-                    "text-xs text-foreground/80 hover:text-primary",
-                    "transition-all duration-200"
-                  )}
-                >
-                  <div className="h-5 w-5 rounded-md bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center">
-                    <suggestion.icon className="h-3 w-3 text-primary" />
-                  </div>
-                  <span className="text-[11px]">{suggestion.text}</span>
-                  <ArrowRight className="h-3 w-3 text-muted-foreground group-hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-                </motion.button>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* File Previews */}
       <AnimatePresence>
@@ -321,28 +274,82 @@ export function ChatInput({ onSend, isLoading, disabled, onVoiceMessage, onTempl
           }}
           className="relative flex items-end gap-2 bg-muted/20 rounded-2xl border border-border p-2 transition-all duration-300"
         >
-          {/* Stacked buttons: Suggest toggle + Templates */}
-          <div className="flex flex-col gap-0.5">
-            {/* Suggest toggle button */}
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setSuggestionsExpanded(!suggestionsExpanded)}
+          {/* Suggestions popup (opens only when pin is clicked) */}
+          <AnimatePresence>
+            {showSuggestions && suggestionsOpen && !isLoading && (
+              <motion.div
+                initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                transition={{ duration: 0.15 }}
                 className={cn(
-                  "h-9 w-9 shrink-0 rounded-xl transition-colors",
-                  suggestionsExpanded 
-                    ? "text-primary bg-primary/10 hover:bg-primary/20" 
-                    : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                  "absolute left-2 bottom-full mb-2 z-20",
+                  "w-[min(520px,calc(100%-16px))]",
+                  "rounded-2xl border border-border bg-background/95 backdrop-blur-sm",
+                  "shadow-lg"
                 )}
-                title={suggestionsExpanded ? "Hide suggestions" : "Show suggestions"}
               >
-                <Sparkles className="h-5 w-5" />
-              </Button>
-            </motion.div>
-            
-            {/* Quick Templates - icon only */}
+                <div className="p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    <span className="text-xs font-medium text-muted-foreground">Suggested next steps</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {compactSuggestions.map((suggestion) => (
+                      <button
+                        key={suggestion.id}
+                        type="button"
+                        onClick={() => {
+                          if (onTemplateSelect) {
+                            onTemplateSelect(suggestion.text);
+                          } else {
+                            setInput(suggestion.text);
+                          }
+                          setSuggestionsOpen(false);
+                          requestAnimationFrame(() => textareaRef.current?.focus());
+                        }}
+                        className={cn(
+                          "group flex items-center gap-2 px-3 py-2 rounded-xl text-left",
+                          "bg-card/50 hover:bg-primary/10 border border-border hover:border-primary/30",
+                          "text-sm text-foreground/85 hover:text-primary transition-all"
+                        )}
+                      >
+                        <div className="h-7 w-7 rounded-lg bg-primary/10 group-hover:bg-primary/20 flex items-center justify-center">
+                          <suggestion.icon className="h-4 w-4 text-primary" />
+                        </div>
+                        <span className="flex-1 truncate">{suggestion.text}</span>
+                        <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Stacked pins: Suggest + Templates */}
+          <div className="flex flex-col gap-0.5">
+            {showSuggestions && (
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSuggestionsOpen((v) => !v)}
+                  className={cn(
+                    "h-9 w-9 shrink-0 rounded-xl transition-colors",
+                    suggestionsOpen
+                      ? "text-primary bg-primary/10 hover:bg-primary/20"
+                      : "text-muted-foreground hover:text-primary hover:bg-primary/10"
+                  )}
+                  title="Suggested next steps"
+                >
+                  <Sparkles className="h-5 w-5" />
+                </Button>
+              </motion.div>
+            )}
+
             <QuickTemplates onSelectTemplate={(template) => {
               if (onTemplateSelect) {
                 onTemplateSelect(template);
