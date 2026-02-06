@@ -283,6 +283,83 @@ const developerTools = [
         required: ["project_name", "github_url", "industry"]
       }
     }
+  },
+  // NEW: Client & WhatsApp Handling Tools
+  {
+    type: "function",
+    function: {
+      name: "handle_client_request",
+      description: "Process a client's business request - estimate cost, time, create action plan",
+      parameters: {
+        type: "object",
+        properties: {
+          client_name: { type: "string", description: "Client name" },
+          request_type: { type: "string", enum: ["software", "website", "app", "api", "support", "custom"], description: "Type of request" },
+          request_details: { type: "string", description: "What the client needs" },
+          priority: { type: "string", enum: ["urgent", "normal", "low"], description: "Priority level" }
+        },
+        required: ["client_name", "request_type", "request_details"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "send_client_response",
+      description: "Generate professional response for client (for WhatsApp/Email)",
+      parameters: {
+        type: "object",
+        properties: {
+          client_name: { type: "string", description: "Client name" },
+          response_type: { type: "string", enum: ["quote", "status_update", "support_reply", "welcome", "followup"], description: "Type of response" },
+          context: { type: "string", description: "Context for the response" },
+          include_pricing: { type: "boolean", description: "Include pricing in response" }
+        },
+        required: ["client_name", "response_type", "context"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "setup_whatsapp_integration",
+      description: "Guide user through WhatsApp Business API setup for auto-replies",
+      parameters: {
+        type: "object",
+        properties: {
+          business_name: { type: "string", description: "Business name for WhatsApp" },
+          phone_number: { type: "string", description: "WhatsApp business phone number" }
+        }
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "setup_vala_agent",
+      description: "Guide user to install VALA Agent on their PC for code sync",
+      parameters: {
+        type: "object",
+        properties: {
+          os_type: { type: "string", enum: ["linux", "windows", "macos"], description: "Operating system" },
+          server_url: { type: "string", description: "Optional custom server URL" }
+        }
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_client_requests",
+      description: "Fetch pending/active client requests from database",
+      parameters: {
+        type: "object",
+        properties: {
+          status: { type: "string", enum: ["pending", "in_progress", "completed", "all"], description: "Filter by status" },
+          limit: { type: "number", description: "Number of requests to fetch (default: 10)" }
+        }
+      }
+    }
   }
 ];
 
@@ -1113,6 +1190,157 @@ async function executeAddToSourceCatalog(args: any, supabase: any): Promise<Tool
   };
 }
 
+// Handle Client Request - AI powered client management
+async function executeHandleClientRequest(args: any, supabase: any): Promise<ToolResult> {
+  const { client_name, request_type, request_details, priority = 'normal' } = args;
+  console.log(`[TOOL] handle_client_request: ${client_name} - ${request_type}`);
+
+  const estimations: Record<string, { base_cost: number; time: string; complexity: string }> = {
+    'software': { base_cost: 500, time: '2-4 weeks', complexity: 'high' },
+    'website': { base_cost: 200, time: '1-2 weeks', complexity: 'medium' },
+    'app': { base_cost: 800, time: '4-8 weeks', complexity: 'high' },
+    'api': { base_cost: 300, time: '1-2 weeks', complexity: 'medium' },
+    'support': { base_cost: 50, time: '1-2 days', complexity: 'low' },
+    'custom': { base_cost: 400, time: '2-4 weeks', complexity: 'medium' }
+  };
+
+  const estimate = estimations[request_type] || estimations['custom'];
+  const priorityMultiplier = priority === 'urgent' ? 1.5 : priority === 'low' ? 0.8 : 1;
+  const finalCost = Math.round(estimate.base_cost * priorityMultiplier);
+
+  const { data, error } = await supabase
+    .from('client_requests')
+    .insert({
+      client_name,
+      request_type,
+      request_details,
+      priority,
+      status: 'pending',
+      estimated_cost: finalCost,
+      ai_response: `Estimated ${estimate.time} timeline, $${finalCost} budget`
+    })
+    .select()
+    .single();
+
+  return {
+    tool_call_id: '',
+    content: JSON.stringify({
+      success: true,
+      request_id: data?.id || 'temp-id',
+      client_name,
+      request_type,
+      estimation: { cost: `$${finalCost}`, time: estimate.time, complexity: estimate.complexity },
+      priority,
+      ai_recommendation: `${client_name} ke liye ${request_type} project - approximately $${finalCost} lagega aur ${estimate.time} time.`,
+      action_plan: ['1. Requirements finalize', '2. Design mockups', '3. 50% advance', '4. Development', '5. Testing & delivery']
+    }),
+    success: true
+  };
+}
+
+// Generate Client Response
+async function executeSendClientResponse(args: any): Promise<ToolResult> {
+  const { client_name, response_type, context, include_pricing = false } = args;
+  console.log(`[TOOL] send_client_response: ${client_name} - ${response_type}`);
+
+  const templates: Record<string, string> = {
+    'quote': `🙏 Namaste ${client_name} ji,\n\nAapki enquiry ke liye dhanyavaad!\n\n📋 *Project Details:*\n${context}\n\n${include_pricing ? '💰 *Estimated Cost:* Please discuss\n⏰ *Timeline:* 1-2 weeks\n\n' : ''}✅ Hum kal tak detailed proposal bhejenge.\n\n*SoftwareVala™ - The Name of Trust*\n📞 +91-8768878787`,
+    'status_update': `Hello ${client_name}! 👋\n\n📊 *Project Update:*\n${context}\n\n✅ Aapka kaam progress me hai!\n\n*Team SoftwareVala*`,
+    'support_reply': `Hi ${client_name},\n\n${context}\n\n🛠️ Problem resolved! Please check.\n\n*SoftwareVala Support*`,
+    'welcome': `🎉 Welcome ${client_name} ji!\n\nSoftwareVala family me swagat hai! 🙏\n\n✨ 24x7 Support | Quality Software | Best Pricing\n\n📞 +91-8768878787\n\n*SoftwareVala™*`,
+    'followup': `Hello ${client_name} ji! 👋\n\n${context}\n\nKya aage proceed karein?\n\n*Team SoftwareVala*`
+  };
+
+  return {
+    tool_call_id: '',
+    content: JSON.stringify({
+      success: true,
+      response_type,
+      client_name,
+      generated_message: templates[response_type] || templates['support_reply'],
+      channels: ['WhatsApp', 'Email', 'SMS'],
+      instruction: 'Copy and send to client or enable auto-send'
+    }),
+    success: true
+  };
+}
+
+// Setup WhatsApp Integration Guide
+async function executeSetupWhatsappIntegration(args: any): Promise<ToolResult> {
+  const { business_name = 'SoftwareVala', phone_number } = args;
+  console.log(`[TOOL] setup_whatsapp_integration: ${business_name}`);
+
+  return {
+    tool_call_id: '',
+    content: JSON.stringify({
+      success: true,
+      title: '📱 WhatsApp Business API Setup Guide',
+      business_name,
+      webhook_url: 'https://astmdnelnuqwpdbyzecr.supabase.co/functions/v1/whatsapp-webhook',
+      steps: [
+        { step: 1, title: 'Meta Business Account', url: 'https://business.facebook.com' },
+        { step: 2, title: 'WhatsApp API Enable', url: 'https://developers.facebook.com/docs/whatsapp' },
+        { step: 3, title: 'Webhook Setup', description: 'Add webhook URL above' },
+        { step: 4, title: 'Access Token Save', description: 'Save in settings' }
+      ],
+      features: ['✅ Auto welcome message', '✅ Order status reply', '✅ Support handling', '✅ Quote generation'],
+      note: 'Setup ke baad main sab handle karunga! 🤖'
+    }),
+    success: true
+  };
+}
+
+// Setup VALA Agent for PC
+async function executeSetupValaAgent(args: any): Promise<ToolResult> {
+  const { os_type = 'linux' } = args;
+  console.log(`[TOOL] setup_vala_agent: ${os_type}`);
+
+  const commands: Record<string, string> = {
+    'linux': 'curl -sSL https://softwarevala.net/vala-agent/install.sh | bash',
+    'windows': 'powershell -Command "iwr -useb https://softwarevala.net/vala-agent/install.ps1 | iex"',
+    'macos': 'curl -sSL https://softwarevala.net/vala-agent/install.sh | bash'
+  };
+
+  return {
+    tool_call_id: '',
+    content: JSON.stringify({
+      success: true,
+      title: '🖥️ VALA Agent Installation',
+      os_type,
+      install_command: commands[os_type],
+      usage: ['vala-agent start', 'vala sync /path/to/project', 'vala upload'],
+      features: ['📂 Local to cloud sync', '🔄 Auto-sync on changes', '🚀 One-click GitHub upload', '🔐 Secure transfer'],
+      note: 'Install karke "vala sync" run karo - main automatically analyze aur upload karunga!'
+    }),
+    success: true
+  };
+}
+
+// Get Client Requests
+async function executeGetClientRequests(args: any, supabase: any): Promise<ToolResult> {
+  const { status = 'all', limit = 10 } = args;
+  console.log(`[TOOL] get_client_requests: ${status}`);
+
+  let query = supabase.from('client_requests').select('*').order('created_at', { ascending: false }).limit(limit);
+  if (status !== 'all') query = query.eq('status', status);
+
+  const { data, error } = await query;
+
+  return {
+    tool_call_id: '',
+    content: JSON.stringify({
+      success: !error,
+      total: data?.length || 0,
+      requests: data?.map((r: any) => ({
+        id: r.id, client: r.client_name, type: r.request_type,
+        details: r.request_details?.substring(0, 100), status: r.status,
+        priority: r.priority, cost: r.estimated_cost ? `$${r.estimated_cost}` : 'N/A'
+      })) || []
+    }),
+    success: !error
+  };
+}
+
 // Execute tool based on name
 async function executeTool(toolCall: ToolCall, supabase: any): Promise<ToolResult> {
   const { name, arguments: argsString } = toolCall.function;
@@ -1177,6 +1405,22 @@ async function executeTool(toolCall: ToolCall, supabase: any): Promise<ToolResul
     case 'create_backup':
       result = await executeCreateBackup(args, supabase);
       break;
+    // NEW: Client & WhatsApp Tools
+    case 'handle_client_request':
+      result = await executeHandleClientRequest(args, supabase);
+      break;
+    case 'send_client_response':
+      result = await executeSendClientResponse(args);
+      break;
+    case 'setup_whatsapp_integration':
+      result = await executeSetupWhatsappIntegration(args);
+      break;
+    case 'setup_vala_agent':
+      result = await executeSetupValaAgent(args);
+      break;
+    case 'get_client_requests':
+      result = await executeGetClientRequests(args, supabase);
+      break;
     default:
       result = { tool_call_id: toolCall.id, content: `Unknown tool: ${name}`, success: false };
   }
@@ -1231,63 +1475,69 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // System prompt for Full-Stack AI Developer
+    // System prompt for Full-Stack AI Developer + Client Manager
     const systemMessage: Message = {
       role: 'system',
-      content: `You are VALA AI Developer - SaaSVala ka FULL-STACK AI DEVELOPER. Tu code analyze, fix, GitHub upload, aur deploy sab kar sakta hai!
+      content: `Tu VALA AI hai - SoftwareVala ka SUPER INTELLIGENT Full-Stack AI Developer + Client Manager + Business Automation Expert!
 
-## Teri Powers (Tools)
-Tu ye sab ACTUALLY kar sakta hai - sirf baat nahi, kaam!
+## 🧠 TERI SUPERPOWERS
 
-### 🔥 GitHub Integration
-- **upload_to_github**: Code ko SaaSVala ya SoftwareVala GitHub pe auto-upload kar
-- **list_github_repos**: Saare repos dekh SaaSVala/SoftwareVala account me
+### 🖥️ PC CODE ACCESS (User bole "mere PC se code lo")
+Jab user bole code lena hai PC se:
+- **setup_vala_agent** tool use kar - Installation guide do
+- Bolo: "VALA Agent install karo - ek command se sab sync hoga!"
+- Linux/Mac: curl -sSL https://softwarevala.net/vala-agent/install.sh | bash
+- Windows: PowerShell me iwr command do
+- Phir "vala sync" command se code sync hoga
 
-### 📦 Source Code Analysis  
-- **analyze_zip_file**: ZIP file analyze kar - framework detect, security scan
-- **analyze_code**: Code me bugs, security issues dhundh
-- **fix_code**: Code auto-fix kar with security patches
+### 📱 WHATSAPP CLIENT HANDLING (User bole "WhatsApp handle karo")
+Jab user bole WhatsApp se clients handle karna hai:
+- **setup_whatsapp_integration** tool use kar - Setup guide do
+- **send_client_response** - Professional messages generate kar
+- Webhook URL: https://astmdnelnuqwpdbyzecr.supabase.co/functions/v1/whatsapp-webhook
+- Auto-reply features: Welcome, Order status, Support, Quotes
 
-### 🚀 Deployment & Servers
-- **list_servers**: Connected servers dekh
-- **server_status**: Server ka live status (CPU, RAM, Disk)
-- **deploy_project**: Project deploy kar server pe
-- **restart_service**: Nginx, MySQL, PHP-FPM restart kar
+### 👥 CLIENT MANAGEMENT (User bole "client handle karo")
+- **handle_client_request** - Client request process kar, estimate do
+- **get_client_requests** - Pending requests dekho
+- **send_client_response** - Professional reply generate karo
+- Auto estimate: Cost + Timeline + Action plan
 
-### 💾 Database & Catalog
-- **database_query**: Database se data fetch kar
-- **add_to_source_catalog**: Project ko marketplace catalog me add kar
-- **generate_license**: License keys generate kar
+### 🔥 CODE & GITHUB
+- **upload_to_github** - SaaSVala/SoftwareVala GitHub pe push
+- **list_github_repos** - Repos list dekho
+- **analyze_zip_file** - ZIP file analyze
+- **analyze_code** - Security scan
+- **fix_code** - Auto-fix bugs
 
-### 🔐 Security & Backup
-- **check_ssl**: SSL certificate check kar
-- **create_backup**: Server/database backup banao
-- **view_logs**: Server logs dekho
+### 🚀 SERVERS & DEPLOYMENT
+- **list_servers** / **server_status** - Server health
+- **deploy_project** - One-click deploy
+- **restart_service** - nginx, mysql restart
 
-## Behavior Rules
-1. **IMMEDIATE ACTION**: User bole "analyze" ya "check" toh TURANT tool use kar
-2. **GITHUB AUTO-UPLOAD**: User file upload kare toh puch - "GitHub pe upload karun SaaSVala account me?"
-3. **HINGLISH RESPONSE**: Hindi-English mix me baat kar - professional but friendly
-4. **SHOW RESULTS**: Tool output ko readable format me dikha with ✅ ❌ icons
-5. **CHAIN ACTIONS**: "Upload and deploy" bole toh analyze → github upload → deploy - sab sequence me kar
+### 💾 DATABASE & MARKETPLACE
+- **database_query** - Data fetch
+- **add_to_source_catalog** - Marketplace me add
+- **generate_license** - License keys
 
-## Response Style
-- Markdown tables use kar data ke liye
-- Code blocks with syntax highlighting
-- Status icons: ✅ Success, ❌ Failed, ⏳ Processing, ⚠️ Warning
-- Short aur to-the-point answers
+## 🎯 SMART BEHAVIOR
 
-## Example Flows
-User: "Ye ZIP file check karo aur SaaSVala me daal do"
-You: [analyze_zip_file → upload_to_github(account: SaaSVala) → show results]
+### Auto-Detect User Intent:
+- "Mere PC se code lo" → setup_vala_agent tool
+- "WhatsApp pe reply karo" → setup_whatsapp_integration + send_client_response
+- "Client handle karo" → handle_client_request + send_client_response
+- "File check karo" → analyze_zip_file
+- "GitHub pe daal do" → upload_to_github
+- "Deploy kar do" → deploy_project
 
-User: "SoftwareVala ke saare repos dikha"  
-You: [list_github_repos(account: SoftwareVala) → show in table]
+### Response Style:
+- Hinglish (Hindi + English mix)
+- Professional but friendly
+- Action-oriented - pehle kaam, phir baat
+- Status icons: ✅ ❌ ⏳ ⚠️
+- Tables for data display
 
-User: "Is code ko fix karke deploy kar do"
-You: [analyze_code → fix_code → list_servers → deploy_project]
-
-POWERED BY SOFTWAREVALA™ | ENTERPRISE GRADE AI DEVELOPER`
+POWERED BY SOFTWAREVALA™ | THE NAME OF TRUST | UNLIMITED AUTOMATION`
     };
 
     const allMessages = [systemMessage, ...messages];
