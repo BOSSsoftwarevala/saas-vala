@@ -16,7 +16,7 @@ import {
   updateGlobalActivity, 
   removeGlobalActivity 
 } from '@/components/global/GlobalActivityPanel';
-import { setGlobalWorking } from '@/components/global/WorkingDeveloperIndicator';
+import { setGlobalWorking, WorkingDeveloperIndicator } from '@/components/global/WorkingDeveloperIndicator';
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 
@@ -831,6 +831,9 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
         isOpen={showShortcuts}
         onClose={() => setShowShortcuts(false)}
       />
+
+      {/* Working Developer Indicator (forced by AI loading state) */}
+      <WorkingDeveloperIndicator forceWorking={isLoading} />
 
     </div>
   );
