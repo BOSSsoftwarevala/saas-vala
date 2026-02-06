@@ -173,17 +173,12 @@ export function ChatInput({ onSend, isLoading, disabled, onVoiceMessage, onTempl
     }
   };
 
-  const quickSuggestions = [
-    { text: 'Upload source code', icon: FileCode },
-    { text: 'Analyze my project', icon: Wand2 },
-    { text: 'Deploy to server', icon: Sparkles },
-    { text: 'Add payment addon', icon: Sparkles }
-  ];
+  const quickSuggestions: { text: string; icon: typeof FileCode }[] = [];
 
   const hasContent = input.trim() || files.length > 0;
 
   return (
-    <div className="border-t border-border bg-gradient-to-t from-background via-background to-transparent">
+    <div className="border-t border-border bg-background/95 backdrop-blur-sm">
       {/* Hidden File Inputs */}
       <input
         ref={fileInputRef}
@@ -289,7 +284,7 @@ export function ChatInput({ onSend, isLoading, disabled, onVoiceMessage, onTempl
       </AnimatePresence>
 
       {/* Input Area */}
-      <div className="p-4 max-w-3xl mx-auto">
+      <div className="p-2 max-w-3xl mx-auto">
         <motion.div 
           animate={{ 
             borderColor: isFocused ? 'hsl(var(--primary) / 0.5)' : 'hsl(var(--border))',
@@ -372,11 +367,11 @@ export function ChatInput({ onSend, isLoading, disabled, onVoiceMessage, onTempl
               onKeyDown={handleKeyDown}
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
-              placeholder="Message SaaS VALA AI or click 🎤 to speak..."
+              placeholder="Message AI..."
               disabled={isLoading || disabled || voiceState !== 'idle'}
               className={cn(
-                'flex-1 min-h-[44px] max-h-[200px] resize-none border-0 bg-transparent px-2 py-2.5',
-                'text-base placeholder:text-muted-foreground/60 focus-visible:ring-0 focus-visible:ring-offset-0'
+                'flex-1 min-h-[36px] max-h-[80px] resize-none border-0 bg-transparent px-2 py-2',
+                'text-sm placeholder:text-muted-foreground/60 focus-visible:ring-0 focus-visible:ring-offset-0'
               )}
               rows={1}
             />
@@ -466,20 +461,6 @@ export function ChatInput({ onSend, isLoading, disabled, onVoiceMessage, onTempl
                 )}
               </Button>
             </motion.div>
-          </div>
-        </motion.div>
-
-        {/* Footer */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="flex items-center justify-center gap-2 mt-4"
-        >
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/30 border border-border">
-            <Sparkles className="h-3 w-3 text-primary" />
-            <p className="text-xs text-muted-foreground">
-              Powered by <span className="text-primary font-semibold">SoftwareVala™</span>
-            </p>
           </div>
         </motion.div>
       </div>

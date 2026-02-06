@@ -77,13 +77,15 @@ interface ChatHeaderProps {
         <div className="h-6 w-px bg-border mx-1" />
 
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/20">
-            <Sparkles className="h-4 w-4 text-primary" />
-          </div>
+          <img 
+            src="/vala-ai-logo.jpg" 
+            alt="VALA AI" 
+            className="h-8 w-8 rounded-full object-cover"
+          />
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-sm font-semibold text-foreground">
-                Vala AI
+                VALA AI
               </h1>
              {onModelChange && (
                <ModelSelector
