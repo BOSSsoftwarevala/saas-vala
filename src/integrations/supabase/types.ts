@@ -729,6 +729,59 @@ export type Database = {
         }
         Relationships: []
       }
+      bulk_upload_queue: {
+        Row: {
+          attempts: number | null
+          catalog_id: string | null
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          max_attempts: number | null
+          priority: number | null
+          scheduled_at: string | null
+          started_at: string | null
+          status: string | null
+          upload_type: string
+        }
+        Insert: {
+          attempts?: number | null
+          catalog_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          max_attempts?: number | null
+          priority?: number | null
+          scheduled_at?: string | null
+          started_at?: string | null
+          status?: string | null
+          upload_type: string
+        }
+        Update: {
+          attempts?: number | null
+          catalog_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          max_attempts?: number | null
+          priority?: number | null
+          scheduled_at?: string | null
+          started_at?: string | null
+          status?: string | null
+          upload_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulk_upload_queue_catalog_id_fkey"
+            columns: ["catalog_id"]
+            isOneToOne: false
+            referencedRelation: "source_code_catalog"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           created_at: string | null
@@ -2372,6 +2425,93 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      source_code_catalog: {
+        Row: {
+          ai_description: string | null
+          ai_generated_readme: string | null
+          analysis_logs: string | null
+          analyzed_at: string | null
+          complexity_score: number | null
+          created_at: string
+          detected_features: Json | null
+          file_path: string | null
+          file_size: number | null
+          github_account: string | null
+          github_repo_url: string | null
+          id: string
+          is_on_marketplace: boolean | null
+          listed_at: string | null
+          marketplace_listing_id: string | null
+          marketplace_price: number | null
+          project_name: string
+          project_type: string | null
+          sales_count: number | null
+          slug: string | null
+          status: string | null
+          target_industry: string | null
+          tech_stack: Json | null
+          updated_at: string
+          uploaded_at: string | null
+          uploaded_to_github: boolean | null
+        }
+        Insert: {
+          ai_description?: string | null
+          ai_generated_readme?: string | null
+          analysis_logs?: string | null
+          analyzed_at?: string | null
+          complexity_score?: number | null
+          created_at?: string
+          detected_features?: Json | null
+          file_path?: string | null
+          file_size?: number | null
+          github_account?: string | null
+          github_repo_url?: string | null
+          id?: string
+          is_on_marketplace?: boolean | null
+          listed_at?: string | null
+          marketplace_listing_id?: string | null
+          marketplace_price?: number | null
+          project_name: string
+          project_type?: string | null
+          sales_count?: number | null
+          slug?: string | null
+          status?: string | null
+          target_industry?: string | null
+          tech_stack?: Json | null
+          updated_at?: string
+          uploaded_at?: string | null
+          uploaded_to_github?: boolean | null
+        }
+        Update: {
+          ai_description?: string | null
+          ai_generated_readme?: string | null
+          analysis_logs?: string | null
+          analyzed_at?: string | null
+          complexity_score?: number | null
+          created_at?: string
+          detected_features?: Json | null
+          file_path?: string | null
+          file_size?: number | null
+          github_account?: string | null
+          github_repo_url?: string | null
+          id?: string
+          is_on_marketplace?: boolean | null
+          listed_at?: string | null
+          marketplace_listing_id?: string | null
+          marketplace_price?: number | null
+          project_name?: string
+          project_type?: string | null
+          sales_count?: number | null
+          slug?: string | null
+          status?: string | null
+          target_industry?: string | null
+          tech_stack?: Json | null
+          updated_at?: string
+          uploaded_at?: string | null
+          uploaded_to_github?: boolean | null
+        }
+        Relationships: []
       }
       ssl_logs: {
         Row: {
