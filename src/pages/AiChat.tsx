@@ -754,9 +754,27 @@ Password: ${pendingDeployFile.analysisResult?.demoCredentials?.password || 'demo
     );
   };
   return (
-    <div className="h-screen w-screen flex bg-background overflow-hidden main-layout app-root ai-chat-force">
+    <div
+      className="h-screen w-screen flex bg-background overflow-hidden main-layout app-root ai-chat-force"
+      style={{
+        display: 'flex',
+        flexDirection: 'row',
+        width: '100vw',
+        height: '100vh',
+        maxWidth: 'none',
+        overflow: 'hidden',
+      }}
+    >
       {/* ==================== LEFT PANEL: AI CHAT ==================== */}
-      <div className="w-[420px] min-w-[360px] max-w-[45vw] h-full flex flex-col border-r border-border bg-sidebar shrink-0 left-chat chat-panel ai-chat">
+      <div
+        className="w-[420px] min-w-[360px] max-w-[45vw] h-full flex flex-col border-r border-border bg-sidebar shrink-0 left-chat chat-panel ai-chat"
+        style={{
+          flex: '0 0 auto',
+          width: 'var(--chat-width, 420px)',
+          height: '100vh',
+          overflowY: 'auto',
+        }}
+      >
         {/* New Chat Button */}
         <div className="p-3 border-b border-border">
           <Button onClick={createNewSession} className="w-full gap-2 bg-primary hover:bg-primary/90 h-10">
@@ -822,7 +840,18 @@ Password: ${pendingDeployFile.analysisResult?.demoCredentials?.password || 'demo
       </div>
 
       {/* ==================== RIGHT PANEL: RESULT ==================== */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden w-auto max-w-none live-result preview-panel output-screen">
+      <div
+        className="flex-1 flex flex-col min-w-0 overflow-hidden w-auto max-w-none live-result preview-panel output-screen"
+        style={{
+          flex: '1 1 0%',
+          width: 'auto',
+          minWidth: 0,
+          maxWidth: 'none',
+          height: '100vh',
+          overflow: 'hidden',
+          alignSelf: 'stretch',
+        }}
+      >
         {/* Header */}
         <header className="h-14 border-b border-border bg-background/95 backdrop-blur-sm flex items-center justify-between px-4 shrink-0">
           <div className="flex items-center gap-3">
