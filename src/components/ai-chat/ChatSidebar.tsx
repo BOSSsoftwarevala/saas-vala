@@ -121,8 +121,8 @@ export function ChatSidebar({
     <>
       <div
         className={cn(
-          'h-full bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300 shrink-0',
-          isOpen ? 'w-[400px]' : 'w-0 overflow-hidden',
+          'h-full border-r border-sidebar-border flex flex-col transition-all duration-300 shrink-0',
+          isOpen ? 'w-[20%] min-w-[280px]' : 'w-0 overflow-hidden',
         )}
       >
         <TooltipProvider delayDuration={200}>
@@ -272,7 +272,7 @@ export function ChatSidebar({
             </div>
           )}
 
-          <div className="shrink-0 py-2 px-3 border-t border-sidebar-border bg-sidebar">
+          <div className="shrink-0 py-2 px-3 border-t border-sidebar-border">
             <p className="text-[10px] text-center text-muted-foreground">
               Powered by <span className="font-medium text-primary">SoftwareVala™</span>
             </p>
