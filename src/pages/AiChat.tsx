@@ -5,6 +5,7 @@ import { ChatMessage, Message, FileAttachment } from '@/components/ai-chat/ChatM
 import { ChatInput } from '@/components/ai-chat/ChatInput';
 import { HostingCredentialsModal, HostingCredentials } from '@/components/ai-chat/HostingCredentialsModal';
 import { ThinkingIndicator } from '@/components/ai-chat/ThinkingIndicator';
+import { AiStatusBar } from '@/components/ai-chat/AiStatusBar';
 import { ChatHistoryPanel } from '@/components/ai-chat/ChatHistoryPanel';
 import { ChatSearch } from '@/components/ai-chat/ChatSearch';
 import { KeyboardShortcuts, useKeyboardShortcuts } from '@/components/ai-chat/KeyboardShortcuts';
@@ -75,6 +76,15 @@ export default function AiChat() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
+  
+  // AI Status tracking
+  const [aiStatus, setAiStatus] = useState({
+    tokensReceived: 0,
+    elapsedTime: 0,
+    error: null as string | null,
+  });
+  const aiTimerRef = useRef<number | null>(null);
+  const aiStartTimeRef = useRef<number | null>(null);
   
   // Hosting modal state
   const [showHostingModal, setShowHostingModal] = useState(false);
@@ -487,6 +497,20 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
 
     setIsLoading(true);
     setGlobalWorking(true);
+    
+    // Reset and start AI status tracking
+    setAiStatus({ tokensReceived: 0, elapsedTime: 0, error: null });
+    aiStartTimeRef.current = Date.now();
+    
+    // Start elapsed time timer
+    aiTimerRef.current = window.setInterval(() => {
+      if (aiStartTimeRef.current) {
+        setAiStatus(prev => ({
+          ...prev,
+          elapsedTime: (Date.now() - aiStartTimeRef.current!) / 1000
+        }));
+      }
+    }, 100);
  
    // Add global activity for AI processing
    const aiActivityId = 'ai-chat-' + Date.now();
@@ -502,6 +526,7 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
     // Create assistant message placeholder
     const assistantId = crypto.randomUUID();
     let assistantContent = '';
+    let tokenCount = 0;
 
     const addAssistantMessage = () => {
       setSessions(prev => prev.map(s => {
@@ -525,10 +550,19 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
 
     const updateAssistantMessage = (newContent: string) => {
       assistantContent = newContent;
+      // Count approximate tokens (rough estimate: 1 token ≈ 4 chars)
+      tokenCount = Math.floor(assistantContent.length / 4);
+      
+      // Update AI status with token count
+      setAiStatus(prev => ({
+        ...prev,
+        tokensReceived: tokenCount,
+      }));
+      
      // Update global activity progress
      updateGlobalActivity(aiActivityId, { 
        progress: Math.min(95, assistantContent.length / 10),
-       details: 'Generating response...'
+       details: `${tokenCount} tokens received...`
      });
       setSessions(prev => prev.map(s => {
         if (s.id === sessionId) {
@@ -566,19 +600,30 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
           updateAssistantMessage(assistantContent);
         },
        () => {
+         // Stop the timer
+         if (aiTimerRef.current) {
+           window.clearInterval(aiTimerRef.current);
+           aiTimerRef.current = null;
+         }
          setIsLoading(false);
          setGlobalWorking(false);
          updateGlobalActivity(aiActivityId, { 
            status: 'completed', 
            progress: 100,
            title: 'Response Generated',
-           details: 'Complete'
+           details: `Complete (${tokenCount} tokens)`
          });
          setTimeout(() => removeGlobalActivity(aiActivityId), 3000);
        }
       );
     } catch (error) {
       console.error('AI Chat error:', error);
+      // Stop the timer on error
+      if (aiTimerRef.current) {
+        window.clearInterval(aiTimerRef.current);
+        aiTimerRef.current = null;
+      }
+      setAiStatus(prev => ({ ...prev, error: 'Failed to get response' }));
       updateGlobalActivity(aiActivityId, { status: 'failed', details: 'Error occurred' });
       updateAssistantMessage('I apologize, but I encountered an error. Please try again.');
       setIsLoading(false);
@@ -813,6 +858,16 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
           onOpenShortcuts={() => setShowShortcuts(true)}
           selectedModel={selectedModel}
           onModelChange={setSelectedModel}
+        />
+
+        {/* AI Status Bar - Shows real-time AI status */}
+        <AiStatusBar
+          isLoading={isLoading}
+          isConnected={true}
+          tokensReceived={aiStatus.tokensReceived}
+          elapsedTime={aiStatus.elapsedTime}
+          error={aiStatus.error}
+          model={selectedModel.split('/').pop() || 'gemini-3-flash'}
         />
 
         {/* Clean empty area - no content */}
