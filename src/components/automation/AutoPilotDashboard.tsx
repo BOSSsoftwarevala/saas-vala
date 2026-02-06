@@ -6,7 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAutomation } from '@/hooks/useAutoMation';
+import { GitHubMultiAccountPanel } from './GitHubMultiAccountPanel';
 import { 
   Bot, 
   Zap, 
@@ -19,7 +21,8 @@ import {
   Users,
   Package,
   Loader2,
-  Plus
+  Plus,
+  GitBranch
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -129,7 +132,23 @@ export function AutoPilotDashboard() {
   };
 
   return (
-    <div className="space-y-6">
+    <Tabs defaultValue="autopilot" className="space-y-6">
+      <TabsList className="grid w-full grid-cols-2 lg:w-auto lg:inline-flex">
+        <TabsTrigger value="autopilot" className="gap-2">
+          <Bot className="h-4 w-4" />
+          Auto-Pilot
+        </TabsTrigger>
+        <TabsTrigger value="github" className="gap-2">
+          <GitBranch className="h-4 w-4" />
+          GitHub Multi-Account
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="github">
+        <GitHubMultiAccountPanel />
+      </TabsContent>
+
+      <TabsContent value="autopilot" className="space-y-6">
       {/* Header Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
@@ -520,6 +539,7 @@ export function AutoPilotDashboard() {
           )}
         </CardContent>
       </Card>
-    </div>
+      </TabsContent>
+    </Tabs>
   );
 }

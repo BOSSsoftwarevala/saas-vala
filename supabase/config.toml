@@ -23,3 +23,9 @@ verify_jwt = false
 
 [functions.seo-optimize]
 verify_jwt = false
+
+[functions.ai-auto-pilot]
+verify_jwt = false
+
+[functions.github-multi-account]
+verify_jwt = false
