@@ -1,4 +1,4 @@
-import { useEffect, forwardRef } from 'react';
+import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Keyboard } from 'lucide-react';
 import {
@@ -35,8 +35,7 @@ const shortcuts: Shortcut[] = [
 
 const categories = ['Navigation', 'Actions', 'Help'];
 
-export const KeyboardShortcuts = forwardRef<HTMLDivElement, KeyboardShortcutsProps>(
-  function KeyboardShortcuts({ isOpen, onClose }, ref) {
+export function KeyboardShortcuts({ isOpen, onClose }: KeyboardShortcutsProps) {
    return (
      <Dialog open={isOpen} onOpenChange={onClose}>
        <DialogContent className="sm:max-w-md">
@@ -89,16 +88,14 @@ export const KeyboardShortcuts = forwardRef<HTMLDivElement, KeyboardShortcutsPro
          <div className="pt-4 border-t border-border">
            <p className="text-xs text-muted-foreground text-center">
              Press <kbd className="px-1.5 py-0.5 text-[10px] bg-muted rounded mx-1">Ctrl</kbd> + 
-             <kbd className="px-1.5 py-0.5 text-[10px] bg-muted rounded mx-1">/</kbd> anytime to view
-           </p>
-         </div>
+            <kbd className="px-1.5 py-0.5 text-[10px] bg-muted rounded mx-1">/</kbd> anytime to view
+          </p>
+        </div>
       </DialogContent>
     </Dialog>
   );
-});
+}
 
-KeyboardShortcuts.displayName = 'KeyboardShortcuts';
- 
  // Hook for global keyboard shortcuts
  export function useKeyboardShortcuts({
    onNewChat,
