@@ -267,7 +267,7 @@ export function ChatSidebar({
         {/* Chat Content */}
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
           {hasChatPanel && (
-            <div className="flex-1 min-h-0 overflow-hidden flex flex-col bg-background">
+            <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
               {children}
             </div>
           )}

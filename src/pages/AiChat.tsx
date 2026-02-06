@@ -733,7 +733,7 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
   });
 
   return (
-    <div className="h-screen flex bg-background overflow-hidden">
+    <div className="h-screen flex overflow-hidden">
       {/* Left Sidebar - Sessions + Chat */}
       <ChatSidebar
         sessions={sessions}
