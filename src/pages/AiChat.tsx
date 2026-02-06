@@ -16,7 +16,7 @@ import {
   updateGlobalActivity, 
   removeGlobalActivity 
 } from '@/components/global/GlobalActivityPanel';
-import { setGlobalWorking, WorkingDeveloperIndicator } from '@/components/global/WorkingDeveloperIndicator';
+import { setGlobalWorking } from '@/components/global/WorkingDeveloperIndicator';
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 
@@ -832,8 +832,6 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
         onClose={() => setShowShortcuts(false)}
       />
 
-      {/* Working Developer Indicator */}
-      <WorkingDeveloperIndicator />
     </div>
   );
 }
