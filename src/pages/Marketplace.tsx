@@ -3,9 +3,10 @@ import { motion } from 'framer-motion';
 import { MarketplaceHeader } from '@/components/marketplace/MarketplaceHeader';
 import { ProductSlider } from '@/components/marketplace/ProductSlider';
 import { categories, generateProducts } from '@/data/marketplaceData';
- import { row1Software, row2Software, row3Software, row4Software } from '@/data/topSoftwareData';
+import { row1Software, row2Software, row3Software, row4Software } from '@/data/topSoftwareData';
 import { toast } from 'sonner';
-import { useMarketplacePurchase } from '@/hooks/useMarketplacePurchase';
+import { useApkPurchase } from '@/hooks/useApkPurchase';
+import { useFraudDetection } from '@/hooks/useFraudDetection';
 import { useAuth } from '@/hooks/useAuth';
 import saasValaBanner from '@/assets/saas-vala-banner.jpg';
 import {
@@ -16,7 +17,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, Download, ShoppingCart, CreditCard } from 'lucide-react';
+import { CheckCircle2, Download, ShoppingCart, CreditCard, AlertTriangle, Shield } from 'lucide-react';
 
 interface Product {
   id: string;
@@ -32,29 +33,41 @@ export default function Marketplace() {
   const [showPayment, setShowPayment] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [generatedLicenseKey, setGeneratedLicenseKey] = useState<string>('');
-  const { purchaseProduct, processing } = useMarketplacePurchase();
+  const [_transactionId, setTransactionId] = useState<string>('');
+  const { purchaseApk, processing } = useApkPurchase();
+  const { checkUserStatus } = useFraudDetection();
   const { user } = useAuth();
 
-  const handleBuyNow = (product: Product) => {
+  const handleBuyNow = async (product: Product) => {
     if (!user) {
       toast.error('Please sign in to make a purchase');
       return;
     }
+    
+    // Check if user is blocked before showing payment dialog
+    const fraudStatus = await checkUserStatus(user.id, user.email || '');
+    if (fraudStatus.isBlocked) {
+      toast.error(fraudStatus.message);
+      return;
+    }
+    
     setSelectedProduct(product);
     setShowPayment(true);
     setPaymentSuccess(false);
     setGeneratedLicenseKey('');
+    setTransactionId('');
   };
 
   const handlePayment = async () => {
     if (!selectedProduct) return;
     
-    const result = await purchaseProduct(selectedProduct);
+    const result = await purchaseApk(selectedProduct);
     
     if (result.success) {
       setPaymentSuccess(true);
       setGeneratedLicenseKey(result.licenseKey || '');
-      toast.success('Payment successful! License activated.');
+      setTransactionId(result.transactionId || '');
+      toast.success('🎉 Payment successful! Your Transaction ID is your License Key.');
     } else {
       toast.error(result.error || 'Payment failed');
     }
@@ -221,9 +234,31 @@ export default function Marketplace() {
                       <h3 className="font-semibold">{selectedProduct?.title}</h3>
                       <p className="text-sm text-muted-foreground">{selectedProduct?.subtitle}</p>
                       <p className="text-lg font-bold text-primary mt-1">
-                        ₹{selectedProduct?.price.toLocaleString()}
+                        ${selectedProduct?.price.toLocaleString()}
                       </p>
                     </div>
+                  </div>
+
+                  {/* Transaction = License Key Info */}
+                  <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
+                    <div className="flex items-center gap-2 text-primary text-sm font-medium">
+                      <Shield className="h-4 w-4" />
+                      Transaction ID = License Key
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Your payment Transaction ID becomes your software license key automatically
+                    </p>
+                  </div>
+
+                  {/* Fraud Warning */}
+                  <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                    <div className="flex items-center gap-2 text-destructive text-sm font-medium">
+                      <AlertTriangle className="h-4 w-4" />
+                      Fraud Protection Active
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      1st violation: $2 fine | 2nd: $5 fine | 3rd: Permanent block
+                    </p>
                   </div>
 
                   {/* Payment Options */}
@@ -247,7 +282,7 @@ export default function Marketplace() {
                     ) : (
                       <>
                         <ShoppingCart className="h-4 w-4" />
-                        Pay ₹{selectedProduct?.price.toLocaleString()}
+                        Pay ${selectedProduct?.price.toLocaleString()}
                       </>
                     )}
                   </Button>
@@ -268,13 +303,16 @@ export default function Marketplace() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-lg">{selectedProduct?.title}</h3>
-                    <p className="text-sm text-muted-foreground">License automatically activated</p>
-                      {generatedLicenseKey && (
-                        <div className="mt-3 p-3 bg-muted rounded-lg">
-                          <p className="text-xs text-muted-foreground mb-1">Your License Key:</p>
-                          <p className="font-mono font-bold text-primary">{generatedLicenseKey}</p>
-                        </div>
-                      )}
+                    <p className="text-sm text-muted-foreground">Transaction ID = License Key</p>
+                    {generatedLicenseKey && (
+                      <div className="mt-3 p-3 bg-muted rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-1">Your License Key (Transaction ID):</p>
+                        <p className="font-mono font-bold text-primary text-lg">{generatedLicenseKey}</p>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          ⚠️ Save this key - It's your proof of purchase and software activation key
+                        </p>
+                      </div>
+                    )}
                   </div>
                   <Button className="w-full gap-2">
                     <Download className="h-4 w-4" />
