@@ -4,11 +4,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AiServicesMarketplace } from '@/components/ai-services/AiServicesMarketplace';
 import { AutoPilotPanel } from '@/components/ai-services/AutoPilotPanel';
 import { AiModelManager } from '@/components/saas-ai/AiModelManager';
+import { AiBillingPanel } from '@/components/saas-ai/AiBillingPanel';
 import { 
   Cpu, 
   Zap, 
   ShoppingCart,
-  Settings
+  DollarSign
 } from 'lucide-react';
 
 export default function AiApis() {
@@ -23,7 +24,7 @@ export default function AiApis() {
             AI Services & APIs
           </h2>
           <p className="text-muted-foreground">
-            Subscribe to AI services • Auto-pilot mode • Pay once, run forever
+            Subscribe to AI services • Auto-pilot mode • Billing & Usage tracking
           </p>
         </div>
 
@@ -42,6 +43,10 @@ export default function AiApis() {
               <Cpu className="h-4 w-4" />
               AI Models
             </TabsTrigger>
+            <TabsTrigger value="billing" className="gap-2">
+              <DollarSign className="h-4 w-4" />
+              Billing & Usage
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="marketplace">
@@ -54,6 +59,10 @@ export default function AiApis() {
 
           <TabsContent value="models">
             <AiModelManager />
+          </TabsContent>
+
+          <TabsContent value="billing">
+            <AiBillingPanel />
           </TabsContent>
         </Tabs>
       </div>
