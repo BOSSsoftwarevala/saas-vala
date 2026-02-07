@@ -251,14 +251,15 @@ export default function AiChat() {
 
     if (!resp.ok) {
       const error = await resp.json().catch(() => ({ error: 'Unknown error' }));
+      const errorMsg = error.error || 'Failed to get AI response';
       if (resp.status === 429) {
-        toast.error('Rate limit exceeded. Please wait a moment.');
+        toast.error('⏳ Rate limit exceeded. Thoda wait karo aur try karo.');
       } else if (resp.status === 402) {
-        toast.error('AI credits depleted. Please add funds.');
+        toast.error('💳 AI credits khatam! Settings → Workspace → Usage mein credits add karo.', { duration: 8000 });
       } else {
-        toast.error(error.error || 'Failed to get AI response');
+        toast.error(errorMsg);
       }
-      throw new Error(error.error || 'Stream failed');
+      throw new Error(errorMsg);
     }
 
     // The ai-developer function currently responds with JSON (non-SSE).

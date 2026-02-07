@@ -1568,13 +1568,20 @@ POWERED BY SOFTWAREVALA™ | THE NAME OF TRUST | UNLIMITED AUTOMATION`
       
       if (response.status === 429) {
         return new Response(
-          JSON.stringify({ error: 'Rate limit exceeded' }),
+          JSON.stringify({ error: 'Rate limit exceeded. Thoda wait karo aur try karo.' }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       
+      if (response.status === 402) {
+        return new Response(
+          JSON.stringify({ error: 'AI credits khatam ho gaye hain! Please Lovable workspace mein credits add karo: Settings → Workspace → Usage.' }),
+          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
       return new Response(
-        JSON.stringify({ error: 'AI service error' }),
+        JSON.stringify({ error: `AI service error (${response.status})` }),
         { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
