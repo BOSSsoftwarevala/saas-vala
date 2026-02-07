@@ -5,6 +5,13 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Progress } from '@/components/ui/progress';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
   CreditCard,
   Zap,
   Video,
@@ -15,14 +22,15 @@ import {
   Brain,
   Sparkles,
   CheckCircle2,
-  Clock,
-  TrendingUp,
-  AlertCircle,
   Crown,
-  Rocket
+  Rocket,
+  Wallet,
+  Loader2,
+  AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useWallet } from '@/hooks/useWallet';
 
 interface AiService {
   id: string;
@@ -173,6 +181,10 @@ const categoryLabels = {
 export function AiServicesMarketplace() {
   const [serviceList, setServiceList] = useState(services);
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | '6months'>('6months');
+  const [payingService, setPayingService] = useState<AiService | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [payAllMode, setPayAllMode] = useState(false);
+  const { wallet, deductBalance } = useWallet();
 
   const calculatePrice = (service: AiService) => {
     if (selectedPlan === '6months') {
@@ -186,16 +198,99 @@ export function AiServicesMarketplace() {
     return { monthly: service.price, total: service.price, saved: 0 };
   };
 
-  const handlePayNow = (service: AiService) => {
+  const getPayAmount = (service: AiService) => {
     const pricing = calculatePrice(service);
-    const amount = selectedPlan === '6months' ? pricing.total : pricing.monthly;
-    
-    toast.success(`💳 Redirecting to payment for ${service.name}`, {
-      description: `Amount: $${amount.toFixed(2)} (${selectedPlan === '6months' ? '6 months' : 'monthly'})`
-    });
-    
-    // Redirect to wallet
-    window.location.href = '/wallet';
+    return selectedPlan === '6months' ? pricing.total : pricing.monthly;
+  };
+
+  const handlePayNow = (service: AiService) => {
+    setPayAllMode(false);
+    setPayingService(service);
+  };
+
+  const handlePayAll = () => {
+    setPayAllMode(true);
+    setPayingService(serviceList[0]); // just to open dialog
+  };
+
+  const getPayAllTotal = () => {
+    return serviceList
+      .filter(s => s.status === 'active')
+      .reduce((sum, s) => sum + getPayAmount(s), 0);
+  };
+
+  const confirmPayment = async () => {
+    if (!wallet) {
+      toast.error('Wallet not found! Please reload the page.');
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      if (payAllMode) {
+        // Pay for all active services
+        const activeServices = serviceList.filter(s => s.status === 'active');
+        const totalAmount = getPayAllTotal();
+
+        if (wallet.balance < totalAmount) {
+          toast.error(`Insufficient balance! Need $${totalAmount.toFixed(2)}, have $${wallet.balance.toFixed(2)}`, {
+            description: 'Please add funds to your wallet first.',
+            action: { label: 'Go to Wallet', onClick: () => window.location.href = '/wallet' }
+          });
+          setIsProcessing(false);
+          return;
+        }
+
+        await deductBalance(
+          wallet.id,
+          totalAmount,
+          `AI Services Bundle - ${activeServices.length} services (${selectedPlan === '6months' ? '6 months' : 'monthly'})`,
+          'ai-services-bundle',
+          'ai_service'
+        );
+
+        toast.success(`✅ Paid $${totalAmount.toFixed(2)} for ${activeServices.length} AI services!`, {
+          description: 'All services renewed from wallet.'
+        });
+      } else if (payingService) {
+        // Pay for single service
+        const amount = getPayAmount(payingService);
+
+        if (wallet.balance < amount) {
+          toast.error(`Insufficient balance! Need $${amount.toFixed(2)}, have $${wallet.balance.toFixed(2)}`, {
+            description: 'Please add funds to your wallet first.',
+            action: { label: 'Go to Wallet', onClick: () => window.location.href = '/wallet' }
+          });
+          setIsProcessing(false);
+          return;
+        }
+
+        await deductBalance(
+          wallet.id,
+          amount,
+          `${payingService.name} - ${selectedPlan === '6months' ? '6 months' : '1 month'}`,
+          payingService.id,
+          'ai_service'
+        );
+
+        // Activate the service
+        setServiceList(prev => prev.map(s =>
+          s.id === payingService.id ? { ...s, status: 'active' as const } : s
+        ));
+
+        toast.success(`✅ ${payingService.name} activated!`, {
+          description: `$${amount.toFixed(2)} deducted from wallet. Balance: $${(wallet.balance - amount).toFixed(2)}`
+        });
+      }
+    } catch (err: any) {
+      // deductBalance already shows toast on error
+      console.error('Payment error:', err);
+    } finally {
+      setIsProcessing(false);
+      setPayingService(null);
+      setPayAllMode(false);
+    }
   };
 
   const handleToggleAuto = (serviceId: string) => {
@@ -203,13 +298,6 @@ export function AiServicesMarketplace() {
       s.id === serviceId ? { ...s, autoEnabled: !s.autoEnabled } : s
     ));
     toast.success('Auto-mode updated');
-  };
-
-  const handleActivate = (service: AiService) => {
-    setServiceList(prev => prev.map(s => 
-      s.id === service.id ? { ...s, status: 'active' } : s
-    ));
-    toast.success(`✅ ${service.name} activated!`);
   };
 
   const totalMonthly = serviceList
@@ -220,6 +308,34 @@ export function AiServicesMarketplace() {
 
   return (
     <div className="space-y-6">
+      {/* Wallet Balance Bar */}
+      <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-primary/20">
+                <Wallet className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Wallet Balance</p>
+                <p className="text-2xl font-bold text-foreground">
+                  ${wallet?.balance?.toFixed(2) || '0.00'}
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => window.location.href = '/wallet'}
+            >
+              <CreditCard className="h-3.5 w-3.5" />
+              Add Funds
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Plan Selector & Summary */}
       <Card className="glass-card border-primary/20">
         <CardContent className="p-4">
@@ -257,9 +373,13 @@ export function AiServicesMarketplace() {
                 <p className="text-2xl font-bold text-success">{activeCount}</p>
                 <p className="text-xs text-muted-foreground">Active Services</p>
               </div>
-              <Button className="gap-2 bg-gradient-to-r from-primary to-cyan">
-                <CreditCard className="h-4 w-4" />
-                Pay All Now
+              <Button
+                className="gap-2 bg-gradient-to-r from-primary to-cyan"
+                onClick={handlePayAll}
+                disabled={activeCount === 0}
+              >
+                <Wallet className="h-4 w-4" />
+                Pay All from Wallet
               </Button>
             </div>
           </div>
@@ -270,13 +390,13 @@ export function AiServicesMarketplace() {
       <div className="flex items-center gap-3 p-3 bg-success/10 border border-success/20 rounded-lg">
         <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
         <div className="flex-1">
-          <p className="text-sm font-medium text-success">Auto-Upgrade Mode Active</p>
+          <p className="text-sm font-medium text-success">Auto-Pay from Wallet Enabled</p>
           <p className="text-xs text-muted-foreground">
-            When limits are reached, services auto-upgrade. You'll be notified, never asked.
+            Payments auto-deduct from wallet. No redirect needed. Instant activation.
           </p>
         </div>
         <Badge variant="outline" className="bg-success/20 text-success border-success/30">
-          Enabled
+          Wallet Connected
         </Badge>
       </div>
 
@@ -284,7 +404,9 @@ export function AiServicesMarketplace() {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {serviceList.map((service) => {
           const pricing = calculatePrice(service);
+          const payAmount = getPayAmount(service);
           const Icon = service.icon;
+          const canAfford = (wallet?.balance || 0) >= payAmount;
           
           return (
             <Card 
@@ -364,7 +486,7 @@ export function AiServicesMarketplace() {
                   </div>
                 )}
                 
-                {/* Pricing */}
+                {/* Pricing + Pay Button */}
                 <div className="flex items-center justify-between pt-2 border-t border-border/50">
                   <div>
                     <div className="flex items-baseline gap-1">
@@ -378,6 +500,9 @@ export function AiServicesMarketplace() {
                         Save ${pricing.saved.toFixed(2)} on 6mo
                       </p>
                     )}
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      Total: ${payAmount.toFixed(2)}
+                    </p>
                   </div>
                   
                   <div className="flex items-center gap-2">
@@ -394,20 +519,26 @@ export function AiServicesMarketplace() {
                         <Button 
                           size="sm" 
                           variant="outline"
-                          className="h-7 text-xs"
+                          className="h-7 text-xs gap-1"
                           onClick={() => handlePayNow(service)}
                         >
+                          <Wallet className="h-3 w-3" />
                           Renew
                         </Button>
                       </>
                     ) : (
                       <Button 
                         size="sm" 
-                        className="h-7 text-xs gap-1 bg-gradient-to-r from-primary to-cyan"
+                        className={cn(
+                          "h-7 text-xs gap-1",
+                          canAfford
+                            ? "bg-gradient-to-r from-primary to-cyan"
+                            : "bg-muted text-muted-foreground"
+                        )}
                         onClick={() => handlePayNow(service)}
                       >
-                        <CreditCard className="h-3 w-3" />
-                        Pay Now
+                        <Wallet className="h-3 w-3" />
+                        {canAfford ? 'Pay & Activate' : 'Low Balance'}
                       </Button>
                     )}
                   </div>
@@ -418,7 +549,7 @@ export function AiServicesMarketplace() {
         })}
       </div>
 
-      {/* Bottom CTA */}
+      {/* Bottom CTA - Bundle */}
       <Card className="glass-card bg-gradient-to-r from-primary/5 to-cyan/5 border-primary/20">
         <CardContent className="p-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
@@ -427,17 +558,141 @@ export function AiServicesMarketplace() {
               <div>
                 <h3 className="font-bold text-lg">Full Auto-Pilot Bundle</h3>
                 <p className="text-sm text-muted-foreground">
-                  All 7 services • $25/mo (Save 40%) • Best in market
+                  All 7 services • $25/mo (Save 40%) • Pay from Wallet
                 </p>
               </div>
             </div>
-            <Button size="lg" className="gap-2 bg-gradient-to-r from-primary to-cyan">
+            <Button
+              size="lg"
+              className="gap-2 bg-gradient-to-r from-primary to-cyan"
+              onClick={() => {
+                // Activate all and pay bundle price
+                const bundlePrice = selectedPlan === '6months' ? 150 : 25;
+                setPayAllMode(true);
+                setPayingService(serviceList[0]);
+              }}
+            >
               <Crown className="h-4 w-4" />
-              Get Full Bundle - $150 for 6 Months
+              Pay ${selectedPlan === '6months' ? '150' : '25'} from Wallet
             </Button>
           </div>
         </CardContent>
       </Card>
+
+      {/* Payment Confirmation Dialog */}
+      <Dialog open={!!payingService} onOpenChange={(open) => { if (!open) { setPayingService(null); setPayAllMode(false); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wallet className="h-5 w-5 text-primary" />
+              {payAllMode ? 'Pay All Active Services' : `Pay for ${payingService?.name}`}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-2">
+            {/* Wallet Balance */}
+            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+              <span className="text-sm text-muted-foreground">Wallet Balance</span>
+              <span className="text-lg font-bold text-foreground">
+                ${wallet?.balance?.toFixed(2) || '0.00'}
+              </span>
+            </div>
+
+            {/* Payment Details */}
+            {payAllMode ? (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Active Services:</p>
+                {serviceList.filter(s => s.status === 'active').map(s => (
+                  <div key={s.id} className="flex items-center justify-between text-sm px-2">
+                    <span className="text-muted-foreground">{s.name}</span>
+                    <span className="font-mono">${getPayAmount(s).toFixed(2)}</span>
+                  </div>
+                ))}
+                <div className="border-t border-border pt-2 flex items-center justify-between font-medium">
+                  <span>Total</span>
+                  <span className="text-lg font-bold text-primary">${getPayAllTotal().toFixed(2)}</span>
+                </div>
+              </div>
+            ) : payingService && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Service</span>
+                  <span className="font-medium">{payingService.name}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Plan</span>
+                  <span>{selectedPlan === '6months' ? '6 Months' : '1 Month'}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Amount</span>
+                  <span className="text-lg font-bold text-primary">${getPayAmount(payingService).toFixed(2)}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Insufficient balance warning */}
+            {wallet && (
+              (payAllMode ? wallet.balance < getPayAllTotal() : payingService && wallet.balance < getPayAmount(payingService))
+            ) && (
+              <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-destructive">Insufficient Balance</p>
+                  <p className="text-xs text-muted-foreground">
+                    Please add funds to your wallet first.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* After deduction preview */}
+            {wallet && payingService && (
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg text-sm">
+                <span className="text-muted-foreground">Balance After Payment</span>
+                <span className={cn(
+                  "font-bold",
+                  (wallet.balance - (payAllMode ? getPayAllTotal() : getPayAmount(payingService))) < 0
+                    ? "text-destructive"
+                    : "text-success"
+                )}>
+                  ${(wallet.balance - (payAllMode ? getPayAllTotal() : getPayAmount(payingService))).toFixed(2)}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => { setPayingService(null); setPayAllMode(false); }}
+              disabled={isProcessing}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmPayment}
+              disabled={
+                isProcessing ||
+                !wallet ||
+                (payAllMode ? wallet.balance < getPayAllTotal() : (payingService ? wallet.balance < getPayAmount(payingService) : true))
+              }
+              className="gap-2 bg-gradient-to-r from-primary to-cyan"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4" />
+                  Confirm & Pay
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
