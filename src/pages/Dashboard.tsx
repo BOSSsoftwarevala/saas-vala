@@ -54,7 +54,7 @@ export default function Dashboard() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-8 stagger-children">
+      <div className="space-y-8">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatsCard
@@ -63,6 +63,7 @@ export default function Dashboard() {
             icon={Package}
             trend={{ value: stats.activeProducts, positive: true }}
             accentColor="orange"
+            index={0}
           />
           <StatsCard
             title="Active Keys"
@@ -70,6 +71,7 @@ export default function Dashboard() {
             icon={Key}
             trend={{ value: Math.round((stats.activeKeys / Math.max(stats.totalKeys, 1)) * 100), positive: true }}
             accentColor="cyan"
+            index={1}
           />
           <StatsCard
             title="Resellers"
@@ -78,6 +80,7 @@ export default function Dashboard() {
             icon={Users}
             trend={{ value: stats.activeResellers, positive: true }}
             accentColor="green"
+            index={2}
           />
           <StatsCard
             title="Live Servers"
@@ -85,6 +88,7 @@ export default function Dashboard() {
             icon={Server}
             trend={{ value: stats.totalServers - stats.liveServers, positive: false }}
             accentColor="purple"
+            index={3}
           />
         </div>
 

@@ -16,6 +16,7 @@ export default {
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
         display: ["Space Grotesk", "sans-serif"],
+        mono: ["JetBrains Mono", "monospace"],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -73,6 +74,8 @@ export default {
         purple: "hsl(var(--purple))",
         green: "hsl(var(--green))",
         gold: "hsl(var(--gold))",
+        "neon-blue": "hsl(var(--neon-blue))",
+        "neon-pink": "hsl(var(--neon-pink))",
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -95,12 +98,33 @@ export default {
           from: { opacity: "0", transform: "translateY(10px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
+        "pulse-ring": {
+          "0%": { transform: "scale(1)", opacity: "0.8" },
+          "100%": { transform: "scale(2.5)", opacity: "0" },
+        },
+        "morph-gradient": {
+          "0%, 100%": { borderRadius: "60% 40% 30% 70% / 60% 30% 70% 40%" },
+          "50%": { borderRadius: "30% 60% 70% 40% / 50% 60% 30% 60%" },
+        },
+        "slide-up-fade": {
+          "0%": { opacity: "0", transform: "translateY(16px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        "glow-line": {
+          "0%": { left: "0%", opacity: "0" },
+          "50%": { opacity: "1" },
+          "100%": { left: "100%", opacity: "0" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         shimmer: "shimmer 2s infinite",
         "count-up": "count-up 0.5s ease-out forwards",
+        "pulse-ring": "pulse-ring 1.5s cubic-bezier(0, 0, 0.2, 1) infinite",
+        "morph-gradient": "morph-gradient 8s ease-in-out infinite",
+        "slide-up-fade": "slide-up-fade 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
+        "glow-line": "glow-line 3s ease-in-out infinite",
       },
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
@@ -110,6 +134,7 @@ export default {
         "orange-gradient": "linear-gradient(135deg, hsl(25, 95%, 53%) 0%, hsl(38, 92%, 50%) 100%)",
         "cyan-gradient": "linear-gradient(135deg, hsl(187, 85%, 53%) 0%, hsl(187, 85%, 40%) 100%)",
         "purple-gradient": "linear-gradient(135deg, hsl(270, 70%, 55%) 0%, hsl(270, 70%, 40%) 100%)",
+        "mesh-gradient": "radial-gradient(at 40% 20%, hsl(25, 95%, 53%, 0.08) 0px, transparent 50%), radial-gradient(at 80% 0%, hsl(187, 85%, 53%, 0.06) 0px, transparent 50%), radial-gradient(at 0% 50%, hsl(270, 70%, 55%, 0.06) 0px, transparent 50%)",
       },
     },
   },

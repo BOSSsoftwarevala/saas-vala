@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard,
   Package,
@@ -62,29 +63,50 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'fixed left-0 top-0 z-40 h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300',
+        'fixed left-0 top-0 z-40 h-screen border-r border-sidebar-border transition-all duration-300 overflow-hidden',
         collapsed ? 'w-16' : 'w-64'
       )}
+      style={{
+        background: 'linear-gradient(180deg, hsl(222, 47%, 4%) 0%, hsl(222, 47%, 3%) 100%)',
+      }}
     >
-      <div className="flex h-full flex-col">
+      {/* Subtle ambient glow on sidebar */}
+      <div 
+        className="absolute top-0 left-0 w-full h-32 pointer-events-none opacity-30"
+        style={{
+          background: 'radial-gradient(ellipse at 50% 0%, hsl(25, 95%, 53%, 0.1) 0%, transparent 70%)',
+        }}
+      />
+
+      <div className="flex h-full flex-col relative z-10">
         {/* Logo */}
-        <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
+        <div className="flex h-16 items-center justify-between border-b border-sidebar-border/50 px-4">
           {!collapsed && (
-            <div className="flex items-center gap-2">
-              <img src={saasValaLogo} alt="SaaS VALA" className="h-8 w-8 rounded-lg object-cover" />
-              <span className="font-display text-lg font-bold text-foreground">
+            <motion.div 
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="flex items-center gap-2.5"
+            >
+              <div className="relative">
+                <img src={saasValaLogo} alt="SaaS VALA" className="h-8 w-8 rounded-lg object-cover ring-1 ring-primary/20" />
+                <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-success border-2 border-sidebar" />
+              </div>
+              <span className="font-display text-lg font-bold text-foreground tracking-tight">
                 SaaS VALA
               </span>
-            </div>
+            </motion.div>
           )}
           {collapsed && (
-            <img src={saasValaLogo} alt="SaaS VALA" className="mx-auto h-8 w-8 rounded-lg object-cover" />
+            <div className="relative mx-auto">
+              <img src={saasValaLogo} alt="SaaS VALA" className="h-8 w-8 rounded-lg object-cover ring-1 ring-primary/20" />
+              <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-success border-2 border-sidebar" />
+            </div>
           )}
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 space-y-1 p-2 overflow-y-auto">
-          {filteredNavItems.map((item) => {
+        <nav className="flex-1 space-y-0.5 p-2 overflow-y-auto">
+          {filteredNavItems.map((item, index) => {
             const isActive = location.pathname === item.href;
             const Icon = item.icon;
 
@@ -92,19 +114,50 @@ export function Sidebar() {
               <NavLink
                 to={item.href}
                 className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 relative group',
                   isActive
                     ? 'bg-sidebar-accent text-primary'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-foreground'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
                 )}
               >
-                <Icon
-                  className={cn(
-                    'h-5 w-5 shrink-0',
-                    isActive ? 'text-primary' : ''
+                {/* Active indicator bar */}
+                {isActive && (
+                  <motion.div
+                    layoutId="sidebar-active"
+                    className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[60%] rounded-r-full"
+                    style={{
+                      background: 'linear-gradient(180deg, hsl(25, 95%, 53%), hsl(38, 92%, 50%))',
+                      boxShadow: '0 0 12px hsl(25, 95%, 53%, 0.6)',
+                    }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                  />
+                )}
+
+                <motion.div
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                >
+                  <Icon
+                    className={cn(
+                      'h-5 w-5 shrink-0 transition-colors duration-200',
+                      isActive ? 'text-primary' : 'group-hover:text-foreground'
+                    )}
+                  />
+                </motion.div>
+                
+                <AnimatePresence>
+                  {!collapsed && (
+                    <motion.span
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -8 }}
+                      transition={{ duration: 0.15 }}
+                    >
+                      {item.title}
+                    </motion.span>
                   )}
-                />
-                {!collapsed && <span>{item.title}</span>}
+                </AnimatePresence>
               </NavLink>
             );
 
@@ -124,11 +177,13 @@ export function Sidebar() {
         </nav>
 
         {/* Bottom section */}
-        <div className="border-t border-sidebar-border p-2">
+        <div className="border-t border-sidebar-border/50 p-2">
           {/* Logout button */}
           <Tooltip delayDuration={0}>
             <TooltipTrigger asChild>
-              <button
+              <motion.button
+                whileHover={{ x: 2 }}
+                whileTap={{ scale: 0.97 }}
                 onClick={signOut}
                 className={cn(
                   'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
@@ -137,7 +192,7 @@ export function Sidebar() {
               >
                 <LogOut className="h-5 w-5 shrink-0" />
                 {!collapsed && <span>Logout</span>}
-              </button>
+              </motion.button>
             </TooltipTrigger>
             {collapsed && (
               <TooltipContent side="right" className="bg-popover text-popover-foreground border-border">
@@ -167,12 +222,19 @@ export function Sidebar() {
           </Button>
 
           {/* Powered by */}
-          {!collapsed && (
-            <p className="mt-4 text-center text-xs text-muted-foreground">
-              Powered by{' '}
-              <span className="font-semibold text-primary">SoftwareVala™</span>
-            </p>
-          )}
+          <AnimatePresence>
+            {!collapsed && (
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="mt-4 text-center text-xs text-muted-foreground"
+              >
+                Powered by{' '}
+                <span className="font-semibold text-gradient-primary">SoftwareVala™</span>
+              </motion.p>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </aside>
