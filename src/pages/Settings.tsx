@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,10 +19,12 @@ import {
   Smartphone,
   Save,
   Loader2,
+  Upload,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Settings() {
   const { user, isSuperAdmin, signOut } = useAuth();
@@ -53,12 +55,44 @@ export default function Settings() {
     }
   }, [profile]);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
   const handleSave = async () => {
     setSaving(true);
     try {
       await updateProfile(formData);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File too large. Max 5MB.');
+      return;
+    }
+    if (!['image/jpeg', 'image/png', 'image/gif'].includes(file.type)) {
+      toast.error('Only JPG, PNG, GIF allowed.');
+      return;
+    }
+    setUploading(true);
+    try {
+      const ext = file.name.split('.').pop();
+      const path = `${user?.id}/avatar.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(path, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
+      await updateProfile({ avatar_url: `${urlData.publicUrl}?t=${Date.now()}` });
+      toast.success('Avatar updated!');
+    } catch (err: any) {
+      toast.error('Upload failed: ' + (err.message || 'Unknown error'));
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -121,8 +155,21 @@ export default function Settings() {
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <Button variant="outline" className="border-border">
-                          Change Avatar
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          onChange={handleAvatarUpload}
+                          accept="image/jpeg,image/png,image/gif"
+                          className="hidden"
+                        />
+                        <Button
+                          variant="outline"
+                          className="border-border gap-2"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={uploading}
+                        >
+                          {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                          {uploading ? 'Uploading...' : 'Change Avatar'}
                         </Button>
                         <p className="text-xs text-muted-foreground mt-2">
                           JPG, PNG, GIF up to 5MB
