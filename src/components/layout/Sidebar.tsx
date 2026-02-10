@@ -1,5 +1,5 @@
-import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { useSidebarState } from '@/hooks/useSidebarState';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -52,7 +52,7 @@ const navItems: NavItem[] = [
 ];
 
 export function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false);
+  const { collapsed, toggle } = useSidebarState();
   const location = useLocation();
   const { isSuperAdmin, signOut } = useAuth();
 
@@ -205,7 +205,7 @@ export function Sidebar() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setCollapsed(!collapsed)}
+            onClick={toggle}
             className={cn(
               'mt-2 w-full justify-center text-sidebar-foreground hover:bg-sidebar-accent hover:text-foreground',
               collapsed && 'px-0'

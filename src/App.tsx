@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { SidebarProvider } from "@/hooks/useSidebarState";
 import { Loader2 } from "lucide-react";
  import { GlobalActivityPanel } from "@/components/global/GlobalActivityPanel";
  import { WorkingDeveloperIndicator } from "@/components/global/WorkingDeveloperIndicator";
@@ -273,7 +274,9 @@ const App = () => (
        <WorkingDeveloperIndicator />
       <BrowserRouter>
         <AuthProvider>
-          <AppRoutes />
+          <SidebarProvider>
+            <AppRoutes />
+          </SidebarProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
