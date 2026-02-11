@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Table,
   TableBody,
@@ -48,6 +49,14 @@ import {
   Ban,
   Play,
   Loader2,
+  Github,
+  GitBranch,
+  Lock,
+  Globe,
+  Rocket,
+  Store,
+  ExternalLink,
+  CheckCircle2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useProducts, type Product } from '@/hooks/useProducts';
@@ -62,6 +71,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { toast } from 'sonner';
 
 const statusStyles = {
   active: 'bg-success/20 text-success border-success/30',
@@ -69,6 +79,27 @@ const statusStyles = {
   archived: 'bg-muted text-muted-foreground border-muted-foreground/30',
   suspended: 'bg-destructive/20 text-destructive border-destructive/30',
 };
+
+const deployStyles: Record<string, string> = {
+  idle: 'bg-muted text-muted-foreground',
+  building: 'bg-warning/20 text-warning',
+  deployed: 'bg-success/20 text-success',
+  failed: 'bg-destructive/20 text-destructive',
+};
+
+interface GitHubRepo {
+  id: number;
+  name: string;
+  full_name: string;
+  private: boolean;
+  description: string;
+  default_branch: string;
+  updated_at: string;
+  language: string;
+  html_url: string;
+}
+
+const STORAGE_KEY = 'github_connection';
 
 export default function Products() {
   const { products, categories, loading, createProduct, updateProduct, deleteProduct, suspendProduct, activateProduct } = useProducts();
@@ -78,6 +109,28 @@ export default function Products() {
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Git import state
+  const [gitDialogOpen, setGitDialogOpen] = useState(false);
+  const [gitRepos, setGitRepos] = useState<GitHubRepo[]>([]);
+  const [loadingRepos, setLoadingRepos] = useState(false);
+  const [importingRepos, setImportingRepos] = useState<Set<number>>(new Set());
+  const [gitConnected, setGitConnected] = useState(false);
+  const [gitAccessToken, setGitAccessToken] = useState<string | null>(null);
+
+  // Check for existing git connection
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.connected && parsed.accessToken) {
+          setGitConnected(true);
+          setGitAccessToken(parsed.accessToken);
+        }
+      } catch {}
+    }
+  }, []);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -146,6 +199,100 @@ export default function Products() {
     setDeleteId(null);
   };
 
+  // Git import functions
+  const openGitImport = async () => {
+    if (!gitConnected || !gitAccessToken) {
+      toast.error('GitHub not connected', {
+        description: 'Go to Servers → Git to connect your GitHub account first.',
+      });
+      return;
+    }
+    setGitDialogOpen(true);
+    await fetchGitRepos();
+  };
+
+  const fetchGitRepos = async () => {
+    if (!gitAccessToken) return;
+    setLoadingRepos(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/github-oauth?action=repos`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            'x-github-token': gitAccessToken,
+          },
+          body: JSON.stringify({}),
+        }
+      );
+      const result = await response.json();
+      if (result.error) throw new Error(result.error);
+      setGitRepos(result.repos || []);
+    } catch (error) {
+      toast.error('Failed to fetch repositories');
+      console.error(error);
+    } finally {
+      setLoadingRepos(false);
+    }
+  };
+
+  const importRepoAsProduct = async (repo: GitHubRepo) => {
+    // Check if already imported
+    const alreadyExists = products.some(
+      (p) => p.git_repo_url === repo.html_url || p.git_repo_name === repo.full_name
+    );
+    if (alreadyExists) {
+      toast.info(`"${repo.name}" is already imported as a product.`);
+      return;
+    }
+
+    setImportingRepos((prev) => new Set(prev).add(repo.id));
+    try {
+      await createProduct({
+        name: repo.name.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+        slug: repo.name.toLowerCase(),
+        description: repo.description || `Imported from GitHub: ${repo.full_name}`,
+        git_repo_url: repo.html_url,
+        git_repo_name: repo.full_name,
+        git_default_branch: repo.default_branch,
+        deploy_status: 'idle',
+        status: 'draft',
+        price: 0,
+      });
+      toast.success(`Imported "${repo.name}" as product`);
+    } catch {
+      toast.error(`Failed to import "${repo.name}"`);
+    } finally {
+      setImportingRepos((prev) => {
+        const next = new Set(prev);
+        next.delete(repo.id);
+        return next;
+      });
+    }
+  };
+
+  const importAllRepos = async () => {
+    const unimported = gitRepos.filter(
+      (repo) => !products.some((p) => p.git_repo_url === repo.html_url || p.git_repo_name === repo.full_name)
+    );
+    if (unimported.length === 0) {
+      toast.info('All repositories are already imported.');
+      return;
+    }
+    for (const repo of unimported) {
+      await importRepoAsProduct(repo);
+    }
+  };
+
+  const isRepoImported = (repo: GitHubRepo) =>
+    products.some((p) => p.git_repo_url === repo.html_url || p.git_repo_name === repo.full_name);
+
+  const toggleMarketplace = async (product: Product) => {
+    await updateProduct(product.id, { marketplace_visible: !product.marketplace_visible } as any);
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -159,7 +306,12 @@ export default function Products() {
               Manage your products, demos, and APKs
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <Button onClick={openGitImport} variant="outline" className="gap-2 border-border">
+              <Github className="h-4 w-4" />
+              Import from Git
+              {gitConnected && <CheckCircle2 className="h-3 w-3 text-success" />}
+            </Button>
             <Button onClick={openCreateDialog} className="bg-orange-gradient hover:opacity-90 text-white gap-2">
               <Plus className="h-4 w-4" />
               Add Product
@@ -218,11 +370,17 @@ export default function Products() {
             <div className="flex flex-col items-center justify-center p-12 text-center">
               <Package className="h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="font-semibold text-foreground mb-2">No products found</h3>
-              <p className="text-muted-foreground mb-4">Get started by adding your first product</p>
-              <Button onClick={openCreateDialog}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Product
-              </Button>
+              <p className="text-muted-foreground mb-4">Import from Git or add manually</p>
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={openGitImport} className="gap-2">
+                  <Github className="h-4 w-4" />
+                  Import from Git
+                </Button>
+                <Button onClick={openCreateDialog}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Product
+                </Button>
+              </div>
             </div>
           ) : (
             <>
@@ -230,10 +388,11 @@ export default function Products() {
                 <TableHeader>
                   <TableRow className="border-border hover:bg-muted/50">
                     <TableHead className="text-muted-foreground">Name</TableHead>
+                    <TableHead className="text-muted-foreground">Source</TableHead>
                     <TableHead className="text-muted-foreground">Price</TableHead>
                     <TableHead className="text-muted-foreground">Status</TableHead>
-                    <TableHead className="text-muted-foreground">Version</TableHead>
-                    <TableHead className="text-muted-foreground">Created</TableHead>
+                    <TableHead className="text-muted-foreground">Deploy</TableHead>
+                    <TableHead className="text-muted-foreground">Marketplace</TableHead>
                     <TableHead className="text-muted-foreground text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -243,13 +402,29 @@ export default function Products() {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
-                            <Package className="h-5 w-5 text-muted-foreground" />
+                            {product.git_repo_url ? (
+                              <Github className="h-5 w-5 text-muted-foreground" />
+                            ) : (
+                              <Package className="h-5 w-5 text-muted-foreground" />
+                            )}
                           </div>
                           <div>
                             <span className="font-medium text-foreground">{product.name}</span>
                             <p className="text-xs text-muted-foreground">{product.slug}</p>
                           </div>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {product.git_repo_name ? (
+                          <div className="flex items-center gap-1.5">
+                            <GitBranch className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground truncate max-w-[120px]">
+                              {product.git_repo_name}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Manual</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         {product.price > 0 ? (
@@ -264,10 +439,20 @@ export default function Products() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <span className="text-muted-foreground font-mono text-sm">{product.version}</span>
+                        <Badge variant="outline" className={cn('capitalize text-xs', deployStyles[product.deploy_status || 'idle'])}>
+                          {product.deploy_status || 'idle'}
+                        </Badge>
                       </TableCell>
                       <TableCell>
-                        <span className="text-muted-foreground">{new Date(product.created_at).toLocaleDateString()}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 gap-1 text-xs"
+                          onClick={() => toggleMarketplace(product)}
+                        >
+                          <Store className={cn('h-3 w-3', product.marketplace_visible ? 'text-success' : 'text-muted-foreground')} />
+                          {product.marketplace_visible ? 'Listed' : 'Hidden'}
+                        </Button>
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -282,6 +467,14 @@ export default function Products() {
                             </DropdownMenuItem>
                             <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => openEditDialog(product)}>
                               <Edit className="h-4 w-4" /> Edit
+                            </DropdownMenuItem>
+                            {product.git_repo_url && (
+                              <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => window.open(product.git_repo_url!, '_blank')}>
+                                <ExternalLink className="h-4 w-4" /> Open Repo
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem className="gap-2 cursor-pointer">
+                              <Rocket className="h-4 w-4" /> Deploy
                             </DropdownMenuItem>
                             {product.status === 'suspended' ? (
                               <DropdownMenuItem className="gap-2 cursor-pointer text-success" onClick={() => activateProduct(product.id)}>
@@ -405,6 +598,102 @@ export default function Products() {
               {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {editProduct ? 'Update' : 'Create'}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import from Git Dialog */}
+      <Dialog open={gitDialogOpen} onOpenChange={setGitDialogOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Github className="h-5 w-5" />
+              Import from Git Repository
+            </DialogTitle>
+            <DialogDescription>
+              Select repositories to auto-create as products. Each repo becomes a deployable product.
+            </DialogDescription>
+          </DialogHeader>
+
+          {loadingRepos ? (
+            <div className="flex items-center justify-center p-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : gitRepos.length === 0 ? (
+            <div className="text-center p-8 text-muted-foreground">
+              No repositories found. Make sure your GitHub is connected in Servers → Git.
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-muted-foreground">{gitRepos.length} repositories found</span>
+                <Button size="sm" variant="outline" onClick={importAllRepos} className="gap-1 text-xs">
+                  <Plus className="h-3 w-3" />
+                  Import All
+                </Button>
+              </div>
+              <ScrollArea className="h-[350px] border border-border rounded-lg">
+                <div className="divide-y divide-border">
+                  {gitRepos.map((repo) => {
+                    const imported = isRepoImported(repo);
+                    const importing = importingRepos.has(repo.id);
+                    return (
+                      <div key={repo.id} className="flex items-center justify-between p-3 hover:bg-muted/30 transition-colors">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            {repo.private ? (
+                              <Lock className="h-3 w-3 text-muted-foreground shrink-0" />
+                            ) : (
+                              <Globe className="h-3 w-3 text-muted-foreground shrink-0" />
+                            )}
+                            <span className="font-medium text-foreground text-sm truncate">{repo.name}</span>
+                            {repo.language && (
+                              <Badge variant="outline" className="text-[10px] border-border shrink-0">
+                                {repo.language}
+                              </Badge>
+                            )}
+                          </div>
+                          {repo.description && (
+                            <p className="text-xs text-muted-foreground mt-0.5 truncate">{repo.description}</p>
+                          )}
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            <GitBranch className="h-2.5 w-2.5 inline mr-0.5" />
+                            {repo.default_branch}
+                          </p>
+                        </div>
+                        <div className="shrink-0 ml-3">
+                          {imported ? (
+                            <Badge variant="outline" className="bg-success/20 text-success border-success/30 text-xs">
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Imported
+                            </Badge>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs gap-1"
+                              disabled={importing}
+                              onClick={() => importRepoAsProduct(repo)}
+                            >
+                              {importing ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Plus className="h-3 w-3" />
+                              )}
+                              Import
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            </>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGitDialogOpen(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

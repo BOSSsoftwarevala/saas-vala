@@ -1909,12 +1909,19 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           currency: string | null
+          demo_url: string | null
+          deploy_status: string | null
           description: string | null
           download_count: number | null
           features: Json | null
+          git_default_branch: string | null
+          git_repo_name: string | null
+          git_repo_url: string | null
           icon_path: string | null
           id: string
           is_apk: boolean | null
+          live_url: string | null
+          marketplace_visible: boolean | null
           meta: Json | null
           name: string
           price: number | null
@@ -1922,6 +1929,7 @@ export type Database = {
           short_description: string | null
           slug: string
           status: Database["public"]["Enums"]["product_status"] | null
+          thumbnail_url: string | null
           updated_at: string | null
           version: string | null
           visibility: string | null
@@ -1933,12 +1941,19 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
+          demo_url?: string | null
+          deploy_status?: string | null
           description?: string | null
           download_count?: number | null
           features?: Json | null
+          git_default_branch?: string | null
+          git_repo_name?: string | null
+          git_repo_url?: string | null
           icon_path?: string | null
           id?: string
           is_apk?: boolean | null
+          live_url?: string | null
+          marketplace_visible?: boolean | null
           meta?: Json | null
           name: string
           price?: number | null
@@ -1946,6 +1961,7 @@ export type Database = {
           short_description?: string | null
           slug: string
           status?: Database["public"]["Enums"]["product_status"] | null
+          thumbnail_url?: string | null
           updated_at?: string | null
           version?: string | null
           visibility?: string | null
@@ -1957,12 +1973,19 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
+          demo_url?: string | null
+          deploy_status?: string | null
           description?: string | null
           download_count?: number | null
           features?: Json | null
+          git_default_branch?: string | null
+          git_repo_name?: string | null
+          git_repo_url?: string | null
           icon_path?: string | null
           id?: string
           is_apk?: boolean | null
+          live_url?: string | null
+          marketplace_visible?: boolean | null
           meta?: Json | null
           name?: string
           price?: number | null
@@ -1970,6 +1993,7 @@ export type Database = {
           short_description?: string | null
           slug?: string
           status?: Database["public"]["Enums"]["product_status"] | null
+          thumbnail_url?: string | null
           updated_at?: string | null
           version?: string | null
           visibility?: string | null

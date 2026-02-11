@@ -16,6 +16,14 @@ export interface Product {
   features: Json;
   created_at: string;
   updated_at: string;
+  git_repo_url: string | null;
+  git_repo_name: string | null;
+  git_default_branch: string | null;
+  deploy_status: string | null;
+  marketplace_visible: boolean | null;
+  demo_url: string | null;
+  live_url: string | null;
+  thumbnail_url: string | null;
 }
 
 export interface Category {
@@ -77,7 +85,14 @@ export function useProducts() {
         currency: product.currency || 'INR',
         version: product.version || '1.0.0',
         features: product.features || [],
-        created_by: userData.user?.id
+        created_by: userData.user?.id,
+        git_repo_url: product.git_repo_url || null,
+        git_repo_name: product.git_repo_name || null,
+        git_default_branch: product.git_default_branch || 'main',
+        deploy_status: product.deploy_status || 'idle',
+        marketplace_visible: product.marketplace_visible || false,
+        demo_url: product.demo_url || null,
+        live_url: product.live_url || null,
       })
       .select()
       .single();
