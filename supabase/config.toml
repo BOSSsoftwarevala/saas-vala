@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.source-code-manager]
 verify_jwt = false
+
+[functions.auto-monitor]
+verify_jwt = false

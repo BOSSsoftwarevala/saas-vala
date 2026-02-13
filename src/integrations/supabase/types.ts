@@ -2800,6 +2800,108 @@ export type Database = {
         }
         Relationships: []
       }
+      system_health_snapshots: {
+        Row: {
+          approvals_queued: number | null
+          auto_actions_taken: number | null
+          created_at: string
+          details: Json | null
+          id: string
+          issues_detected: number | null
+          metrics: Json | null
+          snapshot_type: string
+          status: string
+        }
+        Insert: {
+          approvals_queued?: number | null
+          auto_actions_taken?: number | null
+          created_at?: string
+          details?: Json | null
+          id?: string
+          issues_detected?: number | null
+          metrics?: Json | null
+          snapshot_type: string
+          status?: string
+        }
+        Update: {
+          approvals_queued?: number | null
+          auto_actions_taken?: number | null
+          created_at?: string
+          details?: Json | null
+          id?: string
+          issues_detected?: number | null
+          metrics?: Json | null
+          snapshot_type?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      system_monitor_queue: {
+        Row: {
+          action_payload: Json | null
+          ai_confidence: number | null
+          approved_at: string | null
+          approved_by: string | null
+          auto_approved: boolean | null
+          created_at: string
+          effect: string
+          error_message: string | null
+          executed_at: string | null
+          id: string
+          monitor_type: string
+          reason: string
+          risk_level: string
+          source_module: string | null
+          status: string
+          target_entity_id: string | null
+          target_entity_type: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          action_payload?: Json | null
+          ai_confidence?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
+          auto_approved?: boolean | null
+          created_at?: string
+          effect: string
+          error_message?: string | null
+          executed_at?: string | null
+          id?: string
+          monitor_type: string
+          reason: string
+          risk_level?: string
+          source_module?: string | null
+          status?: string
+          target_entity_id?: string | null
+          target_entity_type?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          action_payload?: Json | null
+          ai_confidence?: number | null
+          approved_at?: string | null
+          approved_by?: string | null
+          auto_approved?: boolean | null
+          created_at?: string
+          effect?: string
+          error_message?: string | null
+          executed_at?: string | null
+          id?: string
+          monitor_type?: string
+          reason?: string
+          risk_level?: string
+          source_module?: string | null
+          status?: string
+          target_entity_id?: string | null
+          target_entity_type?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tenants: {
         Row: {
           created_at: string | null
