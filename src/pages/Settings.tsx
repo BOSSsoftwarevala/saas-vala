@@ -26,6 +26,50 @@ import { useProfile } from '@/hooks/useProfile';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
+function ChangePasswordForm() {
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleChangePassword = async () => {
+    if (newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    setSaving(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setSaving(false);
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success('Password updated successfully');
+      setNewPassword('');
+      setConfirmPassword('');
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="new-password">New Password</Label>
+        <Input id="new-password" type="password" placeholder="••••••••" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="bg-muted/50 border-border" />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="confirm-new-password">Confirm New Password</Label>
+        <Input id="confirm-new-password" type="password" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="bg-muted/50 border-border" />
+      </div>
+      <Button onClick={handleChangePassword} disabled={saving || !newPassword} className="gap-2">
+        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
+        Update Password
+      </Button>
+    </div>
+  );
+}
+
 export default function Settings() {
   const { user, isSuperAdmin, signOut } = useAuth();
   const { profile, loading, updateProfile } = useProfile();
@@ -224,8 +268,18 @@ export default function Settings() {
             </Card>
           </TabsContent>
 
-          {/* Security Tab */}
           <TabsContent value="security" className="mt-6 space-y-6">
+            {/* Change Password */}
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-foreground">Change Password</CardTitle>
+                <CardDescription>Update your account password</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <ChangePasswordForm />
+              </CardContent>
+            </Card>
+
             <Card className="glass-card">
               <CardHeader>
                 <CardTitle className="text-foreground">Two-Factor Authentication</CardTitle>

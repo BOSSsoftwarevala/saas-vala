@@ -6,9 +6,9 @@
  import { Label } from '@/components/ui/label';
  import { Card, CardContent } from '@/components/ui/card';
  import { Checkbox } from '@/components/ui/checkbox';
- import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
  import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
- import { Shield, Loader2, Mail, Lock, User, Eye, EyeOff, KeyRound } from 'lucide-react';
+ import { Loader2, Mail, Lock, User, Eye, EyeOff, KeyRound } from 'lucide-react';
+ import { supabase } from '@/integrations/supabase/client';
  import { useToast } from '@/hooks/use-toast';
  import { z } from 'zod';
  import { motion, AnimatePresence } from 'framer-motion';
@@ -27,21 +27,21 @@
    path: ['confirmPassword'],
  });
  
- type AuthMode = 'login' | 'signup';
- type SelectedRole = 'super_admin' | 'reseller';
- 
- export default function Auth() {
-   const navigate = useNavigate();
-   const { user, role, signIn, signUp, loading, initializing } = useAuth();
-   const { toast } = useToast();
-   const [isSubmitting, setIsSubmitting] = useState(false);
-   const [authMode, setAuthMode] = useState<AuthMode>('login');
-   const [selectedRole, setSelectedRole] = useState<SelectedRole>('super_admin');
-   const [showPassword, setShowPassword] = useState(false);
-   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-   const [rememberMe, setRememberMe] = useState(false);
-   const [otpValue, setOtpValue] = useState('');
-   const [show2FA, setShow2FA] = useState(false);
+type AuthMode = 'login' | 'signup' | 'forgot_password';
+
+export default function Auth() {
+  const navigate = useNavigate();
+  const { user, role, signIn, signUp, loading, initializing } = useAuth();
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [authMode, setAuthMode] = useState<AuthMode>('login');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [otpValue, setOtpValue] = useState('');
+  const [show2FA, setShow2FA] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [resetSent, setResetSent] = useState(false);
  
    // Login form state
    const [loginEmail, setLoginEmail] = useState('');
@@ -280,50 +280,15 @@
                      Back to Login
                    </Button>
                  </motion.div>
-               ) : authMode === 'login' ? (
-                 /* Login Form */
-                 <motion.form
-                   key="login"
-                   initial={{ opacity: 0, x: 20 }}
-                   animate={{ opacity: 1, x: 0 }}
-                   exit={{ opacity: 0, x: -20 }}
-                   onSubmit={handleLogin}
-                   className="space-y-5"
-                 >
-                   {/* Role Selector */}
-                   <div className="space-y-3">
-                     <Label className="text-foreground text-sm font-medium">Select Role</Label>
-                     <RadioGroup
-                       value={selectedRole}
-                       onValueChange={(v) => setSelectedRole(v as SelectedRole)}
-                       className="grid grid-cols-2 gap-3"
-                     >
-                       <Label
-                         htmlFor="role-admin"
-                         className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                           selectedRole === 'super_admin'
-                             ? 'border-primary bg-primary/10 text-primary'
-                             : 'border-border bg-muted/30 text-muted-foreground hover:border-primary/50'
-                         }`}
-                       >
-                         <RadioGroupItem value="super_admin" id="role-admin" className="sr-only" />
-                         <Shield className="h-4 w-4" />
-                         <span className="text-sm font-medium">Super Admin</span>
-                       </Label>
-                       <Label
-                         htmlFor="role-reseller"
-                         className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                           selectedRole === 'reseller'
-                             ? 'border-primary bg-primary/10 text-primary'
-                             : 'border-border bg-muted/30 text-muted-foreground hover:border-primary/50'
-                         }`}
-                       >
-                         <RadioGroupItem value="reseller" id="role-reseller" className="sr-only" />
-                         <User className="h-4 w-4" />
-                         <span className="text-sm font-medium">Reseller</span>
-                       </Label>
-                     </RadioGroup>
-                   </div>
+                ) : authMode === 'login' ? (
+                  <motion.form
+                    key="login"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    onSubmit={handleLogin}
+                    className="space-y-5"
+                  >
  
                    {/* Email */}
                    <div className="space-y-2">
@@ -380,13 +345,13 @@
                          Remember me
                        </Label>
                      </div>
-                     <button
-                       type="button"
-                       className="text-sm text-primary hover:underline"
-                       onClick={() => toast({ title: 'Reset Password', description: 'Check your email for reset instructions.' })}
-                     >
-                       Forgot Password?
-                     </button>
+                      <button
+                        type="button"
+                        className="text-sm text-primary hover:underline"
+                        onClick={() => setAuthMode('forgot_password')}
+                      >
+                        Forgot Password?
+                      </button>
                    </div>
  
                    {/* Login Button */}
@@ -405,26 +370,7 @@
                      )}
                    </Button>
  
-                   {/* Secondary Links */}
-                   <div className="flex items-center justify-center gap-4 text-sm">
-                     <button
-                       type="button"
-                       className="text-muted-foreground hover:text-primary transition-colors"
-                       onClick={() => toast({ title: 'Change Password', description: 'Feature coming soon.' })}
-                     >
-                       Change Password
-                     </button>
-                     <span className="text-border">|</span>
-                     <button
-                       type="button"
-                       className="text-muted-foreground hover:text-primary transition-colors"
-                       onClick={() => setShow2FA(true)}
-                     >
-                       Enable 2FA
-                     </button>
-                   </div>
- 
-                   {/* Sign Up Link */}
+                    {/* Sign Up Link */}
                    <p className="text-center text-sm text-muted-foreground">
                      Don't have an account?{' '}
                      <button type="button" onClick={() => setAuthMode('signup')} className="text-primary font-medium hover:underline">
@@ -432,7 +378,91 @@
                      </button>
                    </p>
                  </motion.form>
-               ) : (
+                ) : authMode === 'forgot_password' ? (
+                  <motion.div
+                    key="forgot"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="space-y-5"
+                  >
+                    <div className="text-center">
+                      <div className="mx-auto w-14 h-14 rounded-xl bg-primary/20 flex items-center justify-center mb-4">
+                        <Mail className="h-7 w-7 text-primary" />
+                      </div>
+                      <h2 className="text-lg font-semibold text-foreground">Reset Password</h2>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {resetSent 
+                          ? 'Check your email for reset instructions' 
+                          : 'Enter your email to receive a reset link'}
+                      </p>
+                    </div>
+
+                    {!resetSent ? (
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="forgot-email" className="text-foreground text-sm">Email</Label>
+                          <div className="relative">
+                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              id="forgot-email"
+                              type="email"
+                              placeholder="you@example.com"
+                              value={forgotEmail}
+                              onChange={(e) => setForgotEmail(e.target.value)}
+                              className="pl-10 h-12 bg-muted/30 border-border/50 focus:border-primary"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <Button
+                          className="w-full bg-gradient-to-r from-primary to-orange-500 hover:opacity-90 text-white font-semibold h-12"
+                          disabled={isSubmitting || !forgotEmail}
+                          onClick={async () => {
+                            setIsSubmitting(true);
+                            const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+                              redirectTo: `${window.location.origin}/auth`,
+                            });
+                            setIsSubmitting(false);
+                            if (error) {
+                              toast({ variant: 'destructive', title: 'Error', description: error.message });
+                            } else {
+                              setResetSent(true);
+                              toast({ title: 'Email sent', description: 'Check your inbox for password reset instructions.' });
+                            }
+                          }}
+                        >
+                          {isSubmitting ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Sending...
+                            </>
+                          ) : (
+                            'Send Reset Link'
+                          )}
+                        </Button>
+                      </>
+                    ) : (
+                      <div className="text-center p-4 bg-primary/5 rounded-lg">
+                        <p className="text-sm text-foreground">
+                          ✅ Reset link sent! Check your email inbox.
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Link expires in 15 minutes
+                        </p>
+                      </div>
+                    )}
+
+                    <Button
+                      variant="ghost"
+                      className="w-full text-muted-foreground"
+                      onClick={() => { setAuthMode('login'); setResetSent(false); setForgotEmail(''); }}
+                    >
+                      Back to Login
+                    </Button>
+                  </motion.div>
+                ) : (
                  /* Sign Up Form */
                  <motion.form
                    key="signup"

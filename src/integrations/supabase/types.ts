@@ -1826,6 +1826,51 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_attempt_log: {
+        Row: {
+          amount: number
+          attempt_number: number | null
+          created_at: string
+          device_info: Json | null
+          error_message: string | null
+          id: string
+          ip_address: string | null
+          payment_method: string
+          product_id: string | null
+          product_name: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          attempt_number?: number | null
+          created_at?: string
+          device_info?: Json | null
+          error_message?: string | null
+          id?: string
+          ip_address?: string | null
+          payment_method: string
+          product_id?: string | null
+          product_name?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          attempt_number?: number | null
+          created_at?: string
+          device_info?: Json | null
+          error_message?: string | null
+          id?: string
+          ip_address?: string | null
+          payment_method?: string
+          product_id?: string | null
+          product_name?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       permissions: {
         Row: {
           action: string

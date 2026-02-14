@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { MarketplaceHeader } from '@/components/marketplace/MarketplaceHeader';
 import { ProductSlider } from '@/components/marketplace/ProductSlider';
@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { useApkPurchase } from '@/hooks/useApkPurchase';
 import { useFraudDetection } from '@/hooks/useFraudDetection';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import saasValaBanner from '@/assets/saas-vala-banner.jpg';
 import {
   Dialog,
@@ -17,7 +18,11 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, Download, ShoppingCart, CreditCard, AlertTriangle, Shield } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { 
+  CheckCircle2, Download, ShoppingCart, CreditCard, AlertTriangle, Shield,
+  Wallet, Loader2, ChevronDown, ChevronUp
+} from 'lucide-react';
 
 interface Product {
   id: string;
@@ -34,9 +39,36 @@ export default function Marketplace() {
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [generatedLicenseKey, setGeneratedLicenseKey] = useState<string>('');
   const [_transactionId, setTransactionId] = useState<string>('');
+  const [showMorePayment, setShowMorePayment] = useState(false);
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+  const paymentLockRef = useRef(false);
   const { purchaseApk, processing } = useApkPurchase();
   const { checkUserStatus } = useFraudDetection();
   const { user } = useAuth();
+
+  const logPaymentAttempt = async (
+    product: Product, 
+    method: string, 
+    status: string, 
+    attempt: number = 1,
+    errorMsg?: string
+  ) => {
+    if (!user) return;
+    try {
+      await supabase.from('payment_attempt_log').insert({
+        user_id: user.id,
+        product_id: product.id,
+        product_name: product.title,
+        amount: product.price,
+        payment_method: method,
+        status,
+        attempt_number: attempt,
+        error_message: errorMsg || null,
+      });
+    } catch (e) {
+      console.error('Failed to log payment attempt:', e);
+    }
+  };
 
   const handleBuyNow = async (product: Product) => {
     if (!user) {
@@ -44,7 +76,6 @@ export default function Marketplace() {
       return;
     }
     
-    // Check if user is blocked before showing payment dialog
     const fraudStatus = await checkUserStatus(user.id, user.email || '');
     if (fraudStatus.isBlocked) {
       toast.error(fraudStatus.message);
@@ -56,10 +87,19 @@ export default function Marketplace() {
     setPaymentSuccess(false);
     setGeneratedLicenseKey('');
     setTransactionId('');
+    setShowMorePayment(false);
+    setPaymentSubmitting(false);
+    paymentLockRef.current = false;
   };
 
   const handlePayment = async () => {
-    if (!selectedProduct) return;
+    if (!selectedProduct || paymentLockRef.current) return;
+    
+    // Double-submit prevention
+    paymentLockRef.current = true;
+    setPaymentSubmitting(true);
+
+    await logPaymentAttempt(selectedProduct, 'wallet', 'initiated');
     
     const result = await purchaseApk(selectedProduct);
     
@@ -67,10 +107,16 @@ export default function Marketplace() {
       setPaymentSuccess(true);
       setGeneratedLicenseKey(result.licenseKey || '');
       setTransactionId(result.transactionId || '');
-      toast.success('🎉 Payment successful! Your Transaction ID is your License Key.');
+      await logPaymentAttempt(selectedProduct, 'wallet', 'completed');
+      toast.success('🎉 Payment successful!');
     } else {
+      await logPaymentAttempt(selectedProduct, 'wallet', 'failed', 1, result.error);
       toast.error(result.error || 'Payment failed');
+      // Allow retry
+      paymentLockRef.current = false;
     }
+    
+    setPaymentSubmitting(false);
   };
 
   const handleFavorite = (product: Product) => {
@@ -81,21 +127,20 @@ export default function Marketplace() {
     toast.success(`You'll be notified when ${product.title} launches`);
   };
 
-   const handleDownloadApk = (product: Product) => {
-     if (!user) {
-       toast.error('Please sign in to download APK');
-       return;
-     }
-     // Check wallet → Pay $5 → Download APK → Auto attach license
-     handleBuyNow(product);
-   };
- 
+  const handleDownloadApk = (product: Product) => {
+    if (!user) {
+      toast.error('Please sign in to download APK');
+      return;
+    }
+    handleBuyNow(product);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Fixed Header */}
       <MarketplaceHeader />
 
-      {/* Main Content - with top padding for fixed header */}
+      {/* Main Content */}
       <main className="pt-20 pb-8">
         {/* Hero Banner */}
         <motion.div 
@@ -112,81 +157,81 @@ export default function Marketplace() {
           </div>
         </motion.div>
 
-         {/* Row 1: Most Used / Daily Business Software */}
-         <motion.div
-           initial={{ opacity: 0, y: 20 }}
-           animate={{ opacity: 1, y: 0 }}
-           transition={{ delay: 0.1 }}
-         >
-           <ProductSlider
-              title="🔥 TOP SOFTWARE ROW 1"
-              products={row1Software}
-             onBuyNow={handleBuyNow}
-             onFavorite={handleFavorite}
-             onNotify={handleNotify}
-             onDownloadApk={handleDownloadApk}
-             showTechStack={true}
-           />
-         </motion.div>
- 
-          {/* Row 2 */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <ProductSlider
-              title="⚡ TOP SOFTWARE ROW 2"
-              products={row2Software}
-              onBuyNow={handleBuyNow}
-              onFavorite={handleFavorite}
-              onNotify={handleNotify}
-              onDownloadApk={handleDownloadApk}
-              showTechStack={true}
-            />
-          </motion.div>
- 
-          {/* Row 3 */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            <ProductSlider
-              title="💼 TOP SOFTWARE ROW 3"
-              products={row3Software}
-              onBuyNow={handleBuyNow}
-              onFavorite={handleFavorite}
-              onNotify={handleNotify}
-              onDownloadApk={handleDownloadApk}
-              showTechStack={true}
-            />
-          </motion.div>
- 
-          {/* Row 4 */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-          >
-            <ProductSlider
-              title="🚀 TOP SOFTWARE ROW 4"
-              products={row4Software}
-              onBuyNow={handleBuyNow}
-              onFavorite={handleFavorite}
-              onNotify={handleNotify}
-              onDownloadApk={handleDownloadApk}
-              showTechStack={true}
-            />
-          </motion.div>
- 
-        {/* Category Rows - All 29 categories */}
+        {/* Row 1 */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <ProductSlider
+            title="🔥 TOP SOFTWARE ROW 1"
+            products={row1Software}
+            onBuyNow={handleBuyNow}
+            onFavorite={handleFavorite}
+            onNotify={handleNotify}
+            onDownloadApk={handleDownloadApk}
+            showTechStack={true}
+          />
+        </motion.div>
+
+        {/* Row 2 */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <ProductSlider
+            title="⚡ TOP SOFTWARE ROW 2"
+            products={row2Software}
+            onBuyNow={handleBuyNow}
+            onFavorite={handleFavorite}
+            onNotify={handleNotify}
+            onDownloadApk={handleDownloadApk}
+            showTechStack={true}
+          />
+        </motion.div>
+
+        {/* Row 3 */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <ProductSlider
+            title="💼 TOP SOFTWARE ROW 3"
+            products={row3Software}
+            onBuyNow={handleBuyNow}
+            onFavorite={handleFavorite}
+            onNotify={handleNotify}
+            onDownloadApk={handleDownloadApk}
+            showTechStack={true}
+          />
+        </motion.div>
+
+        {/* Row 4 */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <ProductSlider
+            title="🚀 TOP SOFTWARE ROW 4"
+            products={row4Software}
+            onBuyNow={handleBuyNow}
+            onFavorite={handleFavorite}
+            onNotify={handleNotify}
+            onDownloadApk={handleDownloadApk}
+            showTechStack={true}
+          />
+        </motion.div>
+
+        {/* Category Rows */}
         {categories.map((category, index) => (
           <motion.div
             key={category.id}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-             transition={{ delay: (index + 1) * 0.05 }}
+            transition={{ delay: (index + 1) * 0.05 }}
           >
             <ProductSlider
               title={`${category.icon} ${category.title}`}
@@ -206,86 +251,131 @@ export default function Marketplace() {
         </p>
       </footer>
 
-      {/* Payment Dialog */}
+      {/* Simplified Payment Dialog — No nested scroll, single vertical layout */}
       {showPayment && (
-        <Dialog open={showPayment} onOpenChange={setShowPayment}>
-          <DialogContent className="sm:max-w-md">
+        <Dialog open={showPayment} onOpenChange={(open) => {
+          if (!paymentSubmitting) {
+            setShowPayment(open);
+            paymentLockRef.current = false;
+          }
+        }}>
+          <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
             {!paymentSuccess ? (
               <div className="space-y-4">
                 <DialogHeader>
                   <DialogTitle className="flex items-center gap-2">
-                    <CreditCard className="h-5 w-5 text-primary" />
+                    <ShoppingCart className="h-5 w-5 text-primary" />
                     Complete Purchase
                   </DialogTitle>
                   <DialogDescription>
-                    You're about to purchase {selectedProduct?.title}
+                    Purchase {selectedProduct?.title}
                   </DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-4 py-4">
-                  {/* Product Summary */}
-                  <div className="flex gap-4 p-4 bg-muted/50 rounded-lg">
-                    <img
-                      src={selectedProduct?.image}
-                      alt={selectedProduct?.title}
-                      className="w-20 h-20 rounded-lg object-cover"
-                    />
-                    <div>
-                      <h3 className="font-semibold">{selectedProduct?.title}</h3>
-                      <p className="text-sm text-muted-foreground">{selectedProduct?.subtitle}</p>
-                      <p className="text-lg font-bold text-primary mt-1">
-                        ${selectedProduct?.price.toLocaleString()}
-                      </p>
-                    </div>
+                {/* Product Summary */}
+                <div className="flex gap-4 p-4 bg-muted/50 rounded-lg">
+                  <img
+                    src={selectedProduct?.image}
+                    alt={selectedProduct?.title}
+                    className="w-16 h-16 rounded-lg object-cover"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-sm truncate">{selectedProduct?.title}</h3>
+                    <p className="text-xs text-muted-foreground truncate">{selectedProduct?.subtitle}</p>
+                    <p className="text-lg font-bold text-primary mt-1">
+                      ${selectedProduct?.price.toLocaleString()}
+                    </p>
                   </div>
+                </div>
 
-                  {/* Transaction = License Key Info */}
-                  <div className="p-3 bg-primary/10 border border-primary/20 rounded-lg">
-                    <div className="flex items-center gap-2 text-primary text-sm font-medium">
-                      <Shield className="h-4 w-4" />
-                      Transaction ID = License Key
+                {/* Primary: Wallet Balance (UPI-style instant) */}
+                <div className="space-y-3">
+                  <div className="p-3 rounded-lg border-2 border-primary bg-primary/5">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Wallet className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">Wallet Balance</span>
+                      <Badge className="ml-auto bg-primary/10 text-primary border-primary/20 text-[10px]">
+                        Instant
+                      </Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Your payment Transaction ID becomes your software license key automatically
+                    <p className="text-xs text-muted-foreground">
+                      Deduct directly from your wallet — fastest checkout
                     </p>
                   </div>
 
-                  {/* Fraud Warning */}
-                  <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-                    <div className="flex items-center gap-2 text-destructive text-sm font-medium">
-                      <AlertTriangle className="h-4 w-4" />
-                      Fraud Protection Active
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      1st violation: $2 fine | 2nd: $5 fine | 3rd: Permanent block
-                    </p>
-                  </div>
-
-                  {/* Payment Options */}
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">Pay using:</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button variant="outline" size="sm">Wallet Balance</Button>
-                      <Button variant="outline" size="sm">UPI</Button>
-                      <Button variant="outline" size="sm">Card</Button>
-                      <Button variant="outline" size="sm">Net Banking</Button>
-                    </div>
-                  </div>
-
+                  {/* Pay Button — Disabled after first click */}
                   <Button 
-                    className="w-full gap-2" 
+                    className="w-full gap-2 h-12" 
                     onClick={handlePayment}
-                    disabled={processing}
+                    disabled={paymentSubmitting || processing}
                   >
-                    {processing ? (
-                      <>Processing...</>
+                    {paymentSubmitting || processing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Processing... Do not close
+                      </>
                     ) : (
                       <>
                         <ShoppingCart className="h-4 w-4" />
-                        Pay ${selectedProduct?.price.toLocaleString()}
+                        Pay ${selectedProduct?.price.toLocaleString()} from Wallet
                       </>
                     )}
                   </Button>
+
+                  {/* More Payment Options — Expandable */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full gap-2 text-muted-foreground"
+                    onClick={() => setShowMorePayment(!showMorePayment)}
+                    disabled={paymentSubmitting}
+                  >
+                    {showMorePayment ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                    More Payment Options
+                  </Button>
+
+                  {showMorePayment && (
+                    <motion.div 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      className="space-y-2"
+                    >
+                      <Button variant="outline" size="sm" className="w-full justify-start gap-2" disabled>
+                        <CreditCard className="h-4 w-4" /> Card Payment
+                        <Badge variant="outline" className="ml-auto text-[10px]">Coming Soon</Badge>
+                      </Button>
+                      <Button variant="outline" size="sm" className="w-full justify-start gap-2" disabled>
+                        <Wallet className="h-4 w-4" /> UPI
+                        <Badge variant="outline" className="ml-auto text-[10px]">Coming Soon</Badge>
+                      </Button>
+                      <Button variant="outline" size="sm" className="w-full justify-start gap-2" disabled>
+                        <CreditCard className="h-4 w-4" /> Net Banking
+                        <Badge variant="outline" className="ml-auto text-[10px]">Coming Soon</Badge>
+                      </Button>
+                    </motion.div>
+                  )}
+                </div>
+
+                {/* Transaction = License Key Info */}
+                <div className="p-3 bg-primary/5 border border-primary/10 rounded-lg">
+                  <div className="flex items-center gap-2 text-primary text-xs font-medium">
+                    <Shield className="h-3.5 w-3.5" />
+                    Transaction ID = License Key
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Your payment Transaction ID becomes your software license key automatically
+                  </p>
+                </div>
+
+                {/* Fraud Warning */}
+                <div className="p-3 bg-destructive/5 border border-destructive/10 rounded-lg">
+                  <div className="flex items-center gap-2 text-destructive text-xs font-medium">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Fraud Protection Active
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    1st violation: $2 fine | 2nd: $5 fine | 3rd: Permanent block
+                  </p>
                 </div>
               </div>
             ) : (
@@ -306,10 +396,10 @@ export default function Marketplace() {
                     <p className="text-sm text-muted-foreground">Transaction ID = License Key</p>
                     {generatedLicenseKey && (
                       <div className="mt-3 p-3 bg-muted rounded-lg">
-                        <p className="text-xs text-muted-foreground mb-1">Your License Key (Transaction ID):</p>
+                        <p className="text-xs text-muted-foreground mb-1">Your License Key:</p>
                         <p className="font-mono font-bold text-primary text-lg">{generatedLicenseKey}</p>
                         <p className="text-xs text-muted-foreground mt-2">
-                          ⚠️ Save this key - It's your proof of purchase and software activation key
+                          ⚠️ Save this key - proof of purchase & activation key
                         </p>
                       </div>
                     )}

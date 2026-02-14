@@ -1,9 +1,9 @@
 import { Button } from '@/components/ui/button';
 import { 
-  Wallet, 
   User, 
   Globe,
-  ChevronDown
+  ChevronDown,
+  LogIn,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 import saasValaLogo from '@/assets/saas-vala-logo.jpg';
 
 const languages = [
@@ -22,8 +23,16 @@ const languages = [
   { code: 'zh', name: '中文', flag: '🇨🇳' },
 ];
 
+const navLinks = [
+  { label: 'Marketplace', href: '/' },
+  { label: 'Pricing', href: '/#pricing' },
+  { label: 'Demo', href: '/#demo' },
+  { label: 'Contact', href: '/#contact' },
+];
+
 export function MarketplaceHeader() {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-background/95 backdrop-blur-md border-b border-border">
@@ -31,7 +40,7 @@ export function MarketplaceHeader() {
         {/* Left - Logo */}
         <div 
           className="flex items-center gap-3 cursor-pointer"
-          onClick={() => navigate('/marketplace')}
+          onClick={() => navigate('/')}
         >
           <img 
             src={saasValaLogo} 
@@ -43,10 +52,18 @@ export function MarketplaceHeader() {
           </span>
         </div>
 
-        {/* Center - Title */}
-        <h1 className="absolute left-1/2 -translate-x-1/2 font-display font-semibold text-foreground text-sm md:text-base">
-          ALL SOFTWARE
-        </h1>
+        {/* Center - Nav Links */}
+        <nav className="hidden md:flex items-center gap-6">
+          {navLinks.map((link) => (
+            <button
+              key={link.label}
+              onClick={() => navigate(link.href)}
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {link.label}
+            </button>
+          ))}
+        </nav>
 
         {/* Right - Actions */}
         <div className="flex items-center gap-2">
@@ -69,25 +86,26 @@ export function MarketplaceHeader() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Wallet */}
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="gap-1 px-2"
-            onClick={() => navigate('/wallet')}
-          >
-            <Wallet className="h-4 w-4" />
-            <span className="hidden sm:inline text-xs font-medium">₹0</span>
-          </Button>
-
-          {/* Profile */}
-          <Button 
-            variant="ghost" 
-            size="icon"
-            onClick={() => navigate('/settings')}
-          >
-            <User className="h-4 w-4" />
-          </Button>
+          {/* Login / Profile */}
+          {user ? (
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => navigate('/dashboard')}
+            >
+              <User className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="gap-1.5"
+              onClick={() => navigate('/auth')}
+            >
+              <LogIn className="h-4 w-4" />
+              <span className="hidden sm:inline">Login</span>
+            </Button>
+          )}
         </div>
       </div>
     </header>

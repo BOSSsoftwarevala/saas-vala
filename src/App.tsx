@@ -79,28 +79,16 @@ function AppRoutes() {
       {/* Auth route */}
       <Route path="/auth" element={<Auth />} />
 
+      {/* Public routes - no auth required */}
+      <Route path="/" element={<Marketplace />} />
+      <Route path="/marketplace" element={<Marketplace />} />
+
       {/* Protected routes */}
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <Marketplace />
-          </ProtectedRoute>
-        }
-      />
       <Route
         path="/dashboard"
         element={
           <ProtectedRoute>
             <Dashboard />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/marketplace"
-        element={
-          <ProtectedRoute>
-            <Marketplace />
           </ProtectedRoute>
         }
       />
