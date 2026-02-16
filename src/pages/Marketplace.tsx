@@ -2,8 +2,8 @@ import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { MarketplaceHeader } from '@/components/marketplace/MarketplaceHeader';
 import { ProductSlider } from '@/components/marketplace/ProductSlider';
-import { categories, generateProducts } from '@/data/marketplaceData';
 import { row1Software, row2Software, row3Software, row4Software } from '@/data/topSoftwareData';
+import { useMarketplaceProducts } from '@/hooks/useMarketplaceProducts';
 import { toast } from 'sonner';
 import { useApkPurchase } from '@/hooks/useApkPurchase';
 import { useFraudDetection } from '@/hooks/useFraudDetection';
@@ -45,6 +45,7 @@ export default function Marketplace() {
   const { purchaseApk, processing } = useApkPurchase();
   const { checkUserStatus } = useFraudDetection();
   const { user } = useAuth();
+  const { allRows, loading: dbLoading, totalCount } = useMarketplaceProducts();
 
   const logPaymentAttempt = async (
     product: Product, 
@@ -225,20 +226,22 @@ export default function Marketplace() {
           />
         </motion.div>
 
-        {/* Category Rows */}
-        {categories.map((category, index) => (
+        {/* Database Product Rows — Real 503+ products from GitHub */}
+        {allRows.map((row, rowIndex) => (
           <motion.div
-            key={category.id}
+            key={`db-row-${rowIndex}`}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: (index + 1) * 0.05 }}
+            transition={{ delay: (rowIndex + 5) * 0.05 }}
           >
             <ProductSlider
-              title={`${category.icon} ${category.title}`}
-              products={generateProducts(category.id, 10)}
+              title={`📦 SOFTWARE CATALOG ROW ${rowIndex + 1}`}
+              products={row}
               onBuyNow={handleBuyNow}
               onFavorite={handleFavorite}
               onNotify={handleNotify}
+              onDownloadApk={handleDownloadApk}
+              showTechStack={true}
             />
           </motion.div>
         ))}

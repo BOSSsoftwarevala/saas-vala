@@ -7,7 +7,7 @@
  import { Card, CardContent } from '@/components/ui/card';
  import { Checkbox } from '@/components/ui/checkbox';
  import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
- import { Loader2, Mail, Lock, User, Eye, EyeOff, KeyRound } from 'lucide-react';
+ import { Loader2, Mail, Lock, User, Eye, EyeOff, KeyRound, Store } from 'lucide-react';
  import { supabase } from '@/integrations/supabase/client';
  import { useToast } from '@/hooks/use-toast';
  import { z } from 'zod';
@@ -52,8 +52,9 @@ export default function Auth() {
    const [signupFullName, setSignupFullName] = useState('');
    const [signupEmail, setSignupEmail] = useState('');
    const [signupPassword, setSignupPassword] = useState('');
-   const [signupConfirmPassword, setSignupConfirmPassword] = useState('');
-   const [signupErrors, setSignupErrors] = useState<Record<string, string>>({});
+    const [signupConfirmPassword, setSignupConfirmPassword] = useState('');
+    const [signupRole, setSignupRole] = useState<'user' | 'reseller'>('user');
+    const [signupErrors, setSignupErrors] = useState<Record<string, string>>({});
  
    // Redirect based on role after login
    useEffect(() => {
@@ -146,8 +147,8 @@ export default function Auth() {
        return;
      }
  
-     setIsSubmitting(true);
-     const { error } = await signUp(signupEmail, signupPassword, signupFullName);
+      setIsSubmitting(true);
+      const { error } = await signUp(signupEmail, signupPassword, signupFullName, signupRole === 'reseller' ? 'reseller' : undefined);
      setIsSubmitting(false);
  
      if (error) {
@@ -487,8 +488,41 @@ export default function Auth() {
                          required
                        />
                      </div>
-                     {signupErrors.fullName && <p className="text-sm text-destructive">{signupErrors.fullName}</p>}
-                   </div>
+                    {signupErrors.fullName && <p className="text-sm text-destructive">{signupErrors.fullName}</p>}
+                    </div>
+
+                    {/* Role Selector */}
+                    <div className="space-y-2">
+                      <Label className="text-foreground text-sm">I want to join as</Label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setSignupRole('user')}
+                          className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${
+                            signupRole === 'user' 
+                              ? 'border-primary bg-primary/10 text-foreground' 
+                              : 'border-border bg-muted/30 text-muted-foreground hover:border-primary/50'
+                          }`}
+                        >
+                          <User className="h-5 w-5" />
+                          <span className="text-xs font-semibold">USER</span>
+                          <span className="text-[10px] text-muted-foreground">Buy & Download Software</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSignupRole('reseller')}
+                          className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${
+                            signupRole === 'reseller' 
+                              ? 'border-primary bg-primary/10 text-foreground' 
+                              : 'border-border bg-muted/30 text-muted-foreground hover:border-primary/50'
+                          }`}
+                        >
+                          <Store className="h-5 w-5" />
+                          <span className="text-xs font-semibold">RESELLER</span>
+                          <span className="text-[10px] text-muted-foreground">Sell & Earn Commission</span>
+                        </button>
+                      </div>
+                    </div>
  
                    {/* Email */}
                    <div className="space-y-2">
