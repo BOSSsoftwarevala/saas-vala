@@ -35,3 +35,9 @@ verify_jwt = false
 
 [functions.auto-monitor]
 verify_jwt = false
+
+[functions.download-apk]
+verify_jwt = false
+
+[functions.verify-license]
+verify_jwt = false

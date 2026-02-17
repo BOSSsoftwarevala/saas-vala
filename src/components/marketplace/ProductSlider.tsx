@@ -19,7 +19,8 @@ interface Product {
   features?: string[] | { icon: string; text: string }[];
   originalPrice?: number;
   discount?: number;
-   techStack?: string[];
+  techStack?: string[];
+  apkUrl?: string;
 }
 
 interface ProductSliderProps {
@@ -266,7 +267,7 @@ export function ProductSlider({ title, products, onBuyNow, onFavorite, onNotify,
                         </>
                       ) : (
                         <>
-                           {showTechStack && (
+                           {showTechStack && product.apkUrl && (
                              <Button 
                                variant="outline"
                                size="sm"

@@ -11,6 +11,7 @@ export interface MarketplaceProduct {
   features: { icon: string; text: string }[];
   techStack: string[];
   gitRepoUrl?: string;
+  apkUrl?: string;
 }
 
 // Business stock images for product cards
@@ -63,6 +64,7 @@ function mapDbProduct(product: any, index: number): MarketplaceProduct {
     features,
     techStack: defaultTechStack,
     gitRepoUrl: product.git_repo_url,
+    apkUrl: product.apk_url || undefined,
   };
 }
 
@@ -75,7 +77,7 @@ export function useMarketplaceProducts() {
       setLoading(true);
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, slug, description, price, status, features, thumbnail_url, git_repo_url, marketplace_visible')
+        .select('id, name, slug, description, price, status, features, thumbnail_url, git_repo_url, marketplace_visible, apk_url')
         .eq('marketplace_visible', true)
         .eq('status', 'active')
         .order('created_at', { ascending: false });

@@ -360,6 +360,47 @@ export type Database = {
           },
         ]
       }
+      apk_download_logs: {
+        Row: {
+          created_at: string
+          device_id: string | null
+          download_ip: string | null
+          id: string
+          license_key: string
+          product_id: string
+          signed_url_expires_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_id?: string | null
+          download_ip?: string | null
+          id?: string
+          license_key: string
+          product_id: string
+          signed_url_expires_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_id?: string | null
+          download_ip?: string | null
+          id?: string
+          license_key?: string
+          product_id?: string
+          signed_url_expires_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apk_download_logs_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       apk_downloads: {
         Row: {
           blocked_reason: string | null
@@ -1585,6 +1626,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      license_verification_logs: {
+        Row: {
+          app_signature: string | null
+          created_at: string
+          device_id: string | null
+          id: string
+          ip_address: string | null
+          license_key: string
+          reason: string | null
+          result: string
+          user_id: string | null
+        }
+        Insert: {
+          app_signature?: string | null
+          created_at?: string
+          device_id?: string | null
+          id?: string
+          ip_address?: string | null
+          license_key: string
+          reason?: string | null
+          result: string
+          user_id?: string | null
+        }
+        Update: {
+          app_signature?: string | null
+          created_at?: string
+          device_id?: string | null
+          id?: string
+          ip_address?: string | null
+          license_key?: string
+          reason?: string | null
+          result?: string
+          user_id?: string | null
+        }
+        Relationships: []
       }
       marketplace_listings: {
         Row: {
