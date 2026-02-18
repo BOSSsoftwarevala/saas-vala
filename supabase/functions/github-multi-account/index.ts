@@ -518,6 +518,135 @@ Deno.serve(async (req) => {
         );
       }
 
+      // ============= SYNC REAL REPOS → PRODUCTS =============
+      case "sync_to_products": {
+        const results: { name: string; account: string; status: string; id?: string }[] = [];
+
+        for (const account of accounts) {
+          const repos = await fetchAllRepos(account);
+
+          for (const repo of repos) {
+            const slug = repo.name
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "-")
+              .replace(/^-|-$/g, "");
+
+            const productName = repo.name
+              .replace(/[-_]/g, " ")
+              .replace(/\b\w/g, (c: string) => c.toUpperCase());
+
+            const { data: existing } = await supabase
+              .from("products")
+              .select("id")
+              .eq("slug", slug)
+              .maybeSingle();
+
+            if (existing) {
+              // Update git_repo_url if changed
+              await supabase
+                .from("products")
+                .update({
+                  git_repo_url: repo.html_url,
+                  description: repo.description || productName,
+                })
+                .eq("id", existing.id);
+              results.push({ name: repo.name, account: account.name, status: "updated", id: existing.id });
+            } else {
+              const { data: inserted, error } = await supabase
+                .from("products")
+                .insert({
+                  name: productName,
+                  slug,
+                  description: repo.description || `${productName} - ${account.name}`,
+                  base_price: 5,
+                  price: 5,
+                  currency: "USD",
+                  product_type: "software",
+                  status: "active",
+                  marketplace_visible: true,
+                  git_repo_url: repo.html_url,
+                  features: [
+                    { icon: "Code2", text: repo.language || "Custom" },
+                    { icon: "GitBranch", text: `Branch: ${repo.default_branch}` },
+                    { icon: "Star", text: `Stars: ${repo.stargazers_count}` },
+                    { icon: "Key", text: "License Key Included" },
+                    { icon: "Download", text: "APK Available" },
+                  ],
+                })
+                .select("id")
+                .single();
+
+              if (error) {
+                results.push({ name: repo.name, account: account.name, status: `error: ${error.message}` });
+              } else {
+                results.push({ name: repo.name, account: account.name, status: "inserted", id: inserted?.id });
+              }
+            }
+          }
+        }
+
+        const inserted = results.filter(r => r.status === "inserted").length;
+        const updated = results.filter(r => r.status === "updated").length;
+        const errors = results.filter(r => r.status.startsWith("error")).length;
+
+        return new Response(
+          JSON.stringify({ success: true, inserted, updated, errors, total: results.length, results: results.slice(0, 50) }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // ============= ADD SINGLE PRODUCT MANUALLY =============
+      case "add_manual_product": {
+        const { name, description, gitUrl, apkUrl, price = 5, language } = data || {};
+
+        if (!name) {
+          return new Response(
+            JSON.stringify({ success: false, error: "Product name required" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const slug = name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "");
+
+        const { data: inserted, error } = await supabase
+          .from("products")
+          .insert({
+            name,
+            slug,
+            description: description || name,
+            base_price: Number(price),
+            price: Number(price),
+            currency: "USD",
+            product_type: "software",
+            status: "active",
+            marketplace_visible: true,
+            git_repo_url: gitUrl || null,
+            apk_url: apkUrl || null,
+            features: [
+              { icon: "Code2", text: language || "Custom" },
+              { icon: "Key", text: "License Key Included" },
+              { icon: "Download", text: "APK Available" },
+            ],
+          })
+          .select("id, name, slug")
+          .single();
+
+        if (error) {
+          return new Response(
+            JSON.stringify({ success: false, error: error.message }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, product: inserted }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       default:
         return new Response(
           JSON.stringify({ error: "Unknown action" }),

@@ -2,8 +2,9 @@ import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { MarketplaceHeader } from '@/components/marketplace/MarketplaceHeader';
 import { ProductSlider } from '@/components/marketplace/ProductSlider';
-import { row1Software, row2Software, row3Software, row4Software } from '@/data/topSoftwareData';
+
 import { useMarketplaceProducts } from '@/hooks/useMarketplaceProducts';
+import { AdminProductManager } from '@/components/marketplace/AdminProductManager';
 import { toast } from 'sonner';
 import { useApkPurchase } from '@/hooks/useApkPurchase';
 import { useFraudDetection } from '@/hooks/useFraudDetection';
@@ -42,10 +43,10 @@ export default function Marketplace() {
   const [showMorePayment, setShowMorePayment] = useState(false);
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const paymentLockRef = useRef(false);
-  const { purchaseApk, processing } = useApkPurchase();
+  const { purchaseApk } = useApkPurchase();
   const { checkUserStatus } = useFraudDetection();
   const { user } = useAuth();
-  const { allRows, loading: dbLoading, totalCount } = useMarketplaceProducts();
+  const { allRows, loading: dbLoading } = useMarketplaceProducts();
 
   const logPaymentAttempt = async (
     product: Product, 
@@ -158,84 +159,35 @@ export default function Marketplace() {
           </div>
         </motion.div>
 
-        {/* Row 1 */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <ProductSlider
-            title="🔥 TOP SOFTWARE ROW 1"
-            products={row1Software}
-            onBuyNow={handleBuyNow}
-            onFavorite={handleFavorite}
-            onNotify={handleNotify}
-            onDownloadApk={handleDownloadApk}
-            showTechStack={true}
-          />
-        </motion.div>
+        {/* Admin Product Manager — visible to logged-in users (super_admin sees full controls) */}
+        <AdminProductManager />
 
-        {/* Row 2 */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <ProductSlider
-            title="⚡ TOP SOFTWARE ROW 2"
-            products={row2Software}
-            onBuyNow={handleBuyNow}
-            onFavorite={handleFavorite}
-            onNotify={handleNotify}
-            onDownloadApk={handleDownloadApk}
-            showTechStack={true}
-          />
-        </motion.div>
+        {/* Database Product Rows — Real products from GitHub */}
+        {allRows.length === 0 && !dbLoading && (
+          <div className="px-4 md:px-8 py-16 text-center">
+            <p className="text-muted-foreground text-lg mb-2">No products yet.</p>
+            <p className="text-sm text-muted-foreground">
+              Use <strong>Admin: Manage Products → GitHub Sync</strong> above to import real repos from SaaSVala & SoftwareVala.
+            </p>
+          </div>
+        )}
 
-        {/* Row 3 */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <ProductSlider
-            title="💼 TOP SOFTWARE ROW 3"
-            products={row3Software}
-            onBuyNow={handleBuyNow}
-            onFavorite={handleFavorite}
-            onNotify={handleNotify}
-            onDownloadApk={handleDownloadApk}
-            showTechStack={true}
-          />
-        </motion.div>
+        {dbLoading && (
+          <div className="px-4 md:px-8 py-8 flex items-center justify-center gap-3">
+            <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <span className="text-muted-foreground text-sm">Loading products...</span>
+          </div>
+        )}
 
-        {/* Row 4 */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <ProductSlider
-            title="🚀 TOP SOFTWARE ROW 4"
-            products={row4Software}
-            onBuyNow={handleBuyNow}
-            onFavorite={handleFavorite}
-            onNotify={handleNotify}
-            onDownloadApk={handleDownloadApk}
-            showTechStack={true}
-          />
-        </motion.div>
-
-        {/* Database Product Rows — Real 503+ products from GitHub */}
         {allRows.map((row, rowIndex) => (
           <motion.div
             key={`db-row-${rowIndex}`}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: (rowIndex + 5) * 0.05 }}
+            transition={{ delay: (rowIndex) * 0.05 }}
           >
             <ProductSlider
-              title={`📦 SOFTWARE CATALOG ROW ${rowIndex + 1}`}
+              title={rowIndex === 0 ? '🔥 TOP SOFTWARE' : rowIndex === 1 ? '⚡ FEATURED' : `📦 SOFTWARE CATALOG ${rowIndex + 1}`}
               products={row}
               onBuyNow={handleBuyNow}
               onFavorite={handleFavorite}
@@ -310,9 +262,9 @@ export default function Marketplace() {
                   <Button 
                     className="w-full gap-2 h-12" 
                     onClick={handlePayment}
-                    disabled={paymentSubmitting || processing}
+                    disabled={paymentSubmitting}
                   >
-                    {paymentSubmitting || processing ? (
+                    {paymentSubmitting ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
                         Processing... Do not close
