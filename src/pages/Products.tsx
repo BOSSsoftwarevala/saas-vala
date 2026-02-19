@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -101,6 +102,7 @@ interface GitHubRepo {
 }
 
 export default function Products() {
+  const navigate = useNavigate();
   const { products, categories, loading, createProduct, updateProduct, deleteProduct, suspendProduct, activateProduct } = useProducts();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
@@ -280,7 +282,7 @@ export default function Products() {
               Import from Git
               {gitConnected && <CheckCircle2 className="h-3 w-3 text-success" />}
             </Button>
-            <Button onClick={openCreateDialog} className="bg-orange-gradient hover:opacity-90 text-white gap-2">
+            <Button onClick={() => navigate('/admin/add-product')} className="bg-orange-gradient hover:opacity-90 text-white gap-2">
               <Plus className="h-4 w-4" />
               Add Product
             </Button>

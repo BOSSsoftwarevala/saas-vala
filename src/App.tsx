@@ -32,6 +32,7 @@ import SystemHealth from "./pages/SystemHealth";
 import NotFound from "./pages/NotFound";
 import ResellerDashboard from "./pages/ResellerDashboard";
 import Automation from "./pages/Automation";
+import AddProduct from "./pages/AddProduct";
 
 const queryClient = new QueryClient();
 
@@ -242,6 +243,16 @@ function AppRoutes() {
           <ProtectedRoute>
             <AdminRoute>
               <Automation />
+            </AdminRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/add-product"
+        element={
+          <ProtectedRoute>
+            <AdminRoute>
+              <AddProduct />
             </AdminRoute>
           </ProtectedRoute>
         }

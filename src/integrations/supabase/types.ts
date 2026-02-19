@@ -2025,16 +2025,28 @@ export type Database = {
       }
       products: {
         Row: {
+          apk_file_size: number | null
           apk_url: string | null
+          apk_version_code: number | null
+          app_hash: string | null
           business_type: string | null
           category_id: string | null
           created_at: string | null
           created_by: string | null
           currency: string | null
+          deep_category: string | null
+          demo_click_count: number | null
+          demo_enabled: boolean | null
+          demo_login: string | null
+          demo_password: string | null
           demo_url: string | null
           deploy_status: string | null
           description: string | null
+          device_bind: boolean | null
+          device_limit: number | null
           download_count: number | null
+          expiry_type: string | null
+          featured: boolean | null
           features: Json | null
           git_default_branch: string | null
           git_repo_name: string | null
@@ -2042,31 +2054,61 @@ export type Database = {
           icon_path: string | null
           id: string
           is_apk: boolean | null
+          keywords_json: Json | null
+          license_enabled: boolean | null
           live_url: string | null
+          log_downloads: boolean | null
           marketplace_visible: boolean | null
           meta: Json | null
+          micro_category: string | null
           name: string
+          nano_category: string | null
+          package_name: string | null
           price: number | null
           product_code: string
+          require_payment: boolean | null
+          secure_download: boolean | null
+          seo_description: string | null
+          seo_title: string | null
           short_description: string | null
           slug: string
+          source_method: string | null
           status: Database["public"]["Enums"]["product_status"] | null
+          storage_path: string | null
+          sub_category: string | null
+          tags_json: Json | null
+          target_industry: string | null
+          tech_stack_json: Json | null
           thumbnail_url: string | null
+          trending: boolean | null
           updated_at: string | null
+          use_case: string | null
           version: string | null
           visibility: string | null
         }
         Insert: {
+          apk_file_size?: number | null
           apk_url?: string | null
+          apk_version_code?: number | null
+          app_hash?: string | null
           business_type?: string | null
           category_id?: string | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
+          deep_category?: string | null
+          demo_click_count?: number | null
+          demo_enabled?: boolean | null
+          demo_login?: string | null
+          demo_password?: string | null
           demo_url?: string | null
           deploy_status?: string | null
           description?: string | null
+          device_bind?: boolean | null
+          device_limit?: number | null
           download_count?: number | null
+          expiry_type?: string | null
+          featured?: boolean | null
           features?: Json | null
           git_default_branch?: string | null
           git_repo_name?: string | null
@@ -2074,31 +2116,61 @@ export type Database = {
           icon_path?: string | null
           id?: string
           is_apk?: boolean | null
+          keywords_json?: Json | null
+          license_enabled?: boolean | null
           live_url?: string | null
+          log_downloads?: boolean | null
           marketplace_visible?: boolean | null
           meta?: Json | null
+          micro_category?: string | null
           name: string
+          nano_category?: string | null
+          package_name?: string | null
           price?: number | null
           product_code?: string
+          require_payment?: boolean | null
+          secure_download?: boolean | null
+          seo_description?: string | null
+          seo_title?: string | null
           short_description?: string | null
           slug: string
+          source_method?: string | null
           status?: Database["public"]["Enums"]["product_status"] | null
+          storage_path?: string | null
+          sub_category?: string | null
+          tags_json?: Json | null
+          target_industry?: string | null
+          tech_stack_json?: Json | null
           thumbnail_url?: string | null
+          trending?: boolean | null
           updated_at?: string | null
+          use_case?: string | null
           version?: string | null
           visibility?: string | null
         }
         Update: {
+          apk_file_size?: number | null
           apk_url?: string | null
+          apk_version_code?: number | null
+          app_hash?: string | null
           business_type?: string | null
           category_id?: string | null
           created_at?: string | null
           created_by?: string | null
           currency?: string | null
+          deep_category?: string | null
+          demo_click_count?: number | null
+          demo_enabled?: boolean | null
+          demo_login?: string | null
+          demo_password?: string | null
           demo_url?: string | null
           deploy_status?: string | null
           description?: string | null
+          device_bind?: boolean | null
+          device_limit?: number | null
           download_count?: number | null
+          expiry_type?: string | null
+          featured?: boolean | null
           features?: Json | null
           git_default_branch?: string | null
           git_repo_name?: string | null
@@ -2106,17 +2178,35 @@ export type Database = {
           icon_path?: string | null
           id?: string
           is_apk?: boolean | null
+          keywords_json?: Json | null
+          license_enabled?: boolean | null
           live_url?: string | null
+          log_downloads?: boolean | null
           marketplace_visible?: boolean | null
           meta?: Json | null
+          micro_category?: string | null
           name?: string
+          nano_category?: string | null
+          package_name?: string | null
           price?: number | null
           product_code?: string
+          require_payment?: boolean | null
+          secure_download?: boolean | null
+          seo_description?: string | null
+          seo_title?: string | null
           short_description?: string | null
           slug?: string
+          source_method?: string | null
           status?: Database["public"]["Enums"]["product_status"] | null
+          storage_path?: string | null
+          sub_category?: string | null
+          tags_json?: Json | null
+          target_industry?: string | null
+          tech_stack_json?: Json | null
           thumbnail_url?: string | null
+          trending?: boolean | null
           updated_at?: string | null
+          use_case?: string | null
           version?: string | null
           visibility?: string | null
         }
