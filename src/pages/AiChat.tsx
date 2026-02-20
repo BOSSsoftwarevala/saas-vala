@@ -1,26 +1,39 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { ChatSidebar } from '@/components/ai-chat/ChatSidebar';
-import { ChatHeader } from '@/components/ai-chat/ChatHeader';
 import { ChatMessage, Message, FileAttachment } from '@/components/ai-chat/ChatMessage';
 import { ChatInput } from '@/components/ai-chat/ChatInput';
 import { ThinkingIndicator } from '@/components/ai-chat/ThinkingIndicator';
-import { AiStatusBar } from '@/components/ai-chat/AiStatusBar';
 import { ChatHistoryPanel } from '@/components/ai-chat/ChatHistoryPanel';
 import { ChatSearch } from '@/components/ai-chat/ChatSearch';
 import { KeyboardShortcuts, useKeyboardShortcuts } from '@/components/ai-chat/KeyboardShortcuts';
 import { MemoryPanel } from '@/components/ai-chat/MemoryPanel';
+import { ModelSelector } from '@/components/ai-chat/ModelSelector';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 import {
-  addGlobalActivity, 
-  updateGlobalActivity, 
-  removeGlobalActivity 
+  addGlobalActivity,
+  updateGlobalActivity,
+  removeGlobalActivity
 } from '@/components/global/GlobalActivityPanel';
 import { setGlobalWorking, WorkingDeveloperIndicator } from '@/components/global/WorkingDeveloperIndicator';
+import {
+  Plus,
+  Trash2,
+  MessageSquare,
+  ChevronRight,
+  Globe,
+  RefreshCw,
+  ExternalLink,
+  Brain,
+  Search,
+  PanelLeftClose,
+  PanelLeft,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
-// Use AI Developer for full-stack capabilities with tool calling
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-developer`;
 
 interface ChatSession {
@@ -30,23 +43,35 @@ interface ChatSession {
   messages: Message[];
 }
 
-
 const getFileType = (file: File): FileAttachment['type'] => {
   const ext = file.name.split('.').pop()?.toLowerCase() || '';
   const codeExts = ['js', 'ts', 'tsx', 'jsx', 'py', 'php', 'html', 'css', 'json', 'xml', 'md', 'txt', 'sql', 'java', 'kt', 'swift', 'go', 'rs', 'c', 'cpp'];
   const archiveExts = ['zip', 'rar', '7z', 'tar', 'gz', 'apk'];
-  
   if (file.type.startsWith('image/')) return 'image';
   if (codeExts.includes(ext)) return 'code';
   if (archiveExts.includes(ext)) return 'archive';
   return 'other';
 };
 
-// Check if file is analyzable source code
 const isAnalyzableFile = (file: File): boolean => {
   const ext = file.name.split('.').pop()?.toLowerCase() || '';
   const analyzableExts = ['zip', 'apk', 'php', 'js', 'ts', 'tsx', 'jsx', 'py', 'html', 'css', 'json', 'sql', 'java', 'kt', 'xml', 'tar', 'gz', 'rar'];
   return analyzableExts.includes(ext);
+};
+
+const formatTime = (date: Date) => {
+  try {
+    const d = date instanceof Date ? date : new Date(date);
+    const now = new Date();
+    const diff = now.getTime() - d.getTime();
+    const mins = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m`;
+    if (hours < 24) return `${hours}h`;
+    return `${days}d`;
+  } catch { return ''; }
 };
 
 export default function AiChat() {
@@ -58,60 +83,42 @@ export default function AiChat() {
         return parsed.map((s: any) => ({
           ...s,
           createdAt: new Date(s.createdAt),
-          messages: s.messages.map((m: any) => ({
-            ...m,
-            timestamp: new Date(m.timestamp)
-          }))
+          messages: s.messages.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }))
         }));
-      } catch {
-        return [];
-      }
+      } catch { return []; }
     }
     return [];
   });
-  
+
   const [activeSessionId, setActiveSessionId] = useState<string | null>(() => {
-    const saved = localStorage.getItem('saas-ai-active-session');
-    // If we have a saved session id, use it; otherwise we'll auto-select later
-    return saved || null;
+    return localStorage.getItem('saas-ai-active-session') || null;
   });
-  
+
   const [isLoading, setIsLoading] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sessionListOpen, setSessionListOpen] = useState(true);
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [previewInput, setPreviewInput] = useState('');
+  const [previewKey, setPreviewKey] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
-  
-  // AI Status tracking
-  const [aiStatus, setAiStatus] = useState({
-    tokensReceived: 0,
-    elapsedTime: 0,
-    error: null as string | null,
-  });
+
+  const [aiStatus, setAiStatus] = useState({ tokensReceived: 0, elapsedTime: 0, error: null as string | null });
   const aiTimerRef = useRef<number | null>(null);
   const aiStartTimeRef = useRef<number | null>(null);
-  const aiTokensRef = useRef<number>(0); // Track tokens in real-time
-  
-  // DEPRECATED: Legacy hosting modal removed - Using VALA Server Agent system
-  // const [showHostingModal, setShowHostingModal] = useState(false);
-  // const [pendingDeployFile, setPendingDeployFile] = useState<...>(null);
+  const aiTokensRef = useRef<number>(0);
 
-  // History panel state
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
-  
-  // Search panel state
   const [showSearchPanel, setShowSearchPanel] = useState(false);
-  
-  // Shortcuts panel state
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showMemoryPanel, setShowMemoryPanel] = useState(false);
-  
-  // Pinned messages state
   const [pinnedMessages, setPinnedMessages] = useState<Set<string>>(new Set());
-  
-  // Context for thinking indicator
   const [thinkingContext, setThinkingContext] = useState<'analyzing' | 'fixing' | 'deploying' | 'general'>('general');
 
-  // Auto-select first session if none is active but sessions exist
+  const [selectedModel, setSelectedModel] = useState<string>(() => {
+    return localStorage.getItem('saas-ai-model') || 'google/gemini-3-flash-preview';
+  });
+
+  // Auto-select first session
   useEffect(() => {
     if (!activeSessionId && sessions.length > 0) {
       setActiveSessionId(sessions[0].id);
@@ -119,75 +126,29 @@ export default function AiChat() {
   }, [sessions, activeSessionId]);
 
   const activeSession = sessions.find(s => s.id === activeSessionId);
- 
-   // AI Model selection
-   const [selectedModel, setSelectedModel] = useState<string>(() => {
-     return localStorage.getItem('saas-ai-model') || 'google/gemini-3-flash-preview';
-   });
- 
-   // Save selected model to localStorage
-   useEffect(() => {
-     localStorage.setItem('saas-ai-model', selectedModel);
-   }, [selectedModel]);
 
-  // Pin/Unpin message handlers
-  const handlePinMessage = useCallback((messageId: string) => {
-    setPinnedMessages(prev => new Set([...prev, messageId]));
-  }, []);
+  useEffect(() => { localStorage.setItem('saas-ai-model', selectedModel); }, [selectedModel]);
+  useEffect(() => { localStorage.setItem('saas-ai-sessions', JSON.stringify(sessions)); }, [sessions]);
+  useEffect(() => { if (activeSessionId) localStorage.setItem('saas-ai-active-session', activeSessionId); }, [activeSessionId]);
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [activeSession?.messages]);
+  useEffect(() => { if (isMobile) setSessionListOpen(false); }, [isMobile]);
 
-  const handleUnpinMessage = useCallback((messageId: string) => {
-    setPinnedMessages(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(messageId);
-      return newSet;
-    });
-  }, []);
+  const handlePinMessage = useCallback((id: string) => setPinnedMessages(prev => new Set([...prev, id])), []);
+  const handleUnpinMessage = useCallback((id: string) => setPinnedMessages(prev => { const s = new Set(prev); s.delete(id); return s; }), []);
 
-  // Navigate to message from search
   const handleNavigateToMessage = useCallback((messageId: string) => {
-    const messageElement = document.getElementById(`message-${messageId}`);
-    if (messageElement) {
-      messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      messageElement.classList.add('ring-2', 'ring-primary', 'ring-offset-2');
-      setTimeout(() => {
-        messageElement.classList.remove('ring-2', 'ring-primary', 'ring-offset-2');
-      }, 2000);
+    const el = document.getElementById(`message-${messageId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('ring-2', 'ring-primary', 'ring-offset-2');
+      setTimeout(() => el.classList.remove('ring-2', 'ring-primary', 'ring-offset-2'), 2000);
     }
   }, []);
-
-  // Save to localStorage
-  useEffect(() => {
-    localStorage.setItem('saas-ai-sessions', JSON.stringify(sessions));
-  }, [sessions]);
-
-  useEffect(() => {
-    if (activeSessionId) {
-      localStorage.setItem('saas-ai-active-session', activeSessionId);
-    }
-  }, [activeSessionId]);
-
-  // Scroll to bottom on new messages
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeSession?.messages]);
-
-  // Close sidebar on mobile by default
-  useEffect(() => {
-    if (isMobile) {
-      setSidebarOpen(false);
-    }
-  }, [isMobile]);
 
   const createNewSession = () => {
-    const newSession: ChatSession = {
-      id: crypto.randomUUID(),
-      title: 'New Chat',
-      createdAt: new Date(),
-      messages: []
-    };
+    const newSession: ChatSession = { id: crypto.randomUUID(), title: 'New Chat', createdAt: new Date(), messages: [] };
     setSessions(prev => [newSession, ...prev]);
     setActiveSessionId(newSession.id);
-    if (isMobile) setSidebarOpen(false);
   };
 
   const deleteSession = (id: string) => {
@@ -198,40 +159,22 @@ export default function AiChat() {
     }
   };
 
-  // Restore chat to a specific message index
   const restoreToMessage = useCallback((messageIndex: number) => {
     if (!activeSessionId) return;
-    
-    setSessions(prev => prev.map(s => {
-      if (s.id === activeSessionId) {
-        return {
-          ...s,
-          messages: s.messages.slice(0, messageIndex + 1)
-        };
-      }
-      return s;
-    }));
+    setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, messages: s.messages.slice(0, messageIndex + 1) } : s));
   }, [activeSessionId]);
 
-  // Clear current chat
   const clearCurrentChat = useCallback(() => {
     if (!activeSessionId) return;
-    
-    setSessions(prev => prev.map(s => {
-      if (s.id === activeSessionId) {
-        return { ...s, messages: [] };
-      }
-      return s;
-    }));
+    setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, messages: [] } : s));
     toast.success('Chat cleared');
   }, [activeSessionId]);
 
-  // Detect context from message content
   const detectThinkingContext = (content: string): 'analyzing' | 'fixing' | 'deploying' | 'general' => {
     const lower = content.toLowerCase();
     if (lower.includes('deploy') || lower.includes('server') || lower.includes('upload')) return 'deploying';
     if (lower.includes('fix') || lower.includes('error') || lower.includes('bug')) return 'fixing';
-    if (lower.includes('analyze') || lower.includes('scan') || lower.includes('check') || lower.includes('security')) return 'analyzing';
+    if (lower.includes('analyze') || lower.includes('scan') || lower.includes('check')) return 'analyzing';
     return 'general';
   };
 
@@ -241,131 +184,60 @@ export default function AiChat() {
     onDelta: (chunk: string) => void,
     onDone: () => void
   ) => {
-    const formattedMessages = messages.map(m => ({
-      role: m.role,
-      content: m.content
-    }));
-
-    // Get user's actual JWT token for proper authentication
+    const formattedMessages = messages.map(m => ({ role: m.role, content: m.content }));
     const { data: { session: authSession } } = await supabase.auth.getSession();
     const authToken = authSession?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
     const resp = await fetch(CHAT_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`,
-      },
-      body: JSON.stringify({
-        messages: formattedMessages,
-        stream: false, // Use JSON mode - more reliable, no SSE parsing issues
-        model: selectedModel,
-      }),
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+      body: JSON.stringify({ messages: formattedMessages, stream: false, model: selectedModel }),
     });
 
     if (!resp.ok) {
       const error = await resp.json().catch(() => ({ error: 'Unknown error' }));
       const errorMsg = error.error || 'Failed to get AI response';
-      if (resp.status === 429) {
-        toast.error('⏳ Rate limit exceeded. Thoda wait karo aur try karo.');
-      } else if (resp.status === 402) {
-        toast.error('💳 AI credits khatam! Settings → Workspace → Usage mein credits add karo.', { duration: 8000 });
-      } else {
-        toast.error(errorMsg);
-      }
+      if (resp.status === 429) toast.error('⏳ Rate limit. Thodi der baad try karo.');
+      else if (resp.status === 402) toast.error('💳 AI credits khatam!', { duration: 8000 });
+      else toast.error(errorMsg);
       throw new Error(errorMsg);
     }
 
-    // The ai-developer function currently responds with JSON (non-SSE).
-    // Support both: SSE streaming when available, otherwise a JSON fallback.
     const contentType = resp.headers.get('content-type') || '';
-    const isSse = contentType.includes('text/event-stream');
-
-    if (!isSse) {
+    if (!contentType.includes('text/event-stream')) {
       const data = await resp.json().catch(() => ({} as any));
-      const text =
-        (typeof (data as any)?.response === 'string' && (data as any).response) ||
-        (typeof (data as any)?.message === 'string' && (data as any).message) ||
-        (typeof (data as any)?.content === 'string' && (data as any).content) ||
-        '';
-
-      onDelta(text || '');
+      const text = data?.response || data?.message || data?.content || '';
+      onDelta(text);
       onDone();
       return;
     }
 
     if (!resp.body) throw new Error('No response body');
-
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
-    let streamDone = false;
 
     try {
-      while (!streamDone) {
+      while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-
         buffer += decoder.decode(value, { stream: true });
-
-        // Process all complete lines
         let newlineIndex: number;
         while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
           let line = buffer.slice(0, newlineIndex);
           buffer = buffer.slice(newlineIndex + 1);
-
-          // Clean up line
           if (line.endsWith('\r')) line = line.slice(0, -1);
-
-          // Skip SSE comments (: OPENROUTER PROCESSING) and empty lines
-          if (line.startsWith(':') || line.trim() === '') continue;
-
-          // Skip non-data lines
-          if (!line.startsWith('data: ')) continue;
-
+          if (line.startsWith(':') || !line.startsWith('data: ')) continue;
           const jsonStr = line.slice(6).trim();
-
-          // Check for stream end
-          if (jsonStr === '[DONE]') {
-            streamDone = true;
-            break;
-          }
-
-          // Parse and extract content
+          if (jsonStr === '[DONE]') { onDone(); return; }
           try {
             const parsed = JSON.parse(jsonStr);
             const content = parsed.choices?.[0]?.delta?.content;
-            if (content && typeof content === 'string') {
-              onDelta(content);
-            }
-          } catch (parseError) {
-            // JSON might be split across chunks - this is normal, skip invalid chunks
-            console.debug('Skipping incomplete SSE chunk');
-          }
+            if (content) onDelta(content);
+          } catch { /* skip */ }
         }
       }
-    } catch (streamError) {
-      console.error('Stream reading error:', streamError);
-    }
-
-    // Final flush for any remaining buffer content
-    if (buffer.trim()) {
-      for (const raw of buffer.split('\n')) {
-        if (!raw || raw.startsWith(':') || !raw.startsWith('data: ')) continue;
-        const jsonStr = raw.slice(6).trim();
-        if (jsonStr === '[DONE]') continue;
-        try {
-          const parsed = JSON.parse(jsonStr);
-          const content = parsed.choices?.[0]?.delta?.content;
-          if (content && typeof content === 'string') {
-            onDelta(content);
-          }
-        } catch {
-          /* ignore incomplete final chunks */
-        }
-      }
-    }
-
+    } catch (e) { console.error('Stream error:', e); }
     onDone();
   }, [selectedModel]);
 
@@ -373,146 +245,58 @@ export default function AiChat() {
     if ((!content.trim() && (!files || files.length === 0)) || isLoading) return;
 
     let sessionId = activeSessionId;
-    
-    // Create new session if none active
     if (!sessionId) {
-      const title = content.trim() 
-        ? content.slice(0, 40) + (content.length > 40 ? '...' : '')
-        : `${files?.length || 0} file(s) uploaded`;
-      const newSession: ChatSession = {
-        id: crypto.randomUUID(),
-        title,
-        createdAt: new Date(),
-        messages: []
-      };
+      const title = content.trim() ? content.slice(0, 40) + (content.length > 40 ? '...' : '') : `${files?.length || 0} file(s)`;
+      const newSession: ChatSession = { id: crypto.randomUUID(), title, createdAt: new Date(), messages: [] };
       setSessions(prev => [newSession, ...prev]);
       sessionId = newSession.id;
       setActiveSessionId(sessionId);
     }
 
-    // Convert files to attachments
     const fileAttachments: FileAttachment[] = files?.map(file => ({
-      name: file.name,
-      size: file.size,
-      type: getFileType(file),
+      name: file.name, size: file.size, type: getFileType(file),
       preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined
     })) || [];
 
-    // Build message content including file info
     let messageContent = content;
     let analysisResults: string[] = [];
-    
-    // Upload and analyze files if present
+
     if (files && files.length > 0) {
-      const fileNames = files.map(f => f.name).join(', ');
-      
-      // Check for analyzable files
       const analyzableFiles = files.filter(f => isAnalyzableFile(f));
-      
       if (analyzableFiles.length > 0) {
-        toast.info('Uploading and analyzing files...');
-        
-        // Get user
+        toast.info('Files analyzing...');
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           for (const file of analyzableFiles) {
             try {
-              // Upload to storage
               const fileId = crypto.randomUUID();
               const filePath = `${user.id}/${fileId}-${file.name}`;
-              
-              const { error: uploadError } = await supabase.storage
-                .from('source-code')
-                .upload(filePath, file, { cacheControl: '3600', upsert: false });
-              
+              const { error: uploadError } = await supabase.storage.from('source-code').upload(filePath, file, { cacheControl: '3600', upsert: false });
               if (!uploadError) {
-                // Trigger auto-deploy pipeline for analysis
-                const { data: pipelineResult, error: pipelineError } = await supabase.functions.invoke('auto-deploy-pipeline', {
-                  body: { filePath, deploymentId: fileId }
-                });
-                
+                const { data: pipelineResult, error: pipelineError } = await supabase.functions.invoke('auto-deploy-pipeline', { body: { filePath, deploymentId: fileId } });
                 if (!pipelineError && pipelineResult) {
-                  // Format analysis results
                   const result = pipelineResult as any;
-                   const demoUser = result.demoCredentials?.username || `demo_${Math.random().toString(36).substring(2, 8)}`;
-                   const demoPass = result.demoCredentials?.password || Math.random().toString(36).substring(2, 12);
-                   
-                  analysisResults.push(`
-📦 **${file.name}** Analysis Complete:
-
-**Framework:** ${result.analysis?.framework || 'Unknown'}
-**Language:** ${result.analysis?.language || 'Unknown'}
-**Size:** ${result.analysis?.size || 'N/A'}
-
-**🔒 Security Issues:** ${result.security?.issues || 0}
-${result.security?.remaining?.length > 0 ? result.security.remaining.map((i: string) => `  • ${i}`).join('\n') : '  ✓ No issues found'}
-
-**🔧 Auto-Fixes Applied:** ${result.fixes?.applied || 0}
-${result.fixes?.details?.length > 0 ? result.fixes.details.map((f: string) => `  • ${f}`).join('\n') : '  • None needed'}
-
-**📦 Dependencies:** ${result.analysis?.dependencies?.length || 0}
-${result.analysis?.dependencies?.length > 0 ? result.analysis.dependencies.map((d: string) => `  • ${d}`).join('\n') : '  • None detected'}
-
-**✅ Tests:** ${result.tests?.passed || 0} passed, ${result.tests?.failed || 0} failed
-${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
-
-**📋 Status:** ${result.deployment?.status === 'ready' ? '🟢 Ready to deploy' : result.deployment?.status === 'deployed' ? '🚀 Deployed' : '🔴 Needs attention'}
-
- **🔑 Demo Credentials:**
- \`\`\`
- Username: ${demoUser}
- Password: ${demoPass}
- \`\`\`
- *(Use these for testing after server upload)*
- 
----
-🚀 **Ready to deploy!** Click the deploy button or type "deploy" to upload to your hosting.
-`);
-                  toast.success(`${file.name} analyzed successfully`);
-                  
-                  // VALA Agent System - No legacy modal needed
-                  console.log('[VALA] File ready for deployment via Server Agent:', file.name);
-                  
-                } else {
-                  console.error('Pipeline error:', pipelineError);
+                  analysisResults.push(`📦 **${file.name}** analyzed. Framework: ${result.analysis?.framework || 'Unknown'}`);
+                  toast.success(`${file.name} analyzed`);
                 }
-              } else {
-                console.error('Upload error:', uploadError);
               }
-            } catch (err) {
-              console.error('Analysis error:', err);
-            }
+            } catch (err) { console.error('File analysis error:', err); }
           }
         }
       }
-      
-      if (content.trim()) {
-        messageContent = `${content}\n\n[Attached files: ${fileNames}]`;
-      } else {
-        messageContent = `[Uploaded files: ${fileNames}]\n\nPlease analyze these files for missing dependencies, security issues, and database requirements.`;
-      }
+      if (!content.trim()) messageContent = `Attached ${files.length} file(s): ${files.map(f => f.name).join(', ')}`;
     }
-    
-    // Set thinking context based on message
-    setThinkingContext(detectThinkingContext(messageContent));
 
-    // Add user message
     const userMessage: Message = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: messageContent,
-      timestamp: new Date(),
-      files: fileAttachments.length > 0 ? fileAttachments : undefined
+      id: crypto.randomUUID(), role: 'user', content: messageContent,
+      timestamp: new Date(), files: fileAttachments.length > 0 ? fileAttachments : undefined
     };
 
+    // Update title if first message
     setSessions(prev => prev.map(s => {
       if (s.id === sessionId) {
         const updatedMessages = [...s.messages, userMessage];
-        const title = s.messages.length === 0 
-          ? (content.trim() 
-              ? content.slice(0, 40) + (content.length > 40 ? '...' : '')
-              : `${files?.length || 0} file(s) uploaded`)
-          : s.title;
+        const title = s.messages.length === 0 ? messageContent.slice(0, 40) + (messageContent.length > 40 ? '...' : '') : s.title;
         return { ...s, messages: updatedMessages, title };
       }
       return s;
@@ -520,199 +304,93 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
 
     setIsLoading(true);
     setGlobalWorking(true);
-    
-    // Reset and start AI status tracking
+    setThinkingContext(detectThinkingContext(content));
     setAiStatus({ tokensReceived: 0, elapsedTime: 0, error: null });
+
     aiStartTimeRef.current = Date.now();
     aiTokensRef.current = 0;
-    
-    // Start elapsed time timer - updates both time AND tokens
     aiTimerRef.current = window.setInterval(() => {
-      if (aiStartTimeRef.current) {
-        setAiStatus({
-          tokensReceived: aiTokensRef.current,
-          elapsedTime: (Date.now() - aiStartTimeRef.current!) / 1000,
-          error: null,
-        });
-      }
-    }, 100);
- 
-   // Add global activity for AI processing
-   const aiActivityId = 'ai-chat-' + Date.now();
-   addGlobalActivity({
-     id: aiActivityId,
-     type: 'ai',
-     title: 'AI Processing',
-     status: 'processing',
-     progress: 0,
-     details: messageContent.slice(0, 50) + '...',
-   });
+      setAiStatus(prev => ({ ...prev, elapsedTime: Math.floor((Date.now() - (aiStartTimeRef.current || Date.now())) / 1000) }));
+    }, 1000);
 
-    // Create assistant message placeholder
-    const assistantId = crypto.randomUUID();
+    const aiActivityId = crypto.randomUUID();
+    addGlobalActivity({ id: aiActivityId, type: 'ai', title: 'VALA AI Processing', status: 'processing', details: 'Generating response...', progress: 0 });
+
+    const assistantMsgId = crypto.randomUUID();
     let assistantContent = '';
 
     const addAssistantMessage = () => {
       setSessions(prev => prev.map(s => {
         if (s.id === sessionId) {
-          const hasAssistant = s.messages.some(m => m.id === assistantId);
-          if (!hasAssistant) {
-            return {
-              ...s,
-              messages: [...s.messages, {
-                id: assistantId,
-                role: 'assistant' as const,
-                content: '',
-                timestamp: new Date()
-              }]
-            };
-          }
+          return { ...s, messages: [...s.messages, { id: assistantMsgId, role: 'assistant' as const, content: '', timestamp: new Date() }] };
         }
         return s;
       }));
     };
 
-    const updateAssistantMessage = (newContent: string) => {
-      assistantContent = newContent;
-      // Count approximate tokens (rough estimate: 1 token ≈ 4 chars)
-      const currentTokens = Math.floor(assistantContent.length / 4);
-      aiTokensRef.current = currentTokens; // Update ref for timer to read
-      
-     // Update global activity progress
-     updateGlobalActivity(aiActivityId, { 
-       progress: Math.min(95, assistantContent.length / 10),
-       details: `${currentTokens} tokens received...`
-     });
+    const updateAssistantMessage = (content: string) => {
       setSessions(prev => prev.map(s => {
         if (s.id === sessionId) {
-          return {
-            ...s,
-            messages: s.messages.map(m => 
-              m.id === assistantId ? { ...m, content: newContent } : m
-            )
-          };
+          return { ...s, messages: s.messages.map(m => m.id === assistantMsgId ? { ...m, content } : m) };
         }
         return s;
       }));
+      aiTokensRef.current = Math.floor(content.length / 4);
+      setAiStatus(prev => ({ ...prev, tokensReceived: aiTokensRef.current }));
     };
 
     try {
       addAssistantMessage();
-      
-      // If we have analysis results, prepend them to the AI context
       let enhancedUserMessage = userMessage;
       if (analysisResults.length > 0) {
-        enhancedUserMessage = {
-          ...userMessage,
-          content: `${userMessage.content}\n\n---\n**AUTO-ANALYSIS RESULTS:**\n${analysisResults.join('\n---\n')}\n\nBased on this analysis, please provide recommendations for:\n1. Missing database tables/schema needed\n2. Missing configurations or environment variables\n3. Security fixes required\n4. Dependencies to install\n5. Next steps for deployment`
-        };
+        enhancedUserMessage = { ...userMessage, content: `${userMessage.content}\n\nAUTO-ANALYSIS:\n${analysisResults.join('\n')}` };
       }
-      
       const currentSession = sessions.find(s => s.id === sessionId);
       const historyMessages = currentSession?.messages.slice(-10) || [];
-      
+
       await streamChat(
         [...historyMessages, enhancedUserMessage],
         sessionId,
-        (chunk) => {
-          assistantContent += chunk;
-          updateAssistantMessage(assistantContent);
-        },
-       () => {
-         // Stop the timer
-         if (aiTimerRef.current) {
-           window.clearInterval(aiTimerRef.current);
-           aiTimerRef.current = null;
-         }
-         setIsLoading(false);
-         setGlobalWorking(false);
-         updateGlobalActivity(aiActivityId, { 
-           status: 'completed', 
-           progress: 100,
-           title: 'Response Generated',
-           details: `Complete (${aiTokensRef.current} tokens)`
-         });
-         setTimeout(() => removeGlobalActivity(aiActivityId), 3000);
-       }
+        (chunk) => { assistantContent += chunk; updateAssistantMessage(assistantContent); },
+        () => {
+          if (aiTimerRef.current) { window.clearInterval(aiTimerRef.current); aiTimerRef.current = null; }
+          setIsLoading(false);
+          setGlobalWorking(false);
+          updateGlobalActivity(aiActivityId, { status: 'completed', progress: 100, title: 'Done', details: `${aiTokensRef.current} tokens` });
+          setTimeout(() => removeGlobalActivity(aiActivityId), 3000);
+        }
       );
     } catch (error) {
       console.error('AI Chat error:', error);
-      // Stop the timer on error
-      if (aiTimerRef.current) {
-        window.clearInterval(aiTimerRef.current);
-        aiTimerRef.current = null;
-      }
-      setAiStatus(prev => ({ ...prev, error: 'Failed to get response' }));
-      updateGlobalActivity(aiActivityId, { status: 'failed', details: 'Error occurred' });
-      
-      // Show specific, actionable error messages
+      if (aiTimerRef.current) { window.clearInterval(aiTimerRef.current); aiTimerRef.current = null; }
+      setAiStatus(prev => ({ ...prev, error: 'Failed' }));
+      updateGlobalActivity(aiActivityId, { status: 'failed', details: 'Error' });
       const errMsg = error instanceof Error ? error.message : String(error);
-      let userFacingError: string;
-      
-      if (errMsg.includes('credits exhausted') || errMsg.includes('402')) {
-        userFacingError = `⚠️ **AI Credits Khatam Ho Gaye**\n\nDono providers (OpenAI + Lovable AI) ke credits exhaust ho gaye hain.\n\n**Fix karo:**\n- OpenAI: https://platform.openai.com/billing mein credits add karo\n- Ya Lovable Workspace → Usage mein credits add karo\n\nIsके baad phir try karo. 🔄`;
-        toast.error('💳 AI credits khatam! Billing page pe credits add karo.', { duration: 10000 });
-      } else if (errMsg.includes('rate_limit') || errMsg.includes('429') || errMsg.includes('too large') || errMsg.includes('tokens')) {
-        userFacingError = `⚠️ **Token Limit Exceed Ho Gayi**\n\nConversation bohot lamba ho gaya hai. AI context window limit hit ho gayi.\n\n**Fix:** Naya chat session start karo (sidebar mein "+" button) ya current chat clear karo.`;
-        toast.warning('⏳ Naya chat session start karo — conversation bohot lamba ho gaya.', { duration: 8000 });
-      } else if (errMsg.includes('401')) {
-        userFacingError = `❌ **API Key Invalid**\n\nOpenAI API key invalid ya expired hai. Settings mein check karo.`;
-        toast.error('❌ API key issue. Admin se contact karo.', { duration: 8000 });
-      } else {
-        userFacingError = `❌ **Error aaya:** ${errMsg}\n\nThodi der baad retry karo ya naya chat start karo.`;
-        toast.error('Something went wrong. Retry karo.', { duration: 5000 });
-      }
-      
+      let userFacingError = `❌ Error: ${errMsg}\n\nThodi der baad retry karo.`;
+      if (errMsg.includes('402')) userFacingError = '⚠️ AI credits khatam. Settings mein credits add karo.';
       updateAssistantMessage(userFacingError);
       setIsLoading(false);
       setGlobalWorking(false);
     }
   };
 
-  const handleSuggestionClick = (suggestion: string) => {
-    handleSend(suggestion);
-  };
-
-  // Handle voice conversation messages
   const handleVoiceMessage = useCallback((userText: string, aiResponse: string) => {
     let sessionId = activeSessionId;
-    
-    // Create new session if none active
     if (!sessionId) {
-      const title = userText.slice(0, 40) + (userText.length > 40 ? '...' : '');
-      const newSession: ChatSession = {
-        id: crypto.randomUUID(),
-        title,
-        createdAt: new Date(),
-        messages: []
-      };
+      const newSession: ChatSession = { id: crypto.randomUUID(), title: userText.slice(0, 40), createdAt: new Date(), messages: [] };
       setSessions(prev => [newSession, ...prev]);
       sessionId = newSession.id;
       setActiveSessionId(sessionId);
     }
-
-    // Add both messages
-    const userMessage: Message = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: `🎤 ${userText}`,
-      timestamp: new Date()
-    };
-
-    const assistantMessage: Message = {
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      content: aiResponse,
-      timestamp: new Date()
-    };
-
     setSessions(prev => prev.map(s => {
       if (s.id === sessionId) {
-        const updatedMessages = [...s.messages, userMessage, assistantMessage];
-        const title = s.messages.length === 0 
-          ? userText.slice(0, 40) + (userText.length > 40 ? '...' : '')
-          : s.title;
-        return { ...s, messages: updatedMessages, title };
+        return {
+          ...s, title: s.messages.length === 0 ? userText.slice(0, 40) : s.title,
+          messages: [...s.messages,
+            { id: crypto.randomUUID(), role: 'user' as const, content: `🎤 ${userText}`, timestamp: new Date() },
+            { id: crypto.randomUUID(), role: 'assistant' as const, content: aiResponse, timestamp: new Date() }
+          ]
+        };
       }
       return s;
     }));
@@ -720,11 +398,7 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
 
   const handleExport = () => {
     if (!activeSession) return;
-    
-    const content = activeSession.messages
-      .map(m => `${m.role === 'user' ? 'You' : 'SaaS VALA AI'}: ${m.content}`)
-      .join('\n\n');
-    
+    const content = activeSession.messages.map(m => `${m.role === 'user' ? 'You' : 'VALA AI'}: ${m.content}`).join('\n\n');
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -732,170 +406,289 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
     a.download = `${activeSession.title}.txt`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success('Chat exported successfully');
+    toast.success('Chat exported');
   };
 
-  // DEPRECATED: Legacy FTP hosting deploy removed - Using VALA Server Agent system
-  // All deployments now go through the server-agent edge function with token-based auth
-
-  // Keyboard shortcuts - must be after all function definitions
   useKeyboardShortcuts({
     onNewChat: createNewSession,
     onExport: handleExport,
     onSearch: () => setShowSearchPanel(true),
     onHistory: () => setShowHistoryPanel(true),
     onClear: clearCurrentChat,
-    onToggleSidebar: () => setSidebarOpen(!sidebarOpen),
+    onToggleSidebar: () => setSessionListOpen(!sessionListOpen),
     onShowShortcuts: () => setShowShortcuts(true),
   });
 
+  const handlePreviewNavigate = () => {
+    if (previewInput.trim()) {
+      const url = previewInput.startsWith('http') ? previewInput : `https://${previewInput}`;
+      setPreviewUrl(url);
+      setPreviewKey(k => k + 1);
+    }
+  };
+
   return (
-    <div className="h-screen flex bg-background overflow-hidden">
-      {/* Left Sidebar - Sessions list only */}
-      <ChatSidebar
-        sessions={sessions}
-        activeSessionId={activeSessionId}
-        onSelectSession={(id) => {
-          setActiveSessionId(id);
-          if (isMobile) setSidebarOpen(false);
-        }}
-        onNewSession={createNewSession}
-        onDeleteSession={deleteSession}
-        isOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
-        onOpenHistory={() => setShowHistoryPanel(true)}
-        onClearChat={clearCurrentChat}
-        onExport={handleExport}
-      />
+    <TooltipProvider delayDuration={200}>
+      <div className="h-screen flex bg-background overflow-hidden">
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ minWidth: 0 }}>
-        <ChatHeader
-          title={activeSession?.title || 'VALA AI'}
-          onExport={handleExport}
-          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-          sidebarOpen={sidebarOpen}
-          onOpenHistory={() => setShowHistoryPanel(true)}
-          onClearChat={clearCurrentChat}
-          onOpenSearch={() => setShowSearchPanel(true)}
-          onOpenShortcuts={() => setShowShortcuts(true)}
-          selectedModel={selectedModel}
-          onModelChange={setSelectedModel}
-          onOpenMemory={() => setShowMemoryPanel(true)}
-        />
+        {/* ── LEFT PANEL: Chat Interface ── */}
+        <div className={cn(
+          'flex flex-col border-r border-border transition-all duration-300 shrink-0',
+          isMobile ? 'w-full' : 'w-[420px]'
+        )}>
 
-        {/* AI Status Bar */}
-        <AiStatusBar
-          isLoading={isLoading}
-          isConnected={true}
-          tokensReceived={aiStatus.tokensReceived}
-          elapsedTime={aiStatus.elapsedTime}
-          error={aiStatus.error}
-          model={selectedModel.split('/').pop() || 'gemini-3-flash'}
-        />
-
-        {/* Messages Area — scrollable, fills remaining space */}
-        <div className="flex-1 overflow-y-auto" style={{ minHeight: 0 }}>
-          {activeSession && activeSession.messages.length > 0 ? (
-            <div className="max-w-4xl mx-auto px-4 pb-32 pt-4">
-              {activeSession.messages.map((message, index) => (
-                <div key={message.id} id={`message-${message.id}`}>
-                  <ChatMessage
-                    message={message}
-                    index={index}
-                    isPinned={pinnedMessages.has(message.id)}
-                    onPin={handlePinMessage}
-                    onUnpin={handleUnpinMessage}
-                    onApproveAction={(messageId, actionId) => {
-                      // Send approval back to AI as a new user message
-                      handleSend(`✅ APPROVED — Action ID: ${actionId}. Aage badho aur execute karo.`);
-                      toast.success('Action approved! VALA AI executing...');
-                    }}
-                    onDenyAction={(messageId, actionId) => {
-                      handleSend(`❌ CANCELLED — Action ID: ${actionId}. Is action ko cancel kar do.`);
-                      toast.info('Action cancelled.');
-                    }}
-                  />
-                </div>
-              ))}
-              {isLoading && (
-                <ThinkingIndicator isActive={true} context={thinkingContext} />
-              )}
-              <div ref={messagesEndRef} />
+          {/* Chat Header */}
+          <div className="h-12 flex items-center justify-between px-3 border-b border-border bg-muted/30 shrink-0">
+            <div className="flex items-center gap-2">
+              {/* Session list toggle */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={() => setSessionListOpen(!sessionListOpen)} className="h-7 w-7 text-muted-foreground hover:text-foreground">
+                    {sessionListOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Toggle history</TooltipContent>
+              </Tooltip>
+              <span className="text-sm font-semibold text-foreground">VALA AI</span>
+              {isLoading && <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />}
             </div>
-          ) : (
-            /* Welcome screen when no messages */
-            <div className="flex flex-col items-center justify-center min-h-full py-20 text-center px-8">
-              <div className="w-20 h-20 rounded-3xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-6 shadow-lg">
-                <span className="text-4xl">🤖</span>
-              </div>
-              <h2 className="text-3xl font-bold text-foreground mb-3">VALA AI</h2>
-              <p className="text-muted-foreground mb-10 max-w-md text-base leading-relaxed">
-                Full-Stack Developer + Business Automation Expert.<br />
-                Kuch bhi poocho — code, deploy, analyze, audit.
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl w-full">
-                {[
-                  { emoji: '🔍', text: 'GitHub repos audit karo' },
-                  { emoji: '🚀', text: 'Server status check karo' },
-                  { emoji: '💡', text: 'New product idea suggest karo' },
-                  { emoji: '🛡️', text: 'Security scan karo' },
-                  { emoji: '📊', text: 'System health report do' },
-                  { emoji: '🔑', text: 'License key generate karo' },
-                ].map(({ emoji, text }) => (
-                  <button
-                    key={text}
-                    onClick={() => handleSuggestionClick(`${emoji} ${text}`)}
-                    className="flex items-center gap-3 text-left p-4 rounded-xl border border-border/50 bg-card/40 hover:bg-card hover:border-primary/40 hover:shadow-md transition-all text-sm text-muted-foreground hover:text-foreground group"
-                  >
-                    <span className="text-xl group-hover:scale-110 transition-transform">{emoji}</span>
-                    <span>{text}</span>
-                  </button>
-                ))}
-              </div>
+            <div className="flex items-center gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={() => setShowSearchPanel(true)} className="h-7 w-7 text-muted-foreground hover:text-foreground">
+                    <Search className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Search</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={() => setShowMemoryPanel(true)} className="h-7 w-7 text-muted-foreground hover:text-foreground">
+                    <Brain className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Memory</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={createNewSession} className="h-7 w-7 text-muted-foreground hover:text-primary">
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">New chat</TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
+
+          {/* Session List (collapsible) */}
+          {sessionListOpen && (
+            <div className="border-b border-border bg-muted/10 shrink-0 max-h-48 overflow-y-auto">
+              {sessions.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground text-xs">
+                  <MessageSquare className="h-5 w-5 mx-auto mb-1 opacity-30" />
+                  <p>No chats yet</p>
+                </div>
+              ) : (
+                <div className="p-1.5 space-y-0.5">
+                  {sessions.map(session => (
+                    <div
+                      key={session.id}
+                      onClick={() => setActiveSessionId(session.id)}
+                      className={cn(
+                        'group flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer transition-all text-xs',
+                        activeSessionId === session.id
+                          ? 'bg-primary/10 text-foreground border border-primary/20'
+                          : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                      )}
+                    >
+                      <MessageSquare className={cn('h-3 w-3 shrink-0', activeSessionId === session.id ? 'text-primary' : 'opacity-50')} />
+                      <span className="flex-1 truncate font-medium">{session.title}</span>
+                      <span className="text-[10px] text-muted-foreground/50 shrink-0">{formatTime(session.createdAt)}</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteSession(session.id); }}
+                        className="opacity-0 group-hover:opacity-100 h-4 w-4 flex items-center justify-center rounded hover:bg-destructive/10 hover:text-destructive"
+                      >
+                        <Trash2 className="h-2.5 w-2.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
-        </div>
 
-        {/* Chat Input — sticky at bottom */}
-        <div className="border-t border-border/50 bg-background/95 backdrop-blur-md shadow-lg">
-          <div className="max-w-4xl mx-auto">
+          {/* Messages — scrollable */}
+          <div className="flex-1 overflow-y-auto min-h-0">
+            {activeSession && activeSession.messages.length > 0 ? (
+              <div className="px-3 py-3 space-y-1 pb-4">
+                {activeSession.messages.map((message, index) => (
+                  <div key={message.id} id={`message-${message.id}`}>
+                    <ChatMessage
+                      message={message}
+                      index={index}
+                      isPinned={pinnedMessages.has(message.id)}
+                      onPin={handlePinMessage}
+                      onUnpin={handleUnpinMessage}
+                      onApproveAction={(messageId, actionId) => {
+                        handleSend(`✅ APPROVED — Action ID: ${actionId}. Execute karo.`);
+                        toast.success('Action approved!');
+                      }}
+                      onDenyAction={(messageId, actionId) => {
+                        handleSend(`❌ CANCELLED — Action ID: ${actionId}.`);
+                        toast.info('Action cancelled.');
+                      }}
+                    />
+                  </div>
+                ))}
+                {isLoading && <ThinkingIndicator isActive={true} context={thinkingContext} />}
+                <div ref={messagesEndRef} />
+              </div>
+            ) : (
+              /* Welcome screen */
+              <div className="flex flex-col items-center justify-center h-full py-10 px-4 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-4">
+                  <span className="text-2xl">🤖</span>
+                </div>
+                <h2 className="text-xl font-bold text-foreground mb-2">VALA AI</h2>
+                <p className="text-muted-foreground mb-6 text-sm leading-relaxed max-w-xs">
+                  Full-Stack Developer + Business Expert.<br />Code, deploy, analyze, audit.
+                </p>
+                <div className="grid grid-cols-1 gap-2 w-full max-w-xs">
+                  {[
+                    { emoji: '🔍', text: 'GitHub repos audit karo' },
+                    { emoji: '🚀', text: 'Server status check karo' },
+                    { emoji: '🛡️', text: 'Security scan karo' },
+                    { emoji: '📊', text: 'System health report do' },
+                  ].map(({ emoji, text }) => (
+                    <button
+                      key={text}
+                      onClick={() => handleSend(`${emoji} ${text}`)}
+                      className="flex items-center gap-2 text-left p-3 rounded-lg border border-border/50 bg-card/40 hover:bg-card hover:border-primary/30 transition-all text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      <span>{emoji}</span>
+                      <span>{text}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Model selector + input */}
+          <div className="shrink-0 border-t border-border/50 bg-background/95 backdrop-blur-md">
+            <div className="px-2 pt-1.5 flex items-center gap-2">
+              <ModelSelector selectedModel={selectedModel} onModelChange={setSelectedModel} />
+              {isLoading && (
+                <span className="text-[10px] text-muted-foreground">
+                  {aiStatus.elapsedTime}s · {aiStatus.tokensReceived} tokens
+                </span>
+              )}
+            </div>
             <ChatInput onSend={handleSend} isLoading={isLoading} onVoiceMessage={handleVoiceMessage} />
           </div>
         </div>
+
+        {/* ── RIGHT PANEL: Project / Browser Preview ── */}
+        {!isMobile && (
+          <div className="flex-1 flex flex-col min-w-0 bg-muted/5">
+            {/* Preview header / URL bar */}
+            <div className="h-12 flex items-center gap-2 px-3 border-b border-border bg-muted/30 shrink-0">
+              <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="flex-1 flex items-center gap-1 bg-background border border-border rounded-md px-2 h-7">
+                <input
+                  type="text"
+                  value={previewInput}
+                  onChange={e => setPreviewInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handlePreviewNavigate()}
+                  placeholder="Enter project URL to preview... (e.g. yoursite.com)"
+                  className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none"
+                />
+              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={handlePreviewNavigate}>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Go</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => setPreviewKey(k => k + 1)}>
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Refresh</TooltipContent>
+              </Tooltip>
+              {previewUrl && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => window.open(previewUrl, '_blank')}>
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">Open in new tab</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+
+            {/* Preview area */}
+            <div className="flex-1 overflow-hidden relative">
+              {previewUrl ? (
+                <iframe
+                  key={previewKey}
+                  src={previewUrl}
+                  className="w-full h-full border-0"
+                  title="Project Preview"
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                />
+              ) : (
+                /* Empty state */
+                <div className="flex flex-col items-center justify-center h-full text-center px-8">
+                  <div className="w-20 h-20 rounded-3xl bg-muted/50 border border-border flex items-center justify-center mb-6">
+                    <Globe className="h-8 w-8 text-muted-foreground/40" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">Project Preview</h3>
+                  <p className="text-muted-foreground text-sm max-w-sm mb-6">
+                    Upar URL bar mein apne deployed project ka link daalo aur preview dekho. Ya VALA AI se koi project deploy karo.
+                  </p>
+                  <div className="grid grid-cols-1 gap-3 w-full max-w-xs">
+                    <div className="p-4 rounded-xl border border-border/50 bg-card/40 text-left">
+                      <p className="text-xs font-semibold text-foreground mb-1">🚀 Quick Actions</p>
+                      <p className="text-xs text-muted-foreground">VALA AI se poocho: <span className="text-primary font-mono">"Server status check karo"</span></p>
+                    </div>
+                    <div className="p-4 rounded-xl border border-border/50 bg-card/40 text-left">
+                      <p className="text-xs font-semibold text-foreground mb-1">🔗 Preview Karo</p>
+                      <p className="text-xs text-muted-foreground">Koi bhi URL upar bar mein daalo aur Enter dabao</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Overlays */}
+        <ChatHistoryPanel
+          isOpen={showHistoryPanel}
+          onClose={() => setShowHistoryPanel(false)}
+          messages={activeSession?.messages || []}
+          onRestore={restoreToMessage}
+        />
+        <ChatSearch
+          isOpen={showSearchPanel}
+          onClose={() => setShowSearchPanel(false)}
+          messages={activeSession?.messages || []}
+          onNavigateToMessage={handleNavigateToMessage}
+        />
+        <KeyboardShortcuts isOpen={showShortcuts} onClose={() => setShowShortcuts(false)} />
+        <WorkingDeveloperIndicator forceWorking={isLoading} />
+        <Sheet open={showMemoryPanel} onOpenChange={setShowMemoryPanel}>
+          <SheetContent side="right" className="w-full sm:w-[600px] p-0 overflow-hidden">
+            <MemoryPanel onClose={() => setShowMemoryPanel(false)} />
+          </SheetContent>
+        </Sheet>
       </div>
-
-      {/* History Panel */}
-      <ChatHistoryPanel
-        isOpen={showHistoryPanel}
-        onClose={() => setShowHistoryPanel(false)}
-        messages={activeSession?.messages || []}
-        onRestore={restoreToMessage}
-      />
-
-      {/* Search Dialog */}
-      <ChatSearch
-        isOpen={showSearchPanel}
-        onClose={() => setShowSearchPanel(false)}
-        messages={activeSession?.messages || []}
-        onNavigateToMessage={handleNavigateToMessage}
-      />
-
-      {/* Keyboard Shortcuts Dialog */}
-      <KeyboardShortcuts
-        isOpen={showShortcuts}
-        onClose={() => setShowShortcuts(false)}
-      />
-
-      {/* Working Developer Indicator */}
-      <WorkingDeveloperIndicator forceWorking={isLoading} />
-
-      {/* Memory Panel - Slide-over sheet */}
-      <Sheet open={showMemoryPanel} onOpenChange={setShowMemoryPanel}>
-        <SheetContent side="right" className="w-full sm:w-[600px] p-0 overflow-hidden">
-          <MemoryPanel onClose={() => setShowMemoryPanel(false)} />
-        </SheetContent>
-      </Sheet>
-    </div>
+    </TooltipProvider>
   );
 }
