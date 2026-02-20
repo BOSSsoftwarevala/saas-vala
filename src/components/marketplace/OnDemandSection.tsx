@@ -21,7 +21,8 @@ const staticOnDemand = [
 
 export function OnDemandSection({ onBuyNow }: { onBuyNow: (p: any) => void }) {
   const [requestModal, setRequestModal] = useState<{ open: boolean; product?: any }>({ open: false });
-  const { products: dbProducts, loading } = useProductsByCategory(['saas', 'cloud', 'on_demand', 'erp', 'crm', 'pos', 'software']);
+  // Strict: only saas/cloud/on_demand — NOT education/school/college/coaching etc.
+  const { products: dbProducts, loading } = useProductsByCategory(['saas', 'cloud', 'on_demand']);
 
   const openRequest = (product: any) => setRequestModal({ open: true, product });
 

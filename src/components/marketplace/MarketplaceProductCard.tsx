@@ -107,7 +107,14 @@ export function MarketplaceProductCard({
     if (product.demoUrl) {
       window.open(product.demoUrl, '_blank', 'noopener,noreferrer');
     } else {
-      toast.info('Demo not available yet');
+      // Show demo credentials popup or fallback
+      toast.info(`Demo for ${product.title} — Contact us at saasvala.com/demo`, {
+        duration: 4000,
+        action: {
+          label: 'Request',
+          onClick: () => window.open('mailto:demo@saasvala.com?subject=Demo Request: ' + product.title, '_blank'),
+        },
+      });
     }
   };
 
