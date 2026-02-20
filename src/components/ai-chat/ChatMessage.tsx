@@ -1,13 +1,11 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { User, Sparkles, Copy, Check, RotateCcw, FileCode, FileArchive, File, Image, Pin } from 'lucide-react';
+import { User, Sparkles, Copy, Check, FileCode, FileArchive, File, Image, Pin, Volume2, VolumeX } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { MessageReactions } from './MessageReactions';
 import { CriticalApprovalBox, parseCriticalAction } from './CriticalApprovalBox';
 
 export interface FileAttachment {
@@ -44,8 +42,26 @@ const getFileIcon = (type: FileAttachment['type']) => {
   }
 };
 
-export function ChatMessage({ message, index = 0, isPinned, onPin, onUnpin, onApproveAction, onDenyAction }: ChatMessageProps) {
+// Strip markdown for TTS
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, '') // code blocks
+    .replace(/`[^`]+`/g, '')         // inline code
+    .replace(/#{1,6}\s+/g, '')        // headers
+    .replace(/\*\*([^*]+)\*\*/g, '$1') // bold
+    .replace(/\*([^*]+)\*/g, '$1')    // italic
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // links
+    .replace(/[-*+]\s+/g, '')         // list bullets
+    .replace(/\n{2,}/g, '. ')         // double newlines
+    .replace(/\n/g, ' ')              // single newlines
+    .trim()
+    .slice(0, 500); // max 500 chars for TTS
+}
+
+export function ChatMessage({ message, index = 0, isPinned, onApproveAction, onDenyAction }: ChatMessageProps) {
   const [copied, setCopied] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [audioObj, setAudioObj] = useState<HTMLAudioElement | null>(null);
   const isUser = message.role === 'user';
   const criticalAction = !isUser ? parseCriticalAction(message.content) : null;
 
@@ -56,6 +72,68 @@ export function ChatMessage({ message, index = 0, isPinned, onPin, onUnpin, onAp
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleSpeak = useCallback(async () => {
+    // Stop if already speaking
+    if (isSpeaking && audioObj) {
+      audioObj.pause();
+      audioObj.src = '';
+      setAudioObj(null);
+      setIsSpeaking(false);
+      return;
+    }
+
+    const text = stripMarkdown(message.content);
+    if (!text) return;
+
+    setIsSpeaking(true);
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const apiKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/elevenlabs-tts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'apikey': apiKey,
+        },
+        body: JSON.stringify({
+          text,
+          voiceId: 'pFZP5JQG7iQjIQuC4Bku', // Lily - friendly assistant voice
+          returnBase64: true,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`TTS failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (!data.audioContent) throw new Error('No audio received');
+
+      const audioUrl = `data:audio/mpeg;base64,${data.audioContent}`;
+      const audio = new Audio(audioUrl);
+      setAudioObj(audio);
+
+      audio.onended = () => {
+        setIsSpeaking(false);
+        setAudioObj(null);
+      };
+      audio.onerror = () => {
+        setIsSpeaking(false);
+        setAudioObj(null);
+        toast.error('Audio playback failed');
+      };
+
+      await audio.play();
+    } catch (err) {
+      console.error('TTS error:', err);
+      toast.error('Voice unavailable. ElevenLabs key check karo.');
+      setIsSpeaking(false);
+      setAudioObj(null);
+    }
+  }, [isSpeaking, audioObj, message.content]);
+
   // Enhanced markdown rendering for code blocks
   const renderContent = (content: string) => {
     if (!content) return null;
@@ -64,46 +142,19 @@ export function ChatMessage({ message, index = 0, isPinned, onPin, onUnpin, onAp
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          // Headers
-          h1: ({ children }) => (
-            <h1 className="text-2xl font-bold text-foreground mt-4 mb-2">{children}</h1>
-          ),
-          h2: ({ children }) => (
-            <h2 className="text-xl font-bold text-foreground mt-4 mb-2">{children}</h2>
-          ),
-          h3: ({ children }) => (
-            <h3 className="text-lg font-semibold text-primary mt-3 mb-2">{children}</h3>
-          ),
-          h4: ({ children }) => (
-            <h4 className="text-base font-semibold text-foreground mt-2 mb-1">{children}</h4>
-          ),
-          // Paragraphs
-          p: ({ children }) => (
-            <p className="mb-2 leading-relaxed">{children}</p>
-          ),
-          // Strong/Bold
-          strong: ({ children }) => (
-            <strong className="font-semibold text-foreground">{children}</strong>
-          ),
-          // Emphasis/Italic
-          em: ({ children }) => (
-            <em className="italic text-foreground/90">{children}</em>
-          ),
-          // Lists
-          ul: ({ children }) => (
-            <ul className="list-disc list-inside space-y-1 my-2 ml-2">{children}</ul>
-          ),
-          ol: ({ children }) => (
-            <ol className="list-decimal list-inside space-y-1 my-2 ml-2">{children}</ol>
-          ),
-          li: ({ children }) => (
-            <li className="text-foreground/90">{children}</li>
-          ),
-          // Code blocks
-          code: ({ className, children, ...props }) => {
+          h1: ({ children }) => <h1 className="text-2xl font-bold text-foreground mt-4 mb-2">{children}</h1>,
+          h2: ({ children }) => <h2 className="text-xl font-bold text-foreground mt-4 mb-2">{children}</h2>,
+          h3: ({ children }) => <h3 className="text-lg font-semibold text-primary mt-3 mb-2">{children}</h3>,
+          h4: ({ children }) => <h4 className="text-base font-semibold text-foreground mt-2 mb-1">{children}</h4>,
+          p: ({ children }) => <p className="mb-2 leading-relaxed">{children}</p>,
+          strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+          em: ({ children }) => <em className="italic text-foreground/90">{children}</em>,
+          ul: ({ children }) => <ul className="list-disc list-inside space-y-1 my-2 ml-2">{children}</ul>,
+          ol: ({ children }) => <ol className="list-decimal list-inside space-y-1 my-2 ml-2">{children}</ol>,
+          li: ({ children }) => <li className="text-foreground/90">{children}</li>,
+          code: ({ className, children }) => {
             const match = /language-(\w+)/.exec(className || '');
             const isInline = !match && !className;
-            
             if (isInline) {
               return (
                 <code className="px-1.5 py-0.5 mx-0.5 rounded-md bg-primary/10 text-sm font-mono text-primary border border-primary/20">
@@ -111,12 +162,10 @@ export function ChatMessage({ message, index = 0, isPinned, onPin, onUnpin, onAp
                 </code>
               );
             }
-            
             const language = match ? match[1] : '';
             const codeContent = String(children).replace(/\n$/, '');
-            
             return (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
@@ -131,10 +180,7 @@ export function ChatMessage({ message, index = 0, isPinned, onPin, onUnpin, onAp
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => {
-                        navigator.clipboard.writeText(codeContent);
-                        toast.success('Code copied');
-                      }}
+                      onClick={() => { navigator.clipboard.writeText(codeContent); toast.success('Code copied'); }}
                       className="h-7 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       <Copy className="h-3 w-3 mr-1.5" />
@@ -148,52 +194,26 @@ export function ChatMessage({ message, index = 0, isPinned, onPin, onUnpin, onAp
               </motion.div>
             );
           },
-          // Pre (wrapper for code blocks)
           pre: ({ children }) => <>{children}</>,
-          // Links
           a: ({ href, children }) => (
-            <a 
-              href={href} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-primary hover:text-primary/80 underline underline-offset-2"
-            >
+            <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 underline underline-offset-2">
               {children}
             </a>
           ),
-          // Blockquotes
           blockquote: ({ children }) => (
-            <blockquote className="border-l-4 border-primary/50 pl-4 my-3 italic text-foreground/80">
-              {children}
-            </blockquote>
+            <blockquote className="border-l-4 border-primary/50 pl-4 my-3 italic text-foreground/80">{children}</blockquote>
           ),
-          // Horizontal rule
-          hr: () => (
-            <hr className="my-4 border-border/50" />
-          ),
-          // Tables
+          hr: () => <hr className="my-4 border-border/50" />,
           table: ({ children }) => (
             <div className="overflow-x-auto my-4">
-              <table className="min-w-full border border-border rounded-lg overflow-hidden">
-                {children}
-              </table>
+              <table className="min-w-full border border-border rounded-lg overflow-hidden">{children}</table>
             </div>
           ),
-          thead: ({ children }) => (
-            <thead className="bg-muted/50">{children}</thead>
-          ),
-          tbody: ({ children }) => (
-            <tbody className="divide-y divide-border">{children}</tbody>
-          ),
-          tr: ({ children }) => (
-            <tr className="hover:bg-muted/30 transition-colors">{children}</tr>
-          ),
-          th: ({ children }) => (
-            <th className="px-4 py-2 text-left text-sm font-semibold text-foreground">{children}</th>
-          ),
-          td: ({ children }) => (
-            <td className="px-4 py-2 text-sm text-foreground/90">{children}</td>
-          ),
+          thead: ({ children }) => <thead className="bg-muted/50">{children}</thead>,
+          tbody: ({ children }) => <tbody className="divide-y divide-border">{children}</tbody>,
+          tr: ({ children }) => <tr className="hover:bg-muted/30 transition-colors">{children}</tr>,
+          th: ({ children }) => <th className="px-4 py-2 text-left text-sm font-semibold text-foreground">{children}</th>,
+          td: ({ children }) => <td className="px-4 py-2 text-sm text-foreground/90">{children}</td>,
         }}
       >
         {content}
@@ -209,44 +229,33 @@ export function ChatMessage({ message, index = 0, isPinned, onPin, onUnpin, onAp
 
   return (
     <motion.div
+      id={`message-${message.id}`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ 
-        duration: 0.4, 
-        delay: Math.min(index * 0.05, 0.3),
-        ease: [0.16, 1, 0.3, 1]
-      }}
+      transition={{ duration: 0.4, delay: Math.min(index * 0.05, 0.3), ease: [0.16, 1, 0.3, 1] }}
       className={cn(
         'group py-6 px-4 md:px-6 transition-colors duration-300 relative',
         isUser ? 'bg-transparent' : 'bg-muted/10',
         isPinned && 'bg-primary/5 border-l-2 border-primary'
       )}
     >
-      {/* Pinned indicator */}
       {isPinned && (
         <div className="absolute top-2 right-4 flex items-center gap-1 text-xs text-primary">
           <Pin className="h-3 w-3 fill-primary" />
           <span>Pinned</span>
         </div>
       )}
-      
+
       <div className="max-w-3xl mx-auto">
-        {/* Content */}
         <div className="flex-1 min-w-0 space-y-2">
-          {/* Header - Name first, then icon */}
+          {/* Header */}
           <div className="flex items-center gap-2">
-            <span className={cn(
-              "text-sm font-semibold",
-              isUser ? "text-secondary" : "text-primary"
-            )}>
+            <span className={cn("text-sm font-semibold", isUser ? "text-secondary" : "text-primary")}>
               {isUser ? 'You' : 'VALA AI'}
             </span>
-            {/* Small icon AFTER name */}
             <div className={cn(
               "h-5 w-5 rounded-full flex items-center justify-center shrink-0",
-              isUser 
-                ? "bg-secondary/20 text-secondary" 
-                : "bg-primary/20 text-primary"
+              isUser ? "bg-secondary/20 text-secondary" : "bg-primary/20 text-primary"
             )}>
               {isUser ? <User className="h-3 w-3" /> : <Sparkles className="h-3 w-3" />}
             </div>
@@ -258,11 +267,44 @@ export function ChatMessage({ message, index = 0, isPinned, onPin, onUnpin, onAp
                 GPT-5
               </span>
             )}
+
+            {/* TTS Voice Button — only for AI messages */}
+            {!isUser && message.content && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSpeak}
+                title={isSpeaking ? 'Stop Speaking' : 'Listen to this response'}
+                className={cn(
+                  "h-6 w-6 p-0 ml-1 rounded-full transition-all",
+                  isSpeaking
+                    ? "text-primary bg-primary/10 animate-pulse"
+                    : "text-muted-foreground hover:text-primary hover:bg-primary/10 opacity-0 group-hover:opacity-100"
+                )}
+              >
+                {isSpeaking ? (
+                  <VolumeX className="h-3 w-3" />
+                ) : (
+                  <Volume2 className="h-3 w-3" />
+                )}
+              </Button>
+            )}
+
+            {/* Copy button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleCopy}
+              className="h-6 w-6 p-0 rounded-full text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-all"
+              title="Copy message"
+            >
+              {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+            </Button>
           </div>
 
           {/* File Attachments */}
           {message.files && message.files.length > 0 && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               className="flex flex-wrap gap-2 mb-3"
@@ -276,26 +318,15 @@ export function ChatMessage({ message, index = 0, isPinned, onPin, onUnpin, onAp
                   className="flex items-center gap-2.5 bg-muted/50 hover:bg-muted/70 border border-border hover:border-primary/30 rounded-xl p-2.5 max-w-[220px] transition-all duration-200 group/file cursor-pointer"
                 >
                   {file.type === 'image' && file.preview ? (
-                    <img
-                      src={file.preview}
-                      alt={file.name}
-                      className="h-12 w-12 rounded-lg object-cover ring-1 ring-border"
-                    />
+                    <img src={file.preview} alt={file.name} className="h-12 w-12 rounded-lg object-cover ring-1 ring-border" />
                   ) : (
                     <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center shrink-0 group-hover/file:from-primary/10 group-hover/file:to-primary/5 transition-colors">
-                      {(() => {
-                        const Icon = getFileIcon(file.type);
-                        return <Icon className="h-5 w-5 text-muted-foreground group-hover/file:text-primary transition-colors" />;
-                      })()}
+                      {(() => { const Icon = getFileIcon(file.type); return <Icon className="h-5 w-5 text-muted-foreground group-hover/file:text-primary transition-colors" />; })()}
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium truncate group-hover/file:text-primary transition-colors">
-                      {file.name}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {formatFileSize(file.size)}
-                    </p>
+                    <p className="text-xs font-medium truncate group-hover/file:text-primary transition-colors">{file.name}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{formatFileSize(file.size)}</p>
                   </div>
                 </motion.div>
               ))}
@@ -309,12 +340,12 @@ export function ChatMessage({ message, index = 0, isPinned, onPin, onUnpin, onAp
             </div>
           )}
 
-          {/* Critical Approval Box — auto-detected from AI response */}
+          {/* Critical Approval Box */}
           {criticalAction && (
             <CriticalApprovalBox
               data={criticalAction}
               messageId={message.id}
-              onApprove={(actionId, payload) => onApproveAction?.(message.id, actionId)}
+              onApprove={(actionId) => onApproveAction?.(message.id, actionId)}
               onDeny={(actionId) => onDenyAction?.(message.id, actionId)}
             />
           )}
