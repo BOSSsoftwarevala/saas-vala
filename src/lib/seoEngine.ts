@@ -215,15 +215,15 @@
      '@type': type,
      name: data.name,
      description: data.description,
-    url: data.url || 'https://id-preview--2dbe056f-e58d-4a25-ac47-b8b9c5f67907.lovable.app',
-    publisher: {
-      '@type': 'Organization',
-      name: 'SaaS VALA™',
-      logo: {
-        '@type': 'ImageObject',
-        url: 'https://id-preview--2dbe056f-e58d-4a25-ac47-b8b9c5f67907.lovable.app/favicon.png',
-      },
-    },
+     url: data.url || 'https://saasvala.com',
+     publisher: {
+       '@type': 'Organization',
+       name: 'SaaS VALA™',
+       logo: {
+         '@type': 'ImageObject',
+         url: 'https://saasvala.com/favicon.png',
+       },
+     },
    };
    
    if (type === 'SoftwareApplication') {

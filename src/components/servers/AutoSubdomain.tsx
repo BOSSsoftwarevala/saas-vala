@@ -9,7 +9,7 @@ export function AutoSubdomain() {
   const [copied, setCopied] = useState(false);
 
   const subdomain = 'my-project';
-  const fullUrl = `${subdomain}.lovable.app`;
+  const fullUrl = `${subdomain}.saasvala.com`;
 
   const copyUrl = () => {
     navigator.clipboard.writeText(`https://${fullUrl}`);

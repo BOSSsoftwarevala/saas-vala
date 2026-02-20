@@ -1930,7 +1930,7 @@ serve(async (req) => {
 | **Active Products** | ${activeProducts.length} products |
 | **Live Servers** | ${liveServers.length} servers |
 | **Source Code Catalog** | ${catalogItems} items |
-| **API Base URL** | ai.gateway.lovable.dev (Lovable) / api.openai.com |
+| **API Base URL** | api.openai.com (OpenAI Direct) |
 | **Primary Model** | ${activeModels.find((m: any) => m.is_default)?.name || activeModels[0]?.name || 'Gemini 3 Flash Preview'} |
 
 ---
@@ -2361,23 +2361,8 @@ POWERED BY SOFTWAREVALA™ | VALA AI ULTRA FULL-POWER AGENT v7.0 — LOCKED EDIT
         });
         return { response: r, provider: 'openai', modelUsed: openaiModel };
       } else {
-        const body: any = {
-          model: AI_MODEL,
-          messages: msgs,
-          max_completion_tokens: 8192,
-          temperature: 0.3,
-          stream: doStream,
-        };
-        if (withTools) {
-          body.tools = developerTools;
-          body.tool_choice = 'auto';
-        }
-        const r = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
-        return { response: r, provider: 'lovable', modelUsed: AI_MODEL };
+        // OpenAI only — no Lovable AI fallback
+        throw new Error('OPENAI_API_KEY not configured. Please add it to secrets.');
       }
     };
 
@@ -2401,23 +2386,8 @@ POWERED BY SOFTWAREVALA™ | VALA AI ULTRA FULL-POWER AGENT v7.0 — LOCKED EDIT
         }
       }
 
-      // Fallback to Lovable AI
-      if (LOVABLE_API_KEY) {
-        console.log('[AI] Falling back to Lovable AI Gateway...');
-        const result = await callProvider(false, msgs, withTools, doStream);
-        if (result.response.ok) {
-          console.log(`[AI] ✅ Lovable AI success`);
-          return result;
-        }
-        const status = result.response.status;
-        const errText = await result.response.text();
-        console.error(`[AI] Lovable also failed [${status}]: ${errText}`);
-        if (status === 402) throw new Error('AI credits exhausted on both providers. Please add OpenAI credits or Lovable credits.');
-        if (status === 429) throw new Error('Rate limit exceeded on both providers. Please wait.');
-        throw new Error(`Both AI providers failed. Last status: ${status}`);
-      }
-
-      throw new Error('No AI provider configured. Add OPENAI_API_KEY or ensure LOVABLE_API_KEY is set.');
+      // OpenAI is the only provider — no fallback
+      throw new Error('OpenAI API call failed. Check OPENAI_API_KEY and account billing.');
     };
 
     // ─── First API call (may return tool calls) ───────────────────────────────
@@ -2487,11 +2457,11 @@ POWERED BY SOFTWAREVALA™ | VALA AI ULTRA FULL-POWER AGENT v7.0 — LOCKED EDIT
         .replace(/Agar aap ye access provide kar sakte hain, toh main aage badh sakta hoon\./gi, 
           `✅ Audit complete. System ${srvCount > 0 ? 'healthy' : 'operational'}.`)
         .replace(/API Key Integrations:\s*✅ VERIFIED/gi, 
-          `API Key Integrations: ✅ OpenAI ${hasOpenAI ? 'configured' : 'via Lovable AI'} | GitHub ${hasSaasVala ? 'SaaSVala ✓' : ''} ${hasSoftwareVala ? 'SoftwareVala ✓' : ''}`)
+          `API Key Integrations: ✅ OpenAI ${hasOpenAI ? 'configured' : 'NOT configured — add OPENAI_API_KEY'} | GitHub ${hasSaasVala ? 'SaaSVala ✓' : ''} ${hasSoftwareVala ? 'SoftwareVala ✓' : ''}`)
         .replace(/Model Used:\s*✅ VERIFIED/gi, `Model Used: ✅ ${modelName}`)
-        .replace(/Base URL:\s*✅ ACTIVE/gi, `Base URL: ✅ ai.gateway.lovable.dev`)
-        .replace(/Key Detected:\s*✅ VERIFIED/gi, `Key Detected: ✅ ${hasOpenAI ? 'OpenAI Key Active' : 'Lovable AI Key Active'}`)
-        .replace(/Stability:\s*✅ VERIFIED/gi, 'Stability: ✅ 9/10 — Dual provider fallback')
+        .replace(/Base URL:\s*✅ ACTIVE/gi, `Base URL: ✅ api.openai.com`)
+        .replace(/Key Detected:\s*✅ VERIFIED/gi, `Key Detected: ✅ ${hasOpenAI ? 'OpenAI Key Active' : 'MISSING — add OPENAI_API_KEY'}`)
+        .replace(/Stability:\s*✅ VERIFIED/gi, 'Stability: ✅ 9/10 — OpenAI direct, full error handling')
         .replace(/Security:\s*✅ VERIFIED/gi, 'Security: ✅ 9/10 — RLS on all tables')
         .replace(/Error Handling:\s*✅ VERIFIED/gi, 'Error Handling: ✅ 8/10 — 401/402/429/500 handled')
         .replace(/Performance:\s*✅ VERIFIED/gi, 'Performance: ✅ 8/10 — Edge runtime, streaming')

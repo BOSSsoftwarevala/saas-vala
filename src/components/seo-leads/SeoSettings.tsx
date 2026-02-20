@@ -51,8 +51,8 @@ export function SeoSettings() {
   "@context": "https://schema.org",
   "@type": "Organization",
   "name": "SaaS VALA",
-  "url": "https://id-preview--2dbe056f-e58d-4a25-ac47-b8b9c5f67907.lovable.app",
-  "logo": "https://id-preview--2dbe056f-e58d-4a25-ac47-b8b9c5f67907.lovable.app/favicon.png",
+  "url": "https://saasvala.com",
+  "logo": "https://saasvala.com/favicon.png",
   "sameAs": [
     "https://facebook.com/saasvala",
     "https://twitter.com/saasvala"

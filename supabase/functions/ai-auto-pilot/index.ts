@@ -48,14 +48,14 @@ Respond with JSON:
   "response_to_client": "string"
 }`;
 
-        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            Authorization: `Bearer ${Deno.env.get("OPENAI_API_KEY")}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
+            model: "gpt-4o-mini",
             messages: [
               { role: "system", content: systemPrompt },
               { role: "user", content: `Client: ${clientName}\nRequest Type: ${requestType}\nDetails: ${requestDetails}` }
@@ -130,14 +130,14 @@ Respond with JSON array of 2 products:
   "description": "2-3 sentence description"
 }]`;
 
-        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            Authorization: `Bearer ${Deno.env.get("OPENAI_API_KEY")}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
+            model: "gpt-4o-mini",
             messages: [
               { role: "system", content: systemPrompt },
               { role: "user", content: `Generate 2 new software products for date: ${date}. Make them unique and useful for small businesses.` }
@@ -202,14 +202,14 @@ Respond with JSON:
   "schema_markup": {}
 }`;
 
-        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            Authorization: `Bearer ${Deno.env.get("OPENAI_API_KEY")}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
+            model: "gpt-4o-mini",
             messages: [
               { role: "system", content: systemPrompt },
               { role: "user", content: `Product: ${productName}\nDescription: ${productDescription}\n\nGenerate comprehensive SEO strategy for India and Africa markets.` }
