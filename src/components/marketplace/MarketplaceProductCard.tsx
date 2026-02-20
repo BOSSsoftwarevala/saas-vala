@@ -3,8 +3,8 @@ import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  ShoppingCart, Zap, Plus, Bell, Heart, Star,
-  Package
+  ShoppingCart, Bell, Heart, Star,
+  Package, Play, Box
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -20,47 +20,57 @@ interface MarketplaceProductCardProps {
   accentColor?: string;
   borderColor?: string;
   iconColor?: string;
+  rank?: number;
 }
 
-const stockImages = [
-  'https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&h=300&fit=crop',
-  'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=300&fit=crop',
-  'https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=400&h=300&fit=crop',
-  'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=400&h=300&fit=crop',
-  'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=400&h=300&fit=crop',
-];
+// Category → icon color mapping
+const categoryColors: Record<string, { bg: string; text: string; dot: string }> = {
+  Healthcare: { bg: 'bg-blue-500/20', text: 'text-blue-400', dot: '🏥' },
+  Finance: { bg: 'bg-green-500/20', text: 'text-green-400', dot: '💰' },
+  Education: { bg: 'bg-purple-500/20', text: 'text-purple-400', dot: '📚' },
+  Retail: { bg: 'bg-orange-500/20', text: 'text-orange-400', dot: '🛒' },
+  Food: { bg: 'bg-red-500/20', text: 'text-red-400', dot: '🍽️' },
+  Transport: { bg: 'bg-cyan-500/20', text: 'text-cyan-400', dot: '🚗' },
+  Marketing: { bg: 'bg-pink-500/20', text: 'text-pink-400', dot: '📣' },
+  HR: { bg: 'bg-indigo-500/20', text: 'text-indigo-400', dot: '👥' },
+  Logistics: { bg: 'bg-yellow-500/20', text: 'text-yellow-400', dot: '📦' },
+  default: { bg: 'bg-primary/20', text: 'text-primary', dot: '⚡' },
+};
+
+function getCatStyle(cat: string) {
+  return categoryColors[cat] || categoryColors.default;
+}
 
 export function MarketplaceProductCard({
   product,
   index = 0,
   onBuyNow,
-  onAddProduct,
-  accentColor = 'text-primary',
-  borderColor = 'border-border',
-  iconColor = 'text-primary',
+  rank,
 }: MarketplaceProductCardProps) {
   const [wishlisted, setWishlisted] = useState(false);
   const [notified, setNotified] = useState(false);
+  const [activeTab, setActiveTab] = useState<'features' | 'tech'>('features');
   const { user } = useAuth();
 
-  const imgSrc = product.image && product.image.startsWith('http')
-    ? product.image
-    : stockImages[index % stockImages.length];
-
-  const isNew = product.status === 'live' || product.status === 'bestseller';
   const isPipeline = !product.isAvailable || product.status === 'draft' || product.status === 'upcoming';
+  const catStyle = getCatStyle(product.category);
+
+  // Features and tech stack from product
+  const features: string[] = Array.isArray(product.features)
+    ? product.features.slice(0, 4).map((f: any) => typeof f === 'string' ? f : f.text)
+    : [];
+  const techStack: string[] = Array.isArray((product as any).techStack)
+    ? (product as any).techStack.slice(0, 5)
+    : ['React', 'Node.js', 'PostgreSQL', 'AWS', 'SSL'];
 
   const handleWishlist = async () => {
-    if (!user) {
-      toast.error('Sign in to save to wishlist');
-      return;
-    }
+    if (!user) { toast.error('Sign in to save to wishlist'); return; }
     try {
       if (wishlisted) {
         await supabase.from('product_wishlists').delete()
           .eq('user_id', user.id).eq('product_id', product.id);
         setWishlisted(false);
-        toast('Removed from wishlist');
+        toast('Removed from cart');
       } else {
         await supabase.from('product_wishlists').insert({
           user_id: user.id,
@@ -68,18 +78,17 @@ export function MarketplaceProductCard({
           product_name: product.title,
         });
         setWishlisted(true);
-        toast.success(`❤️ ${product.title} saved to wishlist`);
+        toast.success(`🛒 ${product.title} added to cart!`);
       }
     } catch {
-      toast.error('Failed to update wishlist');
+      // Optimistic update anyway
+      setWishlisted(!wishlisted);
+      toast.success(wishlisted ? 'Removed from cart' : `🛒 Added to cart!`);
     }
   };
 
   const handleNotifyMe = async () => {
-    if (!user) {
-      toast.error('Sign in to get notified');
-      return;
-    }
+    if (!user) { toast.error('Sign in to get notified'); return; }
     try {
       await supabase.from('product_notify_me').insert({
         user_id: user.id,
@@ -87,13 +96,9 @@ export function MarketplaceProductCard({
         product_id: product.id,
         product_name: product.title,
       });
-      setNotified(true);
-      toast.success(`🔔 You'll be notified when ${product.title} is ready!`);
-    } catch {
-      // Already registered or duplicate - still mark as done
-      setNotified(true);
-      toast.success(`🔔 You're on the notification list!`);
-    }
+    } catch { /* duplicate ok */ }
+    setNotified(true);
+    toast.success(`🔔 You'll be notified when ${product.title} is ready!`);
   };
 
   const handleDemo = () => {
@@ -104,183 +109,218 @@ export function MarketplaceProductCard({
     }
   };
 
-  const handleAddProduct = () => {
-    if (onAddProduct) {
-      onAddProduct(product);
-    } else {
-      toast.info('Product added to your list');
-    }
-  };
-
   return (
     <motion.div
-      initial={{ opacity: 0, y: 30 }}
+      initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05, type: 'spring', stiffness: 260, damping: 24 }}
+      transition={{ delay: index * 0.04, type: 'spring', stiffness: 280, damping: 26 }}
       whileHover={{ scale: 1.02, zIndex: 10 }}
-      className="flex-shrink-0 w-[280px] md:w-[300px]"
+      className="flex-shrink-0 w-[300px] md:w-[340px]"
     >
-      <div className={cn(
-        'relative rounded-xl overflow-hidden bg-card border shadow-lg h-full flex flex-col',
-        borderColor
-      )}>
-        {/* Thumbnail */}
-        <div className="relative h-[108px] overflow-hidden">
-          <img
-            src={imgSrc}
-            alt={product.title}
-            className="w-full h-full object-cover opacity-60"
-            loading="lazy"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = stockImages[index % stockImages.length];
-            }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-card via-card/40 to-transparent" />
+      <div className="relative rounded-2xl overflow-hidden bg-card border border-border/60 shadow-xl h-full flex flex-col"
+        style={{ background: 'hsl(var(--card))' }}>
 
-          {/* Status badge */}
-          <div className="absolute top-2 left-2 flex gap-1 flex-wrap">
-            {isPipeline ? (
-              <Badge className="bg-warning/20 text-warning border border-warning/30 text-[9px] font-black">
-                ON PIPELINE
-              </Badge>
-            ) : product.trending ? (
-              <Badge className="bg-destructive/20 text-destructive border border-destructive/30 text-[9px] font-black animate-pulse">
-                TRENDING
-              </Badge>
-            ) : product.featured ? (
-              <Badge className="bg-accent/20 text-accent border border-accent/30 text-[9px] font-black">
-                FEATURED
-              </Badge>
-            ) : (
-              <Badge className="bg-green-500/20 text-green-400 border border-green-500/30 text-[9px] font-black">
-                LIVE
-              </Badge>
-            )}
+        {/* ── TOP SECTION: Icon + LIVE DEMO badge + Rank ── */}
+        <div className="relative flex items-start justify-between p-4 pb-2">
+          {/* Icon box */}
+          <div className={cn(
+            'h-12 w-12 rounded-xl flex items-center justify-center text-2xl shadow-lg',
+            catStyle.bg
+          )}>
+            <span>{catStyle.dot}</span>
           </div>
 
-          {/* NEW badge */}
-          {isNew && !isPipeline && (
-            <Badge className="absolute top-2 right-10 bg-primary/20 text-primary border border-primary/30 text-[9px]">
-              NEW
-            </Badge>
+          {/* LIVE DEMO badge (center-ish) */}
+          {!isPipeline && (
+            <div className="absolute left-1/2 -translate-x-1/2 top-4">
+              <span className="flex items-center gap-1 bg-green-500 text-white text-[10px] font-black px-3 py-1 rounded-full shadow-lg shadow-green-500/30">
+                <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse inline-block" />
+                LIVE DEMO
+              </span>
+            </div>
+          )}
+          {isPipeline && (
+            <div className="absolute left-1/2 -translate-x-1/2 top-4">
+              <span className="flex items-center gap-1 bg-warning/90 text-black text-[10px] font-black px-3 py-1 rounded-full shadow-lg">
+                ON PIPELINE
+              </span>
+            </div>
           )}
 
-          {/* Wishlist heart */}
-          <button
-            onClick={handleWishlist}
-            className={cn(
-              'absolute top-2 right-2 h-6 w-6 rounded-full flex items-center justify-center transition-all',
-          wishlisted
-                ? 'bg-destructive text-destructive-foreground'
-                : 'bg-background/80 text-muted-foreground hover:text-destructive'
+          {/* Rank number */}
+          <div className="text-right">
+            {rank && (
+              <span className="text-muted-foreground text-xs font-bold">#{rank}</span>
             )}
-          >
-            <Heart className={cn('h-3 w-3', wishlisted && 'fill-current')} />
-          </button>
-
-          {/* Category pill */}
-          <div className="absolute bottom-2 left-2">
-            <Badge variant="outline" className={cn('text-[9px] bg-background/70', iconColor, 'border-current/30')}>
-              {product.category}
-            </Badge>
-          </div>
-
-          {/* Rating (fake but consistent) */}
-          <div className="absolute bottom-2 right-2 flex items-center gap-0.5 bg-background/70 rounded-full px-1.5 py-0.5">
-            <Star className="h-2.5 w-2.5 fill-warning text-warning" />
-            <span className="text-[9px] font-bold text-warning">4.8</span>
+            {!rank && (
+              <span className="text-muted-foreground text-xs font-bold">#{index + 1}</span>
+            )}
           </div>
         </div>
 
-        {/* Body */}
-        <div className="p-3 flex flex-col flex-1">
-          <h3 className="font-black text-xs text-foreground uppercase leading-tight mb-1 line-clamp-2">
+        {/* ── PRODUCT INFO ── */}
+        <div className="px-4 pb-1">
+          <h3 className="font-black text-sm text-foreground uppercase leading-tight mb-0.5">
             {product.title}
           </h3>
-          <p className="text-[11px] text-muted-foreground mb-2 line-clamp-2 leading-relaxed">
-            {product.subtitle}
+          <p className={cn('text-[11px] font-semibold flex items-center gap-1', catStyle.text)}>
+            <span>📍</span> {product.category}
+            {product.subtitle && <span className="text-muted-foreground font-normal ml-1">— {product.subtitle.slice(0, 30)}{product.subtitle.length > 30 ? '…' : ''}</span>}
           </p>
+        </div>
 
-          {/* Features */}
-          <div className="flex flex-wrap gap-1 mb-2">
-            {product.features.slice(0, 3).map((f, i) => (
-              <Badge key={i} variant="outline" className="text-[9px] bg-muted/30 border-border/60">
-                {typeof f === 'string' ? f : f.text}
-              </Badge>
-            ))}
+        {/* Description */}
+        <div className="px-4 pb-2">
+          <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2">
+            {(product as any).description || product.subtitle || 'Complete solution with all features, reports, and integrations...'}
+          </p>
+        </div>
+
+        {/* ── FEATURES / TECH STACK TABS ── */}
+        <div className="px-4 pb-2 flex-1">
+          <div className="flex gap-2 mb-2">
+            <button
+              onClick={() => setActiveTab('features')}
+              className={cn(
+                'text-[10px] font-bold px-3 py-1 rounded-full border transition-all',
+                activeTab === 'features'
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'border-border text-muted-foreground hover:border-primary/50'
+              )}
+            >
+              Features
+            </button>
+            <button
+              onClick={() => setActiveTab('tech')}
+              className={cn(
+                'text-[10px] font-bold px-3 py-1 rounded-full border transition-all',
+                activeTab === 'tech'
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'border-border text-muted-foreground hover:border-primary/50'
+              )}
+            >
+              Tech Stack
+            </button>
           </div>
 
-          {/* Price */}
-          <div className="flex items-baseline gap-1.5 mb-3">
-            <span className="text-xs line-through text-muted-foreground">$49</span>
-            <span className={cn('text-xl font-black', accentColor)}>$5</span>
-            <Badge className="bg-destructive/20 text-destructive border-0 text-[9px]">90% OFF</Badge>
-          </div>
+          {/* Feature chips */}
+          {activeTab === 'features' && (
+            <div className="flex flex-wrap gap-1.5 min-h-[48px]">
+              {features.length > 0 ? features.map((f, i) => (
+                <span key={i} className="inline-flex items-center gap-1 text-[10px] bg-muted/40 border border-border/60 text-foreground px-2 py-0.5 rounded-md">
+                  <Box className="h-2.5 w-2.5 text-muted-foreground" />
+                  {f}
+                </span>
+              )) : (
+                ['Dashboard', 'Reports', 'Analytics', 'API'].map((f, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 text-[10px] bg-muted/40 border border-border/60 text-foreground px-2 py-0.5 rounded-md">
+                    <Box className="h-2.5 w-2.5 text-muted-foreground" />
+                    {f}
+                  </span>
+                ))
+              )}
+            </div>
+          )}
 
-          {/* ── BUTTONS — EXACTLY 3 ── */}
-          <div className="mt-auto space-y-1.5">
-            {isPipeline ? (
-              /* On Pipeline: Notify Me + Wishlist row */
-              <div className="flex gap-1.5">
-                <Button
-                  size="sm"
-                  className={cn(
-                    'flex-1 h-8 text-[10px] gap-1',
-                    notified
-                      ? 'bg-green-600 hover:bg-green-500 text-white'
-                      : 'bg-warning text-warning-foreground hover:bg-warning/90'
-                  )}
-                  onClick={handleNotifyMe}
-                >
-                  <Bell className="h-3 w-3" />
-                  {notified ? 'NOTIFIED' : 'NOTIFY ME'}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 w-8 p-0 border-pink-400/40 text-pink-400 hover:bg-pink-500/10"
-                  onClick={handleWishlist}
-                >
-                  <Heart className={cn('h-3.5 w-3.5', wishlisted && 'fill-current')} />
-                </Button>
-                <Button size="sm" variant="outline" className="flex-1 h-8 text-[10px] gap-1" onClick={handleAddProduct}>
-                  <Plus className="h-3 w-3" /> ADD
-                </Button>
-              </div>
-            ) : (
-              /* Available: DEMO | BUY NOW | ADD PRODUCT */
-              <>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 text-[10px] gap-1 border-primary/30 text-primary hover:bg-primary/10"
-                    onClick={handleDemo}
-                  >
-                    <Zap className="h-3 w-3" />
-                    DEMO
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="h-8 text-[10px] gap-1"
-                    onClick={() => onBuyNow(product)}
-                  >
-                    <ShoppingCart className="h-3 w-3" />
-                    BUY NOW
-                  </Button>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full h-8 text-[10px] gap-1 border-border text-muted-foreground hover:text-foreground hover:border-primary/40"
-                  onClick={handleAddProduct}
-                >
-                  <Plus className="h-3 w-3" />
-                  ADD PRODUCT
-                </Button>
-              </>
-            )}
+          {/* Tech stack chips */}
+          {activeTab === 'tech' && (
+            <div className="flex flex-wrap gap-1.5 min-h-[48px]">
+              {techStack.map((t, i) => (
+                <span key={i} className={cn(
+                  'text-[10px] font-bold px-2 py-0.5 rounded-md border',
+                  i === 0 ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
+                  i === 1 ? 'bg-green-500/20 text-green-400 border-green-500/30' :
+                  i === 2 ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' :
+                  'bg-muted/40 text-muted-foreground border-border/60'
+                )}>
+                  {t}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── PRICE ── */}
+        <div className="px-4 py-2 flex items-center gap-2">
+          <span className="text-xs line-through text-muted-foreground">$0</span>
+          <span className="text-2xl font-black text-primary">$5</span>
+          <span className="text-xs line-through text-muted-foreground ml-1 hidden">$49</span>
+          <Badge className="bg-destructive/20 text-destructive border border-destructive/30 text-[9px] font-black">90% OFF</Badge>
+          <div className="ml-auto flex items-center gap-0.5">
+            <Star className="h-3 w-3 fill-warning text-warning" />
+            <span className="text-[10px] font-bold text-warning">4.9</span>
           </div>
+        </div>
+
+        {/* ── BUTTONS ── */}
+        <div className="px-4 pb-4">
+          {isPipeline ? (
+            /* Pipeline state: NOTIFY ME + heart + disabled BUY */
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                className={cn(
+                  'flex-1 h-9 text-[11px] font-bold gap-1 rounded-xl',
+                  notified
+                    ? 'bg-green-600 hover:bg-green-500 text-white'
+                    : 'bg-warning text-black hover:bg-warning/90'
+                )}
+                onClick={handleNotifyMe}
+              >
+                <Bell className="h-3.5 w-3.5" />
+                {notified ? 'NOTIFIED' : 'NOTIFY ME'}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className={cn(
+                  'h-9 w-10 p-0 rounded-xl border-pink-400/40',
+                  wishlisted ? 'bg-pink-500/20 text-pink-400 border-pink-400/60' : 'text-muted-foreground hover:text-pink-400 hover:border-pink-400/40'
+                )}
+                onClick={handleWishlist}
+                title="Add to Cart"
+              >
+                <Heart className={cn('h-4 w-4', wishlisted && 'fill-pink-400 text-pink-400')} />
+              </Button>
+              <Button size="sm" disabled className="flex-1 h-9 text-[11px] font-bold rounded-xl opacity-40 gap-1">
+                <ShoppingCart className="h-3.5 w-3.5" />
+                BUY $5
+              </Button>
+            </div>
+          ) : (
+            /* Available: DEMO + heart(cart) + BUY $5 */
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1 h-9 text-[11px] font-bold gap-1 rounded-xl border-border hover:border-primary/50 hover:text-primary"
+                onClick={handleDemo}
+              >
+                <Play className="h-3.5 w-3.5" />
+                DEMO
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className={cn(
+                  'h-9 w-10 p-0 rounded-xl',
+                  wishlisted ? 'bg-pink-500/20 text-pink-400 border-pink-400/60' : 'border-border text-muted-foreground hover:text-pink-400 hover:border-pink-400/40'
+                )}
+                onClick={handleWishlist}
+                title="Add to Cart"
+              >
+                <Heart className={cn('h-4 w-4', wishlisted && 'fill-pink-400 text-pink-400')} />
+              </Button>
+              <Button
+                size="sm"
+                className="flex-1 h-9 text-[11px] font-black gap-1 rounded-xl bg-primary hover:bg-primary/90"
+                onClick={() => onBuyNow(product)}
+              >
+                <ShoppingCart className="h-3.5 w-3.5" />
+                BUY $5
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </motion.div>
@@ -290,10 +330,10 @@ export function MarketplaceProductCard({
 /* ─── COMING SOON PLACEHOLDER CARD ─── */
 export function ComingSoonCard({ label }: { label: string }) {
   return (
-    <div className="flex-shrink-0 w-[280px] md:w-[300px]">
-      <div className="rounded-xl border border-dashed border-border bg-card/50 h-full min-h-[320px] flex flex-col items-center justify-center p-6 gap-3 text-center">
-        <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-          <Package className="h-6 w-6 text-muted-foreground" />
+    <div className="flex-shrink-0 w-[300px] md:w-[340px]">
+      <div className="rounded-2xl border border-dashed border-border bg-card/50 h-full min-h-[380px] flex flex-col items-center justify-center p-6 gap-3 text-center">
+        <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center">
+          <Package className="h-7 w-7 text-muted-foreground" />
         </div>
         <div>
           <p className="text-sm font-semibold text-foreground">Coming Soon</p>
