@@ -760,10 +760,10 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
           model={selectedModel.split('/').pop() || 'gemini-3-flash'}
         />
 
-        {/* Messages Area */}
-        <div className="flex-1 min-h-0 overflow-y-auto">
+        {/* Messages Area — scrollable, fills remaining space */}
+        <div className="flex-1 overflow-y-auto" style={{ minHeight: 0 }}>
           {activeSession && activeSession.messages.length > 0 ? (
-            <div className="max-w-4xl mx-auto px-4 pb-4 pt-2">
+            <div className="max-w-4xl mx-auto px-4 pb-32 pt-4">
               {activeSession.messages.map((message, index) => (
                 <div key={message.id} id={`message-${message.id}`}>
                   <ChatMessage
@@ -775,34 +775,38 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
                   />
                 </div>
               ))}
-              {isLoading && activeSession.messages[activeSession.messages.length - 1]?.role === 'user' && (
+              {isLoading && (
                 <ThinkingIndicator isActive={true} context={thinkingContext} />
               )}
               <div ref={messagesEndRef} />
             </div>
           ) : (
             /* Welcome screen when no messages */
-            <div className="flex-1 flex flex-col items-center justify-center h-full text-center px-8">
-              <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-6">
-                <span className="text-3xl">🤖</span>
+            <div className="flex flex-col items-center justify-center min-h-full py-20 text-center px-8">
+              <div className="w-20 h-20 rounded-3xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-6 shadow-lg">
+                <span className="text-4xl">🤖</span>
               </div>
-              <h2 className="text-2xl font-bold text-foreground mb-2">VALA AI</h2>
-              <p className="text-muted-foreground mb-8 max-w-md">
-                Full-Stack Developer + Business Automation Expert. Kuch bhi poocho — code, deploy, analyze, audit.
+              <h2 className="text-3xl font-bold text-foreground mb-3">VALA AI</h2>
+              <p className="text-muted-foreground mb-10 max-w-md text-base leading-relaxed">
+                Full-Stack Developer + Business Automation Expert.<br />
+                Kuch bhi poocho — code, deploy, analyze, audit.
               </p>
-              <div className="grid grid-cols-2 gap-3 max-w-lg w-full">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl w-full">
                 {[
-                  '🔍 GitHub repos audit karo',
-                  '🚀 Server status check karo',
-                  '💡 New product idea suggest karo',
-                  '🛡️ Security scan karo',
-                ].map((suggestion) => (
+                  { emoji: '🔍', text: 'GitHub repos audit karo' },
+                  { emoji: '🚀', text: 'Server status check karo' },
+                  { emoji: '💡', text: 'New product idea suggest karo' },
+                  { emoji: '🛡️', text: 'Security scan karo' },
+                  { emoji: '📊', text: 'System health report do' },
+                  { emoji: '🔑', text: 'License key generate karo' },
+                ].map(({ emoji, text }) => (
                   <button
-                    key={suggestion}
-                    onClick={() => handleSuggestionClick(suggestion)}
-                    className="text-left p-3 rounded-xl border border-border/50 bg-card/50 hover:bg-card hover:border-primary/30 transition-all text-sm text-muted-foreground hover:text-foreground"
+                    key={text}
+                    onClick={() => handleSuggestionClick(`${emoji} ${text}`)}
+                    className="flex items-center gap-3 text-left p-4 rounded-xl border border-border/50 bg-card/40 hover:bg-card hover:border-primary/40 hover:shadow-md transition-all text-sm text-muted-foreground hover:text-foreground group"
                   >
-                    {suggestion}
+                    <span className="text-xl group-hover:scale-110 transition-transform">{emoji}</span>
+                    <span>{text}</span>
                   </button>
                 ))}
               </div>
@@ -810,8 +814,8 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
           )}
         </div>
 
-        {/* Chat Input at bottom of main area */}
-        <div className="border-t border-border/50 bg-background/80 backdrop-blur-sm">
+        {/* Chat Input — sticky at bottom */}
+        <div className="border-t border-border/50 bg-background/95 backdrop-blur-md shadow-lg">
           <div className="max-w-4xl mx-auto">
             <ChatInput onSend={handleSend} isLoading={isLoading} onVoiceMessage={handleVoiceMessage} />
           </div>
