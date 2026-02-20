@@ -9,6 +9,8 @@ import {
   ChevronLeft,
   ChevronRight,
   MoreVertical,
+  MessageSquare,
+  Trash2,
 } from 'lucide-react';
 import {
   Tooltip,
@@ -61,6 +63,11 @@ const demoProjects: Project[] = [
 ];
 
 export function ChatSidebar({
+  sessions,
+  activeSessionId,
+  onSelectSession,
+  onNewSession,
+  onDeleteSession,
   isOpen,
   onToggle,
   onOpenHistory,
@@ -116,6 +123,23 @@ export function ChatSidebar({
   };
 
   const getInitial = (name: string) => name.charAt(0).toUpperCase();
+
+  const formatTime = (date: Date) => {
+    try {
+      const d = date instanceof Date ? date : new Date(date);
+      const now = new Date();
+      const diff = now.getTime() - d.getTime();
+      const mins = Math.floor(diff / 60000);
+      const hours = Math.floor(diff / 3600000);
+      const days = Math.floor(diff / 86400000);
+      if (mins < 1) return 'just now';
+      if (mins < 60) return `${mins}m ago`;
+      if (hours < 24) return `${hours}h ago`;
+      return `${days}d ago`;
+    } catch {
+      return '';
+    }
+  };
 
   return (
     <>
@@ -233,10 +257,68 @@ export function ChatSidebar({
           </div>
         </TooltipProvider>
 
-        {/* Chat Content */}
+        {/* Session list + footer */}
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          {/* New Chat button */}
+          <div className="px-3 pt-3 pb-1 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onNewSession}
+              className="w-full h-8 text-xs gap-1.5 border-dashed border-border/60 hover:border-primary/40 hover:bg-primary/5"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New Chat
+            </Button>
+          </div>
+
+          {/* Chat sessions list */}
+          <div className="flex-1 overflow-y-auto px-2 py-1 space-y-0.5">
+            {sessions.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground text-xs">
+                <MessageSquare className="h-6 w-6 mx-auto mb-2 opacity-30" />
+                <p>No chats yet</p>
+                <p className="opacity-60 mt-0.5">Start a new conversation</p>
+              </div>
+            ) : (
+              sessions.map((session) => (
+                <div
+                  key={session.id}
+                  className={cn(
+                    'group flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer transition-all text-xs',
+                    activeSessionId === session.id
+                      ? 'bg-primary/10 text-foreground border border-primary/20'
+                      : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                  )}
+                  onClick={() => onSelectSession(session.id)}
+                >
+                  <MessageSquare className={cn(
+                    'h-3.5 w-3.5 shrink-0',
+                    activeSessionId === session.id ? 'text-primary' : 'text-muted-foreground/60'
+                  )} />
+                  <div className="flex-1 min-w-0">
+                    <p className="truncate font-medium leading-tight">{session.title}</p>
+                    <p className="text-[10px] text-muted-foreground/50 mt-0.5">
+                      {session.messages.length} msg · {formatTime(session.createdAt)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteSession(session.id);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 h-5 w-5 flex items-center justify-center rounded hover:bg-destructive/10 hover:text-destructive transition-all shrink-0"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Extra children (if any) */}
           {hasChatPanel && (
-            <div className="flex-1 min-h-0 overflow-hidden flex flex-col bg-background">
+            <div className="shrink-0 min-h-0 overflow-hidden flex flex-col bg-background">
               {children}
             </div>
           )}
@@ -262,4 +344,3 @@ export function ChatSidebar({
     </>
   );
 }
-

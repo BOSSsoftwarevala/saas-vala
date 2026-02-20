@@ -2275,12 +2275,13 @@ POWERED BY SOFTWAREVALA™ | VALA AI ULTRA FULL-POWER AGENT v7.0 — LOCKED EDIT
         
         // Update access count + last_accessed_at for recalled memories
         if (usedMemoryIds.length > 0) {
-          await supabase.rpc('increment_memory_access', { memory_ids: usedMemoryIds }).catch(() => {
-            // Fallback: direct update
-            supabase.from('ai_memories')
-              .update({ last_accessed_at: new Date().toISOString(), access_count: supabase.rpc('coalesce') })
+          try {
+            await supabase.from('ai_memories')
+              .update({ last_accessed_at: new Date().toISOString() })
               .in('id', usedMemoryIds);
-          });
+          } catch (_updateErr) {
+            // non-critical, ignore
+          }
           // Log recall in audit
           const recallAudit = usedMemoryIds.map(id => ({
             memory_id: id,

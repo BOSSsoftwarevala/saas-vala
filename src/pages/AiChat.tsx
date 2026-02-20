@@ -71,7 +71,9 @@ export default function AiChat() {
   });
   
   const [activeSessionId, setActiveSessionId] = useState<string | null>(() => {
-    return localStorage.getItem('saas-ai-active-session') || null;
+    const saved = localStorage.getItem('saas-ai-active-session');
+    // If we have a saved session id, use it; otherwise we'll auto-select later
+    return saved || null;
   });
   
   const [isLoading, setIsLoading] = useState(false);
@@ -108,6 +110,13 @@ export default function AiChat() {
   
   // Context for thinking indicator
   const [thinkingContext, setThinkingContext] = useState<'analyzing' | 'fixing' | 'deploying' | 'general'>('general');
+
+  // Auto-select first session if none is active but sessions exist
+  useEffect(() => {
+    if (!activeSessionId && sessions.length > 0) {
+      setActiveSessionId(sessions[0].id);
+    }
+  }, [sessions, activeSessionId]);
 
   const activeSession = sessions.find(s => s.id === activeSessionId);
  
@@ -755,8 +764,8 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
         onExport={handleExport}
       />
 
-      {/* Main Chat Area - Full messages display like Lovable */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ minWidth: 0 }}>
         <ChatHeader
           title={activeSession?.title || 'VALA AI'}
           onExport={handleExport}
