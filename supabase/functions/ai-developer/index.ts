@@ -1071,29 +1071,70 @@ async function executeListGithubRepos(args: any): Promise<ToolResult> {
     };
   }
 
-  try {
-    const response = await fetch(`https://api.github.com/users/${account}/repos?per_page=${limit}&sort=updated`, {
-      headers: {
-        'Authorization': `token ${GITHUB_TOKEN}`,
-        'Accept': 'application/vnd.github.v3+json',
-        'User-Agent': 'VALA-AI-Developer'
-      }
-    });
+  const ghHeaders = {
+    'Authorization': `token ${GITHUB_TOKEN}`,
+    'Accept': 'application/vnd.github.v3+json',
+    'User-Agent': 'VALA-AI-Developer'
+  };
 
-    if (!response.ok) {
-      return { 
-        tool_call_id: '', 
-        content: JSON.stringify({ error: 'Failed to fetch repos' }), 
-        success: false 
+  try {
+    // Step 1: Check if account is a user or organization
+    const accountInfoRes = await fetch(`https://api.github.com/users/${account}`, { headers: ghHeaders });
+    const accountInfo = accountInfoRes.ok ? await accountInfoRes.json() : null;
+    const isOrg = accountInfo?.type === 'Organization';
+
+    console.log(`[TOOL] list_github_repos: ${account} type=${accountInfo?.type ?? 'unknown'}`);
+
+    // Step 2: Try org endpoint first (covers private repos too if token has org access)
+    // For orgs: /orgs/:org/repos  For users: /user/repos (authenticated) or /users/:user/repos (public)
+    const endpoints: string[] = isOrg
+      ? [
+          `https://api.github.com/orgs/${account}/repos?per_page=${limit}&sort=updated&type=all`,
+          `https://api.github.com/users/${account}/repos?per_page=${limit}&sort=updated`,
+        ]
+      : [
+          `https://api.github.com/user/repos?per_page=${limit}&sort=updated&affiliation=owner,collaborator`,
+          `https://api.github.com/users/${account}/repos?per_page=${limit}&sort=updated`,
+        ];
+
+    let repos: any[] = [];
+    let lastStatus = 0;
+    let lastError = '';
+
+    for (const url of endpoints) {
+      const res = await fetch(url, { headers: ghHeaders });
+      lastStatus = res.status;
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          repos = data;
+          console.log(`[TOOL] list_github_repos: fetched ${repos.length} repos from ${url}`);
+          break;
+        }
+      } else {
+        lastError = await res.text();
+        console.warn(`[TOOL] list_github_repos: ${url} => ${res.status} ${lastError}`);
+      }
+    }
+
+    if (repos.length === 0) {
+      return {
+        tool_call_id: '',
+        content: JSON.stringify({
+          error: `No repositories found for ${account}. HTTP ${lastStatus}. Account type: ${accountInfo?.type ?? 'unknown'}. Detail: ${lastError || 'empty response'}`,
+          account,
+          total: 0,
+          repositories: []
+        }),
+        success: false
       };
     }
 
-    const repos = await response.json();
-    
     return {
       tool_call_id: '',
       content: JSON.stringify({
         account,
+        account_type: accountInfo?.type ?? 'unknown',
         total: repos.length,
         repositories: repos.map((r: any) => ({
           name: r.name,
@@ -1101,7 +1142,8 @@ async function executeListGithubRepos(args: any): Promise<ToolResult> {
           private: r.private,
           updated: r.updated_at,
           stars: r.stargazers_count,
-          language: r.language
+          language: r.language,
+          description: r.description
         }))
       }),
       success: true
