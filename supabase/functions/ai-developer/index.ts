@@ -1077,51 +1077,57 @@ async function executeListGithubRepos(args: any): Promise<ToolResult> {
     'User-Agent': 'VALA-AI-Developer'
   };
 
+  // Helper: paginate through ALL pages of a GitHub endpoint (max 100 per page)
+  const fetchAllPages = async (baseUrl: string): Promise<any[]> => {
+    const allRepos: any[] = [];
+    let page = 1;
+    while (true) {
+      const sep = baseUrl.includes('?') ? '&' : '?';
+      const url = `${baseUrl}${sep}per_page=100&page=${page}`;
+      const res = await fetch(url, { headers: ghHeaders });
+      if (!res.ok) {
+        console.warn(`[TOOL] list_github_repos paginate: ${url} => ${res.status}`);
+        break;
+      }
+      const data = await res.json();
+      if (!Array.isArray(data) || data.length === 0) break;
+      allRepos.push(...data);
+      console.log(`[TOOL] list_github_repos page ${page}: +${data.length} repos (total ${allRepos.length})`);
+      if (data.length < 100) break; // last page
+      page++;
+    }
+    return allRepos;
+  };
+
   try {
-    // Step 1: Check if account is a user or organization
+    // Step 1: Check if account is user or organization
     const accountInfoRes = await fetch(`https://api.github.com/users/${account}`, { headers: ghHeaders });
     const accountInfo = accountInfoRes.ok ? await accountInfoRes.json() : null;
     const isOrg = accountInfo?.type === 'Organization';
-
     console.log(`[TOOL] list_github_repos: ${account} type=${accountInfo?.type ?? 'unknown'}`);
 
-    // Step 2: Try org endpoint first (covers private repos too if token has org access)
-    // For orgs: /orgs/:org/repos  For users: /user/repos (authenticated) or /users/:user/repos (public)
-    const endpoints: string[] = isOrg
-      ? [
-          `https://api.github.com/orgs/${account}/repos?per_page=${limit}&sort=updated&type=all`,
-          `https://api.github.com/users/${account}/repos?per_page=${limit}&sort=updated`,
-        ]
-      : [
-          `https://api.github.com/user/repos?per_page=${limit}&sort=updated&affiliation=owner,collaborator`,
-          `https://api.github.com/users/${account}/repos?per_page=${limit}&sort=updated`,
-        ];
-
+    // Step 2: Fetch ALL repos with full pagination
+    // Authenticated /user/repos returns all repos (including private) the token owner has access to
     let repos: any[] = [];
-    let lastStatus = 0;
-    let lastError = '';
 
-    for (const url of endpoints) {
-      const res = await fetch(url, { headers: ghHeaders });
-      lastStatus = res.status;
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          repos = data;
-          console.log(`[TOOL] list_github_repos: fetched ${repos.length} repos from ${url}`);
-          break;
-        }
-      } else {
-        lastError = await res.text();
-        console.warn(`[TOOL] list_github_repos: ${url} => ${res.status} ${lastError}`);
+    if (isOrg) {
+      repos = await fetchAllPages(`https://api.github.com/orgs/${account}/repos?sort=updated&type=all`);
+    } else {
+      // Try authenticated endpoint first (returns private repos)
+      repos = await fetchAllPages(`https://api.github.com/user/repos?sort=updated&affiliation=owner,collaborator`);
+      // If nothing returned, fall back to public repos for that user
+      if (repos.length === 0) {
+        repos = await fetchAllPages(`https://api.github.com/users/${account}/repos?sort=updated`);
       }
     }
+
+    console.log(`[TOOL] list_github_repos: TOTAL ${repos.length} repos fetched for ${account}`);
 
     if (repos.length === 0) {
       return {
         tool_call_id: '',
         content: JSON.stringify({
-          error: `No repositories found for ${account}. HTTP ${lastStatus}. Account type: ${accountInfo?.type ?? 'unknown'}. Detail: ${lastError || 'empty response'}`,
+          error: `No repositories found for ${account}. Account type: ${accountInfo?.type ?? 'unknown'}. Token may lack permissions.`,
           account,
           total: 0,
           repositories: []
@@ -1152,7 +1158,7 @@ async function executeListGithubRepos(args: any): Promise<ToolResult> {
     return { 
       tool_call_id: '', 
       content: JSON.stringify({ error: error.message }), 
-      success: false 
+      success: false
     };
   }
 }
