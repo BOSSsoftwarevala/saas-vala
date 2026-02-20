@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { AiStatusPanel, AiStatusState } from '@/components/ai-chat/AiStatusPanel';
 import { ChatMessage, Message, FileAttachment } from '@/components/ai-chat/ChatMessage';
 import { ChatInput } from '@/components/ai-chat/ChatInput';
-import { ThinkingIndicator } from '@/components/ai-chat/ThinkingIndicator';
+
 import { ChatHistoryPanel } from '@/components/ai-chat/ChatHistoryPanel';
 import { ChatSearch } from '@/components/ai-chat/ChatSearch';
 import { KeyboardShortcuts, useKeyboardShortcuts } from '@/components/ai-chat/KeyboardShortcuts';
@@ -102,10 +103,12 @@ export default function AiChat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
 
-  const [aiStatus, setAiStatus] = useState({ tokensReceived: 0, elapsedTime: 0, error: null as string | null });
+  const [aiStatus, setAiStatus] = useState<AiStatusState>({ stage: 'idle' });
   const aiTimerRef = useRef<number | null>(null);
   const aiStartTimeRef = useRef<number | null>(null);
   const aiTokensRef = useRef<number>(0);
+  const _autoRetryRef = useRef<number | null>(null);
+  const _abortControllerRef = useRef<AbortController | null>(null);
 
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
   const [showSearchPanel, setShowSearchPanel] = useState(false);
@@ -193,6 +196,9 @@ export default function AiChat() {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
       body: JSON.stringify({ messages: formattedMessages, stream: false, model: selectedModel }),
     });
+
+    // Mark as connected — server responded
+    setAiStatus(prev => ({ ...prev, stage: 'connected' }));
 
     if (!resp.ok) {
       const error = await resp.json().catch(() => ({ error: 'Unknown error' }));
@@ -305,13 +311,14 @@ export default function AiChat() {
     setIsLoading(true);
     setGlobalWorking(true);
     setThinkingContext(detectThinkingContext(content));
-    setAiStatus({ tokensReceived: 0, elapsedTime: 0, error: null });
+    setAiStatus({ stage: 'sending', model: selectedModel });
 
     aiStartTimeRef.current = Date.now();
     aiTokensRef.current = 0;
+    aiStartTimeRef.current = Date.now();
     aiTimerRef.current = window.setInterval(() => {
-      setAiStatus(prev => ({ ...prev, elapsedTime: Math.floor((Date.now() - (aiStartTimeRef.current || Date.now())) / 1000) }));
-    }, 1000);
+      setAiStatus(prev => ({ ...prev, elapsedMs: Date.now() - (aiStartTimeRef.current || Date.now()) }));
+    }, 500);
 
     const aiActivityId = crypto.randomUUID();
     addGlobalActivity({ id: aiActivityId, type: 'ai', title: 'VALA AI Processing', status: 'processing', details: 'Generating response...', progress: 0 });
@@ -336,7 +343,7 @@ export default function AiChat() {
         return s;
       }));
       aiTokensRef.current = Math.floor(content.length / 4);
-      setAiStatus(prev => ({ ...prev, tokensReceived: aiTokensRef.current }));
+      setAiStatus(prev => ({ ...prev, stage: 'receiving', tokens: aiTokensRef.current }));
     };
 
     try {
@@ -353,21 +360,26 @@ export default function AiChat() {
         sessionId,
         (chunk) => { assistantContent += chunk; updateAssistantMessage(assistantContent); },
         () => {
+          const responseMs = aiStartTimeRef.current ? Date.now() - aiStartTimeRef.current : undefined;
           if (aiTimerRef.current) { window.clearInterval(aiTimerRef.current); aiTimerRef.current = null; }
+          setAiStatus(prev => ({ ...prev, stage: 'done', responseMs, tokens: aiTokensRef.current }));
           setIsLoading(false);
           setGlobalWorking(false);
           updateGlobalActivity(aiActivityId, { status: 'completed', progress: 100, title: 'Done', details: `${aiTokensRef.current} tokens` });
-          setTimeout(() => removeGlobalActivity(aiActivityId), 3000);
+          setTimeout(() => { removeGlobalActivity(aiActivityId); setAiStatus({ stage: 'idle' }); }, 4000);
         }
       );
     } catch (error) {
       console.error('AI Chat error:', error);
       if (aiTimerRef.current) { window.clearInterval(aiTimerRef.current); aiTimerRef.current = null; }
-      setAiStatus(prev => ({ ...prev, error: 'Failed' }));
-      updateGlobalActivity(aiActivityId, { status: 'failed', details: 'Error' });
       const errMsg = error instanceof Error ? error.message : String(error);
+      const errorCode = errMsg.includes('429') ? 429 : errMsg.includes('402') ? 402 : errMsg.includes('401') ? 401 : errMsg.includes('500') ? 500 : 'TIMEOUT';
+      setAiStatus({ stage: 'error', model: selectedModel, errorCode, errorMessage: errMsg, retryCount: 0 });
+      updateGlobalActivity(aiActivityId, { status: 'failed', details: 'Error' });
       let userFacingError = `❌ Error: ${errMsg}\n\nThodi der baad retry karo.`;
       if (errMsg.includes('402')) userFacingError = '⚠️ AI credits khatam. Settings mein credits add karo.';
+      if (errMsg.includes('429')) userFacingError = '⏳ Rate limit exceeded. 30 seconds baad dobara try karo.';
+      if (errMsg.includes('401')) userFacingError = '🔑 API Key invalid hai. Settings check karo.';
       updateAssistantMessage(userFacingError);
       setIsLoading(false);
       setGlobalWorking(false);
@@ -540,7 +552,10 @@ export default function AiChat() {
                     />
                   </div>
                 ))}
-                {isLoading && <ThinkingIndicator isActive={true} context={thinkingContext} />}
+                <AiStatusPanel 
+                  status={aiStatus}
+                  onDismissError={() => setAiStatus({ stage: 'idle' })}
+                />
                 <div ref={messagesEndRef} />
               </div>
             ) : (
@@ -580,7 +595,7 @@ export default function AiChat() {
               <ModelSelector selectedModel={selectedModel} onModelChange={setSelectedModel} />
               {isLoading && (
                 <span className="text-[10px] text-muted-foreground">
-                  {aiStatus.elapsedTime}s · {aiStatus.tokensReceived} tokens
+                  {aiStatus.elapsedMs ? `${(aiStatus.elapsedMs / 1000).toFixed(1)}s` : '0s'} · {aiStatus.tokens ?? 0} tokens
                 </span>
               )}
             </div>
