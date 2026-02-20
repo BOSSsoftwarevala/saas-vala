@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Bell, Clock, Zap, Users } from 'lucide-react';
 import { SectionHeader } from './SectionHeader';
+import { SectionSlider } from './SectionSlider';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -100,8 +101,8 @@ export function UpcomingSection() {
         totalCount={upcomingProducts.length}
       />
 
-      {/* Horizontal scroll slider */}
-      <div className="flex gap-4 overflow-x-auto scrollbar-hide px-4 md:px-8 pb-2" style={{ scrollbarWidth: 'none' }}>
+      {/* Horizontal scroll slider with arrows */}
+      <SectionSlider>
         {upcomingProducts.map((product, index) => (
           <motion.div
             key={product.id}
@@ -174,7 +175,7 @@ export function UpcomingSection() {
             </div>
           </motion.div>
         ))}
-      </div>
+      </SectionSlider>
     </section>
   );
 }

@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ShoppingCart, TrendingUp, Award, Star, Zap } from 'lucide-react';
 import { SectionHeader } from './SectionHeader';
+import { SectionSlider } from './SectionSlider';
 import { cn } from '@/lib/utils';
 
 interface TopSellingProduct {
@@ -57,7 +58,7 @@ export function TopSellingSection({ onBuyNow }: { onBuyNow: (p: any) => void }) 
         totalCount={topSellingProducts.length}
       />
 
-      <div className="flex gap-4 overflow-x-auto scrollbar-hide px-4 md:px-8 pb-2" style={{ scrollbarWidth: 'none' }}>
+      <SectionSlider>
         {topSellingProducts.map((product, index) => (
           <motion.div
             key={product.id}
@@ -145,7 +146,7 @@ export function TopSellingSection({ onBuyNow }: { onBuyNow: (p: any) => void }) 
             </div>
           </motion.div>
         ))}
-      </div>
+      </SectionSlider>
     </section>
   );
 }

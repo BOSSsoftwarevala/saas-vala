@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ShoppingCart, GraduationCap, BookOpen, Award, Users, Zap, Star } from 'lucide-react';
+import { SectionSlider } from './SectionSlider';
 import { cn } from '@/lib/utils';
 
 interface EduProduct {
@@ -75,7 +76,7 @@ export function EducationSection({ onBuyNow }: { onBuyNow: (p: any) => void }) {
         ))}
       </div>
 
-      <div className="flex gap-4 overflow-x-auto scrollbar-hide px-4 md:px-8 pb-2" style={{ scrollbarWidth: 'none' }}>
+      <SectionSlider>
         {eduProducts.map((product, index) => {
           const IconComp = product.icon;
           return (
@@ -154,7 +155,7 @@ export function EducationSection({ onBuyNow }: { onBuyNow: (p: any) => void }) {
             </motion.div>
           );
         })}
-      </div>
+      </SectionSlider>
     </section>
   );
 }

@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ShoppingCart, Heart, Play, Star, Flame, TrendingUp } from 'lucide-react';
 import { SectionHeader } from './SectionHeader';
+import { SectionSlider } from './SectionSlider';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -69,7 +70,7 @@ export function PopularProductsSection({ onBuyNow }: { onBuyNow: (p: any) => voi
         totalCount={popularProducts.length}
       />
 
-      <div className="flex gap-4 overflow-x-auto scrollbar-hide px-4 md:px-8 pb-2" style={{ scrollbarWidth: 'none' }}>
+      <SectionSlider>
         {popularProducts.map((product, index) => {
           const isWL = wishlisted.has(product.id);
           return (
@@ -149,7 +150,7 @@ export function PopularProductsSection({ onBuyNow }: { onBuyNow: (p: any) => voi
             </motion.div>
           );
         })}
-      </div>
+      </SectionSlider>
     </section>
   );
 }

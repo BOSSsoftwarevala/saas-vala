@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ShoppingCart, Download, Star, Zap } from 'lucide-react';
 import { SectionHeader } from './SectionHeader';
+import { SectionSlider } from './SectionSlider';
 import { cn } from '@/lib/utils';
 import * as LucideIcons from 'lucide-react';
 
@@ -99,7 +100,7 @@ export function OnDemandSection({ onBuyNow }: { onBuyNow: (p: any) => void }) {
         totalCount={onDemandProducts.length}
       />
 
-      <div className="flex gap-4 overflow-x-auto scrollbar-hide px-4 md:px-8 pb-2" style={{ scrollbarWidth: 'none' }}>
+      <SectionSlider>
         {onDemandProducts.map((product, index) => {
           const IconKey = product.features[0]?.icon as keyof typeof LucideIcons;
           const IconComp = (LucideIcons[IconKey] as React.ComponentType<{ className?: string }>) || LucideIcons.Box;
@@ -187,7 +188,7 @@ export function OnDemandSection({ onBuyNow }: { onBuyNow: (p: any) => void }) {
             </motion.div>
           );
         })}
-      </div>
+      </SectionSlider>
     </section>
   );
 }
