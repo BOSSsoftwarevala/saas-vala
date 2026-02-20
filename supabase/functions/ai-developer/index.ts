@@ -2168,7 +2168,25 @@ AUTO-BLOCK (no exceptions):
 POWERED BY SOFTWAREVALA™ | VALA AI ULTRA FULL-POWER AGENT v7.0 — LOCKED EDITION`
     };
 
-    const allMessages = [systemMessage, ...messages];
+    // ─── Smart context trimming to prevent token overflow ────────────────────
+    // Keep only last 10 messages to stay under 30k TPM limit.
+    // Always keep the most recent user message + prior context.
+    const MAX_HISTORY = 10;
+    const trimmedMessages = messages.length > MAX_HISTORY
+      ? messages.slice(messages.length - MAX_HISTORY)
+      : messages;
+
+    // Also trim individual message content if it's extremely large (e.g. tool results)
+    const safeMessages = trimmedMessages.map(m => {
+      const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content);
+      // Truncate very long messages (> 8000 chars) to prevent single-message overflow
+      return {
+        ...m,
+        content: content.length > 8000 ? content.slice(0, 8000) + '\n\n[...truncated for context window...]' : content,
+      };
+    });
+
+    const allMessages = [systemMessage, ...safeMessages];
 
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') ?? '';
 

@@ -630,7 +630,26 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
       }
       setAiStatus(prev => ({ ...prev, error: 'Failed to get response' }));
       updateGlobalActivity(aiActivityId, { status: 'failed', details: 'Error occurred' });
-      updateAssistantMessage('I apologize, but I encountered an error. Please try again.');
+      
+      // Show specific, actionable error messages
+      const errMsg = error instanceof Error ? error.message : String(error);
+      let userFacingError: string;
+      
+      if (errMsg.includes('credits exhausted') || errMsg.includes('402')) {
+        userFacingError = `⚠️ **AI Credits Khatam Ho Gaye**\n\nDono providers (OpenAI + Lovable AI) ke credits exhaust ho gaye hain.\n\n**Fix karo:**\n- OpenAI: https://platform.openai.com/billing mein credits add karo\n- Ya Lovable Workspace → Usage mein credits add karo\n\nIsके baad phir try karo. 🔄`;
+        toast.error('💳 AI credits khatam! Billing page pe credits add karo.', { duration: 10000 });
+      } else if (errMsg.includes('rate_limit') || errMsg.includes('429') || errMsg.includes('too large') || errMsg.includes('tokens')) {
+        userFacingError = `⚠️ **Token Limit Exceed Ho Gayi**\n\nConversation bohot lamba ho gaya hai. AI context window limit hit ho gayi.\n\n**Fix:** Naya chat session start karo (sidebar mein "+" button) ya current chat clear karo.`;
+        toast.warning('⏳ Naya chat session start karo — conversation bohot lamba ho gaya.', { duration: 8000 });
+      } else if (errMsg.includes('401')) {
+        userFacingError = `❌ **API Key Invalid**\n\nOpenAI API key invalid ya expired hai. Settings mein check karo.`;
+        toast.error('❌ API key issue. Admin se contact karo.', { duration: 8000 });
+      } else {
+        userFacingError = `❌ **Error aaya:** ${errMsg}\n\nThodi der baad retry karo ya naya chat start karo.`;
+        toast.error('Something went wrong. Retry karo.', { duration: 5000 });
+      }
+      
+      updateAssistantMessage(userFacingError);
       setIsLoading(false);
       setGlobalWorking(false);
     }
