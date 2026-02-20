@@ -355,29 +355,75 @@ export default function Auth() {
                       </button>
                    </div>
  
-                   {/* Login Button */}
-                   <Button
-                     type="submit"
-                     className="w-full bg-gradient-to-r from-primary to-orange-500 hover:opacity-90 text-white font-semibold h-12"
-                     disabled={isSubmitting}
-                   >
-                     {isSubmitting ? (
-                       <>
-                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                         Signing in...
-                       </>
-                     ) : (
-                       'Login'
-                     )}
-                   </Button>
- 
-                    {/* Sign Up Link */}
-                   <p className="text-center text-sm text-muted-foreground">
-                     Don't have an account?{' '}
-                     <button type="button" onClick={() => setAuthMode('signup')} className="text-primary font-medium hover:underline">
-                       Sign Up
-                     </button>
-                   </p>
+                    {/* Login Button */}
+                    <Button
+                      type="submit"
+                      className="w-full bg-gradient-to-r from-primary to-orange-500 hover:opacity-90 text-white font-semibold h-12"
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Signing in...
+                        </>
+                      ) : (
+                        'Login'
+                      )}
+                    </Button>
+
+                    {/* One-Click Quick Login */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-px bg-border/50" />
+                        <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider px-2">Quick Fill</span>
+                        <div className="flex-1 h-px bg-border/50" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <motion.button
+                          type="button"
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => {
+                            setLoginEmail('hellosoftwarevala@gmail.com');
+                            toast({ title: '👑 Admin email filled!', description: 'Enter your password and click Login' });
+                          }}
+                          disabled={isSubmitting}
+                          className="flex items-center gap-2 p-2.5 rounded-xl border border-orange-500/30 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 text-xs font-semibold transition-all disabled:opacity-50"
+                        >
+                          <div className="w-5 h-5 rounded-full bg-orange-500/20 flex items-center justify-center text-[10px]">👑</div>
+                          <div className="text-left">
+                            <div className="text-[10px] font-bold">ADMIN</div>
+                            <div className="text-[9px] text-orange-400/70">Fill Email</div>
+                          </div>
+                        </motion.button>
+
+                        <motion.button
+                          type="button"
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => {
+                            setLoginEmail('haroonzaka2@gmail.com');
+                            toast({ title: '🏪 Reseller email filled!', description: 'Enter your password and click Login' });
+                          }}
+                          disabled={isSubmitting}
+                          className="flex items-center gap-2 p-2.5 rounded-xl border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-xs font-semibold transition-all disabled:opacity-50"
+                        >
+                          <div className="w-5 h-5 rounded-full bg-cyan-500/20 flex items-center justify-center text-[10px]">🏪</div>
+                          <div className="text-left">
+                            <div className="text-[10px] font-bold">RESELLER</div>
+                            <div className="text-[9px] text-cyan-400/70">Fill Email</div>
+                          </div>
+                        </motion.button>
+                      </div>
+                    </div>
+
+                     {/* Sign Up Link */}
+                    <p className="text-center text-sm text-muted-foreground">
+                      Don't have an account?{' '}
+                      <button type="button" onClick={() => setAuthMode('signup')} className="text-primary font-medium hover:underline">
+                        Sign Up
+                      </button>
+                    </p>
                  </motion.form>
                 ) : authMode === 'forgot_password' ? (
                   <motion.div
