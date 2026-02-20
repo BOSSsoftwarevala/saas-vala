@@ -1231,19 +1231,21 @@ async function executeAddToSourceCatalog(args: any, supabase: any): Promise<Tool
   // Generate branded name
   const brandedName = `Vala ${industry.charAt(0).toUpperCase() + industry.slice(1)} ${project_name} ${tier}`;
 
+  const slug = project_name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+  
   const { data, error } = await supabase
     .from('source_code_catalog')
     .upsert({
-      repo_name: project_name.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-      display_name: brandedName,
-      github_url,
-      industry,
-      tier,
-      price,
-      status: 'active',
-      marketplace_ready: true,
-      last_synced: new Date().toISOString()
-    }, { onConflict: 'repo_name' })
+      project_name: project_name,
+      vala_name: brandedName,
+      slug: slug,
+      github_repo_url: github_url,
+      target_industry: industry,
+      marketplace_price: price,
+      is_on_marketplace: true,
+      status: 'analyzed',
+      analyzed_at: new Date().toISOString(),
+    }, { onConflict: 'slug' })
     .select()
     .single();
 
