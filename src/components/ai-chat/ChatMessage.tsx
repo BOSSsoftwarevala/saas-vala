@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button';
 import { User, Sparkles, Copy, Check, RotateCcw, FileCode, FileArchive, File, Image, Pin } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
- import ReactMarkdown from 'react-markdown';
- import remarkGfm from 'remark-gfm';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { MessageReactions } from './MessageReactions';
+import { CriticalApprovalBox, parseCriticalAction } from './CriticalApprovalBox';
 
 export interface FileAttachment {
   name: string;
@@ -30,6 +31,8 @@ interface ChatMessageProps {
   isPinned?: boolean;
   onPin?: (messageId: string) => void;
   onUnpin?: (messageId: string) => void;
+  onApproveAction?: (messageId: string, actionId: string) => void;
+  onDenyAction?: (messageId: string, actionId: string) => void;
 }
 
 const getFileIcon = (type: FileAttachment['type']) => {
@@ -41,9 +44,10 @@ const getFileIcon = (type: FileAttachment['type']) => {
   }
 };
 
-export function ChatMessage({ message, index = 0, isPinned, onPin, onUnpin }: ChatMessageProps) {
+export function ChatMessage({ message, index = 0, isPinned, onPin, onUnpin, onApproveAction, onDenyAction }: ChatMessageProps) {
   const [copied, setCopied] = useState(false);
   const isUser = message.role === 'user';
+  const criticalAction = !isUser ? parseCriticalAction(message.content) : null;
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(message.content);
@@ -303,6 +307,16 @@ export function ChatMessage({ message, index = 0, isPinned, onPin, onUnpin }: Ch
             <div className="text-[15px] text-foreground/90 leading-relaxed prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground/90 prose-strong:text-foreground prose-code:text-primary prose-a:text-primary">
               {renderContent(message.content)}
             </div>
+          )}
+
+          {/* Critical Approval Box — auto-detected from AI response */}
+          {criticalAction && (
+            <CriticalApprovalBox
+              data={criticalAction}
+              messageId={message.id}
+              onApprove={(actionId, payload) => onApproveAction?.(message.id, actionId)}
+              onDeny={(actionId) => onDenyAction?.(message.id, actionId)}
+            />
           )}
         </div>
       </div>

@@ -772,6 +772,15 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
                     isPinned={pinnedMessages.has(message.id)}
                     onPin={handlePinMessage}
                     onUnpin={handleUnpinMessage}
+                    onApproveAction={(messageId, actionId) => {
+                      // Send approval back to AI as a new user message
+                      handleSend(`✅ APPROVED — Action ID: ${actionId}. Aage badho aur execute karo.`);
+                      toast.success('Action approved! VALA AI executing...');
+                    }}
+                    onDenyAction={(messageId, actionId) => {
+                      handleSend(`❌ CANCELLED — Action ID: ${actionId}. Is action ko cancel kar do.`);
+                      toast.info('Action cancelled.');
+                    }}
                   />
                 </div>
               ))}
