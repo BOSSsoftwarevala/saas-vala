@@ -51,8 +51,8 @@ interface AiService {
 
 const services: AiService[] = [
   {
-    id: 'lovable-ai',
-    name: 'Lovable AI Gateway',
+    id: 'vala-ai',
+    name: 'VALA AI Gateway',
     description: 'GPT-5, Gemini 3, Claude - All models in one',
     icon: Brain,
     price: 5,

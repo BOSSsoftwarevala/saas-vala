@@ -8,43 +8,14 @@ import { MarketplaceProductCard, ComingSoonCard } from './MarketplaceProductCard
 import { OnDemandRequestModal } from './OnDemandRequestModal';
 import { useProductsByCategory } from '@/hooks/useMarketplaceProducts';
 
-const staticOnDemand = [
-  { id: 'od-1', title: 'SCHOOL ERP PRO', subtitle: 'Complete K-12 school management suite', category: 'Education', features: ['Admissions', 'Fee Mgmt', 'Attendance', 'Reports'] },
-  { id: 'od-2', title: 'HOSPITAL CRM AI', subtitle: 'Patient relationship & appointment AI', category: 'Healthcare', features: ['Patient Records', 'Appointments', 'AI Triage', 'Billing'] },
-  { id: 'od-3', title: 'RESTAURANT POS MAX', subtitle: 'Multi-outlet restaurant management', category: 'Food', features: ['Table Mgmt', 'KOT System', 'Delivery', 'Reports'] },
-  { id: 'od-4', title: 'FLEET TRACKER GPS', subtitle: 'Real-time vehicle tracking & dispatch', category: 'Transport', features: ['GPS Live', 'Driver App', 'Route AI', 'Analytics'] },
-  { id: 'od-5', title: 'PROPERTY MANAGER CRM', subtitle: 'End-to-end real estate & rental CRM', category: 'Finance', features: ['Lead Mgmt', 'Listings', 'Rental Track', 'Reports'] },
-  { id: 'od-6', title: 'WAREHOUSE WMS PRO', subtitle: 'Intelligent warehouse & inventory system', category: 'Logistics', features: ['Barcode Scan', 'Stock Mgmt', 'Purchase', 'Reports'] },
-  { id: 'od-7', title: 'CLINIC MANAGER LITE', subtitle: 'Fast clinic & pharmacy management', category: 'Healthcare', features: ['Patient OPD', 'Pharmacy', 'Lab Reports', 'Billing'] },
-  { id: 'od-8', title: 'GOVT CITIZEN PORTAL', subtitle: 'Municipal services & citizen app platform', category: 'Marketing', features: ['Online Forms', 'e-Payments', 'Grievance', 'Reports'] },
-];
-
 export function OnDemandSection({ onBuyNow }: { onBuyNow: (p: any) => void }) {
   const [requestModal, setRequestModal] = useState<{ open: boolean; product?: any }>({ open: false });
-  // Strict: only saas/cloud/on_demand — NOT education/school/college/coaching etc.
   const { products: dbProducts, loading } = useProductsByCategory(['saas', 'cloud', 'on_demand']);
 
   const openRequest = (product: any) => setRequestModal({ open: true, product });
 
-  const showStatic = dbProducts.length === 0;
-
-  const staticProducts = staticOnDemand.map((p, i) => ({
-    ...p,
-    price: 5,
-    image: '',
-    isAvailable: true,
-    status: 'live' as const,
-    trending: i < 3,
-    featured: i === 0,
-    demoUrl: '',
-    description: p.subtitle,
-  }));
-
-  const displayProducts = showStatic ? staticProducts : dbProducts;
-
   return (
     <section className="py-4">
-      {/* Section header with REQUEST DOWNLOAD CTA */}
       <div className="px-4 md:px-8 mb-5 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3 mb-1">
@@ -58,10 +29,9 @@ export function OnDemandSection({ onBuyNow }: { onBuyNow: (p: any) => void }) {
           </div>
           <p className="text-sm text-muted-foreground ml-9">
             Instantly deploy. No setup. Live in minutes.
-            <span className="ml-2 text-primary font-semibold">{displayProducts.length} products</span>
+            <span className="ml-2 text-primary font-semibold">{dbProducts.length} products</span>
           </p>
         </div>
-        {/* Prominent REQUEST DOWNLOAD button */}
         <Button
           className="gap-2 h-9 text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
           onClick={() => openRequest({ id: '', title: 'Custom Software', category: 'General' })}
@@ -72,7 +42,7 @@ export function OnDemandSection({ onBuyNow }: { onBuyNow: (p: any) => void }) {
       </div>
 
       <SectionSlider>
-        {displayProducts.map((product, i) => (
+        {dbProducts.map((product, i) => (
           <div key={product.id} className="flex flex-col gap-2">
             <MarketplaceProductCard
               product={product as any}
@@ -80,7 +50,6 @@ export function OnDemandSection({ onBuyNow }: { onBuyNow: (p: any) => void }) {
               onBuyNow={onBuyNow}
               rank={i + 1}
             />
-            {/* REQUEST DOWNLOAD per card */}
             <Button
               size="sm"
               variant="outline"
@@ -93,12 +62,11 @@ export function OnDemandSection({ onBuyNow }: { onBuyNow: (p: any) => void }) {
           </div>
         ))}
 
-        {!loading && displayProducts.length === 0 && (
+        {!loading && dbProducts.length === 0 && (
           <ComingSoonCard label="On-Demand" />
         )}
       </SectionSlider>
 
-      {/* On-Demand Request Modal */}
       <OnDemandRequestModal
         open={requestModal.open}
         onOpenChange={(v) => setRequestModal({ open: v })}
