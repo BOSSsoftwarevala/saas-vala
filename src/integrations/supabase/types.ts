@@ -2004,6 +2004,57 @@ export type Database = {
         }
         Relationships: []
       }
+      ondemand_requests: {
+        Row: {
+          advance_amount: number
+          client_email: string
+          client_name: string
+          client_phone: string | null
+          created_at: string
+          id: string
+          payment_reference: string | null
+          product_category: string | null
+          product_id: string | null
+          product_name: string
+          requirements: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          advance_amount?: number
+          client_email: string
+          client_name: string
+          client_phone?: string | null
+          created_at?: string
+          id?: string
+          payment_reference?: string | null
+          product_category?: string | null
+          product_id?: string | null
+          product_name: string
+          requirements?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          advance_amount?: number
+          client_email?: string
+          client_name?: string
+          client_phone?: string | null
+          created_at?: string
+          id?: string
+          payment_reference?: string | null
+          product_category?: string | null
+          product_id?: string | null
+          product_name?: string
+          requirements?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       payment_attempt_log: {
         Row: {
           amount: number
@@ -2121,6 +2172,57 @@ export type Database = {
           slug?: string
           sort_order?: number | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      product_notify_me: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          product_id: string
+          product_name: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          product_id: string
+          product_name: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          product_id?: string
+          product_name?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      product_wishlists: {
+        Row: {
+          created_at: string
+          id: string
+          product_id: string
+          product_name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_id: string
+          product_name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_id?: string
+          product_name?: string
+          user_id?: string
         }
         Relationships: []
       }

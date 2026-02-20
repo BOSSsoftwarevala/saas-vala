@@ -35,7 +35,7 @@ interface Product {
   title: string;
   subtitle: string;
   image: string;
-  status: 'upcoming' | 'live' | 'bestseller';
+  status: 'upcoming' | 'live' | 'bestseller' | 'draft';
   price: number;
 }
 
@@ -51,7 +51,7 @@ export default function Marketplace() {
   const { purchaseApk, processing } = useApkPurchase();
   const { checkUserStatus } = useFraudDetection();
   const { user } = useAuth();
-  const { allRows, loading: dbLoading, totalCount } = useMarketplaceProducts();
+  const { allRows } = useMarketplaceProducts();
 
   const logPaymentAttempt = async (
     product: Product, 

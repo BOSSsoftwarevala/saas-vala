@@ -9,7 +9,7 @@ interface ApkProduct {
   title: string;
   subtitle: string;
   image: string;
-  status: 'upcoming' | 'live' | 'bestseller';
+  status: 'upcoming' | 'live' | 'bestseller' | 'draft';
   price: number;
 }
 
