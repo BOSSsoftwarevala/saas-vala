@@ -149,6 +149,107 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_memories: {
+        Row: {
+          access_count: number | null
+          category: string
+          content: string
+          created_at: string | null
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          is_active: boolean | null
+          last_accessed_at: string | null
+          memory_type: string
+          priority: string
+          project_context: string | null
+          source: string | null
+          tags: string[] | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          access_count?: number | null
+          category?: string
+          content: string
+          created_at?: string | null
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_accessed_at?: string | null
+          memory_type?: string
+          priority?: string
+          project_context?: string | null
+          source?: string | null
+          tags?: string[] | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          access_count?: number | null
+          category?: string
+          content?: string
+          created_at?: string | null
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_accessed_at?: string | null
+          memory_type?: string
+          priority?: string
+          project_context?: string | null
+          source?: string | null
+          tags?: string[] | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      ai_memory_audit: {
+        Row: {
+          action: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          memory_id: string | null
+          new_content: string | null
+          old_content: string | null
+          recall_reason: string | null
+          session_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          memory_id?: string | null
+          new_content?: string | null
+          old_content?: string | null
+          recall_reason?: string | null
+          session_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          memory_id?: string | null
+          new_content?: string | null
+          old_content?: string | null
+          recall_reason?: string | null
+          session_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_memory_audit_memory_id_fkey"
+            columns: ["memory_id"]
+            isOneToOne: false
+            referencedRelation: "ai_memories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_models: {
         Row: {
           capabilities: Json | null

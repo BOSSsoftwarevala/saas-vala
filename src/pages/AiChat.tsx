@@ -3,17 +3,17 @@ import { ChatSidebar } from '@/components/ai-chat/ChatSidebar';
 import { ChatHeader } from '@/components/ai-chat/ChatHeader';
 import { ChatMessage, Message, FileAttachment } from '@/components/ai-chat/ChatMessage';
 import { ChatInput } from '@/components/ai-chat/ChatInput';
-// DEPRECATED: Legacy FTP modal removed - Using VALA Server Agent
-// import { HostingCredentialsModal, HostingCredentials } from '@/components/ai-chat/HostingCredentialsModal';
 import { ThinkingIndicator } from '@/components/ai-chat/ThinkingIndicator';
 import { AiStatusBar } from '@/components/ai-chat/AiStatusBar';
 import { ChatHistoryPanel } from '@/components/ai-chat/ChatHistoryPanel';
 import { ChatSearch } from '@/components/ai-chat/ChatSearch';
 import { KeyboardShortcuts, useKeyboardShortcuts } from '@/components/ai-chat/KeyboardShortcuts';
+import { MemoryPanel } from '@/components/ai-chat/MemoryPanel';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
-import { 
+import {
   addGlobalActivity, 
   updateGlobalActivity, 
   removeGlobalActivity 
@@ -101,6 +101,7 @@ export default function AiChat() {
   
   // Shortcuts panel state
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showMemoryPanel, setShowMemoryPanel] = useState(false);
   
   // Pinned messages state
   const [pinnedMessages, setPinnedMessages] = useState<Set<string>>(new Set());
@@ -767,6 +768,7 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
           onOpenShortcuts={() => setShowShortcuts(true)}
           selectedModel={selectedModel}
           onModelChange={setSelectedModel}
+          onOpenMemory={() => setShowMemoryPanel(true)}
         />
 
         {/* AI Status Bar */}
@@ -874,6 +876,13 @@ ${result.tests?.details?.map((t: string) => `  ${t}`).join('\n') || ''}
 
       {/* Working Developer Indicator */}
       <WorkingDeveloperIndicator forceWorking={isLoading} />
+
+      {/* Memory Panel - Slide-over sheet */}
+      <Sheet open={showMemoryPanel} onOpenChange={setShowMemoryPanel}>
+        <SheetContent side="right" className="w-full sm:w-[600px] p-0 overflow-hidden">
+          <MemoryPanel onClose={() => setShowMemoryPanel(false)} />
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

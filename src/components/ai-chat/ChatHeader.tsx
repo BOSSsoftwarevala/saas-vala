@@ -1,6 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { PanelLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { PanelLeft, Brain } from 'lucide-react';
 import { ModelSelector } from './ModelSelector';
 
 interface ChatHeaderProps {
@@ -14,6 +13,7 @@ interface ChatHeaderProps {
   onOpenShortcuts?: () => void;
   selectedModel?: string;
   onModelChange?: (model: string) => void;
+  onOpenMemory?: () => void;
 }
 
 export function ChatHeader({ 
@@ -21,8 +21,8 @@ export function ChatHeader({
   sidebarOpen,
   selectedModel = 'google/gemini-3-flash-preview',
   onModelChange,
+  onOpenMemory,
 }: ChatHeaderProps) {
-  const navigate = useNavigate();
 
   return (
     <header className="h-12 border-b border-border bg-background/95 backdrop-blur-sm flex items-center justify-between px-4 shrink-0">
@@ -55,8 +55,20 @@ export function ChatHeader({
         </div>
       </div>
 
-      {/* Right - Model Selector */}
+      {/* Right */}
       <div className="flex items-center gap-2">
+        {onOpenMemory && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onOpenMemory}
+            className="h-8 text-xs gap-1.5 text-muted-foreground hover:text-purple-400 hover:bg-purple-500/10"
+            title="Persistent Memory System"
+          >
+            <Brain className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Memory</span>
+          </Button>
+        )}
         {onModelChange && (
           <ModelSelector
             selectedModel={selectedModel}

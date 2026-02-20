@@ -2216,6 +2216,88 @@ AUTO-BLOCK (no exceptions):
 POWERED BY SOFTWAREVALA™ | VALA AI ULTRA FULL-POWER AGENT v7.0 — LOCKED EDITION`
     };
 
+    // ─── PERSISTENT MEMORY RETRIEVAL ─────────────────────────────────────────
+    // Fetch relevant memories from DB before every response
+    const lastUserMessage = [...messages].reverse().find(m => m.role === 'user')?.content || '';
+    
+    let memoryContext = '';
+    const usedMemoryIds: string[] = [];
+    
+    try {
+      // 1. Always load HIGH priority permanent memories
+      const { data: highMemories } = await supabase
+        .from('ai_memories')
+        .select('id, title, content, category, memory_type, tags')
+        .eq('is_active', true)
+        .eq('priority', 'HIGH')
+        .eq('memory_type', 'permanent')
+        .order('access_count', { ascending: false })
+        .limit(5);
+
+      // 2. Load project/session memories relevant to current message
+      const keywords = lastUserMessage.toLowerCase().split(/\s+/).filter(w => w.length > 3).slice(0, 10);
+      const { data: relevantMemories } = await supabase
+        .from('ai_memories')
+        .select('id, title, content, category, memory_type, tags, priority')
+        .eq('is_active', true)
+        .neq('priority', 'HIGH') // already got HIGH above
+        .or(`memory_type.eq.project,memory_type.eq.session`)
+        .order('last_accessed_at', { ascending: false })
+        .limit(10);
+
+      // 3. Filter TEMP memories - expire old ones
+      const now = new Date().toISOString();
+      const { data: expiredMemories } = await supabase
+        .from('ai_memories')
+        .select('id')
+        .eq('priority', 'TEMP')
+        .lt('expires_at', now);
+      
+      if (expiredMemories && expiredMemories.length > 0) {
+        const expiredIds = expiredMemories.map((m: any) => m.id);
+        await supabase.from('ai_memories').update({ is_active: false }).in('id', expiredIds);
+        // Log expiration
+        const auditRows = expiredIds.map((id: string) => ({ memory_id: id, action: 'expired', recall_reason: 'TTL exceeded' }));
+        await supabase.from('ai_memory_audit').insert(auditRows);
+        console.log(`[MEMORY] Expired ${expiredIds.length} TEMP memories`);
+      }
+
+      // Build memory context string
+      const allRelevant = [...(highMemories || []), ...(relevantMemories || [])];
+      
+      if (allRelevant.length > 0) {
+        memoryContext = '\n\n## 🧠 RETRIEVED MEMORY (from persistent storage)\n';
+        for (const mem of allRelevant) {
+          memoryContext += `\n### [${mem.priority}] ${mem.title} (${mem.category})\n${mem.content}\n`;
+          usedMemoryIds.push(mem.id);
+        }
+        memoryContext += '\n---\n';
+        
+        // Update access count + last_accessed_at for recalled memories
+        if (usedMemoryIds.length > 0) {
+          await supabase.rpc('increment_memory_access', { memory_ids: usedMemoryIds }).catch(() => {
+            // Fallback: direct update
+            supabase.from('ai_memories')
+              .update({ last_accessed_at: new Date().toISOString(), access_count: supabase.rpc('coalesce') })
+              .in('id', usedMemoryIds);
+          });
+          // Log recall in audit
+          const recallAudit = usedMemoryIds.map(id => ({
+            memory_id: id,
+            action: 'recalled',
+            session_id: messages[0]?.content?.slice(0, 50) || 'session',
+            recall_reason: `User asked: ${lastUserMessage.slice(0, 100)}`
+          }));
+          await supabase.from('ai_memory_audit').insert(recallAudit);
+        }
+        
+        console.log(`[MEMORY] Retrieved ${allRelevant.length} memories: ${allRelevant.map((m: any) => m.title).join(', ')}`);
+      }
+    } catch (memErr) {
+      console.warn('[MEMORY] Memory retrieval warning:', memErr);
+      // Non-critical — continue without memory
+    }
+
     // ─── Smart context trimming to prevent token overflow ────────────────────
     // Keep only last 10 messages to stay under 30k TPM limit.
     // Always keep the most recent user message + prior context.
@@ -2234,7 +2316,12 @@ POWERED BY SOFTWAREVALA™ | VALA AI ULTRA FULL-POWER AGENT v7.0 — LOCKED EDIT
       };
     });
 
-    const allMessages = [systemMessage, ...safeMessages];
+    // Inject memory context into system message if available
+    const systemWithMemory: Message = memoryContext 
+      ? { ...systemMessage, content: systemMessage.content + memoryContext }
+      : systemMessage;
+
+    const allMessages = [systemWithMemory, ...safeMessages];
 
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') ?? '';
 
@@ -2422,6 +2509,66 @@ POWERED BY SOFTWAREVALA™ | VALA AI ULTRA FULL-POWER AGENT v7.0 — LOCKED EDIT
     }
     // ─── END POST-PROCESS ─────────────────────────────────────────────────────
 
+    // ─── AUTO-SAVE IMPORTANT INSTRUCTIONS TO MEMORY ───────────────────────────
+    try {
+      const importantPatterns = [
+        { pattern: /remember|yaad rakh|save this|store this|important|zaruri/i, category: 'decision', priority: 'HIGH' },
+        { pattern: /architecture|database|schema|table|struct/i, category: 'architecture', priority: 'NORMAL' },
+        { pattern: /bug|error|fix|issue|problem/i, category: 'bug', priority: 'NORMAL' },
+        { pattern: /deploy|server|github|repo|push/i, category: 'deploy_config', priority: 'NORMAL' },
+        { pattern: /goal|plan|task|requirement|chahiye/i, category: 'current_task', priority: 'TEMP' },
+      ];
+      
+      for (const { pattern, category, priority } of importantPatterns) {
+        if (pattern.test(lastUserMessage) && lastUserMessage.length > 50) {
+          const title = lastUserMessage.slice(0, 80).replace(/\n/g, ' ');
+          
+          // Check if similar memory already exists (avoid duplicates)
+          const { data: existing } = await supabase
+            .from('ai_memories')
+            .select('id')
+            .eq('category', category)
+            .ilike('title', `%${title.slice(0, 40)}%`)
+            .limit(1);
+          
+          if (!existing || existing.length === 0) {
+            const memoryRow: any = {
+              memory_type: priority === 'TEMP' ? 'session' : 'project',
+              category,
+              title: title.slice(0, 200),
+              content: `User instruction: ${lastUserMessage}\n\nAI Response summary: ${finalContent.slice(0, 500)}`,
+              priority,
+              source: 'user',
+              tags: [category, 'auto-saved'],
+            };
+            
+            if (priority === 'TEMP') {
+              // TEMP memories expire in 7 days
+              const expiry = new Date();
+              expiry.setDate(expiry.getDate() + 7);
+              memoryRow.expires_at = expiry.toISOString();
+            }
+            
+            const { data: saved } = await supabase.from('ai_memories').insert(memoryRow).select('id').single();
+            if (saved) {
+              await supabase.from('ai_memory_audit').insert({
+                memory_id: saved.id,
+                action: 'created',
+                new_content: memoryRow.content,
+                recall_reason: 'Auto-saved from user instruction',
+                session_id: lastUserMessage.slice(0, 30)
+              });
+              console.log(`[MEMORY] Auto-saved new memory: ${title}`);
+            }
+          }
+          break; // Only save once per response
+        }
+      }
+    } catch (memSaveErr) {
+      console.warn('[MEMORY] Auto-save warning:', memSaveErr);
+    }
+    // ─── END MEMORY AUTO-SAVE ─────────────────────────────────────────────────
+
     return new Response(
       JSON.stringify({ 
         response: finalContent,
@@ -2429,7 +2576,9 @@ POWERED BY SOFTWAREVALA™ | VALA AI ULTRA FULL-POWER AGENT v7.0 — LOCKED EDIT
         provider: firstResult.provider,
         tools_used: toolResults.map(t => t.name),
         tool_results: toolResults,
-        usage: data.usage
+        usage: data.usage,
+        memory_used: usedMemoryIds.length,
+        memory_ids: usedMemoryIds
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
