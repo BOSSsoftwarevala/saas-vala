@@ -15,6 +15,9 @@ export interface MarketplaceProduct {
   gitRepoUrl?: string;
   apkUrl?: string;
   demoUrl?: string;
+  demoLogin?: string;
+  demoPassword?: string;
+  demoEnabled?: boolean;
   featured: boolean;
   trending: boolean;
   isAvailable: boolean; // false = On Pipeline
@@ -78,6 +81,9 @@ export function mapDbProduct(product: any, index: number): MarketplaceProduct {
     gitRepoUrl: product.git_repo_url,
     apkUrl: product.apk_url || undefined,
     demoUrl: product.demo_url || undefined,
+    demoLogin: product.demo_login || undefined,
+    demoPassword: product.demo_password || undefined,
+    demoEnabled: Boolean(product.demo_enabled),
     featured: Boolean(product.featured),
     trending: Boolean(product.trending),
     isAvailable,
@@ -93,7 +99,7 @@ export function useMarketplaceProducts() {
       setLoading(true);
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, slug, description, short_description, price, status, features, thumbnail_url, git_repo_url, marketplace_visible, apk_url, demo_url, featured, trending, business_type, deploy_status')
+        .select('id, name, slug, description, short_description, price, status, features, thumbnail_url, git_repo_url, marketplace_visible, apk_url, demo_url, demo_login, demo_password, demo_enabled, featured, trending, business_type, deploy_status')
         .eq('marketplace_visible', true)
         .order('created_at', { ascending: false })
         .limit(500);
@@ -148,7 +154,7 @@ export function useProductsByCategory(categories: string[]) {
       // Fetch all marketplace visible products and filter client-side by category
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, slug, description, short_description, price, status, features, thumbnail_url, git_repo_url, marketplace_visible, apk_url, demo_url, featured, trending, business_type, deploy_status')
+        .select('id, name, slug, description, short_description, price, status, features, thumbnail_url, git_repo_url, marketplace_visible, apk_url, demo_url, demo_login, demo_password, demo_enabled, featured, trending, business_type, deploy_status')
         .eq('marketplace_visible', true)
         .order('created_at', { ascending: false })
         .limit(500);
