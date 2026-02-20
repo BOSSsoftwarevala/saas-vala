@@ -350,6 +350,39 @@ const developerTools = [
   {
     type: "function",
     function: {
+      name: "check_github_repos",
+      description: "SaaSVala ya SoftwareVala GitHub se REAL repos fetch karo aur har repo ke liye product status check karo - marketplace me hai ya nahi, deploy hua ya nahi",
+      parameters: {
+        type: "object",
+        properties: {
+          account: { type: "string", enum: ["SaaSVala", "SoftwareVala", "both"], description: "Konsa GitHub account check karna hai" },
+          check_products: { type: "boolean", description: "Marketplace products se match karo (default: true)" },
+          limit: { type: "number", description: "Kitne repos check karne hain (default: 30)" }
+        }
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "test_repo_product",
+      description: "Kisi specific GitHub repo ke product ko test karo - URL accessible hai ya nahi, SSL valid hai ya nahi, response time check karo, errors detect karo",
+      parameters: {
+        type: "object",
+        properties: {
+          repo_name: { type: "string", description: "GitHub repository ka naam" },
+          account: { type: "string", enum: ["SaaSVala", "SoftwareVala"], description: "GitHub account" },
+          test_url: { type: "string", description: "Product ka live URL test karne ke liye (optional)" },
+          check_readme: { type: "boolean", description: "README.md padhna hai product info ke liye" },
+          check_issues: { type: "boolean", description: "Open issues check karne hain" }
+        },
+        required: ["repo_name"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "get_client_requests",
       description: "Fetch pending/active client requests from database",
       parameters: {
@@ -1341,6 +1374,313 @@ async function executeGetClientRequests(args: any, supabase: any): Promise<ToolR
   };
 }
 
+// ─── CHECK GITHUB REPOS (REAL DATA) ──────────────────────────────────────────
+async function executeCheckGithubRepos(args: any, supabase: any): Promise<ToolResult> {
+  const { account = 'both', check_products = true, limit = 30 } = args;
+  console.log(`[TOOL] check_github_repos: ${account}`);
+
+  const accountConfigs: { name: string; tokenKey: string }[] = [];
+  if (account === 'SaaSVala' || account === 'both') {
+    accountConfigs.push({ name: 'SaaSVala', tokenKey: 'SAASVALA_GITHUB_TOKEN' });
+  }
+  if (account === 'SoftwareVala' || account === 'both') {
+    accountConfigs.push({ name: 'SoftwareVala', tokenKey: 'SOFTWAREVALA_GITHUB_TOKEN' });
+  }
+
+  const allRepos: any[] = [];
+
+  for (const acc of accountConfigs) {
+    const token = Deno.env.get(acc.tokenKey);
+    if (!token) {
+      allRepos.push({ account: acc.name, error: 'Token not configured' });
+      continue;
+    }
+
+    try {
+      const ghHeaders = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json', 'User-Agent': 'VALA-AI-Developer' };
+
+      // First get user info to get real login
+      const userRes = await fetch('https://api.github.com/user', { headers: ghHeaders });
+      const userInfo = userRes.ok ? await userRes.json() : null;
+      const realLogin = userInfo?.login || acc.name;
+
+      // Fetch repos using authenticated endpoint (gets private + public)
+      const repoRes = await fetch(`https://api.github.com/user/repos?per_page=${limit}&sort=updated&visibility=all&affiliation=owner,collaborator,organization_member`, {
+        headers: ghHeaders
+      });
+
+      const repos = repoRes.ok ? await repoRes.json() : [];
+
+
+      for (const repo of (Array.isArray(repos) ? repos : [])) {
+        allRepos.push({
+          account: acc.name,
+          github_login: userInfo?.login || acc.name,
+          name: repo.name,
+          full_name: repo.full_name,
+          url: repo.html_url,
+          description: repo.description || 'No description',
+          language: repo.language || 'Unknown',
+          private: repo.private,
+          stars: repo.stargazers_count,
+          forks: repo.forks_count,
+          open_issues: repo.open_issues_count,
+          default_branch: repo.default_branch,
+          updated_at: repo.updated_at,
+          size_kb: repo.size,
+          topics: repo.topics || [],
+          homepage: repo.homepage || null,
+        });
+      }
+    } catch (e: any) {
+      allRepos.push({ account: acc.name, error: e.message });
+    }
+  }
+
+  // Match with marketplace products
+  let productMatches: any[] = [];
+  if (check_products && allRepos.length > 0) {
+    const repoNames = allRepos.filter(r => r.name).map(r => r.name.toLowerCase());
+    const { data: products } = await supabase
+      .from('products')
+      .select('id, name, status, slug, demo_url, price')
+      .limit(200);
+
+    productMatches = (products || []).map((p: any) => {
+      const slugClean = p.slug?.replace(/-/g, '').toLowerCase() || '';
+      const nameClean = p.name?.toLowerCase().replace(/[^a-z0-9]/g, '') || '';
+      const matchedRepo = allRepos.find(r => {
+        const repoClean = r.name?.toLowerCase().replace(/-/g, '') || '';
+        return repoClean === slugClean || repoClean === nameClean || 
+               r.name?.toLowerCase().includes(nameClean) || nameClean.includes(repoClean);
+      });
+      return {
+        product_name: p.name,
+        status: p.status,
+        price: p.price ? `$${p.price}` : 'Free',
+        demo_url: p.demo_url || null,
+        matched_repo: matchedRepo?.full_name || null,
+        on_github: !!matchedRepo,
+        repo_url: matchedRepo?.url || null,
+      };
+    }).filter((p: any) => p.on_github);
+  }
+
+  // Stats
+  const stats = {
+    total_repos: allRepos.filter(r => r.name && !r.error).length,
+    public_repos: allRepos.filter(r => !r.private && r.name).length,
+    private_repos: allRepos.filter(r => r.private && r.name).length,
+    languages: [...new Set(allRepos.filter(r => r.language).map(r => r.language))],
+    products_on_github: productMatches.length,
+    repos_needing_attention: allRepos.filter(r => r.open_issues > 0).length,
+  };
+
+  return {
+    tool_call_id: '',
+    content: JSON.stringify({
+      success: true,
+      stats,
+      repos: allRepos.slice(0, limit),
+      product_matches: productMatches.slice(0, 20),
+      summary: `✅ ${stats.total_repos} repos found | ${stats.products_on_github} marketplace products matched | ${stats.repos_needing_attention} repos have open issues`
+    }, null, 2),
+    success: true
+  };
+}
+
+// ─── TEST REPO PRODUCT (LIVE TESTING) ────────────────────────────────────────
+async function executeTestRepoProduct(args: any, supabase: any): Promise<ToolResult> {
+  const { repo_name, account = 'SaaSVala', test_url, check_readme = true, check_issues = true } = args;
+  console.log(`[TOOL] test_repo_product: ${repo_name} (${account})`);
+
+  const tokenKey = account === 'SoftwareVala' ? 'SOFTWAREVALA_GITHUB_TOKEN' : 'SAASVALA_GITHUB_TOKEN';
+  const token = Deno.env.get(tokenKey);
+
+  if (!token) {
+    return { tool_call_id: '', content: JSON.stringify({ error: `GitHub token not found for ${account}` }), success: false };
+  }
+
+  const ghBase = `https://api.github.com/repos/${account}/${repo_name}`;
+  const ghHeaders = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json', 'User-Agent': 'VALA-AI' };
+
+  const results: any = { repo: repo_name, account, tests: [], overall_status: 'passed' };
+
+  try {
+    // 1. Repo existence check
+    const repoRes = await fetch(ghBase, { headers: ghHeaders });
+    if (!repoRes.ok) {
+      return { tool_call_id: '', content: JSON.stringify({ error: `Repo not found: ${repo_name}` }), success: false };
+    }
+    const repoData = await repoRes.json();
+    results.repo_info = {
+      full_name: repoData.full_name,
+      description: repoData.description,
+      language: repoData.language,
+      stars: repoData.stargazers_count,
+      forks: repoData.forks_count,
+      open_issues: repoData.open_issues_count,
+      default_branch: repoData.default_branch,
+      last_updated: repoData.updated_at,
+      homepage: repoData.homepage,
+      size: `${Math.round(repoData.size / 1024)}MB`,
+      private: repoData.private,
+      license: repoData.license?.name || 'No License',
+    };
+    results.tests.push({ test: 'Repo Exists', status: '✅ PASS', detail: `${repoData.full_name} - ${repoData.language}` });
+
+    // 2. README check
+    if (check_readme) {
+      const readmeRes = await fetch(`${ghBase}/readme`, { headers: ghHeaders });
+      if (readmeRes.ok) {
+        const readmeData = await readmeRes.json();
+        const content = atob(readmeData.content.replace(/\n/g, ''));
+        const readmeLength = content.length;
+        const hasInstall = content.toLowerCase().includes('install') || content.toLowerCase().includes('setup');
+        const hasUsage = content.toLowerCase().includes('usage') || content.toLowerCase().includes('how to');
+        const hasDemo = content.toLowerCase().includes('demo') || content.toLowerCase().includes('preview');
+        results.readme = {
+          exists: true,
+          length: readmeLength,
+          has_install_guide: hasInstall,
+          has_usage_section: hasUsage,
+          has_demo_link: hasDemo,
+          quality_score: Math.min(100, (readmeLength > 500 ? 40 : 20) + (hasInstall ? 20 : 0) + (hasUsage ? 20 : 0) + (hasDemo ? 20 : 0)),
+          preview: content.substring(0, 300) + (content.length > 300 ? '...' : ''),
+        };
+        results.tests.push({ test: 'README Check', status: readmeLength > 200 ? '✅ PASS' : '⚠️ WARN', detail: `${readmeLength} chars | Install: ${hasInstall} | Demo: ${hasDemo}` });
+      } else {
+        results.readme = { exists: false };
+        results.tests.push({ test: 'README Check', status: '❌ FAIL', detail: 'No README.md found' });
+        results.overall_status = 'issues_found';
+      }
+    }
+
+    // 3. Open Issues check
+    if (check_issues && repoData.open_issues_count > 0) {
+      const issuesRes = await fetch(`${ghBase}/issues?state=open&per_page=5`, { headers: ghHeaders });
+      if (issuesRes.ok) {
+        const issues = await issuesRes.json();
+        results.issues = issues.filter((i: any) => !i.pull_request).map((i: any) => ({
+          number: i.number,
+          title: i.title,
+          labels: i.labels?.map((l: any) => l.name) || [],
+          created_at: i.created_at,
+          url: i.html_url,
+        }));
+        const bugIssues = results.issues.filter((i: any) => i.labels.includes('bug')).length;
+        results.tests.push({ test: 'Open Issues', status: bugIssues > 0 ? '⚠️ WARN' : '✅ PASS', detail: `${results.issues.length} open issues (${bugIssues} bugs)` });
+        if (bugIssues > 0) results.overall_status = 'issues_found';
+      }
+    } else {
+      results.tests.push({ test: 'Open Issues', status: '✅ PASS', detail: 'No open issues' });
+    }
+
+    // 4. Recent commits check
+    const commitsRes = await fetch(`${ghBase}/commits?per_page=3`, { headers: ghHeaders });
+    if (commitsRes.ok) {
+      const commits = await commitsRes.json();
+      const lastCommit = commits[0];
+      const daysSinceCommit = lastCommit ? Math.floor((Date.now() - new Date(lastCommit.commit.author.date).getTime()) / 86400000) : 999;
+      results.recent_commits = commits.map((c: any) => ({
+        sha: c.sha?.substring(0, 7),
+        message: c.commit?.message?.split('\n')[0],
+        author: c.commit?.author?.name,
+        date: c.commit?.author?.date,
+      }));
+      results.tests.push({ test: 'Recent Activity', status: daysSinceCommit < 30 ? '✅ PASS' : '⚠️ WARN', detail: `Last commit ${daysSinceCommit} days ago` });
+      if (daysSinceCommit > 90) results.overall_status = 'stale';
+    }
+
+    // 5. Live URL test (if provided or from repo homepage)
+    const urlToTest = test_url || repoData.homepage;
+    if (urlToTest && urlToTest.startsWith('http')) {
+      const startTime = Date.now();
+      try {
+        const siteRes = await fetch(urlToTest, { 
+          method: 'GET', 
+          redirect: 'follow',
+          signal: AbortSignal.timeout(8000)
+        });
+        const responseTime = Date.now() - startTime;
+        const isSSL = urlToTest.startsWith('https://');
+        results.live_url_test = {
+          url: urlToTest,
+          status_code: siteRes.status,
+          response_time_ms: responseTime,
+          ssl_active: isSSL,
+          content_type: siteRes.headers.get('content-type'),
+          accessible: siteRes.ok,
+        };
+        results.tests.push({ 
+          test: 'Live URL Test', 
+          status: siteRes.ok ? '✅ PASS' : '❌ FAIL', 
+          detail: `HTTP ${siteRes.status} | ${responseTime}ms | SSL: ${isSSL ? 'Yes' : 'No'}` 
+        });
+        if (!siteRes.ok) results.overall_status = 'issues_found';
+      } catch (urlErr: any) {
+        results.live_url_test = { url: urlToTest, error: urlErr.message, accessible: false };
+        results.tests.push({ test: 'Live URL Test', status: '❌ FAIL', detail: `Not accessible: ${urlErr.message}` });
+        results.overall_status = 'issues_found';
+      }
+    } else {
+      results.tests.push({ test: 'Live URL Test', status: '⏭️ SKIP', detail: 'No live URL configured' });
+    }
+
+    // 6. Match with DB product
+    const repoNameLower = repo_name.toLowerCase().replace(/-/g, '');
+    const { data: dbProduct } = await supabase
+      .from('products')
+      .select('id, name, status, price, demo_url, slug')
+      .or(`slug.ilike.%${repo_name}%,name.ilike.%${repo_name.replace(/-/g, ' ')}%`)
+      .limit(1)
+      .maybeSingle();
+
+    results.marketplace_product = dbProduct ? {
+      found: true,
+      product_id: dbProduct.id,
+      name: dbProduct.name,
+      status: dbProduct.status,
+      price: dbProduct.price ? `$${dbProduct.price}` : 'Free',
+      demo_url: dbProduct.demo_url,
+    } : { found: false, message: 'Not listed in marketplace yet' };
+
+    results.tests.push({ 
+      test: 'Marketplace Listing', 
+      status: dbProduct ? '✅ PASS' : '⚠️ WARN', 
+      detail: dbProduct ? `Found as "${dbProduct.name}" (${dbProduct.status})` : 'Not in marketplace' 
+    });
+
+    // Final summary
+    const passCount = results.tests.filter((t: any) => t.status.includes('PASS')).length;
+    const failCount = results.tests.filter((t: any) => t.status.includes('FAIL')).length;
+    const warnCount = results.tests.filter((t: any) => t.status.includes('WARN')).length;
+    const score = Math.round((passCount / results.tests.length) * 100);
+
+    results.summary = {
+      overall_status: results.overall_status,
+      score: `${score}%`,
+      passed: passCount,
+      failed: failCount,
+      warnings: warnCount,
+      recommendation: failCount > 0 
+        ? `❌ ${failCount} critical issue(s) fix karo pehle` 
+        : warnCount > 0 
+          ? `⚠️ ${warnCount} warning(s) hain - improve karna better hoga` 
+          : '✅ Product ready hai marketplace ke liye!'
+    };
+
+  } catch (e: any) {
+    return { tool_call_id: '', content: JSON.stringify({ error: e.message }), success: false };
+  }
+
+  return {
+    tool_call_id: '',
+    content: JSON.stringify(results, null, 2),
+    success: true
+  };
+}
+
 // Execute tool based on name
 async function executeTool(toolCall: ToolCall, supabase: any): Promise<ToolResult> {
   const { name, arguments: argsString } = toolCall.function;
@@ -1420,6 +1760,13 @@ async function executeTool(toolCall: ToolCall, supabase: any): Promise<ToolResul
       break;
     case 'get_client_requests':
       result = await executeGetClientRequests(args, supabase);
+      break;
+    // NEW: GitHub Product Testing Tools
+    case 'check_github_repos':
+      result = await executeCheckGithubRepos(args, supabase);
+      break;
+    case 'test_repo_product':
+      result = await executeTestRepoProduct(args, supabase);
       break;
     default:
       result = { tool_call_id: toolCall.id, content: `Unknown tool: ${name}`, success: false };
