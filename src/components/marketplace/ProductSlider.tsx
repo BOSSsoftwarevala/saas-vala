@@ -34,11 +34,6 @@ interface ProductSliderProps {
    showTechStack?: boolean;
 }
 
-const statusConfig = {
-  upcoming: { label: 'COMING SOON', className: 'bg-amber-500/90 text-white border-0' },
-  live: { label: '● LIVE DEMO', className: 'bg-emerald-500/90 text-white border-0' },
-  bestseller: { label: '● LIVE DEMO', className: 'bg-emerald-500/90 text-white border-0' },
-};
 
 const productIcons: Record<string, keyof typeof LucideIcons> = {
   'education': 'GraduationCap',
@@ -140,29 +135,39 @@ export function ProductSlider({ title, products, onBuyNow, onFavorite, onNotify,
             return (
               <motion.div
                 key={product.id}
-                className="flex-shrink-0 w-[280px] md:w-[320px]"
-                whileHover={{ scale: 1.02, zIndex: 10 }}
+                style={{ width: '340px' }}
+                className="flex-shrink-0"
+                whileHover={{ scale: 1.015, zIndex: 10 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 20 }}
               >
-                <div className="relative rounded-xl overflow-hidden bg-card border border-border shadow-lg hover:shadow-xl transition-shadow h-full flex flex-col">
-                  {/* Header with Icon */}
-                  <div className="relative h-[100px] bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-between px-4">
-                    <div className="w-14 h-14 rounded-xl bg-primary/20 flex items-center justify-center">
-                      <IconComponent className="h-7 w-7 text-primary" />
-                    </div>
-                    {/* Status Badge */}
-                    <Badge 
-                      className={cn(
-                        'text-[10px] font-bold px-3 py-1 rounded-full',
-                        statusConfig[product.status].className
-                      )}
+                <div className="relative rounded-2xl overflow-hidden border border-border/50 shadow-xl h-full flex flex-col" style={{ background: 'hsl(var(--card))' }}>
+                  {/* Header with Icon — matches screenshot exactly */}
+                  <div
+                    className="relative flex items-center justify-between px-5 py-5"
+                    style={{ backgroundColor: '#1e2235', minHeight: '100px' }}
+                  >
+                    {/* Orange icon box */}
+                    <div
+                      className="flex items-center justify-center rounded-xl shadow-lg"
+                      style={{ width: 64, height: 64, background: 'rgba(249,115,22,0.25)', border: '1.5px solid rgba(249,115,22,0.4)' }}
                     >
-                      {statusConfig[product.status].label}
-                    </Badge>
-                    {/* Rank Badge */}
-                    <div className="absolute bottom-2 right-4">
-                      <span className="text-xs text-muted-foreground">#{index + 1}</span>
+                      <IconComponent style={{ width: 30, height: 30, color: '#f97316' }} />
                     </div>
+                    {/* LIVE DEMO / COMING SOON badge — center */}
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                      {product.status === 'upcoming' ? (
+                        <span className="flex items-center gap-1.5 font-black text-black text-[11px] px-3 py-1 rounded-full" style={{ background: '#eab308' }}>
+                          ON PIPELINE
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1.5 font-black text-white text-[11px] px-3 py-1 rounded-full" style={{ background: '#16a34a', boxShadow: '0 0 12px rgba(22,163,74,0.5)' }}>
+                          <span className="inline-block rounded-full animate-pulse" style={{ width: 6, height: 6, background: '#fff' }} />
+                          LIVE DEMO
+                        </span>
+                      )}
+                    </div>
+                    {/* Rank — right */}
+                    <span className="text-xs font-bold self-start" style={{ color: 'rgba(255,255,255,0.4)' }}>#{index + 1}</span>
                   </div>
 
                   {/* Content */}
