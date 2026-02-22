@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { AiStatusPanel, AiStatusState } from '@/components/ai-chat/AiStatusPanel';
-import { ChatMessage, Message, FileAttachment } from '@/components/ai-chat/ChatMessage';
+import { ChatMessage, Message, FileAttachment, ToolResultData } from '@/components/ai-chat/ChatMessage';
 import { ChatInput } from '@/components/ai-chat/ChatInput';
 
 import { ChatHistoryPanel } from '@/components/ai-chat/ChatHistoryPanel';
@@ -184,7 +184,7 @@ export default function AiChat() {
   const streamChat = useCallback(async (
     messages: Message[],
     sessionId: string,
-    onDelta: (chunk: string) => void,
+    onDelta: (chunk: string, toolResults?: ToolResultData[], toolsUsed?: string[]) => void,
     onDone: () => void
   ) => {
     const formattedMessages = messages.map(m => ({ role: m.role, content: m.content }));
@@ -213,7 +213,15 @@ export default function AiChat() {
     if (!contentType.includes('text/event-stream')) {
       const data = await resp.json().catch(() => ({} as any));
       const text = data?.response || data?.message || data?.content || '';
-      onDelta(text);
+      
+      // Extract tool results from response
+      const toolResults: ToolResultData[] = (data?.tool_results || []).map((tr: any) => ({
+        name: tr.name,
+        result: tr.result,
+      }));
+      const toolsUsed: string[] = data?.tools_used || [];
+      
+      onDelta(text, toolResults.length > 0 ? toolResults : undefined, toolsUsed.length > 0 ? toolsUsed : undefined);
       onDone();
       return;
     }
@@ -335,10 +343,15 @@ export default function AiChat() {
       }));
     };
 
-    const updateAssistantMessage = (content: string) => {
+    const updateAssistantMessage = (content: string, toolResults?: ToolResultData[], toolsUsed?: string[]) => {
       setSessions(prev => prev.map(s => {
         if (s.id === sessionId) {
-          return { ...s, messages: s.messages.map(m => m.id === assistantMsgId ? { ...m, content } : m) };
+          return { ...s, messages: s.messages.map(m => m.id === assistantMsgId ? { 
+            ...m, 
+            content,
+            ...(toolResults && { toolResults }),
+            ...(toolsUsed && { toolsUsed }),
+          } : m) };
         }
         return s;
       }));
@@ -358,7 +371,10 @@ export default function AiChat() {
       await streamChat(
         [...historyMessages, enhancedUserMessage],
         sessionId,
-        (chunk) => { assistantContent += chunk; updateAssistantMessage(assistantContent); },
+        (chunk, toolResults, toolsUsed) => { 
+          assistantContent += chunk; 
+          updateAssistantMessage(assistantContent, toolResults, toolsUsed); 
+        },
         () => {
           const responseMs = aiStartTimeRef.current ? Date.now() - aiStartTimeRef.current : undefined;
           if (aiTimerRef.current) { window.clearInterval(aiTimerRef.current); aiTimerRef.current = null; }

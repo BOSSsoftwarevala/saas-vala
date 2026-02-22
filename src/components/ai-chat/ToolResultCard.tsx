@@ -37,6 +37,17 @@ const toolIcons: Record<string, React.ElementType> = {
   git_operations: GitBranch,
   check_ssl: Shield,
   create_backup: HardDrive,
+  upload_to_github: GitBranch,
+  list_github_repos: GitBranch,
+  analyze_zip_file: FileText,
+  add_to_source_catalog: Database,
+  handle_client_request: FileText,
+  send_client_response: FileText,
+  check_github_repos: GitBranch,
+  test_repo_product: Shield,
+  get_client_requests: FileText,
+  setup_vala_agent: Terminal,
+  setup_whatsapp_integration: FileText,
 };
 
 const toolLabels: Record<string, string> = {
@@ -52,6 +63,17 @@ const toolLabels: Record<string, string> = {
   git_operations: 'Git Operation',
   check_ssl: 'SSL Check',
   create_backup: 'Backup Created',
+  upload_to_github: 'GitHub Upload',
+  list_github_repos: 'GitHub Repos',
+  analyze_zip_file: 'ZIP Analysis',
+  add_to_source_catalog: 'Source Catalog',
+  handle_client_request: 'Client Request',
+  send_client_response: 'Client Response',
+  check_github_repos: 'GitHub Audit',
+  test_repo_product: 'Product Test',
+  get_client_requests: 'Client Requests',
+  setup_vala_agent: 'VALA Agent Setup',
+  setup_whatsapp_integration: 'WhatsApp Setup',
 };
 
 export function ToolResultCard({ toolName, result, className }: ToolResultCardProps) {

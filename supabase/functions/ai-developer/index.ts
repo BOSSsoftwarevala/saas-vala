@@ -2333,7 +2333,7 @@ POWERED BY SOFTWAREVALA™ | VALA AI ULTRA FULL-POWER AGENT v7.0 — LOCKED EDIT
 
     // ─── Helper: call a provider ─────────────────────────────────────────────
     const callProvider = async (useOpenAI: boolean, msgs: any[], withTools: boolean, doStream: boolean) => {
-      if (useOpenAI) {
+      if (useOpenAI && OPENAI_API_KEY) {
         const modelMap: Record<string, string> = {
           'google/gemini-3-flash-preview': 'gpt-4o-mini',
           'google/gemini-2.5-flash': 'gpt-4o-mini',
@@ -2361,14 +2361,30 @@ POWERED BY SOFTWAREVALA™ | VALA AI ULTRA FULL-POWER AGENT v7.0 — LOCKED EDIT
         });
         return { response: r, provider: 'openai', modelUsed: openaiModel };
       } else {
-        // OpenAI only — no Lovable AI fallback
-        throw new Error('OPENAI_API_KEY not configured. Please add it to secrets.');
+        // Lovable AI Gateway — supports all listed models natively
+        const body: any = {
+          model: AI_MODEL,
+          messages: msgs,
+          max_tokens: 8192,
+          temperature: 0.3,
+          stream: doStream,
+        };
+        if (withTools) {
+          body.tools = developerTools;
+          body.tool_choice = 'auto';
+        }
+        const r = await fetch('https://api.lovable.dev/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        return { response: r, provider: 'lovable', modelUsed: AI_MODEL };
       }
     };
 
     // ─── Attempt primary + fallback ──────────────────────────────────────────
     const attemptCall = async (msgs: any[], withTools: boolean, doStream: boolean) => {
-      // Try OpenAI first
+      // Try OpenAI first if key available
       if (OPENAI_API_KEY) {
         try {
           const result = await callProvider(true, msgs, withTools, doStream);
@@ -2379,15 +2395,29 @@ POWERED BY SOFTWAREVALA™ | VALA AI ULTRA FULL-POWER AGENT v7.0 — LOCKED EDIT
           const status = result.response.status;
           const errText = await result.response.text();
           console.warn(`[AI] OpenAI failed [${status}]: ${errText}`);
-          if (status === 401) throw new Error('OpenAI API key invalid (401)');
+          if (status === 401) console.warn('[AI] OpenAI key invalid, trying Lovable AI...');
         } catch (e) {
-          if (String(e).includes('401')) throw e;
           console.warn('[AI] OpenAI exception:', String(e));
         }
       }
 
-      // OpenAI is the only provider — no fallback
-      throw new Error('OpenAI API call failed. Check OPENAI_API_KEY and account billing.');
+      // Fallback to Lovable AI Gateway
+      if (LOVABLE_API_KEY) {
+        try {
+          console.log(`[AI] Trying Lovable AI Gateway with model: ${AI_MODEL}`);
+          const result = await callProvider(false, msgs, withTools, doStream);
+          if (result.response.ok) {
+            console.log(`[AI] ✅ Lovable AI success`);
+            return result;
+          }
+          const errText = await result.response.text();
+          console.error(`[AI] Lovable AI failed: ${errText}`);
+        } catch (e) {
+          console.error('[AI] Lovable AI exception:', String(e));
+        }
+      }
+
+      throw new Error('Both OpenAI and Lovable AI failed. Check API keys and account billing.');
     };
 
     // ─── First API call (may return tool calls) ───────────────────────────────
