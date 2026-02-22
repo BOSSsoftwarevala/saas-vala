@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CriticalApprovalBox, parseCriticalAction } from './CriticalApprovalBox';
+import { ToolResultCard } from './ToolResultCard';
 
 export interface FileAttachment {
   name: string;
@@ -15,12 +16,19 @@ export interface FileAttachment {
   preview?: string;
 }
 
+export interface ToolResultData {
+  name: string;
+  result: any;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
   files?: FileAttachment[];
+  toolResults?: ToolResultData[];
+  toolsUsed?: string[];
 }
 
 interface ChatMessageProps {
@@ -337,6 +345,21 @@ export function ChatMessage({ message, index = 0, isPinned, onApproveAction, onD
           {message.content && (
             <div className="text-[15px] text-foreground/90 leading-relaxed prose prose-sm max-w-none prose-headings:text-foreground prose-p:text-foreground/90 prose-strong:text-foreground prose-code:text-primary prose-a:text-primary">
               {renderContent(message.content)}
+            </div>
+          )}
+
+          {/* Tool Results */}
+          {message.toolResults && message.toolResults.length > 0 && (
+            <div className="space-y-3 mt-3">
+              {message.toolsUsed && message.toolsUsed.length > 0 && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Sparkles className="h-3 w-3 text-primary" />
+                  <span>Tools used: {message.toolsUsed.join(', ')}</span>
+                </div>
+              )}
+              {message.toolResults.map((tr, i) => (
+                <ToolResultCard key={i} toolName={tr.name} result={tr.result} />
+              ))}
             </div>
           )}
 
