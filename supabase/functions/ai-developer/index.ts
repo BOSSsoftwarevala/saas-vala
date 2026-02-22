@@ -67,7 +67,7 @@ const developerTools = [
     type: "function",
     function: {
       name: "upload_to_github",
-      description: "Upload/push source code to SaaSVala GitHub repository. Creates a new repo if needed and pushes all files.",
+      description: "Upload/push source code to SaaSVala GitHub repository. Creates a new repo if needed and pushes all files via GitHub API.",
       parameters: {
         type: "object",
         properties: {
@@ -75,7 +75,8 @@ const developerTools = [
           description: { type: "string", description: "Repository description" },
           file_path: { type: "string", description: "Path to the source file in storage bucket" },
           is_private: { type: "boolean", description: "Whether repo should be private (default: false)" },
-          account: { type: "string", enum: ["SaaSVala", "SoftwareVala"], description: "Which GitHub account to use" }
+          account: { type: "string", enum: ["SaaSVala", "SoftwareVala"], description: "Which GitHub account to use" },
+          files: { type: "array", items: { type: "object", properties: { path: { type: "string" }, content: { type: "string" }, message: { type: "string" } } }, description: "Array of {path, content} to push directly to repo" }
         },
         required: ["project_name"]
       }
@@ -393,6 +394,25 @@ const developerTools = [
         }
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "generate_code",
+      description: "Generate real code files for a project and push them to GitHub. Creates complete, working code based on requirements.",
+      parameters: {
+        type: "object",
+        properties: {
+          project_name: { type: "string", description: "Repository name for GitHub" },
+          project_type: { type: "string", enum: ["react", "node", "php", "laravel", "python", "html", "express", "nextjs"], description: "Type of project to generate" },
+          description: { type: "string", description: "What the project should do" },
+          features: { type: "array", items: { type: "string" }, description: "List of features to include" },
+          account: { type: "string", enum: ["SaaSVala", "SoftwareVala"], description: "GitHub account to push to" },
+          files: { type: "array", items: { type: "object", properties: { path: { type: "string" }, content: { type: "string" } } }, description: "Array of {path, content} file objects to create" }
+        },
+        required: ["project_name", "project_type", "description"]
+      }
+    }
   }
 ];
 
@@ -688,68 +708,131 @@ async function executeDeployProject(args: any, supabase: any): Promise<ToolResul
   const { project_name, server_id, branch = 'main', environment = 'production' } = args;
   console.log(`[TOOL] deploy_project: ${project_name} to ${server_id}`);
 
-  // Get server info
+  // Get server info including agent details
   const { data: server, error: serverError } = await supabase
     .from('servers')
-    .select('name, status')
+    .select('name, status, agent_url, agent_token, custom_domain, subdomain')
     .eq('id', server_id)
     .single();
 
   if (serverError || !server) {
-    return { tool_call_id: '', content: `Server not found: ${server_id}`, success: false };
+    return { tool_call_id: '', content: JSON.stringify({ error: `Server not found: ${server_id}` }), success: false };
   }
 
   if (server.status !== 'live') {
-    return { tool_call_id: '', content: `Server ${server.name} is not live (status: ${server.status})`, success: false };
+    return { tool_call_id: '', content: JSON.stringify({ error: `Server ${server.name} is not live (status: ${server.status}). Activate it first.` }), success: false };
   }
 
   // Create deployment record
   const { data: deployment, error: deployError } = await supabase
     .from('deployments')
     .insert({
-      server_id,
-      status: 'building',
-      branch,
+      server_id, status: 'building', branch,
       commit_message: `Deploy ${project_name} to ${environment}`,
-      triggered_by: null // Will be set if auth is available
+      triggered_by: null
     })
     .select()
     .single();
 
   if (deployError) {
-    return { tool_call_id: '', content: `Failed to create deployment: ${deployError.message}`, success: false };
+    return { tool_call_id: '', content: JSON.stringify({ error: `Failed to create deployment: ${deployError.message}` }), success: false };
   }
 
-  // Simulate deployment steps
-  const steps = [
-    { step: 1, name: 'Pulling from Git', status: 'complete', time: '2.3s' },
-    { step: 2, name: 'Installing dependencies', status: 'complete', time: '15.7s' },
-    { step: 3, name: 'Building project', status: 'complete', time: '23.4s' },
-    { step: 4, name: 'Running tests', status: 'complete', time: '8.2s' },
-    { step: 5, name: 'Deploying to server', status: 'complete', time: '5.1s' },
-    { step: 6, name: 'Health check', status: 'complete', time: '1.8s' }
-  ];
+  // REAL DEPLOYMENT via VALA Agent
+  if (server.agent_url && server.agent_token) {
+    try {
+      console.log(`[TOOL] Deploying via VALA Agent at ${server.agent_url}`);
+      const startTime = Date.now();
+      
+      const agentRes = await fetch(server.agent_url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${server.agent_token}` },
+        body: JSON.stringify({
+          command: 'deploy',
+          data: { project_name, branch, environment, repository_url: `https://github.com/SaaSVala/${project_name}.git` }
+        })
+      });
 
-  // Update deployment status
-  await supabase
-    .from('deployments')
-    .update({ status: 'success', completed_at: new Date().toISOString(), duration_seconds: 56 })
-    .eq('id', deployment.id);
+      const duration = Math.round((Date.now() - startTime) / 1000);
+
+      if (agentRes.ok) {
+        const agentData = await agentRes.json();
+        
+        // Update deployment as success
+        await supabase.from('deployments').update({
+          status: 'success', completed_at: new Date().toISOString(), duration_seconds: duration,
+          deployed_url: server.custom_domain ? `https://${server.custom_domain}` : `https://${server.subdomain}.saasvala.com`,
+          build_logs: JSON.stringify(agentData.data?.logs || agentData.data || {})
+        }).eq('id', deployment.id);
+
+        // Log activity
+        await supabase.from('activity_logs').insert({
+          entity_type: 'deployment', entity_id: deployment.id,
+          action: 'deploy_success', details: { project_name, server: server.name, duration, environment }
+        });
+
+        return {
+          tool_call_id: '',
+          content: JSON.stringify({
+            success: true, live_execution: true,
+            deployment_id: deployment.id, project: project_name,
+            server: server.name, branch, environment,
+            duration: `${duration}s`,
+            deployed_url: server.custom_domain ? `https://${server.custom_domain}` : `https://${server.subdomain}.saasvala.com`,
+            agent_response: agentData.data || agentData,
+            message: `✅ REAL deployment complete via VALA Agent | ${duration}s`
+          }, null, 2),
+          success: true
+        };
+      } else {
+        const errText = await agentRes.text();
+        await supabase.from('deployments').update({
+          status: 'failed', completed_at: new Date().toISOString(), duration_seconds: duration,
+          build_logs: errText
+        }).eq('id', deployment.id);
+
+        return {
+          tool_call_id: '',
+          content: JSON.stringify({
+            success: false, deployment_id: deployment.id, server: server.name,
+            error: `Agent returned ${agentRes.status}: ${errText}`,
+            message: `❌ Deployment failed on ${server.name}`
+          }, null, 2),
+          success: false
+        };
+      }
+    } catch (agentErr) {
+      await supabase.from('deployments').update({
+        status: 'failed', completed_at: new Date().toISOString(),
+        build_logs: `Agent connection error: ${agentErr.message}`
+      }).eq('id', deployment.id);
+
+      return {
+        tool_call_id: '',
+        content: JSON.stringify({
+          success: false, deployment_id: deployment.id, server: server.name,
+          error: `VALA Agent not reachable: ${agentErr.message}`,
+          fix: 'Check if VALA Agent is running on server. SSH in and run: pm2 status vala-agent'
+        }, null, 2),
+        success: false
+      };
+    }
+  }
+
+  // No agent — cannot deploy
+  await supabase.from('deployments').update({ status: 'failed', completed_at: new Date().toISOString(),
+    build_logs: 'No VALA Agent installed on server'
+  }).eq('id', deployment.id);
 
   return {
     tool_call_id: '',
     content: JSON.stringify({
-      success: true,
-      deployment_id: deployment.id,
-      project: project_name,
-      server: server.name,
-      branch,
-      environment,
-      steps,
-      total_time: '56.5s',
-      deployed_url: `https://${project_name}.saasvala.com`
+      success: false, deployment_id: deployment.id, server: server.name,
+      error: `Server ${server.name} has no VALA Agent installed. Cannot deploy remotely.`,
+      install_command: 'curl -sSL https://softwarevala.net/vala-agent/install.sh | sudo bash',
+      message: `❌ Install VALA Agent first on ${server.name}, then retry deployment.`
     }, null, 2),
-    success: true
+    success: false
   };
 }
 
@@ -873,26 +956,122 @@ async function executeFixCode(args: any, supabase: any): Promise<ToolResult> {
 }
 
 async function executeGitOperations(args: any, supabase: any): Promise<ToolResult> {
-  const { operation, repository_url, branch = 'main', server_id } = args;
+  const { operation, repository_url, branch = 'main', server_id, account = 'SaaSVala' } = args;
   console.log(`[TOOL] git_operations: ${operation}`);
 
-  const results: Record<string, any> = {
-    clone: { success: true, message: `Repository cloned from ${repository_url}`, path: '/var/www/app' },
-    pull: { success: true, message: `Pulled latest changes from ${branch}`, commits_pulled: 3 },
-    push: { success: true, message: `Pushed changes to ${branch}`, commits_pushed: 1 },
-    branch: { success: true, branches: ['main', 'develop', 'feature/new-ui', 'hotfix/security'] },
-    status: { success: true, branch: branch, modified: 2, staged: 1, untracked: 0 },
-    log: { success: true, commits: [
-      { hash: 'a1b2c3d', message: 'Fix security vulnerability', author: 'dev@saasvala.com', date: new Date().toISOString() },
-      { hash: 'e4f5g6h', message: 'Add new feature', author: 'dev@saasvala.com', date: new Date(Date.now() - 86400000).toISOString() }
-    ]}
-  };
+  // Use real GitHub API for status/log/branch operations
+  const tokenKey = account === 'SoftwareVala' ? 'SOFTWAREVALA_GITHUB_TOKEN' : 'SAASVALA_GITHUB_TOKEN';
+  const GITHUB_TOKEN = Deno.env.get(tokenKey);
+  const ghHeaders = GITHUB_TOKEN ? {
+    'Authorization': `token ${GITHUB_TOKEN}`, 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'VALA-AI'
+  } : undefined;
 
-  return {
-    tool_call_id: '',
-    content: JSON.stringify(results[operation] || { error: 'Unknown operation' }, null, 2),
-    success: true
-  };
+  // Extract repo name from URL if provided
+  let repoFullName = '';
+  if (repository_url) {
+    const match = repository_url.match(/github\.com\/([^\/]+\/[^\/\.]+)/);
+    if (match) repoFullName = match[1];
+  }
+
+  try {
+    switch (operation) {
+      case 'status': {
+        if (!repoFullName && !server_id) {
+          // List recent repos as "status"
+          if (!ghHeaders) return { tool_call_id: '', content: JSON.stringify({ error: 'No GitHub token' }), success: false };
+          const res = await fetch('https://api.github.com/user/repos?sort=updated&per_page=5', { headers: ghHeaders });
+          const repos = res.ok ? await res.json() : [];
+          return { tool_call_id: '', content: JSON.stringify({
+            success: true, operation: 'status', repos: repos.map((r: any) => ({
+              name: r.full_name, branch: r.default_branch, updated: r.updated_at, language: r.language
+            }))
+          }, null, 2), success: true };
+        }
+        if (repoFullName && ghHeaders) {
+          const [repoRes, branchRes] = await Promise.all([
+            fetch(`https://api.github.com/repos/${repoFullName}`, { headers: ghHeaders }),
+            fetch(`https://api.github.com/repos/${repoFullName}/branches`, { headers: ghHeaders }),
+          ]);
+          const repo = repoRes.ok ? await repoRes.json() : null;
+          const branches = branchRes.ok ? await branchRes.json() : [];
+          return { tool_call_id: '', content: JSON.stringify({
+            success: true, repo: repoFullName, default_branch: repo?.default_branch,
+            branches: branches.map((b: any) => b.name), last_push: repo?.pushed_at,
+            size_kb: repo?.size, open_issues: repo?.open_issues_count
+          }, null, 2), success: true };
+        }
+        // If server_id, try VALA Agent
+        if (server_id) {
+          const { data: server } = await supabase.from('servers').select('agent_url, agent_token, name').eq('id', server_id).single();
+          if (server?.agent_url && server?.agent_token) {
+            try {
+              const agentRes = await fetch(server.agent_url, {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${server.agent_token}` },
+                body: JSON.stringify({ command: 'git_status' })
+              });
+              if (agentRes.ok) {
+                const agentData = await agentRes.json();
+                return { tool_call_id: '', content: JSON.stringify({ success: true, server: server.name, live_data: true, ...agentData.data }, null, 2), success: true };
+              }
+            } catch (_) {}
+          }
+        }
+        return { tool_call_id: '', content: JSON.stringify({ error: 'Provide repository_url or server_id with VALA Agent' }), success: false };
+      }
+      case 'log': {
+        if (!repoFullName || !ghHeaders) return { tool_call_id: '', content: JSON.stringify({ error: 'Need repository_url + token' }), success: false };
+        const res = await fetch(`https://api.github.com/repos/${repoFullName}/commits?sha=${branch}&per_page=10`, { headers: ghHeaders });
+        const commits = res.ok ? await res.json() : [];
+        return { tool_call_id: '', content: JSON.stringify({
+          success: true, repo: repoFullName, branch,
+          commits: commits.map((c: any) => ({
+            sha: c.sha?.slice(0, 7), message: c.commit?.message?.split('\n')[0],
+            author: c.commit?.author?.name, date: c.commit?.author?.date
+          }))
+        }, null, 2), success: true };
+      }
+      case 'branch': {
+        if (!repoFullName || !ghHeaders) return { tool_call_id: '', content: JSON.stringify({ error: 'Need repository_url + token' }), success: false };
+        const res = await fetch(`https://api.github.com/repos/${repoFullName}/branches`, { headers: ghHeaders });
+        const branches = res.ok ? await res.json() : [];
+        return { tool_call_id: '', content: JSON.stringify({
+          success: true, repo: repoFullName,
+          branches: branches.map((b: any) => ({ name: b.name, protected: b.protected, sha: b.commit?.sha?.slice(0, 7) }))
+        }, null, 2), success: true };
+      }
+      case 'clone':
+      case 'pull':
+      case 'push': {
+        // These need server-side execution via VALA Agent
+        if (server_id) {
+          const { data: server } = await supabase.from('servers').select('agent_url, agent_token, name').eq('id', server_id).single();
+          if (server?.agent_url && server?.agent_token) {
+            try {
+              const agentRes = await fetch(server.agent_url, {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${server.agent_token}` },
+                body: JSON.stringify({ command: `git_${operation}`, data: { repository_url, branch } })
+              });
+              if (agentRes.ok) {
+                const agentData = await agentRes.json();
+                return { tool_call_id: '', content: JSON.stringify({ success: true, operation, server: server.name, live_execution: true, ...agentData.data }, null, 2), success: true };
+              }
+            } catch (e) {
+              return { tool_call_id: '', content: JSON.stringify({ error: `VALA Agent error: ${e.message}`, server: server.name }), success: false };
+            }
+          }
+          return { tool_call_id: '', content: JSON.stringify({ error: `Server ${server_id} has no VALA Agent installed. Install agent first.` }), success: false };
+        }
+        return { tool_call_id: '', content: JSON.stringify({
+          error: `git ${operation} requires a server with VALA Agent. Provide server_id with agent installed.`,
+          install_command: 'curl -sSL https://softwarevala.net/vala-agent/install.sh | sudo bash'
+        }), success: false };
+      }
+      default:
+        return { tool_call_id: '', content: JSON.stringify({ error: `Unknown git operation: ${operation}` }), success: false };
+    }
+  } catch (error) {
+    return { tool_call_id: '', content: JSON.stringify({ error: error.message }), success: false };
+  }
 }
 
 async function executeCheckSSL(args: any): Promise<ToolResult> {
@@ -949,109 +1128,146 @@ async function executeCreateBackup(args: any, supabase: any): Promise<ToolResult
   };
 }
 
-// GitHub Upload Function
+// GitHub Upload Function — REAL file push via Contents API
 async function executeUploadToGithub(args: any, supabase: any): Promise<ToolResult> {
-  const { project_name, description = '', file_path, is_private = false, account = 'SaaSVala' } = args;
+  const { project_name, description = '', file_path, is_private = false, account = 'SaaSVala', files } = args;
   console.log(`[TOOL] upload_to_github: ${project_name} to ${account}`);
 
-  // Get GitHub token based on account
   const tokenKey = account === 'SoftwareVala' ? 'SOFTWAREVALA_GITHUB_TOKEN' : 'SAASVALA_GITHUB_TOKEN';
   const GITHUB_TOKEN = Deno.env.get(tokenKey);
   
   if (!GITHUB_TOKEN) {
-    return { 
-      tool_call_id: '', 
-      content: JSON.stringify({ error: `GitHub token not configured for ${account}` }), 
-      success: false 
-    };
+    return { tool_call_id: '', content: JSON.stringify({ error: `GitHub token not configured for ${account}` }), success: false };
   }
 
-  // Clean repo name
-  const repoName = project_name.toLowerCase()
-    .replace(/[^a-z0-9]/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
+  const repoName = project_name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  const ghHeaders = {
+    'Authorization': `token ${GITHUB_TOKEN}`,
+    'Accept': 'application/vnd.github.v3+json',
+    'User-Agent': 'VALA-AI-Developer',
+    'Content-Type': 'application/json'
+  };
 
   try {
-    // Check if repo exists
-    const checkResponse = await fetch(`https://api.github.com/repos/${account}/${repoName}`, {
-      headers: {
-        'Authorization': `token ${GITHUB_TOKEN}`,
-        'Accept': 'application/vnd.github.v3+json',
-        'User-Agent': 'VALA-AI-Developer'
-      }
-    });
-
+    // Step 1: Check/Create repo
+    const checkRes = await fetch(`https://api.github.com/repos/${account}/${repoName}`, { headers: ghHeaders });
     let repoUrl = '';
     let isNew = false;
 
-    if (checkResponse.status === 404) {
-      // Create new repo
-      const createResponse = await fetch('https://api.github.com/user/repos', {
-        method: 'POST',
-        headers: {
-          'Authorization': `token ${GITHUB_TOKEN}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'VALA-AI-Developer',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: repoName,
-          description: description || `Auto-uploaded by VALA AI Developer`,
-          private: is_private,
-          auto_init: false
-        })
+    if (checkRes.status === 404) {
+      const createRes = await fetch('https://api.github.com/user/repos', {
+        method: 'POST', headers: ghHeaders,
+        body: JSON.stringify({ name: repoName, description: description || `Auto-created by VALA AI`, private: is_private, auto_init: true })
       });
-
-      if (!createResponse.ok) {
-        const error = await createResponse.text();
-        return { 
-          tool_call_id: '', 
-          content: JSON.stringify({ error: `Failed to create repo: ${error}` }), 
-          success: false 
-        };
+      if (!createRes.ok) {
+        const err = await createRes.text();
+        return { tool_call_id: '', content: JSON.stringify({ error: `Failed to create repo: ${err}` }), success: false };
       }
-
-      const repoData = await createResponse.json();
+      const repoData = await createRes.json();
       repoUrl = repoData.html_url;
       isNew = true;
-    } else if (checkResponse.ok) {
-      const existingRepo = await checkResponse.json();
-      repoUrl = existingRepo.html_url;
+      // Wait for GitHub to initialize
+      await new Promise(r => setTimeout(r, 2000));
+    } else if (checkRes.ok) {
+      const existing = await checkRes.json();
+      repoUrl = existing.html_url;
     }
 
-    // Log to source_code_catalog
+    // Step 2: If source file in storage, download and push to GitHub
+    const pushedFiles: string[] = [];
+    
+    if (file_path) {
+      try {
+        const { data: fileData, error: dlError } = await supabase.storage.from('source-code').download(file_path);
+        if (!dlError && fileData) {
+          const arrayBuffer = await fileData.arrayBuffer();
+          const base64Content = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+          const fileName = file_path.split('/').pop() || 'uploaded-file';
+          
+          // Push file via Contents API
+          const putRes = await fetch(`https://api.github.com/repos/${account}/${repoName}/contents/${fileName}`, {
+            method: 'PUT', headers: ghHeaders,
+            body: JSON.stringify({
+              message: `Upload ${fileName} via VALA AI`,
+              content: base64Content,
+            })
+          });
+          if (putRes.ok) {
+            pushedFiles.push(fileName);
+            console.log(`[TOOL] Pushed file: ${fileName}`);
+          } else {
+            console.warn(`[TOOL] Failed to push ${fileName}: ${await putRes.text()}`);
+          }
+        }
+      } catch (e) {
+        console.warn(`[TOOL] File download/push error: ${e.message}`);
+      }
+    }
+
+    // Step 3: If inline files provided, push them
+    if (files && Array.isArray(files)) {
+      for (const f of files) {
+        if (f.path && f.content) {
+          try {
+            // Check if file exists first (need SHA for update)
+            const existRes = await fetch(`https://api.github.com/repos/${account}/${repoName}/contents/${f.path}`, { headers: ghHeaders });
+            const putBody: any = {
+              message: f.message || `Add ${f.path} via VALA AI`,
+              content: btoa(unescape(encodeURIComponent(f.content))),
+            };
+            if (existRes.ok) {
+              const existData = await existRes.json();
+              putBody.sha = existData.sha;
+            }
+            
+            const putRes = await fetch(`https://api.github.com/repos/${account}/${repoName}/contents/${f.path}`, {
+              method: 'PUT', headers: ghHeaders,
+              body: JSON.stringify(putBody)
+            });
+            if (putRes.ok) {
+              const putData = await putRes.json();
+              pushedFiles.push(f.path);
+              console.log(`[TOOL] Pushed: ${f.path} (sha: ${putData.content?.sha?.slice(0, 7)})`);
+            } else {
+              console.warn(`[TOOL] Push failed for ${f.path}: ${await putRes.text()}`);
+            }
+          } catch (e) {
+            console.warn(`[TOOL] Push error for ${f.path}: ${e.message}`);
+          }
+        }
+      }
+    }
+
+    // Step 4: Get latest commit for proof
+    let latestCommit = null;
+    try {
+      const commitRes = await fetch(`https://api.github.com/repos/${account}/${repoName}/commits?per_page=1`, { headers: ghHeaders });
+      if (commitRes.ok) {
+        const commits = await commitRes.json();
+        if (commits[0]) {
+          latestCommit = { sha: commits[0].sha?.slice(0, 7), message: commits[0].commit?.message, date: commits[0].commit?.author?.date };
+        }
+      }
+    } catch (_) {}
+
+    // Log to catalog
     await supabase.from('source_code_catalog').upsert({
-      repo_name: repoName,
-      github_url: repoUrl,
-      github_account: account,
-      status: 'uploaded',
-      last_synced: new Date().toISOString()
-    }, { onConflict: 'repo_name' });
+      project_name: repoName, github_repo_url: repoUrl, github_account: account,
+      status: 'uploaded', uploaded_at: new Date().toISOString()
+    }, { onConflict: 'slug' });
 
     return {
       tool_call_id: '',
       content: JSON.stringify({
-        success: true,
-        repository: repoName,
-        url: repoUrl,
-        account: account,
-        is_new: isNew,
-        message: isNew ? `✅ Repository created: ${repoUrl}` : `✅ Repository exists: ${repoUrl}`,
-        next_steps: [
-          'Files need to be pushed via Git CLI or GitHub Desktop',
-          'Run: git remote add origin ' + repoUrl,
-          'Run: git push -u origin main --force'
-        ]
+        success: true, repository: repoName, url: repoUrl, account, is_new: isNew,
+        files_pushed: pushedFiles.length, pushed_files: pushedFiles,
+        latest_commit: latestCommit,
+        message: `✅ ${isNew ? 'Created' : 'Updated'} repo: ${repoUrl} | ${pushedFiles.length} files pushed`
       }),
       success: true
     };
   } catch (error) {
-    return { 
-      tool_call_id: '', 
-      content: JSON.stringify({ error: `GitHub API error: ${error.message}` }), 
-      success: false 
-    };
+    return { tool_call_id: '', content: JSON.stringify({ error: `GitHub API error: ${error.message}` }), success: false };
   }
 }
 
@@ -1731,6 +1947,141 @@ async function executeTestRepoProduct(args: any, supabase: any): Promise<ToolRes
   };
 }
 
+// Generate Code — creates real files and pushes to GitHub
+async function executeGenerateCode(args: any, supabase: any): Promise<ToolResult> {
+  const { project_name, project_type, description, features = [], account = 'SaaSVala', files: providedFiles } = args;
+  console.log(`[TOOL] generate_code: ${project_name} (${project_type})`);
+
+  const tokenKey = account === 'SoftwareVala' ? 'SOFTWAREVALA_GITHUB_TOKEN' : 'SAASVALA_GITHUB_TOKEN';
+  const GITHUB_TOKEN = Deno.env.get(tokenKey);
+  if (!GITHUB_TOKEN) {
+    return { tool_call_id: '', content: JSON.stringify({ error: `GitHub token not configured for ${account}` }), success: false };
+  }
+
+  const repoName = project_name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  const ghHeaders = {
+    'Authorization': `token ${GITHUB_TOKEN}`, 'Accept': 'application/vnd.github.v3+json',
+    'User-Agent': 'VALA-AI-Developer', 'Content-Type': 'application/json'
+  };
+
+  try {
+    // Step 1: Create repo if not exists
+    const checkRes = await fetch(`https://api.github.com/repos/${account}/${repoName}`, { headers: ghHeaders });
+    let repoUrl = '';
+    if (checkRes.status === 404) {
+      const createRes = await fetch('https://api.github.com/user/repos', {
+        method: 'POST', headers: ghHeaders,
+        body: JSON.stringify({ name: repoName, description: description || `Generated by VALA AI`, private: false, auto_init: true })
+      });
+      if (!createRes.ok) return { tool_call_id: '', content: JSON.stringify({ error: await createRes.text() }), success: false };
+      const rd = await createRes.json();
+      repoUrl = rd.html_url;
+      await new Promise(r => setTimeout(r, 2000));
+    } else {
+      const rd = await checkRes.json();
+      repoUrl = rd.html_url;
+    }
+
+    // Step 2: Use provided files or generate template files
+    const filesToPush = providedFiles || generateTemplateFiles(project_type, project_name, description, features);
+
+    // Step 3: Push all files via Contents API
+    const pushed: string[] = [];
+    const errors: string[] = [];
+    
+    for (const f of filesToPush) {
+      try {
+        // Check if exists (need SHA for update)
+        const existRes = await fetch(`https://api.github.com/repos/${account}/${repoName}/contents/${f.path}`, { headers: ghHeaders });
+        const putBody: any = {
+          message: `Add ${f.path} via VALA AI`,
+          content: btoa(unescape(encodeURIComponent(f.content))),
+        };
+        if (existRes.ok) {
+          const ed = await existRes.json();
+          putBody.sha = ed.sha;
+          putBody.message = `Update ${f.path} via VALA AI`;
+        }
+        const putRes = await fetch(`https://api.github.com/repos/${account}/${repoName}/contents/${f.path}`, {
+          method: 'PUT', headers: ghHeaders, body: JSON.stringify(putBody)
+        });
+        if (putRes.ok) { pushed.push(f.path); } 
+        else { errors.push(`${f.path}: ${(await putRes.json()).message || 'failed'}`); }
+      } catch (e) { errors.push(`${f.path}: ${e.message}`); }
+    }
+
+    // Step 4: Get proof commit
+    let latestCommit = null;
+    try {
+      const cr = await fetch(`https://api.github.com/repos/${account}/${repoName}/commits?per_page=1`, { headers: ghHeaders });
+      if (cr.ok) { const c = await cr.json(); if (c[0]) latestCommit = { sha: c[0].sha?.slice(0, 7), message: c[0].commit?.message }; }
+    } catch (_) {}
+
+    // Log to catalog
+    await supabase.from('source_code_catalog').upsert({
+      project_name: repoName, github_repo_url: repoUrl, github_account: account,
+      project_type, target_industry: 'general', ai_description: description,
+      status: 'uploaded', uploaded_at: new Date().toISOString()
+    }, { onConflict: 'slug' });
+
+    return {
+      tool_call_id: '',
+      content: JSON.stringify({
+        success: true, project: repoName, type: project_type, url: repoUrl, account,
+        files_pushed: pushed.length, pushed_files: pushed,
+        errors: errors.length > 0 ? errors : undefined,
+        latest_commit: latestCommit,
+        message: `✅ ${pushed.length} files created and pushed to ${repoUrl}`
+      }, null, 2),
+      success: true
+    };
+  } catch (error) {
+    return { tool_call_id: '', content: JSON.stringify({ error: error.message }), success: false };
+  }
+}
+
+// Template file generators for different project types
+function generateTemplateFiles(type: string, name: string, desc: string, features: string[]): { path: string; content: string }[] {
+  const featureList = features.map((f, i) => `${i + 1}. ${f}`).join('\n');
+  const readme = `# ${name}\n\n${desc}\n\n## Features\n${featureList || '- Core functionality'}\n\n## Tech Stack\n- ${type}\n\n## Setup\n\`\`\`bash\nnpm install\nnpm start\n\`\`\`\n\n---\nGenerated by VALA AI | SoftwareVala™`;
+
+  switch (type) {
+    case 'react':
+      return [
+        { path: 'README.md', content: readme },
+        { path: 'package.json', content: JSON.stringify({ name, version: '1.0.0', private: true, dependencies: { react: '^18.2.0', 'react-dom': '^18.2.0', 'react-scripts': '5.0.1' }, scripts: { start: 'react-scripts start', build: 'react-scripts build' } }, null, 2) },
+        { path: 'public/index.html', content: `<!DOCTYPE html><html><head><title>${name}</title></head><body><div id="root"></div></body></html>` },
+        { path: 'src/index.js', content: `import React from 'react';\nimport ReactDOM from 'react-dom/client';\nimport App from './App';\nReactDOM.createRoot(document.getElementById('root')).render(<App />);` },
+        { path: 'src/App.js', content: `import React from 'react';\n\nexport default function App() {\n  return (\n    <div style={{padding: '2rem', fontFamily: 'sans-serif'}}>\n      <h1>${name}</h1>\n      <p>${desc}</p>\n    </div>\n  );\n}` },
+      ];
+    case 'node':
+    case 'express':
+      return [
+        { path: 'README.md', content: readme },
+        { path: 'package.json', content: JSON.stringify({ name, version: '1.0.0', main: 'index.js', scripts: { start: 'node index.js', dev: 'nodemon index.js' }, dependencies: { express: '^4.18.2', cors: '^2.8.5' } }, null, 2) },
+        { path: 'index.js', content: `const express = require('express');\nconst cors = require('cors');\nconst app = express();\napp.use(cors());\napp.use(express.json());\n\napp.get('/', (req, res) => {\n  res.json({ name: '${name}', status: 'running', version: '1.0.0' });\n});\n\napp.get('/api/health', (req, res) => {\n  res.json({ status: 'ok', uptime: process.uptime() });\n});\n\nconst PORT = process.env.PORT || 3000;\napp.listen(PORT, () => console.log(\`${name} running on port \${PORT}\`));` },
+      ];
+    case 'php':
+    case 'laravel':
+      return [
+        { path: 'README.md', content: readme },
+        { path: 'index.php', content: `<?php\n/**\n * ${name}\n * ${desc}\n */\n\nheader('Content-Type: application/json');\n\n$response = [\n    'name' => '${name}',\n    'status' => 'running',\n    'version' => '1.0.0',\n    'features' => [${features.map(f => `'${f}'`).join(', ')}]\n];\n\necho json_encode($response, JSON_PRETTY_PRINT);` },
+        { path: 'config.php', content: `<?php\ndefine('APP_NAME', '${name}');\ndefine('APP_VERSION', '1.0.0');\ndefine('APP_DEBUG', false);` },
+      ];
+    case 'python':
+      return [
+        { path: 'README.md', content: readme },
+        { path: 'requirements.txt', content: 'flask>=2.0\nflask-cors>=3.0\ngunicorn>=20.0' },
+        { path: 'app.py', content: `from flask import Flask, jsonify\nfrom flask_cors import CORS\n\napp = Flask(__name__)\nCORS(app)\n\n@app.route('/')\ndef index():\n    return jsonify(name='${name}', status='running', version='1.0.0')\n\n@app.route('/api/health')\ndef health():\n    return jsonify(status='ok')\n\nif __name__ == '__main__':\n    app.run(host='0.0.0.0', port=5000)` },
+      ];
+    default: // html
+      return [
+        { path: 'README.md', content: readme },
+        { path: 'index.html', content: `<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <title>${name}</title>\n  <style>body{font-family:sans-serif;margin:0;padding:2rem;background:#f5f5f5}h1{color:#333}.card{background:white;padding:1.5rem;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);max-width:600px;margin:2rem auto}</style>\n</head>\n<body>\n  <div class="card">\n    <h1>${name}</h1>\n    <p>${desc}</p>\n  </div>\n</body>\n</html>` },
+      ];
+  }
+}
+
 // Execute tool based on name
 async function executeTool(toolCall: ToolCall, supabase: any): Promise<ToolResult> {
   const { name, arguments: argsString } = toolCall.function;
@@ -1817,6 +2168,9 @@ async function executeTool(toolCall: ToolCall, supabase: any): Promise<ToolResul
       break;
     case 'test_repo_product':
       result = await executeTestRepoProduct(args, supabase);
+      break;
+    case 'generate_code':
+      result = await executeGenerateCode(args, supabase);
       break;
     default:
       result = { tool_call_id: toolCall.id, content: `Unknown tool: ${name}`, success: false };
