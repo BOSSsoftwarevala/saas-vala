@@ -1976,8 +1976,8 @@ async function executeGetClientRequests(args: any, supabase: any): Promise<ToolR
 
 // ─── CHECK GITHUB REPOS (REAL DATA) ──────────────────────────────────────────
 async function executeCheckGithubRepos(args: any, supabase: any): Promise<ToolResult> {
-  const { account = 'both', check_products = true, limit = 30 } = args;
-  console.log(`[TOOL] check_github_repos: ${account}`);
+  const { account = 'both', check_products = true, limit = 500 } = args;
+  console.log(`[TOOL] check_github_repos: ${account}, limit: ${limit}`);
 
   const accountConfigs: { name: string; tokenKey: string }[] = [];
   if (account === 'SaaSVala' || account === 'both') {
@@ -2004,15 +2004,24 @@ async function executeCheckGithubRepos(args: any, supabase: any): Promise<ToolRe
       const userInfo = userRes.ok ? await userRes.json() : null;
       const realLogin = userInfo?.login || acc.name;
 
-      // Fetch repos using authenticated endpoint (gets private + public)
-      const repoRes = await fetch(`https://api.github.com/user/repos?per_page=${limit}&sort=updated&visibility=all&affiliation=owner,collaborator,organization_member`, {
-        headers: ghHeaders
-      });
+      // Fetch ALL repos with pagination (100 per page max)
+      let page = 1;
+      let allAccountRepos: any[] = [];
+      while (true) {
+        const repoRes = await fetch(`https://api.github.com/user/repos?per_page=100&page=${page}&sort=updated&visibility=all&affiliation=owner,collaborator,organization_member`, {
+          headers: ghHeaders
+        });
+        if (!repoRes.ok) break;
+        const repos = await repoRes.json();
+        if (!Array.isArray(repos) || repos.length === 0) break;
+        allAccountRepos.push(...repos);
+        if (repos.length < 100) break;
+        page++;
+      }
 
-      const repos = repoRes.ok ? await repoRes.json() : [];
+      console.log(`[TOOL] ${acc.name}: ${allAccountRepos.length} repos fetched (${page} pages)`);
 
-
-      for (const repo of (Array.isArray(repos) ? repos : [])) {
+      for (const repo of allAccountRepos) {
         allRepos.push({
           account: acc.name,
           github_login: userInfo?.login || acc.name,
@@ -2081,7 +2090,7 @@ async function executeCheckGithubRepos(args: any, supabase: any): Promise<ToolRe
     content: JSON.stringify({
       success: true,
       stats,
-      repos: allRepos.slice(0, limit),
+      repos: allRepos.slice(0, Math.min(limit, 500)),
       product_matches: productMatches.slice(0, 20),
       summary: `✅ ${stats.total_repos} repos found | ${stats.products_on_github} marketplace products matched | ${stats.repos_needing_attention} repos have open issues`
     }, null, 2),
