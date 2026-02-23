@@ -508,7 +508,7 @@ async function executeListServers(args: any, supabase: any): Promise<ToolResult>
   
   const { data: servers, error } = await supabase
     .from('servers')
-    .select('id, name, status, subdomain, custom_domain, server_type, runtime, health_status, uptime_percent, created_at, agent_url, agent_token')
+    .select('id, name, status, subdomain, custom_domain, server_type, runtime, health_status, uptime_percent, created_at, agent_url, agent_token, ip_address')
     .order('created_at', { ascending: false })
     .limit(20);
 
@@ -525,6 +525,7 @@ async function executeListServers(args: any, supabase: any): Promise<ToolResult>
       subdomain: s.subdomain || 'N/A',
       domain: s.custom_domain || `${s.subdomain}.saasvala.com`,
       type: s.server_type || s.runtime || 'web',
+      ip_address: s.ip_address || 'N/A',
       health: s.health_status || 'unknown',
       uptime: s.uptime_percent ? `${s.uptime_percent}%` : 'N/A',
       agent_connected: !!s.agent_url
@@ -542,14 +543,18 @@ async function executeServerStatus(args: any, supabase: any): Promise<ToolResult
   const { server_id } = args;
   console.log(`[TOOL] server_status: ${server_id}`);
 
-  const { data: server, error } = await supabase
-    .from('servers')
-    .select('*')
-    .eq('id', server_id)
-    .single();
+  // Try UUID first, then IP address fallback
+  let server: any = null;
+  const { data: byId } = await supabase.from('servers').select('*').eq('id', server_id).single();
+  if (byId) {
+    server = byId;
+  } else {
+    const { data: byIp } = await supabase.from('servers').select('*').eq('ip_address', server_id).single();
+    server = byIp;
+  }
 
-  if (error || !server) {
-    return { tool_call_id: '', content: `Server not found: ${server_id}`, success: false };
+  if (!server) {
+    return { tool_call_id: '', content: `Error: Server with IP ${server_id} not found in the management system.`, success: false };
   }
 
   // If agent is connected, get REAL status from the agent
@@ -731,16 +736,25 @@ async function executeDeployProject(args: any, supabase: any): Promise<ToolResul
   let server_id = providedServerId;
 
   if (server_id) {
-    // Use provided server
-    const { data, error } = await supabase
+    // Try UUID first, then IP address fallback
+    let { data } = await supabase
       .from('servers')
-      .select('id, name, status, agent_url, agent_token, custom_domain, subdomain, git_repo')
+      .select('id, name, status, agent_url, agent_token, custom_domain, subdomain, git_repo, ip_address')
       .eq('id', server_id)
       .single();
-    if (error || !data) {
+    if (!data) {
+      const { data: byIp } = await supabase
+        .from('servers')
+        .select('id, name, status, agent_url, agent_token, custom_domain, subdomain, git_repo, ip_address')
+        .eq('ip_address', server_id)
+        .single();
+      data = byIp;
+    }
+    if (!data) {
       return { tool_call_id: '', content: JSON.stringify({ error: `Server not found: ${server_id}` }), success: false };
     }
     server = data;
+    server_id = data.id;
   } else {
     // Auto-select: pick first live server, or any server
     const { data: servers } = await supabase
