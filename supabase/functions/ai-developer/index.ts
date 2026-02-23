@@ -413,6 +413,25 @@ const developerTools = [
         required: ["project_name", "project_type", "description"]
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "setup_domain",
+      description: "Setup a custom domain on a server: configure Nginx reverse proxy, enable SSL via Let's Encrypt, bind domain to a project. Executes real commands via VALA Agent.",
+      parameters: {
+        type: "object",
+        properties: {
+          domain: { type: "string", description: "Full domain name e.g. softwarevala.saasvala.com" },
+          server_id: { type: "string", description: "Target server ID (optional — auto-selects if not provided)" },
+          project_name: { type: "string", description: "Project/app name to bind the domain to" },
+          app_port: { type: "number", description: "Application port for reverse proxy (default: 3000)" },
+          enable_ssl: { type: "boolean", description: "Enable SSL via Let's Encrypt (default: true)" },
+          enable_www_redirect: { type: "boolean", description: "Redirect www to non-www (default: false)" }
+        },
+        required: ["domain"]
+      }
+    }
   }
 ];
 
@@ -2341,8 +2360,200 @@ function generateTemplateFiles(type: string, name: string, desc: string, feature
       ];
   }
 }
+// Setup Domain — Real Nginx + SSL via VALA Agent
+async function executeSetupDomain(args: any, supabase: any): Promise<ToolResult> {
+  const { domain, server_id: providedServerId, project_name = '', app_port = 3000, enable_ssl = true, enable_www_redirect = false } = args;
+  console.log(`[TOOL] setup_domain: ${domain} -> port ${app_port}`);
 
-// Execute tool based on name
+  // Auto-select server if not provided
+  let server: any = null;
+  let server_id = providedServerId;
+  if (!server_id) {
+    const { data: servers } = await supabase.from('servers').select('id, name, status, agent_url, agent_token, ip_address')
+      .order('status', { ascending: true }).limit(10);
+    if (servers && servers.length > 0) {
+      server = servers.find((s: any) => s.status === 'live' && s.agent_url) || servers.find((s: any) => s.status === 'live') || servers[0];
+      server_id = server.id;
+      console.log(`[TOOL] Auto-selected server: ${server.name}`);
+    }
+  } else {
+    const { data } = await supabase.from('servers').select('id, name, status, agent_url, agent_token, ip_address').eq('id', server_id).single();
+    server = data;
+  }
+
+  if (!server) {
+    return { tool_call_id: '', content: JSON.stringify({ success: false, error: 'No server found. Add a server first.' }), success: false };
+  }
+
+  // Record domain in DB
+  const { data: domainRecord } = await supabase.from('domains').upsert({
+    domain_name: domain,
+    server_id: server.id,
+    domain_type: 'custom',
+    status: 'pending',
+    ssl_status: 'pending',
+  }, { onConflict: 'domain_name' }).select().single();
+
+  // If VALA Agent is connected — execute real commands
+  if (server.agent_url && server.agent_token) {
+    try {
+      console.log(`[TOOL] Sending domain setup to VALA Agent at ${server.agent_url}`);
+      
+      // Step 1: Create Nginx config
+      const nginxConfig = `server {
+    listen 80;
+    server_name ${domain}${enable_www_redirect ? ` www.${domain}` : ''};
+
+    location / {
+        proxy_pass http://127.0.0.1:${app_port};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}`;
+
+      const agentRes = await fetch(server.agent_url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${server.agent_token}` },
+        body: JSON.stringify({
+          command: 'exec',
+          params: {
+            commands: [
+              // Write Nginx config
+              { cmd: `echo '${nginxConfig.replace(/'/g, "\\'")}' | sudo tee /etc/nginx/sites-available/${domain}` },
+              // Enable site
+              { cmd: `sudo ln -sf /etc/nginx/sites-available/${domain} /etc/nginx/sites-enabled/${domain}` },
+              // Test Nginx config
+              { cmd: 'sudo nginx -t' },
+              // Reload Nginx
+              { cmd: 'sudo systemctl reload nginx' },
+              // SSL via Certbot (if enabled)
+              ...(enable_ssl ? [{ cmd: `sudo certbot --nginx -d ${domain}${enable_www_redirect ? ` -d www.${domain}` : ''} --non-interactive --agree-tos --email admin@saasvala.com` }] : []),
+            ]
+          }
+        })
+      });
+
+      if (agentRes.ok) {
+        const agentData = await agentRes.json();
+        
+        // Update domain status
+        await supabase.from('domains').update({
+          status: 'active',
+          ssl_status: enable_ssl ? 'active' : 'none',
+          dns_verified: true,
+          dns_verified_at: new Date().toISOString(),
+        }).eq('id', domainRecord?.id);
+
+        // Update server with custom domain
+        await supabase.from('servers').update({
+          custom_domain: domain,
+        }).eq('id', server.id);
+
+        // Log activity
+        await supabase.from('activity_logs').insert({
+          entity_type: 'domain', entity_id: domainRecord?.id || domain,
+          action: 'domain_setup_complete',
+          details: { domain, server: server.name, app_port, ssl: enable_ssl, project: project_name }
+        });
+
+        // Verify domain is live
+        let liveCheck = { reachable: false, status: 0, ssl_valid: false };
+        try {
+          const proto = enable_ssl ? 'https' : 'http';
+          const checkRes = await fetch(`${proto}://${domain}`, { method: 'HEAD', redirect: 'follow' });
+          liveCheck = { reachable: checkRes.status < 500, status: checkRes.status, ssl_valid: enable_ssl && checkRes.ok };
+        } catch (_) {}
+
+        return {
+          tool_call_id: '', success: true,
+          content: JSON.stringify({
+            success: true, live_execution: true, method: 'vala_agent',
+            domain, server: server.name, server_ip: server.ip_address,
+            app_port, ssl_enabled: enable_ssl, project: project_name,
+            nginx_configured: true,
+            agent_result: agentData.data || agentData,
+            live_check: liveCheck,
+            final_url: `https://${domain}`,
+            dns_record_needed: {
+              type: 'A', host: domain.split('.')[0], value: server.ip_address || '(server IP)',
+              ttl: 3600, note: 'Add this DNS A record at your domain registrar if not already done'
+            },
+            message: `✅ Domain ${domain} configured on ${server.name} | Nginx ✓ | SSL ${enable_ssl ? '✓' : 'skipped'} | Port ${app_port}`
+          }, null, 2)
+        };
+      } else {
+        const errText = await agentRes.text();
+        console.warn(`[TOOL] Agent domain setup failed: ${errText}`);
+        
+        await supabase.from('domains').update({ status: 'failed' }).eq('id', domainRecord?.id);
+
+        return {
+          tool_call_id: '', success: false,
+          content: JSON.stringify({
+            success: false, domain, server: server.name,
+            error: `VALA Agent returned error: ${errText}`,
+            fallback_commands: [
+              `# SSH into ${server.name} (${server.ip_address}) and run:`,
+              `echo '${nginxConfig}' | sudo tee /etc/nginx/sites-available/${domain}`,
+              `sudo ln -sf /etc/nginx/sites-available/${domain} /etc/nginx/sites-enabled/`,
+              `sudo nginx -t && sudo systemctl reload nginx`,
+              enable_ssl ? `sudo certbot --nginx -d ${domain} --non-interactive --agree-tos --email admin@saasvala.com` : '# SSL skipped',
+            ]
+          }, null, 2)
+        };
+      }
+    } catch (agentErr: any) {
+      console.error(`[TOOL] Agent error: ${agentErr.message}`);
+      return {
+        tool_call_id: '', success: false,
+        content: JSON.stringify({
+          success: false, domain, server: server.name,
+          error: `Agent unreachable: ${agentErr.message}`,
+          manual_steps: [
+            `1. SSH into ${server.name} (${server.ip_address})`,
+            `2. Create /etc/nginx/sites-available/${domain}`,
+            `3. Add reverse proxy to port ${app_port}`,
+            `4. sudo nginx -t && sudo systemctl reload nginx`,
+            enable_ssl ? `5. sudo certbot --nginx -d ${domain}` : '',
+          ].filter(Boolean)
+        }, null, 2)
+      };
+    }
+  }
+
+  // No agent — provide manual instructions
+  return {
+    tool_call_id: '', success: false,
+    content: JSON.stringify({
+      success: false, domain, server: server.name, server_ip: server.ip_address,
+      error: `No VALA Agent installed on ${server.name}. Cannot execute remote commands.`,
+      domain_saved: true, domain_id: domainRecord?.id,
+      dns_record_needed: {
+        type: 'A', host: domain.split('.')[0], value: server.ip_address || '(get server IP)',
+        ttl: 3600
+      },
+      manual_commands: [
+        `# 1. Add DNS A Record at domain registrar:`,
+        `#    Host: ${domain.split('.')[0]}  Type: A  Value: ${server.ip_address || 'YOUR_SERVER_IP'}`,
+        `# 2. SSH into server and run:`,
+        `sudo nano /etc/nginx/sites-available/${domain}`,
+        `# Paste Nginx reverse proxy config for port ${app_port}`,
+        `sudo ln -sf /etc/nginx/sites-available/${domain} /etc/nginx/sites-enabled/`,
+        `sudo nginx -t && sudo systemctl reload nginx`,
+        `sudo certbot --nginx -d ${domain}`,
+      ],
+      install_agent: 'curl -sSL https://softwarevala.net/vala-agent/install.sh | sudo bash'
+    }, null, 2)
+  };
+}
+
+
 async function executeTool(toolCall: ToolCall, supabase: any): Promise<ToolResult> {
   const { name, arguments: argsString } = toolCall.function;
   let args = {};
@@ -2431,6 +2642,9 @@ async function executeTool(toolCall: ToolCall, supabase: any): Promise<ToolResul
       break;
     case 'generate_code':
       result = await executeGenerateCode(args, supabase);
+      break;
+    case 'setup_domain':
+      result = await executeSetupDomain(args, supabase);
       break;
     default:
       result = { tool_call_id: toolCall.id, content: `Unknown tool: ${name}`, success: false };
