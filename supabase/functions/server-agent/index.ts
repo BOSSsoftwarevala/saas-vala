@@ -207,20 +207,24 @@ serve(async (req) => {
         let liveStatus = null;
         if (server.agent_url && server.agent_token) {
           try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 8000);
             const statusResponse = await fetch(server.agent_url, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${server.agent_token}`
               },
-              body: JSON.stringify({ command: 'status' })
+              body: JSON.stringify({ command: 'status' }),
+              signal: controller.signal
             });
+            clearTimeout(timeout);
             
             if (statusResponse.ok) {
               liveStatus = await statusResponse.json();
             }
           } catch (e) {
-            console.log('[VALA Agent] Could not reach agent for live status');
+            console.log('[VALA Agent] Could not reach agent for live status:', e.message);
           }
         }
 
