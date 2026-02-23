@@ -2864,7 +2864,7 @@ serve(async (req) => {
 
     const AI_MODEL = model && SUPPORTED_MODELS.includes(model) 
       ? model 
-      : 'google/gemini-3-flash-preview';
+      : 'openai/gpt-5';
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(
