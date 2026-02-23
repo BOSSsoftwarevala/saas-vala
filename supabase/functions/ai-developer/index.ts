@@ -145,11 +145,11 @@ const developerTools = [
         type: "object",
         properties: {
           project_name: { type: "string", description: "Name of the project" },
-          server_id: { type: "string", description: "Target server ID" },
+          server_id: { type: "string", description: "Target server ID (optional — auto-selects if not provided)" },
           branch: { type: "string", description: "Git branch to deploy (default: main)" },
           environment: { type: "string", enum: ["development", "staging", "production"], description: "Deployment environment" }
         },
-        required: ["project_name", "server_id"]
+        required: ["project_name"]
       }
     }
   },
@@ -705,22 +705,80 @@ async function executeGenerateLicense(args: any, supabase: any): Promise<ToolRes
 }
 
 async function executeDeployProject(args: any, supabase: any): Promise<ToolResult> {
-  const { project_name, server_id, branch = 'main', environment = 'production' } = args;
-  console.log(`[TOOL] deploy_project: ${project_name} to ${server_id}`);
+  const { project_name, server_id: providedServerId, branch = 'main', environment = 'production' } = args;
+  console.log(`[TOOL] deploy_project: ${project_name} to ${providedServerId || 'auto-select'}`);
 
-  // Get server info including agent details
-  const { data: server, error: serverError } = await supabase
-    .from('servers')
-    .select('name, status, agent_url, agent_token, custom_domain, subdomain, git_repo')
-    .eq('id', server_id)
-    .single();
+  let server: any = null;
+  let server_id = providedServerId;
 
-  if (serverError || !server) {
-    return { tool_call_id: '', content: JSON.stringify({ error: `Server not found: ${server_id}` }), success: false };
+  if (server_id) {
+    // Use provided server
+    const { data, error } = await supabase
+      .from('servers')
+      .select('id, name, status, agent_url, agent_token, custom_domain, subdomain, git_repo')
+      .eq('id', server_id)
+      .single();
+    if (error || !data) {
+      return { tool_call_id: '', content: JSON.stringify({ error: `Server not found: ${server_id}` }), success: false };
+    }
+    server = data;
+  } else {
+    // Auto-select: pick first live server, or any server
+    const { data: servers } = await supabase
+      .from('servers')
+      .select('id, name, status, agent_url, agent_token, custom_domain, subdomain, git_repo')
+      .order('status', { ascending: true }) // 'live' comes first alphabetically before 'stopped'
+      .limit(10);
+
+    if (servers && servers.length > 0) {
+      server = servers.find((s: any) => s.status === 'live') || servers[0];
+      server_id = server.id;
+      console.log(`[TOOL] Auto-selected server: ${server.name} (${server.status})`);
+    }
   }
 
-  if (server.status !== 'live') {
-    return { tool_call_id: '', content: JSON.stringify({ error: `Server ${server.name} is not live (status: ${server.status}). Activate it first.` }), success: false };
+  // ── PATH 0: No server at all — pure GitHub deploy ──
+  if (!server) {
+    console.log(`[TOOL] No servers found — deploying via GitHub only`);
+    const account = 'SaaSVala';
+    const GITHUB_TOKEN = Deno.env.get('SAASVALA_GITHUB_TOKEN');
+    if (!GITHUB_TOKEN) {
+      return { tool_call_id: '', content: JSON.stringify({ error: 'No servers and no GitHub token configured. Add a server or configure SAASVALA_GITHUB_TOKEN.' }), success: false };
+    }
+    const repoName = project_name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    const ghHeaders = { 'Authorization': `token ${GITHUB_TOKEN}`, 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'VALA-AI', 'Content-Type': 'application/json' };
+    const checkRes = await fetch(`https://api.github.com/repos/${account}/${repoName}`, { headers: ghHeaders });
+    if (!checkRes.ok) {
+      return { tool_call_id: '', content: JSON.stringify({ 
+        success: false, error: `Repository ${account}/${repoName} not found. Use generate_code first.`,
+        suggestion: 'Pehle generate_code use karo, phir deploy karo.' 
+      }), success: false };
+    }
+    const repoData = await checkRes.json();
+    // Push deploy marker
+    const deployMarker = { project: project_name, environment, branch, deployed_at: new Date().toISOString(), triggered_by: 'VALA AI', method: 'github_only' };
+    const markerPath = '.vala/deploy.json';
+    const existRes = await fetch(`https://api.github.com/repos/${account}/${repoName}/contents/${markerPath}`, { headers: ghHeaders });
+    const putBody: any = { message: `🚀 Deploy ${project_name} via VALA AI`, content: btoa(unescape(encodeURIComponent(JSON.stringify(deployMarker, null, 2)))) };
+    if (existRes.ok) { const ed = await existRes.json(); putBody.sha = ed.sha; }
+    const pushRes = await fetch(`https://api.github.com/repos/${account}/${repoName}/contents/${markerPath}`, { method: 'PUT', headers: ghHeaders, body: JSON.stringify(putBody) });
+    
+    // Record deployment in DB (no server_id needed — use a placeholder)
+    const { data: deployment } = await supabase.from('deployments').insert({
+      server_id: '00000000-0000-0000-0000-000000000000', status: pushRes.ok ? 'success' : 'failed', branch,
+      commit_message: `GitHub-only deploy ${project_name}`, deployed_url: repoData.html_url,
+      completed_at: new Date().toISOString()
+    }).select().single().catch(() => ({ data: null }));
+
+    return { tool_call_id: '', content: JSON.stringify({
+      success: pushRes.ok, live_execution: true, method: 'github_only',
+      deployment_id: deployment?.id || 'github-deploy',
+      project: project_name, branch, environment,
+      github_repo: repoData.html_url,
+      message: pushRes.ok 
+        ? `✅ Deployed ${project_name} to GitHub. No server connected — configure server for live hosting.`
+        : `❌ GitHub push failed`
+    }, null, 2), success: pushRes.ok };
   }
 
   // Create deployment record
@@ -2583,20 +2641,23 @@ Ye sab SILENTLY execute karo, koi approval nahi maangna:
 
 ### ⚠️ LEVEL 2 — CONFIRM REQUIRED (Medium Risk — Show Confirm Button)
 In ke liye APPROVE/ALLOW button show karo:
-- GitHub commit/push to repository
 - Database INSERT/UPDATE/DELETE operations
 - Service restart (nginx, mysql, etc.)
-- Non-production deployment (dev/staging)
 - Git branch create/delete
-- New repository creation
 - Automated email send
 - Bulk license key generation (50+)
 - Cron job setup
 - Environment variable changes
 
+### ✅ AUTO-DEPLOY (No approval needed — server auto-selected)
+- GitHub commit/push to repository — AUTO EXECUTE
+- New repository creation — AUTO EXECUTE  
+- deploy_project — AUTO EXECUTE (server auto-selected, GitHub fallback)
+- Non-production deployment — AUTO EXECUTE
+- Production deployment — AUTO EXECUTE (server auto-resolved)
+
 ### 🔴 LEVEL 3 — CRITICAL APPROVAL (High Risk — Red Button Required)
 Sirf in ke liye CRITICAL approval maango:
-- Production server deployment
 - Database DROP/TRUNCATE/DELETE ALL
 - Payment execution
 - OTP/Identity verification
@@ -2637,8 +2698,12 @@ What to do: <exact action needed from user>
 
 ---
 
+⛔ DEPLOY ke liye KABHI server ID mat maango — deploy_project tool KHUD server select karta hai. server_id OPTIONAL hai!
+⛔ DEPLOY ke liye KABHI "ACTION REQUIRED" format mat use karo — SEEDHA deploy_project tool call karo!
+⛔ GitHub push/commit ke liye bhi approval MAT maango — AUTO EXECUTE karo!
+
 Phir execution resume karo approval milne par.
-Bina approval ke execute MAT karo Level 2/3 tasks.
+Bina approval ke execute MAT karo Level 2/3 tasks (deploy aur GitHub push LEVEL 1 hai, approval NAHI chahiye).
 
 ## ═══════════════════════════════════════════════
 ## EXECUTION FLOW
@@ -2718,11 +2783,11 @@ Format:
 - "logs dekho" → view_logs [AUTO]
 - "license generate" → generate_license [AUTO]
 - "backup check" → create_backup [AUTO]
-- "deploy karo (staging)" → deploy_project [CONFIRM]
-- "deploy karo (production/live)" → deploy_project [CRITICAL]
+- "deploy karo (staging)" → deploy_project [AUTO — server auto-selected]
+- "deploy karo (production/live)" → deploy_project [AUTO — server auto-selected, no server ID needed]
 - "service restart" → restart_service [CONFIRM]
 - "database update" → database_query write [CONFIRM]
-- "production pe push" → git_operations push [CRITICAL]
+- "production pe push" → git_operations push [AUTO]
 - "payment karo" → [CRITICAL APPROVAL]
 
 ## ═══════════════════════════════════════════════
