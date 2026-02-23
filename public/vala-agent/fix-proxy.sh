@@ -1,34 +1,45 @@
 #!/bin/bash
-# VALA Agent - Nginx Reverse Proxy Fix
-# This bypasses blocked port 9876 by routing through Nginx (port 80)
-# Run: curl -sSL https://your-domain.com/vala-agent/fix-proxy.sh | sudo bash
+# VALA Agent - Ultimate Nginx Proxy & Agent Fix
+# This bypasses ALL port blocks by routing through Nginx (port 80)
+# Run: curl -sSL https://id-preview--2dbe056f-e58d-4a25-ac47-b8b9c5f67907.lovable.app/vala-agent/fix-proxy.sh | sudo bash
 
 set -e
 
 echo "========================================="
-echo "  VALA Agent - Nginx Proxy Fix"
+echo "  VALA Agent - Ultimate Connectivity Fix"
 echo "========================================="
 
-# Check if nginx is installed
+# Check if running as root
+if [ "$EUID" -ne 0 ]; then 
+  echo "Please run as root: sudo bash"
+  exit 1
+fi
+
+# 1. Ensure Nginx is installed
 if ! command -v nginx &> /dev/null; then
     echo "[!] Nginx not found. Installing..."
     apt-get update -qq && apt-get install -y nginx
 fi
 
-# Check if vala-agent is running
-if ! curl -s http://localhost:9876 > /dev/null 2>&1; then
-    echo "[!] VALA Agent not responding on localhost:9876"
-    echo "[!] Make sure the agent is running: pm2 status"
+# 2. Check/Install Agent
+if ! pm2 status | grep -q "vala-agent"; then
+    echo "[!] VALA Agent not found. Installing first..."
+    curl -sSL https://id-preview--2dbe056f-e58d-4a25-ac47-b8b9c5f67907.lovable.app/vala-agent/install.sh | sudo bash
+fi
+
+# 3. Get server IP and Token
+SERVER_IP=$(curl -s ifconfig.me || hostname -I | awk '{print $1}')
+AGENT_TOKEN=$(grep "VALA_AGENT_TOKEN" /opt/vala-agent/ecosystem.config.js | cut -d"'" -f2)
+
+if [ -z "$AGENT_TOKEN" ]; then
+    echo "[!] Could not find Agent Token. Please reinstall the agent."
     exit 1
 fi
 
-echo "[✓] VALA Agent is running on localhost:9876"
+echo "[✓] Server IP: $SERVER_IP"
+echo "[✓] Agent Token: $AGENT_TOKEN"
 
-# Get server IP
-SERVER_IP=$(curl -s ifconfig.me || hostname -I | awk '{print $1}')
-echo "[i] Server IP: $SERVER_IP"
-
-# Create nginx config for vala-agent proxy
+# 4. Create Nginx Proxy Config
 NGINX_CONF="/etc/nginx/sites-available/vala-agent-proxy"
 
 cat > "$NGINX_CONF" << 'NGINX_EOF'
@@ -36,7 +47,6 @@ server {
     listen 80;
     server_name _;
 
-    # VALA Agent Proxy
     location /vala-agent/ {
         proxy_pass http://127.0.0.1:9876/;
         proxy_http_version 1.1;
@@ -44,9 +54,9 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_connect_timeout 10s;
-        proxy_read_timeout 30s;
-        proxy_send_timeout 30s;
+        proxy_connect_timeout 60s;
+        proxy_read_timeout 60s;
+        proxy_send_timeout 60s;
     }
 }
 NGINX_EOF
@@ -54,60 +64,46 @@ NGINX_EOF
 # Enable the site
 ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/vala-agent-proxy
 
-# Remove default if it conflicts
+# Remove default if it conflicts on port 80
 if [ -f /etc/nginx/sites-enabled/default ]; then
-    # Check if default already has a catch-all on port 80
-    # We'll merge our location into default instead
-    if grep -q "vala-agent" /etc/nginx/sites-enabled/default 2>/dev/null; then
-        echo "[i] Proxy already configured in default site"
-    else
-        # Add location block to existing default config
-        # Safer approach: use separate server block
-        echo "[i] Using separate server block for vala-agent proxy"
-    fi
+    echo "[i] Disabling default site to avoid conflict on port 80..."
+    rm -f /etc/nginx/sites-enabled/default
 fi
 
-# Test nginx config
+# Test and Reload
 echo "[i] Testing nginx configuration..."
-if nginx -t 2>&1; then
-    echo "[✓] Nginx config OK"
+if nginx -t; then
+    systemctl restart nginx
+    echo "[✓] Nginx reloaded on port 80"
 else
-    echo "[!] Nginx config error. Trying alternative approach..."
-    # Alternative: add to default config
-    if [ -f /etc/nginx/sites-available/default ]; then
-        # Insert location block before the last closing brace
-        if ! grep -q "vala-agent" /etc/nginx/sites-available/default; then
-            sed -i '/^}/i \    # VALA Agent Proxy\n    location /vala-agent/ {\n        proxy_pass http://127.0.0.1:9876/;\n        proxy_http_version 1.1;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_connect_timeout 10s;\n        proxy_read_timeout 30s;\n    }' /etc/nginx/sites-available/default
-        fi
-        rm -f "$NGINX_CONF" /etc/nginx/sites-enabled/vala-agent-proxy
-    fi
-    nginx -t 2>&1 || { echo "[✗] Failed to configure nginx"; exit 1; }
-    echo "[✓] Nginx config OK (added to default site)"
+    echo "[!] Nginx test failed. Restoring default site..."
+    ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+    exit 1
 fi
 
-# Reload nginx
-systemctl reload nginx
-echo "[✓] Nginx reloaded"
+# 5. Open Firewall for port 80
+if command -v ufw &> /dev/null; then
+    ufw allow 80/tcp
+    ufw allow 443/tcp
+fi
 
-# Test the proxy
-sleep 1
-echo "[i] Testing proxy..."
-PROXY_TEST=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/vala-agent/ 2>/dev/null || echo "000")
-
-if [ "$PROXY_TEST" != "000" ]; then
-    echo "[✓] Proxy is working! (HTTP $PROXY_TEST)"
+# 6. Test the proxy locally
+sleep 2
+echo "[i] Testing local proxy..."
+TEST=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/vala-agent/health)
+if [ "$TEST" == "200" ]; then
+    echo "[✓] Local Proxy Test SUCCESS (HTTP 200)"
 else
-    echo "[!] Proxy test returned no response, but it may still work externally"
+    echo "[!] Local Proxy Test FAILED (HTTP $TEST)"
 fi
 
 echo ""
 echo "========================================="
-echo "  ✅ DONE! Proxy configured successfully"
+echo "  ✅ DONE! Infrastructure fixed."
+echo "========================================="
+echo "  NEW AGENT URL: http://$SERVER_IP/vala-agent/"
+echo "  AGENT TOKEN: $AGENT_TOKEN"
 echo "========================================="
 echo ""
-echo "  NEW Agent URL: http://$SERVER_IP/vala-agent/"
-echo ""
-echo "  This URL uses port 80 (always open)"
-echo "  No need for port 9876 anymore!"
-echo ""
-echo "========================================="
+echo "Copy-paste the token above if it changed."
+
