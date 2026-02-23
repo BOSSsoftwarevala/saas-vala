@@ -2024,21 +2024,12 @@ async function executeCheckGithubRepos(args: any, supabase: any): Promise<ToolRe
       for (const repo of allAccountRepos) {
         allRepos.push({
           account: acc.name,
-          github_login: userInfo?.login || acc.name,
           name: repo.name,
           full_name: repo.full_name,
-          url: repo.html_url,
-          description: repo.description || 'No description',
           language: repo.language || 'Unknown',
           private: repo.private,
-          stars: repo.stargazers_count,
-          forks: repo.forks_count,
-          open_issues: repo.open_issues_count,
-          default_branch: repo.default_branch,
           updated_at: repo.updated_at,
           size_kb: repo.size,
-          topics: repo.topics || [],
-          homepage: repo.homepage || null,
         });
       }
     } catch (e: any) {
@@ -2049,10 +2040,9 @@ async function executeCheckGithubRepos(args: any, supabase: any): Promise<ToolRe
   // Match with marketplace products
   let productMatches: any[] = [];
   if (check_products && allRepos.length > 0) {
-    const repoNames = allRepos.filter(r => r.name).map(r => r.name.toLowerCase());
     const { data: products } = await supabase
       .from('products')
-      .select('id, name, status, slug, demo_url, price')
+      .select('id, name, status, slug, price')
       .limit(200);
 
     productMatches = (products || []).map((p: any) => {
@@ -2063,36 +2053,39 @@ async function executeCheckGithubRepos(args: any, supabase: any): Promise<ToolRe
         return repoClean === slugClean || repoClean === nameClean || 
                r.name?.toLowerCase().includes(nameClean) || nameClean.includes(repoClean);
       });
-      return {
-        product_name: p.name,
-        status: p.status,
-        price: p.price ? `$${p.price}` : 'Free',
-        demo_url: p.demo_url || null,
-        matched_repo: matchedRepo?.full_name || null,
-        on_github: !!matchedRepo,
-        repo_url: matchedRepo?.url || null,
-      };
-    }).filter((p: any) => p.on_github);
+      return matchedRepo ? { product: p.name, status: p.status, repo: matchedRepo.full_name } : null;
+    }).filter(Boolean);
   }
 
   // Stats
+  const validRepos = allRepos.filter(r => r.name && !r.error);
   const stats = {
-    total_repos: allRepos.filter(r => r.name && !r.error).length,
-    public_repos: allRepos.filter(r => !r.private && r.name).length,
-    private_repos: allRepos.filter(r => r.private && r.name).length,
-    languages: [...new Set(allRepos.filter(r => r.language).map(r => r.language))],
+    total_repos: validRepos.length,
+    public_repos: validRepos.filter(r => !r.private).length,
+    private_repos: validRepos.filter(r => r.private).length,
+    languages: [...new Set(validRepos.map(r => r.language))],
     products_on_github: productMatches.length,
-    repos_needing_attention: allRepos.filter(r => r.open_issues > 0).length,
+    repos_needing_attention: 0,
   };
+
+  // Only send top 50 most recent repos to keep response size manageable
+  const topRepos = validRepos.slice(0, 50).map(r => ({
+    account: r.account,
+    name: r.name,
+    full_name: r.full_name,
+    language: r.language,
+    private: r.private,
+    updated: r.updated_at?.slice(0, 10),
+  }));
 
   return {
     tool_call_id: '',
     content: JSON.stringify({
       success: true,
       stats,
-      repos: allRepos.slice(0, Math.min(limit, 500)),
+      repos: topRepos,
       product_matches: productMatches.slice(0, 20),
-      summary: `✅ ${stats.total_repos} repos found | ${stats.products_on_github} marketplace products matched | ${stats.repos_needing_attention} repos have open issues`
+      summary: `✅ ${stats.total_repos} total repos (${stats.public_repos} public, ${stats.private_repos} private) | ${stats.products_on_github} matched products | Top ${topRepos.length} shown`
     }, null, 2),
     success: true
   };
