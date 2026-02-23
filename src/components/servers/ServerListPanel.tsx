@@ -50,6 +50,7 @@ const typeConfig: Record<string, { icon: typeof Server; label: string }> = {
   vercel: { icon: Globe, label: 'Vercel' },
   hybrid: { icon: Server, label: 'Hybrid' },
   hostinger: { icon: Globe, label: 'Hostinger' },
+  vps: { icon: Server, label: 'VPS' },
 };
 
 export function ServerListPanel() {
