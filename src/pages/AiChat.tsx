@@ -136,6 +136,29 @@ export default function AiChat() {
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [activeSession?.messages]);
   useEffect(() => { if (isMobile) setSessionListOpen(false); }, [isMobile]);
 
+  // Auto-load latest deployed project URL in preview
+  useEffect(() => {
+    if (previewUrl) return; // already has a URL
+    const loadLatestDeployment = async () => {
+      try {
+        const { data } = await supabase
+          .from('deployments')
+          .select('deployed_url')
+          .not('deployed_url', 'is', null)
+          .eq('status', 'success')
+          .order('created_at', { ascending: false })
+          .limit(1);
+        if (data && data.length > 0 && data[0].deployed_url) {
+          setPreviewUrl(data[0].deployed_url);
+          setPreviewInput(data[0].deployed_url);
+        }
+      } catch (e) {
+        console.log('Auto-preview load skipped:', e);
+      }
+    };
+    loadLatestDeployment();
+  }, []);
+
   const handlePinMessage = useCallback((id: string) => setPinnedMessages(prev => new Set([...prev, id])), []);
   const handleUnpinMessage = useCallback((id: string) => setPinnedMessages(prev => { const s = new Set(prev); s.delete(id); return s; }), []);
 
