@@ -2792,6 +2792,7 @@ export type Database = {
           git_repo: string | null
           health_status: string | null
           id: string
+          ip_address: string | null
           last_deploy_at: string | null
           last_deploy_commit: string | null
           last_deploy_message: string | null
@@ -2817,6 +2818,7 @@ export type Database = {
           git_repo?: string | null
           health_status?: string | null
           id?: string
+          ip_address?: string | null
           last_deploy_at?: string | null
           last_deploy_commit?: string | null
           last_deploy_message?: string | null
@@ -2842,6 +2844,7 @@ export type Database = {
           git_repo?: string | null
           health_status?: string | null
           id?: string
+          ip_address?: string | null
           last_deploy_at?: string | null
           last_deploy_commit?: string | null
           last_deploy_message?: string | null
