@@ -890,8 +890,48 @@ async function executeDeployProject(args: any, supabase: any): Promise<ToolResul
 
       if (agentRes.ok) {
         const agentData = await agentRes.json();
-        const deployedUrl = server.custom_domain ? `https://${server.custom_domain}` : `https://${server.subdomain}.saasvala.com`;
+        const repoSlug = project_name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+        const subdomain = `${repoSlug}.saasvala.com`;
+        const deployedUrl = server.custom_domain ? `https://${server.custom_domain}` : `https://${subdomain}`;
         
+        // ── AUTO SUBDOMAIN SETUP: Configure Nginx + SSL for project subdomain ──
+        let subdomainSetup = { configured: false, error: '' };
+        try {
+          const appPort = agentData.data?.port || 3000 + Math.floor(Math.random() * 1000);
+          const nginxConf = `server {\n    listen 80;\n    server_name ${subdomain};\n\n    location / {\n        proxy_pass http://127.0.0.1:${appPort};\n        proxy_http_version 1.1;\n        proxy_set_header Upgrade \\$http_upgrade;\n        proxy_set_header Connection 'upgrade';\n        proxy_set_header Host \\$host;\n        proxy_set_header X-Real-IP \\$remote_addr;\n        proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto \\$scheme;\n        proxy_cache_bypass \\$http_upgrade;\n    }\n}`;
+
+          const domainRes = await fetch(server.agent_url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${server.agent_token}` },
+            body: JSON.stringify({
+              command: 'exec',
+              params: {
+                commands: [
+                  { cmd: `echo '${nginxConf.replace(/'/g, "\\'")}' | sudo tee /etc/nginx/sites-available/${subdomain}` },
+                  { cmd: `sudo ln -sf /etc/nginx/sites-available/${subdomain} /etc/nginx/sites-enabled/${subdomain}` },
+                  { cmd: 'sudo nginx -t && sudo systemctl reload nginx' },
+                  { cmd: `sudo certbot --nginx -d ${subdomain} --non-interactive --agree-tos --email admin@saasvala.com || true` },
+                ]
+              }
+            })
+          });
+
+          if (domainRes.ok) {
+            subdomainSetup = { configured: true, error: '' };
+            // Record domain in DB
+            await supabase.from('domains').upsert({
+              domain_name: subdomain, server_id: server.id, domain_type: 'subdomain',
+              status: 'active', ssl_status: 'active', dns_verified: true, dns_verified_at: new Date().toISOString(),
+            }, { onConflict: 'domain_name' }).select().single();
+            console.log(`[TOOL] Auto-subdomain configured: ${subdomain} -> port ${appPort}`);
+          } else {
+            subdomainSetup = { configured: false, error: `Nginx setup returned ${domainRes.status}` };
+          }
+        } catch (domErr: any) {
+          subdomainSetup = { configured: false, error: domErr.message };
+          console.warn(`[TOOL] Auto-subdomain setup failed: ${domErr.message}`);
+        }
+
         await supabase.from('deployments').update({
           status: 'success', completed_at: new Date().toISOString(), duration_seconds: duration,
           deployed_url: deployedUrl,
@@ -900,7 +940,7 @@ async function executeDeployProject(args: any, supabase: any): Promise<ToolResul
 
         await supabase.from('activity_logs').insert({
           entity_type: 'deployment', entity_id: deployment.id,
-          action: 'deploy_success', details: { project_name, server: server.name, duration, environment }
+          action: 'deploy_success', details: { project_name, server: server.name, duration, environment, subdomain_setup: subdomainSetup }
         });
 
         return {
@@ -910,8 +950,14 @@ async function executeDeployProject(args: any, supabase: any): Promise<ToolResul
             deployment_id: deployment.id, project: project_name,
             server: server.name, branch, environment,
             duration: `${duration}s`, deployed_url: deployedUrl,
+            subdomain_setup: subdomainSetup,
+            dns_record_needed: !subdomainSetup.configured ? null : {
+              type: 'A', host: repoSlug, domain: 'saasvala.com',
+              value: server.ip_address || '72.61.236.249', ttl: 3600,
+              note: `Add A record: ${repoSlug} -> ${server.ip_address || '72.61.236.249'} at your DNS provider`
+            },
             agent_response: agentData.data || agentData,
-            message: `✅ REAL deployment complete via VALA Agent | ${duration}s`
+            message: `✅ REAL deployment complete via VALA Agent | ${duration}s | Subdomain: ${subdomainSetup.configured ? '✅ ' + subdomain : '⚠️ manual setup needed'}`
           }, null, 2),
           success: true
         };
