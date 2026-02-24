@@ -10,6 +10,7 @@ interface VoiceConversationOptions {
 
 type VoiceState = 'idle' | 'listening' | 'processing' | 'speaking';
 
+const STT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-stt`;
 const TTS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`;
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`;
 
@@ -21,124 +22,69 @@ export function useVoiceConversation({
 }: VoiceConversationOptions = {}) {
   const [state, setState] = useState<VoiceState>('idle');
   const [transcript, setTranscript] = useState('');
-  const [isSupported, setIsSupported] = useState(false);
-  
-  const recognitionRef = useRef<any>(null);
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const retryCountRef = useRef(0);
-  const MAX_RETRIES = 2;
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
 
-  // Update state and notify
   const updateState = useCallback((newState: VoiceState) => {
     setState(newState);
     onStateChange?.(newState);
   }, [onStateChange]);
 
-  // Initialize speech recognition
+  // Cleanup on unmount
   useEffect(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    setIsSupported(!!SpeechRecognition);
-
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true; // Keep listening
-      recognition.interimResults = true;
-      recognition.lang = language;
-      recognition.maxAlternatives = 1;
-
-      recognition.onstart = () => {
-        console.log('🎤 Listening...');
-        updateState('listening');
-        retryCountRef.current = 0;
-      };
-
-      recognition.onend = () => {
-        console.log('🎤 Recognition ended');
-        // Only go back to idle if we're still in listening state and not processing
-        if (recognitionRef.current && state === 'listening') {
-          // Auto-restart if no speech detected but user hasn't stopped
-          if (retryCountRef.current < MAX_RETRIES) {
-            retryCountRef.current++;
-            console.log('🎤 Restarting recognition...');
-            try {
-              recognition.start();
-            } catch (e) {
-              console.log('Could not restart recognition');
-              updateState('idle');
-            }
-          } else {
-            updateState('idle');
-          }
-        }
-      };
-
-      recognition.onresult = (event: any) => {
-        let finalText = '';
-        let interimText = '';
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const result = event.results[i];
-          if (result.isFinal) {
-            finalText += result[0].transcript;
-          } else {
-            interimText += result[0].transcript;
-          }
-        }
-
-        if (finalText) {
-          console.log('🎤 Final transcript:', finalText);
-          setTranscript(finalText);
-          onTranscript?.(finalText);
-          retryCountRef.current = MAX_RETRIES; // Prevent restart
-          recognition.stop();
-          // Process the speech
-          processVoiceInput(finalText);
-        } else {
-          setTranscript(interimText);
-        }
-      };
-
-      recognition.onerror = (event: any) => {
-        console.error('🎤 Recognition error:', event.error);
-        
-        if (event.error === 'no-speech') {
-          // Don't show error on no-speech, just keep listening
-          if (retryCountRef.current < MAX_RETRIES) {
-            console.log('🎤 No speech detected, continuing...');
-            return; // Let onend handle restart
-          }
-          toast.info('No speech detected. Tap the mic again to try.');
-          updateState('idle');
-        } else if (event.error === 'not-allowed') {
-          toast.error('Microphone blocked. Click the 🔒 icon in your browser to allow.');
-          updateState('idle');
-        } else if (event.error !== 'aborted') {
-          toast.error(`Voice error: ${event.error}`);
-          updateState('idle');
-        }
-      };
-
-      recognitionRef.current = recognition;
-    }
-
     return () => {
-      recognitionRef.current?.stop();
+      stopRecording();
       abortControllerRef.current?.abort();
     };
-  }, [language, onTranscript, updateState]);
+  }, []);
 
-  // Process voice input through AI and speak response
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+  }, []);
+
+  // Send recorded audio to ElevenLabs Scribe for transcription
+  const transcribeAudio = useCallback(async (audioBlob: Blob): Promise<string> => {
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'recording.webm');
+
+    const response = await fetch(STT_URL, {
+      method: 'POST',
+      headers: {
+        'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+      },
+      body: formData,
+      signal: abortControllerRef.current?.signal,
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ error: 'STT failed' }));
+      throw new Error(err.error || 'Transcription failed');
+    }
+
+    const data = await response.json();
+    return data.text || '';
+  }, []);
+
+  // Process voice: AI response + TTS
   const processVoiceInput = useCallback(async (text: string) => {
     updateState('processing');
-    
+
     try {
-      // Cancel any pending requests
       abortControllerRef.current?.abort();
       abortControllerRef.current = new AbortController();
 
-      // Get AI response (non-streaming for voice)
-      console.log('🤖 Getting AI response...');
+      // Get AI response
       const aiResponse = await fetch(CHAT_URL, {
         method: 'POST',
         headers: {
@@ -152,21 +98,15 @@ export function useVoiceConversation({
         signal: abortControllerRef.current.signal
       });
 
-      if (!aiResponse.ok) {
-        throw new Error('AI request failed');
-      }
+      if (!aiResponse.ok) throw new Error('AI request failed');
 
       const aiData = await aiResponse.json();
       const responseText = aiData.response || aiData.error || 'No response';
-      
-      console.log('🤖 AI response:', responseText.substring(0, 100) + '...');
       onAiResponse?.(responseText);
 
-      // Convert to speech
+      // Convert to speech via ElevenLabs TTS
       updateState('speaking');
-      console.log('🔊 Converting to speech...');
-      
-      // Try ElevenLabs TTS first, fall back to browser TTS
+
       try {
         const ttsResponse = await fetch(TTS_URL, {
           method: 'POST',
@@ -183,49 +123,35 @@ export function useVoiceConversation({
         });
 
         if (!ttsResponse.ok) {
-          console.log('🔊 ElevenLabs unavailable, using browser TTS');
           speakWithBrowser(responseText);
           return;
         }
 
         const ttsData = await ttsResponse.json();
-        
+
         if (ttsData.audioContent) {
           const audioUrl = `data:audio/mpeg;base64,${ttsData.audioContent}`;
           const audio = new Audio(audioUrl);
           audioRef.current = audio;
-          
-          audio.onended = () => {
-            console.log('🔊 Audio finished');
-            updateState('idle');
-          };
-          
-          audio.onerror = () => {
-            console.log('🔊 Audio error, falling back to browser TTS');
-            speakWithBrowser(responseText);
-          };
-          
+          audio.onended = () => updateState('idle');
+          audio.onerror = () => speakWithBrowser(responseText);
           await audio.play();
         } else {
           speakWithBrowser(responseText);
         }
-      } catch (ttsError) {
-        console.log('🔊 TTS error, using browser fallback:', ttsError);
+      } catch {
         speakWithBrowser(responseText);
       }
 
     } catch (error: any) {
-      if (error.name === 'AbortError') {
-        console.log('Request aborted');
-        return;
-      }
+      if (error.name === 'AbortError') return;
       console.error('Voice processing error:', error);
       toast.error('Voice processing failed. Try again.');
       updateState('idle');
     }
   }, [onAiResponse, updateState]);
 
-  // Fallback browser TTS
+  // Browser TTS fallback
   const speakWithBrowser = useCallback((text: string) => {
     if ('speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance(text);
@@ -239,13 +165,8 @@ export function useVoiceConversation({
     }
   }, [updateState]);
 
-  // Start voice conversation
+  // Start recording from microphone
   const startListening = useCallback(async () => {
-    if (!isSupported) {
-      toast.error('Voice not supported. Try Chrome or Edge.');
-      return;
-    }
-
     try {
       // Stop any playing audio
       if (audioRef.current) {
@@ -254,38 +175,91 @@ export function useVoiceConversation({
       }
       window.speechSynthesis?.cancel();
 
-      // Request mic permission
-      await navigator.mediaDevices.getUserMedia({ audio: true });
-      
-      setTranscript('');
-      retryCountRef.current = 0;
-      
-      setTimeout(() => {
-        try {
-          recognitionRef.current?.start();
-          toast.success('🎤 Speak now! I\'m listening...', { duration: 3000 });
-        } catch (e: any) {
-          if (!e.message?.includes('already started')) {
-            console.error('Start error:', e);
-            toast.error('Could not start voice. Try again.');
-          }
+      // Get microphone access
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
+      // Determine supported MIME type
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+          ? 'audio/webm'
+          : 'audio/mp4';
+
+      const recorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
         }
-      }, 100);
+      };
+
+      recorder.onstop = async () => {
+        // Stop mic tracks
+        stream.getTracks().forEach(track => track.stop());
+
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+
+        if (audioBlob.size < 1000) {
+          toast.info('No speech detected. Tap mic and speak clearly.');
+          updateState('idle');
+          return;
+        }
+
+        // Transcribe with ElevenLabs Scribe
+        updateState('processing');
+        setTranscript('Transcribing...');
+
+        try {
+          abortControllerRef.current = new AbortController();
+          const text = await transcribeAudio(audioBlob);
+
+          if (!text.trim()) {
+            toast.info('Could not understand speech. Try again.');
+            updateState('idle');
+            setTranscript('');
+            return;
+          }
+
+          setTranscript(text);
+          onTranscript?.(text);
+
+          // Process through AI
+          await processVoiceInput(text);
+        } catch (error: any) {
+          if (error.name !== 'AbortError') {
+            console.error('Transcription error:', error);
+            toast.error('Voice recognition failed. Try again.');
+          }
+          updateState('idle');
+          setTranscript('');
+        }
+      };
+
+      recorder.onerror = () => {
+        toast.error('Recording failed. Check microphone.');
+        updateState('idle');
+      };
+
+      recorder.start(250); // Collect data every 250ms
+      updateState('listening');
+      toast.success('🎤 Listening... Tap mic again when done.', { duration: 3000 });
 
     } catch (error: any) {
       console.error('Mic error:', error);
       if (error.name === 'NotAllowedError') {
-        toast.error('Microphone blocked. Click the 🔒 icon to allow access.');
+        toast.error('Microphone blocked. Click the 🔒 icon in browser to allow.');
       } else {
         toast.error('Microphone error. Check permissions.');
       }
     }
-  }, [isSupported]);
+  }, [onTranscript, transcribeAudio, processVoiceInput, updateState]);
 
   // Stop everything
   const stop = useCallback(() => {
-    retryCountRef.current = MAX_RETRIES; // Prevent restart
-    recognitionRef.current?.stop();
+    stopRecording();
     abortControllerRef.current?.abort();
     if (audioRef.current) {
       audioRef.current.pause();
@@ -293,11 +267,17 @@ export function useVoiceConversation({
     }
     window.speechSynthesis?.cancel();
     updateState('idle');
-  }, [updateState]);
+    setTranscript('');
+  }, [updateState, stopRecording]);
 
-  // Toggle voice
+  // Toggle voice - if listening, stop recording (triggers transcription). If idle, start.
   const toggle = useCallback(() => {
-    if (state === 'idle') {
+    if (state === 'listening') {
+      // Stop recording - this triggers onstop which does transcription
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
+    } else if (state === 'idle') {
       startListening();
     } else {
       stop();
@@ -307,7 +287,7 @@ export function useVoiceConversation({
   return {
     state,
     transcript,
-    isSupported,
+    isSupported: true, // MediaRecorder is universally supported
     isActive: state !== 'idle',
     startListening,
     stop,
