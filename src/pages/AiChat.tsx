@@ -214,68 +214,92 @@ export default function AiChat() {
     const { data: { session: authSession } } = await supabase.auth.getSession();
     const authToken = authSession?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-    const resp = await fetch(CHAT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-      body: JSON.stringify({ messages: formattedMessages, stream: false, model: selectedModel }),
-    });
+    const maxRetries = 2;
+    let lastError: Error | null = null;
 
-    // Mark as connected — server responded
-    setAiStatus(prev => ({ ...prev, stage: 'connected' }));
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 min timeout
 
-    if (!resp.ok) {
-      const error = await resp.json().catch(() => ({ error: 'Unknown error' }));
-      const errorMsg = error.error || 'Failed to get AI response';
-      if (resp.status === 429) toast.error('⏳ Rate limit. Thodi der baad try karo.');
-      else if (resp.status === 402) toast.error('💳 AI credits khatam!', { duration: 8000 });
-      else toast.error(errorMsg);
-      throw new Error(errorMsg);
-    }
-
-    const contentType = resp.headers.get('content-type') || '';
-    if (!contentType.includes('text/event-stream')) {
-      const data = await resp.json().catch(() => ({} as any));
-      const text = data?.response || data?.message || data?.content || '';
-      
-      // Extract tool results from response
-      const toolResults: ToolResultData[] = (data?.tool_results || []).map((tr: any) => ({
-        name: tr.name,
-        result: tr.result,
-      }));
-      const toolsUsed: string[] = data?.tools_used || [];
-      
-      onDelta(text, toolResults.length > 0 ? toolResults : undefined, toolsUsed.length > 0 ? toolsUsed : undefined);
-      onDone();
-      return;
-    }
-
-    if (!resp.body) throw new Error('No response body');
-    const reader = resp.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        let newlineIndex: number;
-        while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
-          let line = buffer.slice(0, newlineIndex);
-          buffer = buffer.slice(newlineIndex + 1);
-          if (line.endsWith('\r')) line = line.slice(0, -1);
-          if (line.startsWith(':') || !line.startsWith('data: ')) continue;
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr === '[DONE]') { onDone(); return; }
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content;
-            if (content) onDelta(content);
-          } catch { /* skip */ }
+      try {
+        if (attempt > 0) {
+          console.log(`[AI Chat] Retry attempt ${attempt}/${maxRetries}`);
+          setAiStatus(prev => ({ ...prev, stage: 'sending', retryCount: attempt }));
+          await new Promise(r => setTimeout(r, 2000 * attempt)); // backoff
         }
+
+        const resp = await fetch(CHAT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+          body: JSON.stringify({ messages: formattedMessages, stream: false, model: selectedModel }),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+        setAiStatus(prev => ({ ...prev, stage: 'connected' }));
+
+        if (!resp.ok) {
+          const error = await resp.json().catch(() => ({ error: 'Unknown error' }));
+          const errorMsg = error.error || 'Failed to get AI response';
+          if (resp.status === 429) toast.error('⏳ Rate limit. Thodi der baad try karo.');
+          else if (resp.status === 402) toast.error('💳 AI credits khatam!', { duration: 8000 });
+          else toast.error(errorMsg);
+          throw new Error(errorMsg);
+        }
+
+        const contentType = resp.headers.get('content-type') || '';
+        if (!contentType.includes('text/event-stream')) {
+          const data = await resp.json().catch(() => ({} as any));
+          const text = data?.response || data?.message || data?.content || '';
+          const toolResults: ToolResultData[] = (data?.tool_results || []).map((tr: any) => ({
+            name: tr.name, result: tr.result,
+          }));
+          const toolsUsed: string[] = data?.tools_used || [];
+          onDelta(text, toolResults.length > 0 ? toolResults : undefined, toolsUsed.length > 0 ? toolsUsed : undefined);
+          onDone();
+          return;
+        }
+
+        if (!resp.body) throw new Error('No response body');
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            let newlineIndex: number;
+            while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+              let line = buffer.slice(0, newlineIndex);
+              buffer = buffer.slice(newlineIndex + 1);
+              if (line.endsWith('\r')) line = line.slice(0, -1);
+              if (line.startsWith(':') || !line.startsWith('data: ')) continue;
+              const jsonStr = line.slice(6).trim();
+              if (jsonStr === '[DONE]') { onDone(); return; }
+              try {
+                const parsed = JSON.parse(jsonStr);
+                const content = parsed.choices?.[0]?.delta?.content;
+                if (content) onDelta(content);
+              } catch { /* skip */ }
+            }
+          }
+        } catch (e) { console.error('Stream error:', e); }
+        onDone();
+        return; // success — exit retry loop
+
+      } catch (e: any) {
+        clearTimeout(timeoutId);
+        lastError = e;
+        const isRetryable = e.name === 'AbortError' || e.message === 'Failed to fetch' || e.message?.includes('network');
+        if (!isRetryable || attempt >= maxRetries) {
+          throw e;
+        }
+        console.warn(`[AI Chat] Retryable error: ${e.message}, retrying...`);
       }
-    } catch (e) { console.error('Stream error:', e); }
-    onDone();
+    }
+    if (lastError) throw lastError;
   }, [selectedModel]);
 
   const handleSend = async (content: string, files?: File[]) => {
