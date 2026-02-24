@@ -3,144 +3,537 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-interface ServerCredentials {
+interface ServerRecord {
   id: string;
   name: string;
-  agent_url: string;
-  agent_token: string;
+  ip_address: string | null;
   status: string;
+  subdomain: string | null;
+  server_type: string | null;
+  agent_url: string | null;
+  agent_token: string | null;
+  health_status?: string | null;
 }
 
 interface AgentCommand {
-  action: string;
-  params?: Record<string, any>;
+  action?: string;
+  serverId?: string;
+  command?: string;
+  params?: Record<string, unknown>;
 }
 
-interface AgentResponse {
-  success: boolean;
-  data?: any;
-  error?: string;
-  timestamp: string;
+interface AgentProbeResult {
+  alive: boolean;
+  workingUrl: string | null;
+  liveStatus: unknown;
+  attempts: Array<{ url: string; method: string; status: number | null; error?: string }>;
 }
 
-// Available commands the agent can execute
 const AVAILABLE_COMMANDS = [
-  'status',           // Get server status
-  'deploy',           // Deploy a project
-  'restart',          // Restart services
-  'logs',             // View logs
-  'backup',           // Create backup
-  'exec',             // Execute custom command
-  'file_upload',      // Upload file
-  'file_download',    // Download file
-  'service_status',   // Check specific service
-  'disk_usage',       // Check disk usage
-  'memory_usage',     // Check memory
-  'cpu_usage',        // Check CPU
-  'list_processes',   // List running processes
-  'kill_process',     // Kill a process
-  'cron_list',        // List cron jobs
-  'cron_add',         // Add cron job
-  'nginx_reload',     // Reload nginx
-  'ssl_status',       // Check SSL certificates
-  'firewall_status',  // Check firewall
-  'database_backup',  // Backup database
-  'database_restore', // Restore database
+  'status', 'deploy', 'restart', 'logs', 'backup', 'exec', 'file_upload', 'file_download',
+  'service_status', 'disk_usage', 'memory_usage', 'cpu_usage', 'list_processes', 'kill_process',
+  'cron_list', 'cron_add', 'nginx_reload', 'ssl_status', 'firewall_status',
+  'database_backup', 'database_restore',
 ];
 
+const HEARTBEAT_SETTLE_STATUSES = new Set(['deploying', 'suspended', 'failed']);
+
+function jsonResponse(payload: unknown, status = 200): Response {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+function normalizeUrl(url: string): string {
+  return url.replace(/\/+$/, '');
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function tokenMatches(stored: string | null, provided: string | null): Promise<boolean> {
+  if (!stored || !provided) return false;
+  if (stored === provided) return true;
+
+  // Backward compatibility for hashed/plain token mismatches.
+  const [storedHash, providedHash] = await Promise.all([sha256Hex(stored), sha256Hex(provided)]);
+  return stored === providedHash || provided === storedHash;
+}
+
+function getCandidateUrls(server: ServerRecord): string[] {
+  const urls = new Set<string>();
+
+  if (server.agent_url) {
+    urls.add(normalizeUrl(server.agent_url));
+  }
+
+  if (server.ip_address) {
+    urls.add(`http://${server.ip_address}:9876`);
+  }
+
+  return Array.from(urls);
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const ctrl = new AbortController();
+  const timeout = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function probeAgent(server: ServerRecord, tokenOverride?: string): Promise<AgentProbeResult> {
+  const attempts: AgentProbeResult['attempts'] = [];
+  const urls = getCandidateUrls(server);
+  const token = tokenOverride ?? server.agent_token ?? '';
+
+  if (!token || urls.length === 0) {
+    return { alive: false, workingUrl: null, liveStatus: null, attempts };
+  }
+
+  for (const baseUrl of urls) {
+    const healthUrl = `${baseUrl}/health`;
+    try {
+      const healthResp = await fetchWithTimeout(
+        healthUrl,
+        { method: 'GET', headers: { Authorization: `Bearer ${token}` } },
+        8000,
+      );
+      attempts.push({ url: healthUrl, method: 'GET', status: healthResp.status });
+
+      if (healthResp.ok) {
+        const healthPayload = await healthResp.json().catch(() => null);
+        return { alive: true, workingUrl: baseUrl, liveStatus: healthPayload, attempts };
+      }
+      await healthResp.text();
+    } catch (error) {
+      attempts.push({
+        url: healthUrl,
+        method: 'GET',
+        status: null,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    try {
+      const statusResp = await fetchWithTimeout(
+        baseUrl,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+            'X-VALA-Command': 'status',
+          },
+          body: JSON.stringify({ command: 'status', timestamp: new Date().toISOString() }),
+        },
+        8000,
+      );
+      attempts.push({ url: baseUrl, method: 'POST', status: statusResp.status });
+
+      if (statusResp.ok) {
+        const payload = await statusResp.json().catch(async () => {
+          const raw = await statusResp.text();
+          return { raw };
+        });
+        return { alive: true, workingUrl: baseUrl, liveStatus: payload, attempts };
+      }
+      await statusResp.text();
+    } catch (error) {
+      attempts.push({
+        url: baseUrl,
+        method: 'POST',
+        status: null,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return { alive: false, workingUrl: null, liveStatus: null, attempts };
+}
+
+async function executeCommandOnAgent(server: ServerRecord, command: string, params: Record<string, unknown>): Promise<{ result: unknown; usedUrl: string; attempts: AgentProbeResult['attempts'] }> {
+  const attempts: AgentProbeResult['attempts'] = [];
+  const urls = getCandidateUrls(server);
+
+  if (!server.agent_token || urls.length === 0) {
+    throw new Error('Server agent not configured. Please install and register VALA Agent.');
+  }
+
+  for (const url of urls) {
+    try {
+      const resp = await fetchWithTimeout(
+        url,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${server.agent_token}`,
+            'X-VALA-Command': command,
+          },
+          body: JSON.stringify({ command, params, timestamp: new Date().toISOString() }),
+        },
+        12000,
+      );
+      attempts.push({ url, method: 'POST', status: resp.status });
+
+      if (resp.ok) {
+        const result = await resp.json().catch(async () => ({ raw: await resp.text() }));
+        return { result, usedUrl: url, attempts };
+      }
+
+      const errorText = await resp.text();
+      attempts[attempts.length - 1].error = errorText.slice(0, 400);
+    } catch (error) {
+      attempts.push({
+        url,
+        method: 'POST',
+        status: null,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  throw new Error(`Agent command failed on all endpoints. Attempts: ${JSON.stringify(attempts)}`);
+}
+
+async function getServerByIdOrIp(supabase: ReturnType<typeof createClient>, serverId: string): Promise<ServerRecord | null> {
+  if (!serverId) return null;
+
+  let query = supabase.from('servers').select('*');
+  query = isUuid(serverId) ? query.eq('id', serverId) : query.eq('ip_address', serverId);
+
+  const { data, error } = await query.single();
+  if (error || !data) return null;
+  return data as ServerRecord;
+}
+
+async function logServerActivity(
+  supabase: ReturnType<typeof createClient>,
+  entityId: string,
+  action: string,
+  details: Record<string, unknown>,
+): Promise<void> {
+  const { error } = await supabase.from('activity_logs').insert({
+    entity_type: 'server',
+    entity_id: entityId,
+    action,
+    details,
+  });
+
+  if (error) {
+    console.error('[VALA Agent] Failed to write activity log:', error.message);
+  }
+}
+
+function getEnvAudit() {
+  const required = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'];
+  const optional = ['AGENT_TOKEN', 'SERVER_API_KEY'];
+
+  return {
+    required: Object.fromEntries(required.map((k) => [k, !!Deno.env.get(k)])),
+    optional: Object.fromEntries(optional.map((k) => [k, !!Deno.env.get(k)])),
+  };
+}
+
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const envAudit = getEnvAudit();
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('[VALA Agent] Missing required backend env vars:', envAudit);
+      return jsonResponse({
+        success: false,
+        error: 'Server configuration error: required environment variables missing',
+        env_audit: envAudit,
+      }, 500);
+    }
+
     const supabase = createClient(supabaseUrl, supabaseKey);
+    const body = (await req.json().catch(() => ({}))) as AgentCommand;
 
-    const { action, serverId, command, params } = await req.json();
+    const action = body.action;
+    const serverId = body.serverId;
+    const command = body.command;
+    const params = body.params ?? {};
 
-    console.log(`[VALA Agent] Action: ${action}, Server: ${serverId}, Command: ${command}`);
+    console.log(`[VALA Agent] Action=${action} Server=${serverId ?? 'n/a'} Command=${command ?? 'n/a'}`);
 
     switch (action) {
+      case 'env_audit':
+        return jsonResponse({ success: true, env_audit: envAudit, timestamp: new Date().toISOString() });
+
       case 'list_servers': {
-        // List all connected servers with agents
         const { data: servers, error } = await supabase
           .from('servers')
-          .select('id, name, ip_address, status, subdomain, agent_url, agent_token')
+          .select('id, name, ip_address, status, subdomain, agent_url, health_status')
           .not('agent_url', 'is', null);
 
         if (error) throw error;
 
-        return new Response(JSON.stringify({
+        return jsonResponse({
           success: true,
-          servers: servers?.map(s => ({
+          servers: (servers ?? []).map((s) => ({
             id: s.id,
             name: s.name,
             ip: s.ip_address,
             status: s.status,
             subdomain: s.subdomain,
-            agent_connected: !!s.agent_url
-          })) || [],
-          total: servers?.length || 0
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            health_status: s.health_status,
+            agent_connected: !!s.agent_url,
+          })),
+          total: servers?.length ?? 0,
         });
       }
 
+      case 'register':
       case 'register_agent': {
-        // Register a new server agent
-        const { name, ip_address, agent_url, agent_token } = params;
-        
+        const name = String(params.name ?? '').trim();
+        const ip_address = params.ip_address ? String(params.ip_address) : null;
+        const agent_url = params.agent_url ? normalizeUrl(String(params.agent_url)) : null;
+        const agent_token = params.agent_token ? String(params.agent_token) : null;
+
         if (!name || !agent_url || !agent_token) {
           throw new Error('Missing required fields: name, agent_url, agent_token');
         }
 
-        const { data: server, error } = await supabase
-          .from('servers')
-          .insert({
-            name,
-            ip_address: ip_address || 'auto-detected',
-            agent_url,
-            agent_token,
-            status: 'live',
-            server_type: 'vps'
-          })
-          .select()
-          .single();
+        const probe = await probeAgent({
+          id: 'temp',
+          name,
+          ip_address,
+          status: 'stopped',
+          subdomain: null,
+          server_type: 'vps',
+          agent_url,
+          agent_token,
+        });
 
-        if (error) throw error;
+        if (!probe.alive) {
+          throw new Error(`Agent verification failed during registration. Attempts: ${JSON.stringify(probe.attempts)}`);
+        }
 
-        return new Response(JSON.stringify({
+        let existing: ServerRecord | null = null;
+        if (ip_address) {
+          const { data: byIp } = await supabase.from('servers').select('*').eq('ip_address', ip_address).maybeSingle();
+          existing = (byIp as ServerRecord | null) ?? null;
+        }
+
+        let savedServer: ServerRecord;
+        if (existing) {
+          const { data, error } = await supabase
+            .from('servers')
+            .update({
+              name,
+              agent_url: probe.workingUrl,
+              agent_token,
+              status: 'live',
+              health_status: 'healthy',
+              server_type: 'vps',
+            })
+            .eq('id', existing.id)
+            .select('*')
+            .single();
+
+          if (error || !data) throw error ?? new Error('Failed to update existing server');
+          savedServer = data as ServerRecord;
+        } else {
+          const { data, error } = await supabase
+            .from('servers')
+            .insert({
+              name,
+              ip_address,
+              agent_url: probe.workingUrl,
+              agent_token,
+              status: 'live',
+              health_status: 'healthy',
+              server_type: 'vps',
+            })
+            .select('*')
+            .single();
+
+          if (error || !data) throw error ?? new Error('Failed to register server');
+          savedServer = data as ServerRecord;
+        }
+
+        await logServerActivity(supabase, savedServer.id, 'agent_register', {
+          ip_address,
+          agent_url: probe.workingUrl,
+          attempts: probe.attempts,
+        });
+
+        return jsonResponse({
           success: true,
           message: 'Server agent registered successfully',
+          server_id: savedServer.id,
+          server_name: savedServer.name,
+          status: savedServer.status,
+          verified: true,
+        });
+      }
+
+      case 'verify':
+      case 'verify_agent': {
+        if (!serverId) throw new Error('Server ID or IP required');
+        const server = await getServerByIdOrIp(supabase, serverId);
+        if (!server) throw new Error('Server not found');
+
+        const incomingToken = params.agent_token ? String(params.agent_token) : server.agent_token;
+        if (!incomingToken) throw new Error('Agent token missing');
+
+        const probe = await probeAgent(server, incomingToken);
+
+        if (!probe.alive) {
+          await logServerActivity(supabase, server.id, 'agent_verify_failed', { attempts: probe.attempts });
+          throw new Error(`Agent verification failed. Attempts: ${JSON.stringify(probe.attempts)}`);
+        }
+
+        await supabase
+          .from('servers')
+          .update({
+            status: 'live',
+            health_status: 'healthy',
+            agent_url: probe.workingUrl,
+            agent_token: incomingToken,
+          })
+          .eq('id', server.id);
+
+        await logServerActivity(supabase, server.id, 'agent_verify_success', {
+          used_url: probe.workingUrl,
+          attempts: probe.attempts,
+        });
+
+        return jsonResponse({
+          success: true,
+          verified: true,
           server_id: server.id,
-          server_name: server.name
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          server_name: server.name,
+          status: 'live',
+          used_url: probe.workingUrl,
+        });
+      }
+
+      case 'ping':
+      case 'agent_ping': {
+        const inputServerId = params.serverId ? String(params.serverId) : serverId;
+        const ip = params.ip_address ? String(params.ip_address) : null;
+        const providedToken = params.agent_token ? String(params.agent_token) : null;
+
+        let server: ServerRecord | null = null;
+        if (inputServerId) {
+          server = await getServerByIdOrIp(supabase, String(inputServerId));
+        } else if (ip) {
+          const { data } = await supabase.from('servers').select('*').eq('ip_address', ip).maybeSingle();
+          server = (data as ServerRecord | null) ?? null;
+        }
+
+        if (!server) {
+          throw new Error('Server not found for heartbeat ping');
+        }
+
+        const isValidToken = await tokenMatches(server.agent_token, providedToken);
+        if (!isValidToken) {
+          await logServerActivity(supabase, server.id, 'agent_ping_rejected', {
+            reason: 'token_mismatch',
+            ip_address: ip,
+          });
+          return jsonResponse({ success: false, error: 'Invalid agent token' }, 403);
+        }
+
+        await supabase
+          .from('servers')
+          .update({
+            status: 'live',
+            health_status: 'healthy',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', server.id);
+
+        await logServerActivity(supabase, server.id, 'agent_ping_ok', {
+          ip_address: ip,
+          at: new Date().toISOString(),
+        });
+
+        return jsonResponse({ success: true, server_id: server.id, status: 'live', heartbeat: 'accepted' });
+      }
+
+      case 'status':
+      case 'agent_status':
+      case 'quick_status': {
+        if (!serverId) throw new Error('Server ID or IP required');
+        const server = await getServerByIdOrIp(supabase, serverId);
+        if (!server) throw new Error('Server not found');
+
+        const probe = await probeAgent(server);
+
+        if (probe.alive && probe.workingUrl && probe.workingUrl !== normalizeUrl(server.agent_url ?? '')) {
+          await supabase.from('servers').update({ agent_url: probe.workingUrl }).eq('id', server.id);
+        }
+
+        if (probe.alive) {
+          await supabase
+            .from('servers')
+            .update({ status: 'live', health_status: 'healthy', updated_at: new Date().toISOString() })
+            .eq('id', server.id);
+        } else if (server.agent_url && !HEARTBEAT_SETTLE_STATUSES.has(server.status)) {
+          await supabase
+            .from('servers')
+            .update({ status: 'stopped', health_status: 'offline', updated_at: new Date().toISOString() })
+            .eq('id', server.id);
+        }
+
+        await logServerActivity(supabase, server.id, probe.alive ? 'agent_heartbeat_ok' : 'agent_heartbeat_failed', {
+          attempts: probe.attempts,
+          used_url: probe.workingUrl,
+        });
+
+        return jsonResponse({
+          success: true,
+          server: {
+            id: server.id,
+            name: server.name,
+            ip: server.ip_address,
+            status: probe.alive ? 'live' : (HEARTBEAT_SETTLE_STATUSES.has(server.status) ? server.status : 'stopped'),
+            type: server.server_type,
+            subdomain: server.subdomain,
+            agent_connected: !!server.agent_url,
+            agent_alive: probe.alive,
+          },
+          live_status: probe.liveStatus,
+          diagnostics: {
+            attempts: probe.attempts,
+            env_audit: envAudit,
+          },
         });
       }
 
       case 'execute': {
-        // Execute command on server via agent
         if (!serverId) throw new Error('Server ID required');
         if (!command) throw new Error('Command required');
         if (!AVAILABLE_COMMANDS.includes(command)) {
           throw new Error(`Invalid command. Available: ${AVAILABLE_COMMANDS.join(', ')}`);
         }
 
-        // Get server agent details
-        const { data: server, error: serverError } = await supabase
-          .from('servers')
-          .select('id, name, agent_url, agent_token')
-          .eq('id', serverId)
-          .single();
-
-        if (serverError || !server) {
+        const server = await getServerByIdOrIp(supabase, serverId);
+        if (!server) {
           throw new Error('Server not found or agent not configured');
         }
 
@@ -148,217 +541,57 @@ serve(async (req) => {
           throw new Error('Server agent not configured. Please install VALA Agent on this server.');
         }
 
-        // Call the agent
-        const agentUrl = server.agent_url.replace(/\/?$/, '');
-        console.log(`[VALA Agent] Calling agent at ${agentUrl}`);
-        
-        const agentResponse = await fetch(agentUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${server.agent_token}`,
-            'X-VALA-Command': command
-          },
-          body: JSON.stringify({
-            command,
-            params: params || {},
-            timestamp: new Date().toISOString()
-          })
-        });
+        const commandResult = await executeCommandOnAgent(server, command, params as Record<string, unknown>);
 
-        if (!agentResponse.ok) {
-          const errorText = await agentResponse.text();
-          throw new Error(`Agent error: ${agentResponse.status} - ${errorText}`);
+        if (commandResult.usedUrl !== normalizeUrl(server.agent_url)) {
+          await supabase.from('servers').update({ agent_url: commandResult.usedUrl }).eq('id', server.id);
         }
 
-        const result = await agentResponse.json();
-
-        // Log the activity
-        await supabase.from('activity_logs').insert({
-          entity_type: 'server',
-          entity_id: serverId,
-          action: `agent_${command}`,
-          details: { command, params, result: result.success ? 'success' : 'failed' }
+        await logServerActivity(supabase, server.id, `agent_${command}`, {
+          command,
+          params,
+          used_url: commandResult.usedUrl,
+          attempts: commandResult.attempts,
         });
 
-        return new Response(JSON.stringify({
+        return jsonResponse({
           success: true,
           server_name: server.name,
           command,
-          result: result.data,
-          executed_at: new Date().toISOString()
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-
-      case 'quick_status': {
-        // Get quick status of a server
-        if (!serverId) throw new Error('Server ID required');
-
-        // Support lookup by UUID or IP address
-        let serverQuery = supabase.from('servers').select('*');
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(serverId);
-        if (isUuid) {
-          serverQuery = serverQuery.eq('id', serverId);
-        } else {
-          serverQuery = serverQuery.eq('ip_address', serverId);
-        }
-        const { data: server, error } = await serverQuery.single();
-
-        if (error || !server) throw new Error('Server not found');
-
-        // If agent is configured, try to get live status
-        let liveStatus = null;
-        let agentAlive = false;
-        if (server.agent_url && server.agent_token) {
-          // Build list of URLs to try: configured URL + direct port 9876
-          const baseUrl = server.agent_url.replace(/\/?$/, '');
-          const urlsToTry = [baseUrl];
-          
-          // Also try direct port 9876 if the URL uses a proxy path
-          if (server.ip_address && baseUrl.includes('/vala-agent')) {
-            urlsToTry.push(`http://${server.ip_address}:9876`);
-          }
-          
-          for (const tryUrl of urlsToTry) {
-            if (agentAlive) break;
-            
-            // Try GET first
-            try {
-              const ctrl = new AbortController();
-              const t = setTimeout(() => ctrl.abort(), 8000);
-              console.log(`[VALA Agent] Trying GET: ${tryUrl}`);
-              
-              const resp = await fetch(tryUrl, {
-                method: 'GET',
-                headers: { 'Authorization': `Bearer ${server.agent_token}` },
-                signal: ctrl.signal
-              });
-              clearTimeout(t);
-              console.log(`[VALA Agent] GET ${tryUrl}: ${resp.status}`);
-              
-              if (resp.ok) {
-                const text = await resp.text();
-                agentAlive = true;
-                try { liveStatus = JSON.parse(text); } catch { liveStatus = { alive: true, message: text.substring(0, 300) }; }
-                
-                // If direct port worked but proxy didn't, update agent_url
-                if (tryUrl !== baseUrl) {
-                  console.log(`[VALA Agent] Updating agent_url to working URL: ${tryUrl}`);
-                  await supabase.from('servers').update({ agent_url: tryUrl }).eq('id', server.id);
-                }
-                break;
-              } else {
-                await resp.text();
-              }
-            } catch (e) {
-              console.log(`[VALA Agent] GET ${tryUrl} failed: ${e.message}`);
-            }
-            
-            // Try POST
-            if (!agentAlive) {
-              try {
-                const ctrl = new AbortController();
-                const t = setTimeout(() => ctrl.abort(), 8000);
-                console.log(`[VALA Agent] Trying POST: ${tryUrl}`);
-                
-                const resp = await fetch(tryUrl, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${server.agent_token}`,
-                    'X-VALA-Command': 'status'
-                  },
-                  body: JSON.stringify({ command: 'status', timestamp: new Date().toISOString() }),
-                  signal: ctrl.signal
-                });
-                clearTimeout(t);
-                console.log(`[VALA Agent] POST ${tryUrl}: ${resp.status}`);
-                
-                if (resp.ok) {
-                  const text = await resp.text();
-                  agentAlive = true;
-                  try { liveStatus = JSON.parse(text); } catch { liveStatus = { alive: true, raw: text.substring(0, 300) }; }
-                  
-                  if (tryUrl !== baseUrl) {
-                    await supabase.from('servers').update({ agent_url: tryUrl }).eq('id', server.id);
-                  }
-                  break;
-                } else {
-                  await resp.text();
-                }
-              } catch (e) {
-                console.log(`[VALA Agent] POST ${tryUrl} failed: ${e.message}`);
-              }
-            }
-          }
-        }
-
-        // Update server status in DB based on agent reachability
-        const newStatus = agentAlive ? 'live' : (server.agent_url ? server.status : server.status);
-        if (agentAlive && server.status !== 'live') {
-          await supabase.from('servers').update({ status: 'live' }).eq('id', server.id);
-        }
-
-        return new Response(JSON.stringify({
-          success: true,
-          server: {
-            id: server.id,
-            name: server.name,
-            ip: server.ip_address,
-            status: agentAlive ? 'live' : server.status,
-            type: server.server_type,
-            subdomain: server.subdomain,
-            agent_connected: !!server.agent_url,
-            agent_alive: agentAlive
-          },
-          live_status: liveStatus
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          result: (commandResult.result as { data?: unknown })?.data ?? commandResult.result,
+          executed_at: new Date().toISOString(),
+          diagnostics: { attempts: commandResult.attempts },
         });
       }
 
       case 'health':
       case 'system_health': {
-        // Quick health check of all servers
-        const { data: allServers } = await supabase
+        const { data: allServers, error } = await supabase
           .from('servers')
           .select('id, name, ip_address, status, agent_url, agent_token, server_type');
 
-        const results = [];
-        for (const srv of (allServers || [])) {
-          let agentAlive = false;
-          if (srv.agent_url && srv.agent_token) {
-            try {
-              const ctrl = new AbortController();
-              const t = setTimeout(() => ctrl.abort(), 5000);
-              const r = await fetch(`${srv.agent_url.replace(/\/$/, '')}/health`, {
-                headers: { 'Authorization': `Bearer ${srv.agent_token}` },
-                signal: ctrl.signal
-              });
-              clearTimeout(t);
-              agentAlive = r.ok;
-            } catch { agentAlive = false; }
-          }
-          results.push({
-            id: srv.id, name: srv.name, ip: srv.ip_address,
-            status: srv.status, type: srv.server_type,
-            agent_configured: !!srv.agent_url, agent_alive: agentAlive
-          });
-        }
+        if (error) throw error;
 
-        return new Response(JSON.stringify({
-          success: true,
-          servers: results,
-          timestamp: new Date().toISOString()
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
+        const checks = await Promise.all((allServers ?? []).map(async (raw) => {
+          const server = raw as ServerRecord;
+          const probe = await probeAgent(server);
+          return {
+            id: server.id,
+            name: server.name,
+            ip: server.ip_address,
+            status: server.status,
+            type: server.server_type,
+            agent_configured: !!server.agent_url,
+            agent_alive: probe.alive,
+            attempts: probe.attempts,
+          };
+        }));
+
+        return jsonResponse({ success: true, servers: checks, timestamp: new Date().toISOString() });
       }
 
-      case 'available_commands': {
-        return new Response(JSON.stringify({
+      case 'available_commands':
+        return jsonResponse({
           success: true,
           commands: AVAILABLE_COMMANDS,
           description: {
@@ -376,25 +609,20 @@ serve(async (req) => {
             kill_process: 'Kill a process by PID or name',
             nginx_reload: 'Reload nginx configuration',
             ssl_status: 'Check SSL certificate expiry',
-            database_backup: 'Backup MySQL/PostgreSQL database'
-          }
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            database_backup: 'Backup MySQL/PostgreSQL database',
+          },
         });
-      }
 
       default:
-        throw new Error(`Unknown action: ${action}. Available: list_servers, register_agent, execute, quick_status, health, available_commands`);
+        throw new Error(
+          `Unknown action: ${action}. Available: env_audit, list_servers, register, register_agent, verify, verify_agent, ping, agent_ping, status, agent_status, quick_status, execute, health, available_commands`,
+        );
     }
-
   } catch (error) {
     console.error('[VALA Agent] Error:', error);
-    return new Response(JSON.stringify({
+    return jsonResponse({
       success: false,
-      error: error.message
-    }), {
-      status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+      error: error instanceof Error ? error.message : String(error),
+    }, 400);
   }
 });

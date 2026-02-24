@@ -5,7 +5,10 @@ import type { Json } from '@/integrations/supabase/types';
 
 export interface AgentStatus {
   agent_alive: boolean;
-  live_status: any;
+  live_status: unknown;
+  diagnostics?: {
+    attempts?: Array<{ url: string; method: string; status: number | null; error?: string }>;
+  };
   server: {
     id: string;
     name: string;
@@ -55,7 +58,7 @@ export function useServers() {
   const [checkingAgent, setCheckingAgent] = useState<Record<string, boolean>>({});
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchServers = async () => {
+  const fetchServers = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('servers')
@@ -69,9 +72,9 @@ export function useServers() {
       setServers((data || []) as Server[]);
     }
     setLoading(false);
-  };
+  }, []);
 
-  const fetchDeployments = async (serverId?: string) => {
+  const fetchDeployments = useCallback(async (serverId?: string) => {
     let query = supabase
       .from('deployments')
       .select('*')
@@ -89,14 +92,12 @@ export function useServers() {
     } else {
       setDeployments((data || []) as Deployment[]);
     }
-  };
+  }, []);
 
   const createServer = async (server: Partial<Server>) => {
     const { data: userData } = await supabase.auth.getUser();
-    
-    // Generate subdomain from name
     const subdomain = server.name?.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.random().toString(36).substring(2, 6);
-    
+
     const { data, error } = await supabase
       .from('servers')
       .insert({
@@ -107,7 +108,7 @@ export function useServers() {
         runtime: server.runtime || 'nodejs18',
         status: 'stopped',
         auto_deploy: server.auto_deploy ?? true,
-        created_by: userData.user?.id
+        created_by: userData.user?.id,
       })
       .select()
       .single();
@@ -116,7 +117,7 @@ export function useServers() {
       toast.error('Failed to create server');
       throw error;
     }
-    toast.success('Server created: ' + subdomain + '.saasvala.com');
+    toast.success(`Server created: ${subdomain}.saasvala.com`);
     await fetchServers();
     return data;
   };
@@ -151,14 +152,13 @@ export function useServers() {
 
   const deployServer = async (id: string) => {
     const { data: userData } = await supabase.auth.getUser();
-    
-    // Create deployment record
+
     const { error } = await supabase
       .from('deployments')
       .insert({
         server_id: id,
         status: 'building',
-        triggered_by: userData.user?.id
+        triggered_by: userData.user?.id,
       });
 
     if (error) {
@@ -166,7 +166,6 @@ export function useServers() {
       throw error;
     }
 
-    // Update server status
     await supabase
       .from('servers')
       .update({ status: 'deploying', last_deploy_at: new Date().toISOString() })
@@ -185,71 +184,81 @@ export function useServers() {
     await updateServer(id, { status: 'suspended' });
   };
 
-  // Check agent status for a specific server via edge function
+  const registerAgent = useCallback(async (params: { name: string; ip_address?: string; agent_url: string; agent_token: string }) => {
+    const { data, error } = await supabase.functions.invoke('server-agent', {
+      body: { action: 'register', params },
+    });
+
+    if (error || !data?.success) {
+      throw new Error(error?.message || data?.error || 'Agent registration failed');
+    }
+
+    return data;
+  }, []);
+
+  const verifyAgent = useCallback(async (serverId: string, agent_token?: string) => {
+    const { data, error } = await supabase.functions.invoke('server-agent', {
+      body: { action: 'verify', serverId, params: agent_token ? { agent_token } : {} },
+    });
+
+    if (error || !data?.success) {
+      throw new Error(error?.message || data?.error || 'Agent verification failed');
+    }
+
+    return data;
+  }, []);
+
   const checkAgentStatus = useCallback(async (serverId: string) => {
-    setCheckingAgent(prev => ({ ...prev, [serverId]: true }));
+    setCheckingAgent((prev) => ({ ...prev, [serverId]: true }));
     try {
       const { data, error } = await supabase.functions.invoke('server-agent', {
-        body: { action: 'quick_status', serverId }
+        body: { action: 'status', serverId },
       });
 
-      if (error) {
-        console.error('[Agent Check] Error:', error);
+      if (error || !data?.success) {
+        console.error('[Agent Check] Error:', error || data?.error);
+        setServers((prev) => prev.map((s) => (s.id === serverId && s.status !== 'deploying' ? { ...s, status: 'stopped' } : s)));
         return null;
       }
 
-      if (data?.success) {
-        setAgentStatuses(prev => ({ ...prev, [serverId]: data }));
-        
-        // Update server status in local state if agent is alive
-        if (data.server?.agent_alive) {
-          setServers(prev => prev.map(s => 
-            s.id === serverId ? { ...s, status: 'live' as const } : s
-          ));
-        }
-        return data as AgentStatus;
-      }
-      return null;
+      setAgentStatuses((prev) => ({ ...prev, [serverId]: data as AgentStatus }));
+      setServers((prev) => prev.map((s) => {
+        if (s.id !== serverId) return s;
+        const nextStatus = data.server?.agent_alive ? 'live' : (s.status === 'deploying' ? 'deploying' : 'stopped');
+        return { ...s, status: nextStatus as Server['status'] };
+      }));
+
+      return data as AgentStatus;
     } catch (err) {
       console.error('[Agent Check] Failed:', err);
       return null;
     } finally {
-      setCheckingAgent(prev => ({ ...prev, [serverId]: false }));
+      setCheckingAgent((prev) => ({ ...prev, [serverId]: false }));
     }
   }, []);
 
-  // Check all servers with agents
   const checkAllAgents = useCallback(async () => {
-    const serversWithAgents = servers.filter(s => {
-      // Check if server has agent_url by querying fresh
-      return true; // We'll check all; the edge function handles agent_url check
-    });
-    
-    // Get servers with agent_url from DB
     const { data: agentServers } = await supabase
       .from('servers')
       .select('id')
       .not('agent_url', 'is', null);
-    
-    if (agentServers && agentServers.length > 0) {
-      await Promise.all(agentServers.map(s => checkAgentStatus(s.id)));
-    }
-  }, [checkAgentStatus, servers]);
+
+    if (!agentServers?.length) return;
+
+    await Promise.all(agentServers.map((s) => checkAgentStatus(s.id)));
+  }, [checkAgentStatus]);
 
   useEffect(() => {
     fetchServers();
     fetchDeployments();
-  }, []);
+  }, [fetchServers, fetchDeployments]);
 
-  // Start heartbeat after servers load
   useEffect(() => {
     if (servers.length > 0 && !heartbeatRef.current) {
-      // Initial check
       checkAllAgents();
-      
-      // Heartbeat every 60 seconds
       heartbeatRef.current = setInterval(checkAllAgents, 60000);
     }
+
     return () => {
       if (heartbeatRef.current) {
         clearInterval(heartbeatRef.current);
@@ -272,7 +281,9 @@ export function useServers() {
     deployServer,
     stopServer,
     suspendServer,
+    registerAgent,
+    verifyAgent,
     checkAgentStatus,
-    checkAllAgents
+    checkAllAgents,
   };
 }
