@@ -3074,11 +3074,13 @@ async function executeHostingerApi(args: any, supabase: any): Promise<ToolResult
       }), success: false };
     }
 
-    // Log activity
-    await supabase.from('activity_logs').insert({
-      entity_type: 'hostinger', entity_id: vps_id?.toString() || 'global',
-      action: `hostinger_${action}`, details: { action, vps_id, success: true }
-    }).catch(() => {});
+    // Log activity (non-critical)
+    try {
+      await supabase.from('activity_logs').insert({
+        entity_type: 'hostinger', entity_id: vps_id?.toString() || 'global',
+        action: `hostinger_${action}`, details: { action, vps_id, success: true }
+      });
+    } catch (_) {}
 
     return { tool_call_id: '', content: JSON.stringify({
       success: true, action, vps_id, live_execution: true, method: 'hostinger_api',
