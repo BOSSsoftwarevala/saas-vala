@@ -2037,24 +2037,72 @@ async function executeCheckGithubRepos(args: any, supabase: any): Promise<ToolRe
     }
   }
 
-  // Match with marketplace products
+  // Match with marketplace products (fuzzy matching)
   let productMatches: any[] = [];
   if (check_products && allRepos.length > 0) {
     const { data: products } = await supabase
       .from('products')
       .select('id, name, status, slug, price')
-      .limit(200);
+      .limit(500);
 
-    productMatches = (products || []).map((p: any) => {
-      const slugClean = p.slug?.replace(/-/g, '').toLowerCase() || '';
-      const nameClean = p.name?.toLowerCase().replace(/[^a-z0-9]/g, '') || '';
-      const matchedRepo = allRepos.find(r => {
-        const repoClean = r.name?.toLowerCase().replace(/-/g, '') || '';
-        return repoClean === slugClean || repoClean === nameClean || 
-               r.name?.toLowerCase().includes(nameClean) || nameClean.includes(repoClean);
+    // Also check source_code_catalog for repo URLs
+    const { data: catalogEntries } = await supabase
+      .from('source_code_catalog')
+      .select('project_name, github_repo_url, github_account, status, vala_name')
+      .not('github_repo_url', 'is', null)
+      .limit(500);
+
+    const catalogMap = new Map<string, any>();
+    (catalogEntries || []).forEach((c: any) => {
+      if (c.github_repo_url) {
+        const repoName = c.github_repo_url.split('/').pop()?.toLowerCase() || '';
+        catalogMap.set(repoName, c);
+      }
+    });
+
+    // Helper: normalize string for comparison
+    const normalize = (s: string) => s?.toLowerCase().replace(/[^a-z0-9]/g, '') || '';
+
+    // For each repo, try to find a matching product or catalog entry
+    const matchedRepoNames = new Set<string>();
+    
+    for (const repo of allRepos.filter(r => r.name && !r.error)) {
+      const repoNorm = normalize(repo.name);
+      const repoLower = repo.name?.toLowerCase() || '';
+      
+      // Check catalog first (direct repo URL match)
+      const catalogEntry = catalogMap.get(repoLower);
+      
+      // Check products (fuzzy: any significant keyword overlap)
+      const matchedProduct = (products || []).find((p: any) => {
+        const slugNorm = normalize(p.slug || '');
+        const nameNorm = normalize(p.name || '');
+        // Exact match
+        if (repoNorm === slugNorm || repoNorm === nameNorm) return true;
+        // Contains match (at least 6 chars to avoid false positives)
+        if (repoNorm.length >= 6 && (nameNorm.includes(repoNorm) || repoNorm.includes(nameNorm))) return true;
+        if (repoNorm.length >= 6 && (slugNorm.includes(repoNorm) || repoNorm.includes(slugNorm))) return true;
+        // Keyword overlap: split product name into words, check if repo contains 2+ keywords
+        const keywords = (p.name || '').toLowerCase().split(/\s+/).filter((w: string) => w.length > 3);
+        const matchCount = keywords.filter((kw: string) => repoLower.includes(kw)).length;
+        if (keywords.length >= 2 && matchCount >= 2) return true;
+        return false;
       });
-      return matchedRepo ? { product: p.name, status: p.status, repo: matchedRepo.full_name } : null;
-    }).filter(Boolean);
+
+      if (matchedProduct || catalogEntry) {
+        matchedRepoNames.add(repo.name);
+        productMatches.push({
+          repo: repo.full_name,
+          product: matchedProduct?.name || catalogEntry?.vala_name || catalogEntry?.project_name || repo.name,
+          status: matchedProduct?.status || catalogEntry?.status || 'unlinked',
+          source: matchedProduct ? 'products_table' : 'source_catalog',
+          language: repo.language,
+          private: repo.private,
+        });
+      }
+    }
+
+    console.log(`[TOOL] Product matching: ${productMatches.length} matches from ${allRepos.length} repos and ${(products || []).length} products`);
   }
 
   // Stats
