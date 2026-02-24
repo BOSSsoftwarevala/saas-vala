@@ -1,6 +1,23 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Helper: fetch with timeout to prevent hanging when VPS is down
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 10000): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timeout);
+    return res;
+  } catch (e) {
+    clearTimeout(timeout);
+    if (e.name === 'AbortError') {
+      throw new Error(`Connection timeout (${timeoutMs/1000}s) — server unreachable at ${url}`);
+    }
+    throw e;
+  }
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
@@ -731,7 +748,7 @@ async function executeServerStatus(args: any, supabase: any): Promise<ToolResult
   if (server.agent_url && server.agent_token) {
     try {
       console.log(`[TOOL] Calling agent at ${server.agent_url}`);
-      const agentResponse = await fetch(server.agent_url, {
+      const agentResponse = await fetchWithTimeout(server.agent_url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1006,7 +1023,7 @@ async function executeDeployProject(args: any, supabase: any): Promise<ToolResul
     try {
       console.log(`[TOOL] Deploying via VALA Agent at ${server.agent_url}`);
       
-      const agentRes = await fetch(server.agent_url, {
+      const agentRes = await fetchWithTimeout(server.agent_url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${server.agent_token}` },
         body: JSON.stringify({
@@ -1029,7 +1046,7 @@ async function executeDeployProject(args: any, supabase: any): Promise<ToolResul
           const appPort = agentData.data?.port || 3000 + Math.floor(Math.random() * 1000);
           const nginxConf = `server {\n    listen 80;\n    server_name ${subdomain};\n\n    location / {\n        proxy_pass http://127.0.0.1:${appPort};\n        proxy_http_version 1.1;\n        proxy_set_header Upgrade \\$http_upgrade;\n        proxy_set_header Connection 'upgrade';\n        proxy_set_header Host \\$host;\n        proxy_set_header X-Real-IP \\$remote_addr;\n        proxy_set_header X-Forwarded-For \\$proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto \\$scheme;\n        proxy_cache_bypass \\$http_upgrade;\n    }\n}`;
 
-          const domainRes = await fetch(server.agent_url, {
+          const domainRes = await fetchWithTimeout(server.agent_url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${server.agent_token}` },
             body: JSON.stringify({
@@ -1261,7 +1278,7 @@ async function executeViewLogs(args: any, supabase: any): Promise<ToolResult> {
   
   if (server?.agent_url && server?.agent_token) {
     try {
-      const agentRes = await fetch(server.agent_url, {
+      const agentRes = await fetchWithTimeout(server.agent_url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${server.agent_token}` },
         body: JSON.stringify({ command: 'logs', data: { log_type, lines, filter } })
@@ -1338,7 +1355,7 @@ async function executeRestartService(args: any, supabase: any): Promise<ToolResu
   // Try VALA Agent for real restart
   if (server?.agent_url && server?.agent_token) {
     try {
-      const agentRes = await fetch(server.agent_url, {
+      const agentRes = await fetchWithTimeout(server.agent_url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${server.agent_token}` },
         body: JSON.stringify({ command: 'restart', data: { service: service_name } })
@@ -1462,7 +1479,7 @@ async function executeGitOperations(args: any, supabase: any): Promise<ToolResul
           const { data: server } = await supabase.from('servers').select('agent_url, agent_token, name').eq('id', server_id).single();
           if (server?.agent_url && server?.agent_token) {
             try {
-              const agentRes = await fetch(server.agent_url, {
+              const agentRes = await fetchWithTimeout(server.agent_url, {
                 method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${server.agent_token}` },
                 body: JSON.stringify({ command: 'git_status' })
               });
@@ -1504,7 +1521,7 @@ async function executeGitOperations(args: any, supabase: any): Promise<ToolResul
           const { data: server } = await supabase.from('servers').select('agent_url, agent_token, name').eq('id', server_id).single();
           if (server?.agent_url && server?.agent_token) {
             try {
-              const agentRes = await fetch(server.agent_url, {
+              const agentRes = await fetchWithTimeout(server.agent_url, {
                 method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${server.agent_token}` },
                 body: JSON.stringify({ command: `git_${operation}`, data: { repository_url, branch } })
               });
@@ -1584,7 +1601,7 @@ async function executeCreateBackup(args: any, supabase: any): Promise<ToolResult
   // Try VALA Agent for real backup
   if (server?.agent_url && server?.agent_token) {
     try {
-      const agentRes = await fetch(server.agent_url, {
+      const agentRes = await fetchWithTimeout(server.agent_url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${server.agent_token}` },
         body: JSON.stringify({ command: backup_type === 'database' ? 'database_backup' : 'backup', data: { backup_type, compress } })
@@ -2703,7 +2720,7 @@ async function executeSetupDomain(args: any, supabase: any): Promise<ToolResult>
     }
 }`;
 
-      const agentRes = await fetch(server.agent_url, {
+      const agentRes = await fetchWithTimeout(server.agent_url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${server.agent_token}` },
         body: JSON.stringify({
@@ -3038,7 +3055,7 @@ async function executeBuildApk(args: any, supabase: any): Promise<ToolResult> {
   }
 
   try {
-    const agentRes = await fetch(server.agent_url, {
+    const agentRes = await fetchWithTimeout(server.agent_url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${server.agent_token}` },
       body: JSON.stringify({ command: 'exec', params: { commands: buildCommands } })
@@ -3144,7 +3161,7 @@ async function executeUploadApk(args: any, supabase: any): Promise<ToolResult> {
 
   try {
     // Step 1: Get file from server via agent
-    const agentRes = await fetch(server.agent_url, {
+    const agentRes = await fetchWithTimeout(server.agent_url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${server.agent_token}` },
       body: JSON.stringify({ command: 'exec', params: { commands: [
