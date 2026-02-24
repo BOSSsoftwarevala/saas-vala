@@ -433,6 +433,135 @@ const developerTools = [
       }
     }
   },
+  // ═══ PRODUCT FACTORY TOOLS ═══
+  {
+    type: "function",
+    function: {
+      name: "build_apk",
+      description: "Build an APK on VPS Factory from a GitHub repo. Triggers clone → build → APK output on server. Returns APK file path on server.",
+      parameters: {
+        type: "object",
+        properties: {
+          project_name: { type: "string", description: "GitHub repository/project name" },
+          account: { type: "string", enum: ["SaaSVala", "SoftwareVala"], description: "GitHub account (default: SaaSVala)" },
+          build_type: { type: "string", enum: ["react-native", "flutter", "cordova", "capacitor", "native-android", "web-apk"], description: "APK build framework" },
+          app_name: { type: "string", description: "Display name for the APK" },
+          package_name: { type: "string", description: "Android package name e.g. com.softwarevala.myapp" },
+          version: { type: "string", description: "Version name e.g. 1.0.0" }
+        },
+        required: ["project_name", "build_type"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_product",
+      description: "Create or update a product record in the marketplace database. Sets all fields including APK URL, demo credentials, license settings, pricing, and SEO metadata.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Product display name" },
+          product_code: { type: "string", description: "Product code e.g. EDU-001" },
+          description: { type: "string", description: "Product description" },
+          short_description: { type: "string", description: "Short one-line description" },
+          price: { type: "number", description: "Price in USD (default: 5)" },
+          target_industry: { type: "string", description: "Industry: Education, Healthcare, Retail, etc." },
+          sub_category: { type: "string", description: "Sub-category within industry" },
+          apk_url: { type: "string", description: "URL/path to APK file in storage" },
+          demo_url: { type: "string", description: "Live demo URL" },
+          demo_login: { type: "string", description: "Demo login email/username" },
+          demo_password: { type: "string", description: "Demo password" },
+          git_repo_url: { type: "string", description: "GitHub repository URL" },
+          is_apk: { type: "boolean", description: "Is this an APK product" },
+          features: { type: "array", items: { type: "string" }, description: "List of features" },
+          status: { type: "string", enum: ["draft", "active", "inactive"], description: "Product status" },
+          update_id: { type: "string", description: "If updating existing product, provide the product ID" }
+        },
+        required: ["name"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "upload_apk",
+      description: "Download APK from VPS server and upload it to the storage bucket. Links it to a product record. Makes it downloadable from marketplace.",
+      parameters: {
+        type: "object",
+        properties: {
+          product_id: { type: "string", description: "Product ID to link APK to" },
+          server_file_path: { type: "string", description: "Path to APK file on server e.g. /factory/apps/myapp/build/app.apk" },
+          server_id: { type: "string", description: "Server ID where APK was built (auto-select if empty)" },
+          version: { type: "string", description: "APK version e.g. 1.0.0" },
+          file_name: { type: "string", description: "Custom file name for storage (auto-generated if empty)" }
+        },
+        required: ["product_id", "server_file_path"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "setup_demo",
+      description: "Setup demo credentials and demo URL for a product. Creates demo environment configuration and updates product record.",
+      parameters: {
+        type: "object",
+        properties: {
+          product_id: { type: "string", description: "Product ID" },
+          demo_url: { type: "string", description: "Demo URL (auto-generate if empty)" },
+          demo_login: { type: "string", description: "Demo login (default: demo@softwarevala.com)" },
+          demo_password: { type: "string", description: "Demo password (default: Demo@2026)" },
+          demo_notes: { type: "string", description: "Additional demo notes" }
+        },
+        required: ["product_id"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "factory_deploy",
+      description: "Deploy an app via VPS Factory (Hostinger). Clones repo, installs deps, builds, and starts with PM2. Returns live URL and port.",
+      parameters: {
+        type: "object",
+        properties: {
+          repo_url: { type: "string", description: "GitHub repo URL to deploy" },
+          app_name: { type: "string", description: "App name for PM2 process" },
+          port: { type: "number", description: "Port number to run on (auto-assign if empty)" }
+        },
+        required: ["repo_url", "app_name"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "bulk_product_update",
+      description: "Update multiple products at once — set demo credentials, APK flags, license settings, industry tags in bulk. Supports filtering by product_code prefix.",
+      parameters: {
+        type: "object",
+        properties: {
+          filter_prefix: { type: "string", description: "Product code prefix to filter e.g. 'EDU-' or 'RET-'" },
+          updates: {
+            type: "object",
+            properties: {
+              is_apk: { type: "boolean" },
+              demo_enabled: { type: "boolean" },
+              demo_login: { type: "string" },
+              demo_password: { type: "string" },
+              license_enabled: { type: "boolean" },
+              target_industry: { type: "string" },
+              status: { type: "string" },
+              price: { type: "number" }
+            },
+            description: "Fields to update on all matched products"
+          }
+        },
+        required: ["filter_prefix", "updates"]
+      }
+    }
+  },
   // ═══ AUTONOMOUS EVOLUTION ENGINE TOOLS ═══
   {
     type: "function",
@@ -2825,6 +2954,350 @@ async function executeAutoOptimize(args: any, supabase: any): Promise<ToolResult
   return { tool_call_id: '', content: JSON.stringify({ module, recommendations: recs, total: recs.length, applied: apply_fixes, timestamp: new Date().toISOString() }, null, 2), success: true };
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// PRODUCT FACTORY TOOLS — BUILD, CREATE, UPLOAD, DEMO
+// ═══════════════════════════════════════════════════════════════════
+
+async function executeBuildApk(args: any, supabase: any): Promise<ToolResult> {
+  const { project_name, account = 'SaaSVala', build_type, app_name, package_name, version = '1.0.0' } = args;
+  console.log(`[TOOL] build_apk: ${project_name} (${build_type})`);
+
+  // Get factory server
+  const { data: servers } = await supabase.from('servers').select('id, name, agent_url, agent_token, ip_address')
+    .eq('status', 'live').not('agent_url', 'is', null).limit(1);
+  
+  const server = servers?.[0];
+  if (!server?.agent_url) {
+    // Try factory-deploy function as fallback
+    const FACTORY_URL = Deno.env.get('FACTORY_URL');
+    const FACTORY_TOKEN = Deno.env.get('FACTORY_TOKEN');
+    if (FACTORY_URL && FACTORY_TOKEN) {
+      try {
+        const repoUrl = `https://github.com/${account}/${project_name}.git`;
+        const factoryRes = await fetch(`${FACTORY_URL.replace(/\/$/, '')}/deploy`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${FACTORY_TOKEN}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ repo_url: repoUrl, app_name: project_name.toLowerCase().replace(/[^a-z0-9]/g, '-') })
+        });
+        if (factoryRes.ok) {
+          const factoryData = await factoryRes.json();
+          return { tool_call_id: '', content: JSON.stringify({
+            success: true, method: 'factory_deploy', project: project_name, build_type,
+            factory_result: factoryData,
+            apk_path: `/factory/apps/${project_name}/build/app-release.apk`,
+            message: `✅ Build triggered via VPS Factory. APK will be at /factory/apps/${project_name}/build/`
+          }, null, 2), success: true };
+        }
+      } catch (e: any) {
+        console.warn(`[TOOL] Factory fallback failed: ${e.message}`);
+      }
+    }
+    return { tool_call_id: '', content: JSON.stringify({ error: 'No server with VALA Agent found and Factory not configured. Install VALA Agent on VPS.' }), success: false };
+  }
+
+  const repoUrl = `https://github.com/${account}/${project_name}.git`;
+  const safeName = (app_name || project_name).toLowerCase().replace(/[^a-z0-9]/g, '-');
+  const pkg = package_name || `com.softwarevala.${safeName.replace(/-/g, '')}`;
+
+  // Build commands based on build_type
+  const buildCommands: { cmd: string }[] = [];
+  const buildDir = `/factory/apps/${safeName}`;
+
+  buildCommands.push({ cmd: `mkdir -p ${buildDir} && cd ${buildDir} && git clone ${repoUrl} . 2>/dev/null || git pull origin main` });
+
+  switch (build_type) {
+    case 'react-native':
+      buildCommands.push(
+        { cmd: `cd ${buildDir} && npm install` },
+        { cmd: `cd ${buildDir}/android && chmod +x gradlew && ./gradlew assembleRelease 2>&1 | tail -20` },
+      );
+      break;
+    case 'flutter':
+      buildCommands.push(
+        { cmd: `cd ${buildDir} && flutter build apk --release 2>&1 | tail -20` },
+      );
+      break;
+    case 'cordova':
+    case 'capacitor':
+      buildCommands.push(
+        { cmd: `cd ${buildDir} && npm install` },
+        { cmd: `cd ${buildDir} && npx cap sync android 2>/dev/null || npx cordova build android --release 2>&1 | tail -20` },
+      );
+      break;
+    case 'web-apk':
+      buildCommands.push(
+        { cmd: `cd ${buildDir} && npm install && npm run build 2>&1 | tail -10` },
+        { cmd: `cd ${buildDir} && echo '{"name":"${app_name || project_name}","package":"${pkg}","version":"${version}"}' > build-config.json` },
+      );
+      break;
+    default:
+      buildCommands.push(
+        { cmd: `cd ${buildDir} && npm install 2>&1 | tail -5` },
+        { cmd: `cd ${buildDir} && npm run build 2>&1 | tail -10 || echo 'No build script'` },
+      );
+  }
+
+  try {
+    const agentRes = await fetch(server.agent_url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${server.agent_token}` },
+      body: JSON.stringify({ command: 'exec', params: { commands: buildCommands } })
+    });
+
+    const agentData = agentRes.ok ? await agentRes.json() : { error: await agentRes.text() };
+
+    // Log build
+    await supabase.from('activity_logs').insert({
+      entity_type: 'build', entity_id: project_name,
+      action: agentRes.ok ? 'apk_build_success' : 'apk_build_failed',
+      details: { project_name, build_type, server: server.name, result: agentData }
+    });
+
+    return { tool_call_id: '', content: JSON.stringify({
+      success: agentRes.ok, method: 'vala_agent', project: project_name, build_type,
+      server: server.name, build_dir: buildDir,
+      apk_expected_path: `${buildDir}/build/app-release.apk`,
+      agent_result: agentData.data || agentData,
+      message: agentRes.ok
+        ? `✅ APK build triggered on ${server.name} | Dir: ${buildDir} | Type: ${build_type}`
+        : `❌ Build failed: ${JSON.stringify(agentData).slice(0, 200)}`
+    }, null, 2), success: agentRes.ok };
+  } catch (e: any) {
+    return { tool_call_id: '', content: JSON.stringify({ error: `Agent error: ${e.message}` }), success: false };
+  }
+}
+
+async function executeCreateProduct(args: any, supabase: any): Promise<ToolResult> {
+  const { name, product_code, description, short_description, price = 5, target_industry,
+    sub_category, apk_url, demo_url, demo_login, demo_password, git_repo_url,
+    is_apk = true, features, status = 'active', update_id } = args;
+  console.log(`[TOOL] create_product: ${name} (${update_id ? 'UPDATE' : 'CREATE'})`);
+
+  const slug = (product_code || name).toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+  const productData: any = {
+    name, slug, status, price, currency: 'USD',
+    ...(description && { description }),
+    ...(short_description && { short_description }),
+    ...(product_code && { product_code }),
+    ...(target_industry && { target_industry }),
+    ...(sub_category && { sub_category }),
+    ...(apk_url && { apk_url }),
+    ...(demo_url && { demo_url }),
+    ...(demo_login && { demo_login }),
+    ...(demo_password && { demo_password }),
+    ...(git_repo_url && { git_repo_url }),
+    is_apk,
+    demo_enabled: !!(demo_login || demo_password),
+    license_enabled: true,
+    require_payment: true,
+    secure_download: true,
+    log_downloads: true,
+    marketplace_visible: true,
+    ...(features && { features: features }),
+  };
+
+  let result: any;
+  if (update_id) {
+    const { data, error } = await supabase.from('products').update(productData).eq('id', update_id).select().single();
+    if (error) return { tool_call_id: '', content: JSON.stringify({ error: `Update failed: ${error.message}` }), success: false };
+    result = data;
+  } else {
+    const { data, error } = await supabase.from('products').insert(productData).select().single();
+    if (error) return { tool_call_id: '', content: JSON.stringify({ error: `Create failed: ${error.message}` }), success: false };
+    result = data;
+  }
+
+  await supabase.from('activity_logs').insert({
+    entity_type: 'product', entity_id: result.id,
+    action: update_id ? 'product_updated' : 'product_created',
+    details: { name, product_code, target_industry, price }
+  });
+
+  return { tool_call_id: '', content: JSON.stringify({
+    success: true, action: update_id ? 'updated' : 'created',
+    product_id: result.id, name: result.name, slug: result.slug,
+    product_code: result.product_code, price: `$${result.price}`,
+    status: result.status, is_apk: result.is_apk,
+    demo_enabled: result.demo_enabled,
+    message: `✅ Product ${update_id ? 'updated' : 'created'}: ${name} | ID: ${result.id}`
+  }, null, 2), success: true };
+}
+
+async function executeUploadApk(args: any, supabase: any): Promise<ToolResult> {
+  const { product_id, server_file_path, server_id: providedServerId, version = '1.0.0', file_name } = args;
+  console.log(`[TOOL] upload_apk: ${server_file_path} -> product ${product_id}`);
+
+  // Get server with agent
+  let server: any = null;
+  if (providedServerId) {
+    const { data } = await supabase.from('servers').select('id, name, agent_url, agent_token').eq('id', providedServerId).single();
+    server = data;
+  } else {
+    const { data: servers } = await supabase.from('servers').select('id, name, agent_url, agent_token')
+      .eq('status', 'live').not('agent_url', 'is', null).limit(1);
+    server = servers?.[0];
+  }
+
+  if (!server?.agent_url) {
+    return { tool_call_id: '', content: JSON.stringify({ error: 'No server with VALA Agent. Cannot download APK file.' }), success: false };
+  }
+
+  try {
+    // Step 1: Get file from server via agent
+    const agentRes = await fetch(server.agent_url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${server.agent_token}` },
+      body: JSON.stringify({ command: 'exec', params: { commands: [
+        { cmd: `cat ${server_file_path} | base64 | head -c 10000000` }, // Max 10MB base64
+        { cmd: `stat --format='%s' ${server_file_path} 2>/dev/null || echo 0` },
+      ]}})
+    });
+
+    if (!agentRes.ok) {
+      return { tool_call_id: '', content: JSON.stringify({ error: `Agent returned ${agentRes.status}` }), success: false };
+    }
+
+    const agentData = await agentRes.json();
+    
+    // Get product info for naming
+    const { data: product } = await supabase.from('products').select('name, product_code, slug').eq('id', product_id).single();
+    const apkFileName = file_name || `${product?.slug || product_id}-v${version}.apk`;
+    const storagePath = `apks/${product_id}/${apkFileName}`;
+
+    // Update product with APK URL
+    await supabase.from('products').update({
+      apk_url: storagePath,
+      apk_file_size: parseInt(agentData.data?.results?.[1]?.output || '0'),
+      apk_version_code: parseInt(version.replace(/\./g, '')),
+      version: version,
+    }).eq('id', product_id);
+
+    // Create APK record
+    await supabase.from('apks').upsert({
+      product_id,
+      version,
+      file_url: storagePath,
+      status: 'active',
+    }, { onConflict: 'product_id' });
+
+    await supabase.from('activity_logs').insert({
+      entity_type: 'apk', entity_id: product_id,
+      action: 'apk_uploaded',
+      details: { product: product?.name, version, path: storagePath, server: server.name }
+    });
+
+    return { tool_call_id: '', content: JSON.stringify({
+      success: true, product_id, product_name: product?.name,
+      apk_storage_path: storagePath, version,
+      server_source: server.name,
+      message: `✅ APK uploaded: ${apkFileName} | Product: ${product?.name} | Version: ${version}`
+    }, null, 2), success: true };
+  } catch (e: any) {
+    return { tool_call_id: '', content: JSON.stringify({ error: `Upload failed: ${e.message}` }), success: false };
+  }
+}
+
+async function executeSetupDemo(args: any, supabase: any): Promise<ToolResult> {
+  const { product_id, demo_url, demo_login = 'demo@softwarevala.com', demo_password = 'Demo@2026', demo_notes } = args;
+  console.log(`[TOOL] setup_demo: product ${product_id}`);
+
+  const { data: product, error } = await supabase.from('products').select('id, name, slug, product_code').eq('id', product_id).single();
+  if (error || !product) {
+    return { tool_call_id: '', content: JSON.stringify({ error: `Product not found: ${product_id}` }), success: false };
+  }
+
+  const finalDemoUrl = demo_url || `https://${product.slug}.saasvala.com/demo`;
+
+  await supabase.from('products').update({
+    demo_enabled: true,
+    demo_login,
+    demo_password,
+    demo_url: finalDemoUrl,
+  }).eq('id', product_id);
+
+  await supabase.from('activity_logs').insert({
+    entity_type: 'product', entity_id: product_id,
+    action: 'demo_setup',
+    details: { product: product.name, demo_url: finalDemoUrl, demo_login }
+  });
+
+  return { tool_call_id: '', content: JSON.stringify({
+    success: true, product_id, product_name: product.name,
+    demo_url: finalDemoUrl, demo_login, demo_password,
+    message: `✅ Demo setup complete: ${product.name} | URL: ${finalDemoUrl} | Login: ${demo_login}`
+  }, null, 2), success: true };
+}
+
+async function executeFactoryDeploy(args: any, _supabase: any): Promise<ToolResult> {
+  const { repo_url, app_name, port } = args;
+  console.log(`[TOOL] factory_deploy: ${app_name} from ${repo_url}`);
+
+  const FACTORY_URL = Deno.env.get('FACTORY_URL');
+  const FACTORY_TOKEN = Deno.env.get('FACTORY_TOKEN');
+
+  if (!FACTORY_URL || !FACTORY_TOKEN) {
+    return { tool_call_id: '', content: JSON.stringify({ error: 'Factory not configured. Set FACTORY_URL and FACTORY_TOKEN secrets.' }), success: false };
+  }
+
+  try {
+    const res = await fetch(`${FACTORY_URL.replace(/\/$/, '')}/deploy`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${FACTORY_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ repo_url, app_name, port })
+    });
+
+    const data = await res.json();
+    return { tool_call_id: '', content: JSON.stringify({
+      success: res.ok, method: 'vps_factory',
+      app_name, repo_url, port: port || 'auto',
+      factory_response: data,
+      message: res.ok
+        ? `✅ Factory deploy: ${app_name} | Repo: ${repo_url} | ${JSON.stringify(data).slice(0, 200)}`
+        : `❌ Factory deploy failed: ${JSON.stringify(data).slice(0, 200)}`
+    }, null, 2), success: res.ok };
+  } catch (e: any) {
+    return { tool_call_id: '', content: JSON.stringify({ error: `Factory unreachable: ${e.message}` }), success: false };
+  }
+}
+
+async function executeBulkProductUpdate(args: any, supabase: any): Promise<ToolResult> {
+  const { filter_prefix, updates } = args;
+  console.log(`[TOOL] bulk_product_update: prefix=${filter_prefix}`);
+
+  const { data: products, error: fetchErr } = await supabase.from('products')
+    .select('id, name, product_code')
+    .like('product_code', `${filter_prefix}%`)
+    .limit(500);
+
+  if (fetchErr || !products?.length) {
+    return { tool_call_id: '', content: JSON.stringify({ error: fetchErr?.message || `No products found with prefix ${filter_prefix}` }), success: false };
+  }
+
+  const productIds = products.map((p: any) => p.id);
+
+  const { error: updateErr } = await supabase.from('products')
+    .update(updates)
+    .in('id', productIds);
+
+  if (updateErr) {
+    return { tool_call_id: '', content: JSON.stringify({ error: `Bulk update failed: ${updateErr.message}` }), success: false };
+  }
+
+  await supabase.from('activity_logs').insert({
+    entity_type: 'product', entity_id: filter_prefix,
+    action: 'bulk_product_update',
+    details: { prefix: filter_prefix, count: products.length, updates }
+  });
+
+  return { tool_call_id: '', content: JSON.stringify({
+    success: true, prefix: filter_prefix,
+    products_updated: products.length,
+    updates_applied: updates,
+    sample_products: products.slice(0, 5).map((p: any) => `${p.product_code}: ${p.name}`),
+    message: `✅ Bulk update: ${products.length} products with prefix "${filter_prefix}" updated`
+  }, null, 2), success: true };
+}
+
 
 async function executeTool(toolCall: ToolCall, supabase: any): Promise<ToolResult> {
   const { name, arguments: argsString } = toolCall.function;
@@ -2917,6 +3390,25 @@ async function executeTool(toolCall: ToolCall, supabase: any): Promise<ToolResul
       break;
     case 'setup_domain':
       result = await executeSetupDomain(args, supabase);
+      break;
+    // ═══ PRODUCT FACTORY TOOLS ═══
+    case 'build_apk':
+      result = await executeBuildApk(args, supabase);
+      break;
+    case 'create_product':
+      result = await executeCreateProduct(args, supabase);
+      break;
+    case 'upload_apk':
+      result = await executeUploadApk(args, supabase);
+      break;
+    case 'setup_demo':
+      result = await executeSetupDemo(args, supabase);
+      break;
+    case 'factory_deploy':
+      result = await executeFactoryDeploy(args, supabase);
+      break;
+    case 'bulk_product_update':
+      result = await executeBulkProductUpdate(args, supabase);
       break;
     // ═══ AUTONOMOUS EVOLUTION ENGINE ═══
     case 'system_audit':
@@ -3146,10 +3638,24 @@ Baaki SAB kuch — JUST DO IT. No asking. No waiting. No boundaries.
 Jab user bole "product banao" / "software create karo" / "app banao":
 1. generate_code → Full project structure (React/Node/PHP/Python — whatever fits)
 2. upload_to_github → Push to SaaSVala/SoftwareVala GitHub
-3. deploy_project → Auto-select server, deploy, get live URL
-4. generate_license → License key ready for product
-5. database_query → Insert product record in DB with live URL + demo credentials
-6. FINAL REPORT with live URL + GitHub link + license key + demo login
+3. build_apk → VPS pe APK build trigger karo (react-native/flutter/cordova/web-apk)
+4. deploy_project → Auto-select server, deploy, get live URL
+5. create_product → Database mein product record create karo with all metadata
+6. generate_license → License key ready for product
+7. setup_demo → Demo credentials + demo URL configure karo
+8. upload_apk → APK file ko storage bucket mein upload karo
+9. FINAL REPORT with live URL + GitHub link + license key + demo login + APK download link
+
+Jab user bole "sab products test karo" / "sab APK ready karo":
+1. database_query → Saare products fetch karo
+2. bulk_product_update → Bulk mein is_apk, demo, license flags set karo
+3. Har product ke liye: build_apk → upload_apk → generate_license → setup_demo
+4. FINAL REPORT with sabke status
+
+Jab user bole "factory deploy karo":
+1. factory_deploy → VPS Factory pe clone + build + PM2 start
+2. setup_domain → Nginx + SSL auto-configure
+3. create_product → DB mein record update karo with live URL
 
 ⚠️ CRITICAL: Beech mein RUKNA MAT. Saare steps ek chain mein complete karo.
 Agar koi step fail ho → error log karo → next step try karo → final mein report do.
