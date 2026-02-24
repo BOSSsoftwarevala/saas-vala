@@ -149,9 +149,10 @@ serve(async (req) => {
         }
 
         // Call the agent
-        console.log(`[VALA Agent] Calling agent at ${server.agent_url}`);
+        const agentUrl = server.agent_url.replace(/\/?$/, '');
+        console.log(`[VALA Agent] Calling agent at ${agentUrl}`);
         
-        const agentResponse = await fetch(server.agent_url, {
+        const agentResponse = await fetch(agentUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -195,37 +196,109 @@ serve(async (req) => {
         // Get quick status of a server
         if (!serverId) throw new Error('Server ID required');
 
-        const { data: server, error } = await supabase
-          .from('servers')
-          .select('*')
-          .eq('id', serverId)
-          .single();
+        // Support lookup by UUID or IP address
+        let serverQuery = supabase.from('servers').select('*');
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(serverId);
+        if (isUuid) {
+          serverQuery = serverQuery.eq('id', serverId);
+        } else {
+          serverQuery = serverQuery.eq('ip_address', serverId);
+        }
+        const { data: server, error } = await serverQuery.single();
 
         if (error || !server) throw new Error('Server not found');
 
         // If agent is configured, try to get live status
         let liveStatus = null;
+        let agentAlive = false;
         if (server.agent_url && server.agent_token) {
-          try {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 8000);
-            const statusResponse = await fetch(server.agent_url, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${server.agent_token}`
-              },
-              body: JSON.stringify({ command: 'status' }),
-              signal: controller.signal
-            });
-            clearTimeout(timeout);
-            
-            if (statusResponse.ok) {
-              liveStatus = await statusResponse.json();
-            }
-          } catch (e) {
-            console.log('[VALA Agent] Could not reach agent for live status:', e.message);
+          // Build list of URLs to try: configured URL + direct port 9876
+          const baseUrl = server.agent_url.replace(/\/?$/, '');
+          const urlsToTry = [baseUrl];
+          
+          // Also try direct port 9876 if the URL uses a proxy path
+          if (server.ip_address && baseUrl.includes('/vala-agent')) {
+            urlsToTry.push(`http://${server.ip_address}:9876`);
           }
+          
+          for (const tryUrl of urlsToTry) {
+            if (agentAlive) break;
+            
+            // Try GET first
+            try {
+              const ctrl = new AbortController();
+              const t = setTimeout(() => ctrl.abort(), 8000);
+              console.log(`[VALA Agent] Trying GET: ${tryUrl}`);
+              
+              const resp = await fetch(tryUrl, {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${server.agent_token}` },
+                signal: ctrl.signal
+              });
+              clearTimeout(t);
+              console.log(`[VALA Agent] GET ${tryUrl}: ${resp.status}`);
+              
+              if (resp.ok) {
+                const text = await resp.text();
+                agentAlive = true;
+                try { liveStatus = JSON.parse(text); } catch { liveStatus = { alive: true, message: text.substring(0, 300) }; }
+                
+                // If direct port worked but proxy didn't, update agent_url
+                if (tryUrl !== baseUrl) {
+                  console.log(`[VALA Agent] Updating agent_url to working URL: ${tryUrl}`);
+                  await supabase.from('servers').update({ agent_url: tryUrl }).eq('id', server.id);
+                }
+                break;
+              } else {
+                await resp.text();
+              }
+            } catch (e) {
+              console.log(`[VALA Agent] GET ${tryUrl} failed: ${e.message}`);
+            }
+            
+            // Try POST
+            if (!agentAlive) {
+              try {
+                const ctrl = new AbortController();
+                const t = setTimeout(() => ctrl.abort(), 8000);
+                console.log(`[VALA Agent] Trying POST: ${tryUrl}`);
+                
+                const resp = await fetch(tryUrl, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${server.agent_token}`,
+                    'X-VALA-Command': 'status'
+                  },
+                  body: JSON.stringify({ command: 'status', timestamp: new Date().toISOString() }),
+                  signal: ctrl.signal
+                });
+                clearTimeout(t);
+                console.log(`[VALA Agent] POST ${tryUrl}: ${resp.status}`);
+                
+                if (resp.ok) {
+                  const text = await resp.text();
+                  agentAlive = true;
+                  try { liveStatus = JSON.parse(text); } catch { liveStatus = { alive: true, raw: text.substring(0, 300) }; }
+                  
+                  if (tryUrl !== baseUrl) {
+                    await supabase.from('servers').update({ agent_url: tryUrl }).eq('id', server.id);
+                  }
+                  break;
+                } else {
+                  await resp.text();
+                }
+              } catch (e) {
+                console.log(`[VALA Agent] POST ${tryUrl} failed: ${e.message}`);
+              }
+            }
+          }
+        }
+
+        // Update server status in DB based on agent reachability
+        const newStatus = agentAlive ? 'live' : (server.agent_url ? server.status : server.status);
+        if (agentAlive && server.status !== 'live') {
+          await supabase.from('servers').update({ status: 'live' }).eq('id', server.id);
         }
 
         return new Response(JSON.stringify({
@@ -234,10 +307,11 @@ serve(async (req) => {
             id: server.id,
             name: server.name,
             ip: server.ip_address,
-            status: server.status,
+            status: agentAlive ? 'live' : server.status,
             type: server.server_type,
             subdomain: server.subdomain,
-            agent_connected: !!server.agent_url
+            agent_connected: !!server.agent_url,
+            agent_alive: agentAlive
           },
           live_status: liveStatus
         }), {

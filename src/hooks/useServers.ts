@@ -1,7 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { Json } from '@/integrations/supabase/types';
+
+export interface AgentStatus {
+  agent_alive: boolean;
+  live_status: any;
+  server: {
+    id: string;
+    name: string;
+    ip: string;
+    status: string;
+    agent_connected: boolean;
+    agent_alive: boolean;
+  };
+}
 
 export interface Server {
   id: string;
@@ -38,6 +51,9 @@ export function useServers() {
   const [servers, setServers] = useState<Server[]>([]);
   const [deployments, setDeployments] = useState<Deployment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [agentStatuses, setAgentStatuses] = useState<Record<string, AgentStatus>>({});
+  const [checkingAgent, setCheckingAgent] = useState<Record<string, boolean>>({});
+  const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchServers = async () => {
     setLoading(true);
@@ -169,15 +185,85 @@ export function useServers() {
     await updateServer(id, { status: 'suspended' });
   };
 
+  // Check agent status for a specific server via edge function
+  const checkAgentStatus = useCallback(async (serverId: string) => {
+    setCheckingAgent(prev => ({ ...prev, [serverId]: true }));
+    try {
+      const { data, error } = await supabase.functions.invoke('server-agent', {
+        body: { action: 'quick_status', serverId }
+      });
+
+      if (error) {
+        console.error('[Agent Check] Error:', error);
+        return null;
+      }
+
+      if (data?.success) {
+        setAgentStatuses(prev => ({ ...prev, [serverId]: data }));
+        
+        // Update server status in local state if agent is alive
+        if (data.server?.agent_alive) {
+          setServers(prev => prev.map(s => 
+            s.id === serverId ? { ...s, status: 'live' as const } : s
+          ));
+        }
+        return data as AgentStatus;
+      }
+      return null;
+    } catch (err) {
+      console.error('[Agent Check] Failed:', err);
+      return null;
+    } finally {
+      setCheckingAgent(prev => ({ ...prev, [serverId]: false }));
+    }
+  }, []);
+
+  // Check all servers with agents
+  const checkAllAgents = useCallback(async () => {
+    const serversWithAgents = servers.filter(s => {
+      // Check if server has agent_url by querying fresh
+      return true; // We'll check all; the edge function handles agent_url check
+    });
+    
+    // Get servers with agent_url from DB
+    const { data: agentServers } = await supabase
+      .from('servers')
+      .select('id')
+      .not('agent_url', 'is', null);
+    
+    if (agentServers && agentServers.length > 0) {
+      await Promise.all(agentServers.map(s => checkAgentStatus(s.id)));
+    }
+  }, [checkAgentStatus, servers]);
+
   useEffect(() => {
     fetchServers();
     fetchDeployments();
   }, []);
 
+  // Start heartbeat after servers load
+  useEffect(() => {
+    if (servers.length > 0 && !heartbeatRef.current) {
+      // Initial check
+      checkAllAgents();
+      
+      // Heartbeat every 60 seconds
+      heartbeatRef.current = setInterval(checkAllAgents, 60000);
+    }
+    return () => {
+      if (heartbeatRef.current) {
+        clearInterval(heartbeatRef.current);
+        heartbeatRef.current = null;
+      }
+    };
+  }, [servers.length, checkAllAgents]);
+
   return {
     servers,
     deployments,
     loading,
+    agentStatuses,
+    checkingAgent,
     fetchServers,
     fetchDeployments,
     createServer,
@@ -185,6 +271,8 @@ export function useServers() {
     deleteServer,
     deployServer,
     stopServer,
-    suspendServer
+    suspendServer,
+    checkAgentStatus,
+    checkAllAgents
   };
 }
