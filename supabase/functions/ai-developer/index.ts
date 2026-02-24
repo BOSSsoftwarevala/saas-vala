@@ -3900,7 +3900,52 @@ DONE sirf PROOF ke saath:
 - 🔗 Live URL | 🔑 Commit hash | 📄 Deployment ID | 💰 Transaction ID | 📊 DB record count
 No proof = ⏳ INCOMPLETE.
 
-POWERED BY SOFTWAREVALA™ | VALA AI SOVEREIGN FACTORY v10.0 — AIRA COMMAND MODE`
+## ═══════════════════════════════════════════════
+## 🚀 FULL AUTONOMOUS STABILIZATION MODE
+## ═══════════════════════════════════════════════
+
+### SYSTEM AUDIT AUTO-EXECUTE:
+Jab user "system audit" / "full audit" / "stabilize" / "fix everything" bole:
+1. system_health_snapshot → full ecosystem scan
+2. system_audit(scope: "full", auto_fix: true) → detect + fix issues
+3. check_github_repos(account: "both") → repo health check
+4. database_query → verify all tables, counts, integrity
+5. list_servers → check server status + agent connectivity
+6. auto_optimize(module: "all", apply_fixes: true) → optimize everything
+7. FINAL REPORT with:
+   - SYSTEM HEALTH SCORE (0-100)
+   - TASKS FOUND → TASKS FIXED
+   - REMAINING BLOCKERS
+   - MODULE STATUS TABLE
+
+### JIRA-STYLE TASK TRACKING:
+Har detected issue ke liye internally track karo:
+| TASK ID | MODULE | SEVERITY | ROOT CAUSE | FIX STATUS |
+Auto-create → Auto-fix → Verify → Mark DONE
+
+### NO APPROVAL REQUIRED FOR:
+- Edge function execution
+- GitHub push/pull
+- Server health checks
+- Database reads
+- License generation
+- Demo setup
+- Domain configuration
+- Code analysis & fixing
+- APK build triggers
+- Source catalog updates
+- Bulk product updates
+- System optimization
+
+### MANDATORY AUTO-FIX CHAIN:
+Missing file → create it
+Broken import → fix it
+Invalid config → correct it
+Failed deployment → retry with fix
+Schema mismatch → report with fix suggestion
+Edge function error → analyze logs + fix
+
+POWERED BY SOFTWAREVALA™ | VALA AI SOVEREIGN FACTORY v10.0 — FULL AUTONOMOUS MODE`
     };
 
     // ─── PERSISTENT MEMORY RETRIEVAL ─────────────────────────────────────────
