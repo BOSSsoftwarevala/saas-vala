@@ -31,11 +31,14 @@ serve(async (req) => {
     let endpoint = "";
     let method = "POST";
     let body: string | undefined;
+    // Deploy gets 5min, everything else 30s
+    let timeoutMs = 30000;
 
     switch (action) {
       case "deploy":
         endpoint = "/deploy";
         body = JSON.stringify({ repo_url, app_name, port });
+        timeoutMs = 300000;
         break;
       case "list":
         endpoint = "/apps";
@@ -64,6 +67,7 @@ serve(async (req) => {
       case "health":
         endpoint = "/health";
         method = "GET";
+        timeoutMs = 10000;
         break;
       default:
         return new Response(
@@ -73,16 +77,45 @@ serve(async (req) => {
     }
 
     const url = `${FACTORY_URL.replace(/\/$/, "")}${endpoint}`;
-    const fetchOptions: RequestInit = { method, headers };
-    if (body && method === "POST") fetchOptions.body = body;
+    
+    // Use AbortController for timeout
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
-    const response = await fetch(url, fetchOptions);
-    const data = await response.json();
+    try {
+      const fetchOptions: RequestInit = { method, headers, signal: controller.signal };
+      if (body && method === "POST") fetchOptions.body = body;
 
-    return new Response(
-      JSON.stringify(data),
-      { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+      const response = await fetch(url, fetchOptions);
+      clearTimeout(timeout);
+      const data = await response.json();
+
+      return new Response(
+        JSON.stringify(data),
+        { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    } catch (fetchError) {
+      clearTimeout(timeout);
+      
+      const isTimeout = fetchError.name === 'AbortError';
+      const errorMsg = isTimeout 
+        ? `VPS Factory unreachable (timeout ${timeoutMs/1000}s). Check: 1) VPS online at ${FACTORY_URL} 2) Nginx proxy active 3) PM2 vala-factory running`
+        : `VPS connection failed: ${fetchError.message}. Run on VPS: pm2 restart vala-factory && sudo systemctl reload nginx`;
+
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: errorMsg,
+          debug: {
+            factory_url: FACTORY_URL,
+            endpoint,
+            timeout_ms: timeoutMs,
+            error_type: isTimeout ? 'TIMEOUT' : 'CONNECTION_ERROR'
+          }
+        }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
   } catch (error) {
     return new Response(
       JSON.stringify({ success: false, error: error.message }),

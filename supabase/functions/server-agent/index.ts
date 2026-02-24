@@ -245,6 +245,44 @@ serve(async (req) => {
         });
       }
 
+      case 'health':
+      case 'system_health': {
+        // Quick health check of all servers
+        const { data: allServers } = await supabase
+          .from('servers')
+          .select('id, name, ip_address, status, agent_url, agent_token, server_type');
+
+        const results = [];
+        for (const srv of (allServers || [])) {
+          let agentAlive = false;
+          if (srv.agent_url && srv.agent_token) {
+            try {
+              const ctrl = new AbortController();
+              const t = setTimeout(() => ctrl.abort(), 5000);
+              const r = await fetch(`${srv.agent_url.replace(/\/$/, '')}/health`, {
+                headers: { 'Authorization': `Bearer ${srv.agent_token}` },
+                signal: ctrl.signal
+              });
+              clearTimeout(t);
+              agentAlive = r.ok;
+            } catch { agentAlive = false; }
+          }
+          results.push({
+            id: srv.id, name: srv.name, ip: srv.ip_address,
+            status: srv.status, type: srv.server_type,
+            agent_configured: !!srv.agent_url, agent_alive: agentAlive
+          });
+        }
+
+        return new Response(JSON.stringify({
+          success: true,
+          servers: results,
+          timestamp: new Date().toISOString()
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
       case 'available_commands': {
         return new Response(JSON.stringify({
           success: true,
@@ -272,7 +310,7 @@ serve(async (req) => {
       }
 
       default:
-        throw new Error(`Unknown action: ${action}`);
+        throw new Error(`Unknown action: ${action}. Available: list_servers, register_agent, execute, quick_status, health, available_commands`);
     }
 
   } catch (error) {
