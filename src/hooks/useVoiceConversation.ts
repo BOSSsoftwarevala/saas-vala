@@ -249,10 +249,26 @@ export function useVoiceConversation({
 
     } catch (error: any) {
       console.error('Mic error:', error);
-      if (error.name === 'NotAllowedError') {
-        toast.error('Microphone blocked. Click the 🔒 icon in browser to allow.');
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        toast.error('🎤 Microphone blocked!', {
+          description: 'Browser address bar mein 🔒 icon pe click karein → Microphone → Allow → Page refresh',
+          duration: 8000,
+        });
+      } else if (error.name === 'NotFoundError') {
+        toast.error('🎤 No microphone found!', {
+          description: 'Koi mic connected nahi. Headset ya external mic lagayein.',
+          duration: 6000,
+        });
+      } else if (error.name === 'NotReadableError' || error.name === 'AbortError') {
+        toast.error('🎤 Microphone busy!', {
+          description: 'Mic kisi aur app mein use ho raha hai. Band karein aur retry karein.',
+          duration: 6000,
+        });
       } else {
-        toast.error('Microphone error. Check permissions.');
+        toast.error('🎤 Microphone error', {
+          description: `${error.message || error.name}. Browser refresh karke retry karein.`,
+          duration: 6000,
+        });
       }
     }
   }, [onTranscript, transcribeAudio, processVoiceInput, updateState]);
