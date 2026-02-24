@@ -3646,13 +3646,10 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // ─── AUDIT/DIAGNOSTIC INTERCEPT ───────────────────────────────────────────
-    // Detect audit-type requests and handle with real DB data directly
-    const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')?.content?.toLowerCase() || '';
-    const isAuditRequest = lastUserMsg.includes('audit') || lastUserMsg.includes('diagnostic') || 
-      lastUserMsg.includes('runtime') || lastUserMsg.includes('health check') ||
-      lastUserMsg.includes('system check') || lastUserMsg.includes('jira') ||
-      lastUserMsg.includes('module scoring') || lastUserMsg.includes('test karo') ||
-      lastUserMsg.includes('check karo') && (lastUserMsg.includes('api') || lastUserMsg.includes('system'));
+    // Only trigger on EXPLICIT audit commands — not on general messages
+    const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')?.content?.toLowerCase().trim() || '';
+    const auditKeywords = ['system audit', 'full audit', 'run audit', 'audit report', 'diagnostic report', 'module scoring', 'system health check'];
+    const isAuditRequest = auditKeywords.some(kw => lastUserMsg.includes(kw));
 
     if (isAuditRequest) {
       try {
