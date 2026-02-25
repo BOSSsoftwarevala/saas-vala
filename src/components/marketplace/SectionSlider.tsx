@@ -35,6 +35,31 @@ export function SectionSlider({ children, className }: SectionSliderProps) {
     };
   }, []);
 
+  // Auto-scroll every 4 seconds
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    let paused = false;
+    const onEnter = () => { paused = true; };
+    const onLeave = () => { paused = false; };
+    el.addEventListener('mouseenter', onEnter);
+    el.addEventListener('mouseleave', onLeave);
+    const interval = setInterval(() => {
+      if (paused || !el) return;
+      const { scrollLeft, scrollWidth, clientWidth } = el;
+      if (scrollLeft >= scrollWidth - clientWidth - 10) {
+        el.scrollTo({ left: 0, behavior: 'smooth' });
+      } else {
+        el.scrollBy({ left: clientWidth * 0.75, behavior: 'smooth' });
+      }
+    }, 4000);
+    return () => {
+      clearInterval(interval);
+      el.removeEventListener('mouseenter', onEnter);
+      el.removeEventListener('mouseleave', onLeave);
+    };
+  }, []);
+
   const scroll = (direction: 'left' | 'right') => {
     if (!scrollRef.current) return;
     const amount = scrollRef.current.clientWidth * 0.75;

@@ -8,7 +8,8 @@ import { TopSellingSection } from '@/components/marketplace/TopSellingSection';
 import { PopularProductsSection } from '@/components/marketplace/PopularProductsSection';
 import { EducationSection } from '@/components/marketplace/EducationSection';
 import { MarketplaceSectionDivider } from '@/components/marketplace/MarketplaceSectionDivider';
-import { row1Software, row2Software, row3Software, row4Software } from '@/data/topSoftwareData';
+import { MarketplaceCategoryRow } from '@/components/marketplace/MarketplaceCategoryRow';
+import { MARKETPLACE_CATEGORIES } from '@/data/marketplaceCategories';
 import { useMarketplaceProducts } from '@/hooks/useMarketplaceProducts';
 import { toast } from 'sonner';
 import { useApkPurchase } from '@/hooks/useApkPurchase';
@@ -243,26 +244,13 @@ export default function Marketplace() {
         {/* ━━━ SECTION 5: EDUCATION & SKILL DEVELOPMENT ━━━ */}
         <EducationSection onBuyNow={handleBuyNow} />
 
-        <MarketplaceSectionDivider label="all software" />
-
-        {/* ━━━ FEATURED TOP SOFTWARE ROWS ━━━ */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          <ProductSlider title="🔥 TOP SOFTWARE ROW 1" products={row1Software} onBuyNow={handleBuyNow} onFavorite={handleFavorite} onNotify={handleNotify} onDownloadApk={handleDownloadApk} showTechStack={true} />
-        </motion.div>
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-          <ProductSlider title="⚡ TOP SOFTWARE ROW 2" products={row2Software} onBuyNow={handleBuyNow} onFavorite={handleFavorite} onNotify={handleNotify} onDownloadApk={handleDownloadApk} showTechStack={true} />
-        </motion.div>
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-          <ProductSlider title="💼 TOP SOFTWARE ROW 3" products={row3Software} onBuyNow={handleBuyNow} onFavorite={handleFavorite} onNotify={handleNotify} onDownloadApk={handleDownloadApk} showTechStack={true} />
-        </motion.div>
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-          <ProductSlider title="🚀 TOP SOFTWARE ROW 4" products={row4Software} onBuyNow={handleBuyNow} onFavorite={handleFavorite} onNotify={handleNotify} onDownloadApk={handleDownloadApk} showTechStack={true} />
-        </motion.div>
-
-        {/* ━━━ DATABASE CATALOG ROWS ━━━ */}
-        {allRows.map((row, rowIndex) => (
-          <motion.div key={`db-row-${rowIndex}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: (rowIndex + 5) * 0.05 }}>
-            <ProductSlider title={`📦 SOFTWARE CATALOG ROW ${rowIndex + 1}`} products={row} onBuyNow={handleBuyNow} onFavorite={handleFavorite} onNotify={handleNotify} onDownloadApk={handleDownloadApk} showTechStack={true} />
+        {/* ━━━ 35 DYNAMIC CATEGORY ROWS (Rows 6–40) ━━━ */}
+        {MARKETPLACE_CATEGORIES.map((cat, idx) => (
+          <motion.div key={cat.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: (idx + 6) * 0.03 }}>
+            <MarketplaceCategoryRow category={cat} onBuyNow={handleBuyNow} />
+            {idx < MARKETPLACE_CATEGORIES.length - 1 && (
+              <MarketplaceSectionDivider label={cat.id} />
+            )}
           </motion.div>
         ))}
       </main>
