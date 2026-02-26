@@ -312,24 +312,27 @@ serve(async (req) => {
         const agent_url = params.agent_url ? normalizeUrl(String(params.agent_url)) : null;
         const agent_token = params.agent_token ? String(params.agent_token) : null;
 
-        if (!name || !agent_url || !agent_token) {
-          throw new Error('Missing required fields: name, agent_url, agent_token');
+        if (!name) {
+          throw new Error('Missing required field: name');
         }
 
-        const probe = await probeAgent({
-          id: 'temp',
-          name,
-          ip_address,
-          status: 'stopped',
-          subdomain: null,
-          server_type: 'vps',
-          agent_url,
-          agent_token,
-        });
-
-        if (!probe.alive) {
-          throw new Error(`Agent verification failed during registration. Attempts: ${JSON.stringify(probe.attempts)}`);
+        // Try probe but DON'T fail if agent is unreachable - allow offline registration
+        let probe: AgentProbeResult = { alive: false, workingUrl: null, liveStatus: null, attempts: [] };
+        if (agent_url && agent_token) {
+          probe = await probeAgent({
+            id: 'temp',
+            name,
+            ip_address,
+            status: 'stopped',
+            subdomain: null,
+            server_type: 'vps',
+            agent_url,
+            agent_token,
+          });
         }
+
+        const resolvedStatus = probe.alive ? 'live' : 'stopped';
+        const resolvedHealth = probe.alive ? 'healthy' : 'pending';
 
         let existing: ServerRecord | null = null;
         if (ip_address) {
@@ -343,10 +346,10 @@ serve(async (req) => {
             .from('servers')
             .update({
               name,
-              agent_url: probe.workingUrl,
-              agent_token,
-              status: 'live',
-              health_status: 'healthy',
+              agent_url: probe.workingUrl ?? agent_url,
+              agent_token: agent_token ?? existing.agent_token,
+              status: resolvedStatus,
+              health_status: resolvedHealth,
               server_type: 'vps',
             })
             .eq('id', existing.id)
@@ -361,10 +364,10 @@ serve(async (req) => {
             .insert({
               name,
               ip_address,
-              agent_url: probe.workingUrl,
+              agent_url: probe.workingUrl ?? agent_url,
               agent_token,
-              status: 'live',
-              health_status: 'healthy',
+              status: resolvedStatus,
+              health_status: resolvedHealth,
               server_type: 'vps',
             })
             .select('*')
@@ -376,17 +379,22 @@ serve(async (req) => {
 
         await logServerActivity(supabase, savedServer.id, 'agent_register', {
           ip_address,
-          agent_url: probe.workingUrl,
+          agent_url: probe.workingUrl ?? agent_url,
+          agent_alive: probe.alive,
           attempts: probe.attempts,
         });
 
         return jsonResponse({
           success: true,
-          message: 'Server agent registered successfully',
+          message: probe.alive
+            ? 'Server registered and agent verified successfully'
+            : 'Server registered (agent offline — fix Nginx proxy, then verify)',
           server_id: savedServer.id,
           server_name: savedServer.name,
-          status: savedServer.status,
-          verified: true,
+          status: resolvedStatus,
+          agent_alive: probe.alive,
+          verified: probe.alive,
+          fix_instructions: probe.alive ? null : 'Run on your VPS: curl -sSL https://softwarevala.net/vala-agent/fix-proxy.sh | sudo bash',
         });
       }
 
