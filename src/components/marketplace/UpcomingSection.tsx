@@ -2,10 +2,16 @@ import { SectionHeader } from './SectionHeader';
 import { SectionSlider } from './SectionSlider';
 import { MarketplaceProductCard, ComingSoonCard } from './MarketplaceProductCard';
 import { useProductsByCategory } from '@/hooks/useMarketplaceProducts';
+import { fillToTarget } from '@/data/marketplaceProductGenerator';
 
 export function UpcomingSection() {
   const { products: dbProducts, loading } = useProductsByCategory(['upcoming', 'pipeline', 'coming_soon']);
-  const allProducts = dbProducts.map(p => ({ ...p, isAvailable: false, status: 'upcoming' as const }));
+  const allDb = dbProducts.map(p => ({ ...p, isAvailable: false, status: 'upcoming' as const }));
+  const displayProducts = fillToTarget(allDb as any, 'upcoming', 'Upcoming', 50).map(p => ({
+    ...p,
+    isAvailable: false,
+    status: 'upcoming' as const,
+  }));
 
   return (
     <section className="py-4">
@@ -15,11 +21,11 @@ export function UpcomingSection() {
         subtitle="Be first. Get early access before public launch."
         badge="DROPPING SOON"
         badgeVariant="hot"
-        totalCount={allProducts.length}
+        totalCount={displayProducts.length}
       />
 
       <SectionSlider>
-        {allProducts.map((product, i) => (
+        {displayProducts.map((product, i) => (
           <MarketplaceProductCard
             key={product.id}
             product={product as any}
@@ -28,7 +34,7 @@ export function UpcomingSection() {
             rank={i + 1}
           />
         ))}
-        {!loading && allProducts.length === 0 && <ComingSoonCard label="Upcoming" />}
+        {!loading && displayProducts.length === 0 && <ComingSoonCard label="Upcoming" />}
       </SectionSlider>
     </section>
   );

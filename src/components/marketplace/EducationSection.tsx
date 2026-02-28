@@ -1,20 +1,9 @@
-
 import { SectionSlider } from './SectionSlider';
 import { MarketplaceProductCard, ComingSoonCard } from './MarketplaceProductCard';
 import { useProductsByCategory } from '@/hooks/useMarketplaceProducts';
+import { fillToTarget } from '@/data/marketplaceProductGenerator';
 import { Badge } from '@/components/ui/badge';
 import { GraduationCap } from 'lucide-react';
-
-const eduProducts = [
-  { id: 'ed-1', title: 'SCHOOL ERP COMPLETE', subtitle: 'K-12 all-in-one management system', category: 'Education', features: ['Timetable', 'Attendance', 'Fee Management', 'Parent App'] },
-  { id: 'ed-2', title: 'ONLINE LMS PRO', subtitle: 'Complete learning management system', category: 'Education', features: ['Live Classes', 'AI Quizzes', 'Certificates', 'Progress Track'] },
-  { id: 'ed-3', title: 'COLLEGE ERP SUITE', subtitle: 'Higher education institution ERP', category: 'Education', features: ['Admission Portal', 'Exam Module', 'Library', 'Hostel Mgmt'] },
-  { id: 'ed-4', title: 'COACHING CENTRE ERP', subtitle: 'Tuition & coaching management platform', category: 'Education', features: ['Batch Mgmt', 'Test Series', 'Results', 'Fee Collection'] },
-  { id: 'ed-5', title: 'SKILL DEVELOPMENT APP', subtitle: 'Vocational training & certification system', category: 'Education', features: ['Trade Courses', 'Assessments', 'Job Board', 'E-Certificates'] },
-  { id: 'ed-6', title: 'UNIVERSITY ADMISSION', subtitle: 'End-to-end admission management portal', category: 'Education', features: ['Online Apply', 'Merit Lists', 'Document Upload', 'Fee Payment'] },
-  { id: 'ed-7', title: 'LIBRARY MANAGEMENT', subtitle: 'Smart library with RFID & e-resources', category: 'Education', features: ['Book Catalog', 'RFID Issue', 'E-Books', 'Fine Calc'] },
-  { id: 'ed-8', title: 'EXAM & TEST ENGINE', subtitle: 'Online examination & assessment platform', category: 'Education', features: ['Question Bank', 'AI Proctoring', 'Auto Grade', 'Rank Lists'] },
-];
 
 const subCats = ['All', 'School', 'College', 'Coaching', 'E-Learning', 'Skill Training', 'University', 'Library', 'Examination'];
 
@@ -23,21 +12,7 @@ export function EducationSection({ onBuyNow }: { onBuyNow: (p: any) => void }) {
     'education', 'school', 'college', 'coaching', 'elearning', 'e-learning', 'training', 'skill', 'university', 'library', 'examination'
   ]);
 
-  const showStatic = dbProducts.length === 0;
-
-  const staticProducts = eduProducts.map((p, i) => ({
-    ...p,
-    price: 5,
-    image: '',
-    isAvailable: true,
-    status: 'live' as const,
-    trending: i < 2,
-    featured: i === 0,
-    demoUrl: '',
-    description: p.subtitle,
-  }));
-
-  const displayProducts = showStatic ? staticProducts : dbProducts;
+  const displayProducts = fillToTarget(dbProducts as any, 'education', 'Education', 50);
 
   return (
     <section className="py-4">
