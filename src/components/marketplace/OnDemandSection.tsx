@@ -7,10 +7,13 @@ import { SectionSlider } from './SectionSlider';
 import { MarketplaceProductCard, ComingSoonCard } from './MarketplaceProductCard';
 import { OnDemandRequestModal } from './OnDemandRequestModal';
 import { useProductsByCategory } from '@/hooks/useMarketplaceProducts';
+import { fillToTarget } from '@/data/marketplaceProductGenerator';
 
 export function OnDemandSection({ onBuyNow }: { onBuyNow: (p: any) => void }) {
   const [requestModal, setRequestModal] = useState<{ open: boolean; product?: any }>({ open: false });
   const { products: dbProducts, loading } = useProductsByCategory(['saas', 'cloud', 'on_demand']);
+
+  const displayProducts = fillToTarget(dbProducts as any, 'on_demand', 'On-Demand', 50);
 
   const openRequest = (product: any) => setRequestModal({ open: true, product });
 
@@ -29,7 +32,7 @@ export function OnDemandSection({ onBuyNow }: { onBuyNow: (p: any) => void }) {
           </div>
           <p className="text-sm text-muted-foreground ml-9">
             Instantly deploy. No setup. Live in minutes.
-            <span className="ml-2 text-primary font-semibold">{dbProducts.length} products</span>
+            <span className="ml-2 text-primary font-semibold">{displayProducts.length} products</span>
           </p>
         </div>
         <Button
@@ -42,7 +45,7 @@ export function OnDemandSection({ onBuyNow }: { onBuyNow: (p: any) => void }) {
       </div>
 
       <SectionSlider>
-        {dbProducts.map((product, i) => (
+        {displayProducts.map((product, i) => (
           <div key={product.id} className="flex flex-col gap-2">
             <MarketplaceProductCard
               product={product as any}
@@ -62,7 +65,7 @@ export function OnDemandSection({ onBuyNow }: { onBuyNow: (p: any) => void }) {
           </div>
         ))}
 
-        {!loading && dbProducts.length === 0 && (
+        {!loading && displayProducts.length === 0 && (
           <ComingSoonCard label="On-Demand" />
         )}
       </SectionSlider>
