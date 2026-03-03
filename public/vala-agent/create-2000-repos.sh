@@ -93,7 +93,8 @@ CATEGORIES=(
 )
 
 # --- Logging ---
-LOG="create-repos_$(date +%Y%m%d_%H%M%S).log"
+STARTDIR="$(pwd)"
+LOG="${STARTDIR}/create-repos_$(date +%Y%m%d_%H%M%S).log"
 echo "Started: $(date)" > "$LOG"
 
 TOTAL_CREATED=0
@@ -376,15 +377,15 @@ GIEOF
 
         if git push -u origin main --force -q 2>/dev/null; then
             echo -e "${GREEN}✓ CREATED + PUSHED${NC}"
-            echo "SUCCESS: $REPO_NAME" >> "${WORKDIR}/../${LOG}" 2>/dev/null || echo "SUCCESS: $REPO_NAME" >> "$LOG"
+            echo "SUCCESS: $REPO_NAME" >> "$LOG"
             ((TOTAL_CREATED++))
         else
             echo -e "${RED}✗ PUSH FAILED${NC}"
-            echo "PUSH_FAILED: $REPO_NAME" >> "${WORKDIR}/../${LOG}" 2>/dev/null || echo "PUSH_FAILED: $REPO_NAME" >> "$LOG"
+            echo "PUSH_FAILED: $REPO_NAME" >> "$LOG"
             ((TOTAL_FAILED++))
         fi
 
-        cd - > /dev/null
+        cd "$STARTDIR"
 
         # Cleanup to save disk
         rm -rf "${REPO_DIR}"
