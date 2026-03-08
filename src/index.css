@@ -149,7 +149,7 @@
   }
 
   .glass-card-hover {
-    @apply glass-card transition-all duration-400 ease-out cursor-pointer;
+    @apply glass-card transition-all duration-300 ease-out cursor-pointer;
   }
 
   .glass-card-hover:hover {
@@ -402,7 +402,7 @@
   }
 
   .hover-glow {
-    @apply transition-all duration-400 ease-out;
+    @apply transition-all duration-300 ease-out;
   }
 
   .hover-glow:hover {
