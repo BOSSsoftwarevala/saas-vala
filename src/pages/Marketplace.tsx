@@ -7,6 +7,7 @@ import { OnDemandSection } from '@/components/marketplace/OnDemandSection';
 import { TopSellingSection } from '@/components/marketplace/TopSellingSection';
 import { PopularProductsSection } from '@/components/marketplace/PopularProductsSection';
 import { EducationSection } from '@/components/marketplace/EducationSection';
+import { HealthcareSection } from '@/components/marketplace/HealthcareSection';
 import { MarketplaceSectionDivider } from '@/components/marketplace/MarketplaceSectionDivider';
 import { MarketplaceCategoryRow } from '@/components/marketplace/MarketplaceCategoryRow';
 import { MARKETPLACE_CATEGORIES } from '@/data/marketplaceCategories';
