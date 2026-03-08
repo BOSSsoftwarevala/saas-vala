@@ -416,14 +416,16 @@ export function MarketplaceProductCard({
               title={`${product.title} Live Demo`}
               sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
               loading="lazy"
+              onLoad={() => setIframeLoaded(true)}
             />
-            {/* Loading overlay */}
-            <div className="absolute inset-0 flex items-center justify-center bg-background/80 pointer-events-none animate-pulse" style={{ animationDuration: '2s' }}>
-              <div className="text-center space-y-2">
-                <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-                <p className="text-sm text-muted-foreground">Loading demo...</p>
+            {!iframeLoaded && (
+              <div className="absolute inset-0 flex items-center justify-center bg-background/80 pointer-events-none">
+                <div className="text-center space-y-2">
+                  <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+                  <p className="text-sm text-muted-foreground">Loading demo...</p>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Bottom bar */}
