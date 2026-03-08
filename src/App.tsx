@@ -21,6 +21,7 @@ import EducationCategory from "./pages/EducationCategory";
 import Keys from "./pages/Keys";
 import Servers from "./pages/Servers";
 import AiChat from "./pages/AiChat";
+import ValaBuilder from "./pages/ValaBuilder";
 import SaasAiDashboard from "./pages/SaasAiDashboard";
 import AiApis from "./pages/AiApis";
 import Wallet from "./pages/Wallet";
@@ -200,6 +201,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <EducationCategory />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/vala-builder"
+        element={
+          <ProtectedRoute>
+            <ValaBuilder />
           </ProtectedRoute>
         }
       />
