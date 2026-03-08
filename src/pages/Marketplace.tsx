@@ -23,6 +23,7 @@ import { ProductivitySection } from '@/components/marketplace/ProductivitySectio
 import { CybersecuritySection } from '@/components/marketplace/CybersecuritySection';
 import { DataAnalyticsSection } from '@/components/marketplace/DataAnalyticsSection';
 import { ElearningSection } from '@/components/marketplace/ElearningSection';
+import { TelemedicineSection } from '@/components/marketplace/TelemedicineSection';
 import { MarketplaceSectionDivider } from '@/components/marketplace/MarketplaceSectionDivider';
 import { MarketplaceCategoryRow } from '@/components/marketplace/MarketplaceCategoryRow';
 import { MARKETPLACE_CATEGORIES } from '@/data/marketplaceCategories';
