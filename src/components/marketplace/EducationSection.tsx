@@ -18,7 +18,7 @@ const TOP_5_EDUCATION_CLONES = [
     features: ['Student Records', 'Attendance System', 'Timetable Manager', 'Fee Management', 'Teacher Dashboard', 'Report Cards'],
     techStack: ['React', 'Node.js', 'PostgreSQL', 'JWT Auth'],
     github_repo: 'https://github.com/saasvala/schoolmanagementsoftware',
-    demoUrl: 'https://schoolmanagementsoftware.saasvala.com',
+    demoUrl: 'https://schoolmanagementsoftware.vercel.app',
     price: 5,
     old_price: 10,
     rating: 4.9,
