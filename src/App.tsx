@@ -39,6 +39,7 @@ import HealthPwa from "./pages/HealthPwa";
 import RealEstatePwa from "./pages/RealEstatePwa";
 import EcomPwa from "./pages/EcomPwa";
 import RetailPwa from "./pages/RetailPwa";
+import FoodPwa from "./pages/FoodPwa";
 
 const queryClient = new QueryClient();
 
