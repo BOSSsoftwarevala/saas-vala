@@ -52,6 +52,7 @@ import AgriculturePwa from "./pages/AgriculturePwa";
 import EnergyPwa from "./pages/EnergyPwa";
 import TelecomPwa from "./pages/TelecomPwa";
 import ItSoftwarePwa from "./pages/ItSoftwarePwa";
+import CloudDevopsPwa from "./pages/CloudDevopsPwa";
 
 const queryClient = new QueryClient();
 
