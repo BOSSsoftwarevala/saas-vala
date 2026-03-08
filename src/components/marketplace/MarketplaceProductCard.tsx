@@ -124,9 +124,8 @@ export function MarketplaceProductCard({
     return `https://${slug}-software.saasvala.com`;
   };
 
-  // ── DEMO BUTTON — show credentials dialog ──
+  // ── DEMO BUTTON — open live demo directly ──
   const handleDemo = () => {
-    // Build demo URL: prefer explicit demoUrl, then generate from slug
     const demoUrl = (product as any).demoUrl;
     const slug = (product as any).slug;
     const liveUrl = demoUrl && !demoUrl.includes('github.com') 
@@ -135,17 +134,19 @@ export function MarketplaceProductCard({
         ? `https://${slug}.saasvala.com`
         : generateDemoUrl(product.title);
 
-    // Set demo info with credentials and open dialog
+    // Open live demo URL directly in new tab
+    window.open(liveUrl, '_blank', 'noopener,noreferrer');
+    toast.success(`Opening live demo for ${product.title}`);
+
+    // Also open credentials dialog so user knows login info
     setDemoOpen(true);
-    // We use a local computed approach — no async needed
-    (window as any).__currentDemoUrl = liveUrl;
 
     // Fire-and-forget activity log
     if (isUuid(product.id)) {
       supabase.from('activity_logs').insert({
         entity_type: 'demo',
         entity_id: product.id,
-        action: 'demo_credentials_shown',
+        action: 'demo_opened',
         performed_by: user?.id || null,
         details: { product_id: product.id, product_name: product.title, demo_url: liveUrl },
       });
