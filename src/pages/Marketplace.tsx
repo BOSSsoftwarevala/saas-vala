@@ -218,15 +218,15 @@ export default function Marketplace() {
     toast.success(`${label} copied!`);
   };
 
-  const handleFavorite = (product: Product) => {
+  const _handleFavorite = (product: Product) => {
     toast.success(`${product.title} added to favorites`);
   };
 
-  const handleNotify = (product: Product) => {
+  const _handleNotify = (product: Product) => {
     toast.success(`You'll be notified when ${product.title} launches`);
   };
 
-  const handleDownloadApk = (product: Product) => {
+  const _handleDownloadApk = (product: Product) => {
     if (!user) {
       toast.error('Please sign in to download APK');
       return;
