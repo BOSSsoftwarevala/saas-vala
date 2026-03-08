@@ -46,6 +46,7 @@ import LogisticsPwa from "./pages/LogisticsPwa";
 import FinancePwa from "./pages/FinancePwa";
 import InvestPwa from "./pages/InvestPwa";
 import ManufacturingPwa from "./pages/ManufacturingPwa";
+import ConstructionPwa from "./pages/ConstructionPwa";
 
 const queryClient = new QueryClient();
 
@@ -109,6 +110,7 @@ function AppRoutes() {
       <Route path="/finance-pwa" element={<FinancePwa />} />
       <Route path="/invest-pwa" element={<InvestPwa />} />
       <Route path="/manufacturing-pwa" element={<ManufacturingPwa />} />
+      <Route path="/construction-pwa" element={<ConstructionPwa />} />
 
       {/* Protected routes */}
       <Route
