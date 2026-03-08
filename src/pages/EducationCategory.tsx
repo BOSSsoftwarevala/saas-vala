@@ -2,7 +2,7 @@ import { useState, useRef, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
   Heart, Play, ShoppingCart, GraduationCap, Bell, Download,
-  Wallet, User, ArrowLeft, ChevronLeft, ChevronRight, Star, Box, ExternalLink
+  Wallet, User, ArrowLeft, ChevronLeft, ChevronRight, Star, Box
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
