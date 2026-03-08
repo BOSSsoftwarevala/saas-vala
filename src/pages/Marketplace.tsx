@@ -257,8 +257,13 @@ export default function Marketplace() {
         {/* ━━━ SECTION 7: REAL ESTATE & PROPERTY SERVICES ━━━ */}
         <RealEstateSection onBuyNow={handleBuyNow} />
 
-        {/* ━━━ DYNAMIC CATEGORY ROWS (Rows 8–40) ━━━ */}
-        {MARKETPLACE_CATEGORIES.filter(cat => cat.id !== 'healthcare' && cat.id !== 'real_estate').map((cat, idx) => (
+        <MarketplaceSectionDivider label="ecommerce" />
+
+        {/* ━━━ SECTION 8: E-COMMERCE & ONLINE MARKETPLACES ━━━ */}
+        <EcommerceSection onBuyNow={handleBuyNow} />
+
+        {/* ━━━ DYNAMIC CATEGORY ROWS (Rows 9–40) ━━━ */}
+        {MARKETPLACE_CATEGORIES.filter(cat => !['healthcare', 'real_estate', 'ecommerce'].includes(cat.id)).map((cat, idx) => (
           <motion.div key={cat.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: (idx + 6) * 0.03 }}>
             <MarketplaceCategoryRow category={cat} onBuyNow={handleBuyNow} />
             {idx < MARKETPLACE_CATEGORIES.length - 1 && (
