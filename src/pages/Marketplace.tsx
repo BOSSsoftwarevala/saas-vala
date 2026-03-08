@@ -110,6 +110,7 @@ export default function Marketplace() {
   const { purchaseApk, processing } = useApkPurchase();
   const { checkUserStatus } = useFraudDetection();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { allRows } = useMarketplaceProducts();
 
   const logPaymentAttempt = async (
