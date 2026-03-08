@@ -132,11 +132,10 @@ export function MarketplaceProductCard({
     return null;
   };
 
-  // Check if the URL can be embedded in iframe (not GitHub, not dead subdomain)
+  // Check if the URL can be embedded in iframe (not GitHub)
   const isIframeable = (url: string | null): boolean => {
     if (!url) return false;
     if (url.includes('github.com')) return false;
-    if (url.includes('saasvala.com')) return false; // subdomains not deployed
     return true;
   };
 
