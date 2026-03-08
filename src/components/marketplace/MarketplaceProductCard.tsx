@@ -396,7 +396,7 @@ export function MarketplaceProductCard({
       </motion.div>
 
       {/* ── LIVE DEMO iFrame DIALOG ── */}
-      <Dialog open={demoOpen} onOpenChange={setDemoOpen}>
+      <Dialog open={demoOpen} onOpenChange={(open) => { setDemoOpen(open); if (!open) setIframeLoaded(false); }}>
         <DialogContent className="max-w-4xl w-[95vw] h-[85vh] flex flex-col p-0 gap-0">
           <DialogHeader className="px-4 pt-4 pb-2 border-b border-border shrink-0">
             <DialogTitle className="flex items-center gap-2 text-base font-black uppercase">
