@@ -676,7 +676,7 @@ export default function Marketplace() {
                               <Copy className="h-3 w-3 inline mr-1" />Copy
                             </button>
                           </div>
-                          <p className="text-xs text-muted-foreground">Send ₹{selectedProduct?.price?.toLocaleString()} → enter Transaction ID below</p>
+                          <p className="text-xs text-muted-foreground">Send ${selectedProduct?.price} → enter Transaction ID below</p>
                           <Input placeholder="UPI Transaction ID" value={manualTxnRef} onChange={e => setManualTxnRef(e.target.value)} onClick={e => e.stopPropagation()} />
                           <Button className="w-full h-10" onClick={handleManualPayment} disabled={paymentSubmitting || !manualTxnRef.trim()}>
                             {paymentSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Submit UPI Payment'}

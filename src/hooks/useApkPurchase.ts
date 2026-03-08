@@ -118,6 +118,25 @@ export function useApkPurchase() {
         });
       }
 
+      // Step 6.5: Save license key to license_keys table (so user can see it on /keys page)
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30); // 30-day license
+      await supabase.from('license_keys').insert({
+        product_id: isGeneratedProduct ? null : product.id,
+        license_key: licenseKey,
+        key_type: 'monthly' as const,
+        status: 'active' as const,
+        owner_email: user.email || null,
+        owner_name: user.user_metadata?.full_name || null,
+        max_devices: 1,
+        activated_devices: 0,
+        activated_at: new Date().toISOString(),
+        expires_at: expiresAt.toISOString(),
+        created_by: user.id,
+        notes: `Purchased: ${product.title}`,
+        meta: { product_title: product.title, transaction_id: transaction.id, product_id: product.id }
+      });
+
       // Step 7: Create marketplace order (only for real DB products)
       if (!isGeneratedProduct) {
         await supabase
