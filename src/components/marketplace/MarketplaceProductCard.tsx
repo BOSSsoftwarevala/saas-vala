@@ -123,12 +123,7 @@ export function MarketplaceProductCard({
   // Helper: check if an ID looks like a valid UUID
   const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
-  // Generate a fallback GitHub URL from the product title/slug
-  const generateGitHubUrl = (title: string): string => {
-    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    return `https://github.com/saasvala/${slug}-software`;
-  };
-
+  // Generate a demo URL from the product title/slug
   // Generate demo URL from slug
   const generateDemoUrl = (title: string): string => {
     const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
