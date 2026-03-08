@@ -123,6 +123,12 @@ export function MarketplaceProductCard({
   // Helper: check if an ID looks like a valid UUID
   const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
+  // Generate a fallback GitHub URL from the product title/slug
+  const generateGitHubUrl = (title: string): string => {
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    return `https://github.com/saasvala/${slug}-software`;
+  };
+
   // ── REAL DEMO BUTTON ──
   const handleDemo = async () => {
     // If product has a github_repo or gitRepoUrl field, open it directly
@@ -150,14 +156,15 @@ export function MarketplaceProductCard({
       return;
     }
 
-    // For non-UUID (generated) products, skip DB queries
+    // For non-UUID (generated) products, use generated GitHub URL
     if (!isUuid(product.id)) {
-      setDemoOpen(true);
-      setDemoLoading(false);
-      setDemoInfo(null);
+      const fallbackUrl = generateGitHubUrl(product.title);
+      window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
+      toast.success(`Opening demo for ${product.title}`);
       return;
     }
 
+    // For UUID (DB) products, try DB lookup first, then fallback to generated URL
     setDemoLoading(true);
     setDemoOpen(true);
     setDemoInfo(null);
@@ -189,9 +196,10 @@ export function MarketplaceProductCard({
           });
         } catch { /* non-critical */ }
       } else {
+        // Check products table for demo_url
         const { data: productData } = await supabase
           .from('products')
-          .select('demo_url')
+          .select('demo_url, git_repo_url')
           .eq('id', product.id)
           .single();
 
@@ -201,13 +209,26 @@ export function MarketplaceProductCard({
             name: product.title + ' Demo',
             credentials: null,
           });
+        } else if (productData?.git_repo_url) {
+          // Open GitHub repo directly
+          setDemoOpen(false);
+          window.open(productData.git_repo_url, '_blank', 'noopener,noreferrer');
+          toast.success(`Opening demo for ${product.title}`);
         } else {
-          setDemoInfo(null);
+          // Fallback: generate GitHub URL from product name
+          const fallbackUrl = generateGitHubUrl(product.title);
+          setDemoOpen(false);
+          window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
+          toast.success(`Opening demo for ${product.title}`);
         }
       }
     } catch (err) {
       console.error('Demo fetch error:', err);
-      setDemoInfo(null);
+      // Even on error, open a generated GitHub URL
+      const fallbackUrl = generateGitHubUrl(product.title);
+      setDemoOpen(false);
+      window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
+      toast.success(`Opening demo for ${product.title}`);
     } finally {
       setDemoLoading(false);
     }
