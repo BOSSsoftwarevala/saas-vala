@@ -18,6 +18,7 @@ import { FinanceSection } from '@/components/marketplace/FinanceSection';
 import { MediaStreamingSection } from '@/components/marketplace/MediaStreamingSection';
 import { SocialMediaSection } from '@/components/marketplace/SocialMediaSection';
 import { AiAutomationSection } from '@/components/marketplace/AiAutomationSection';
+import { DevToolsSection } from '@/components/marketplace/DevToolsSection';
 import { MarketplaceSectionDivider } from '@/components/marketplace/MarketplaceSectionDivider';
 import { MarketplaceCategoryRow } from '@/components/marketplace/MarketplaceCategoryRow';
 import { MARKETPLACE_CATEGORIES } from '@/data/marketplaceCategories';
