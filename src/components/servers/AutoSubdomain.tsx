@@ -95,7 +95,7 @@ export function AutoSubdomain() {
         }
 
         setBulkResults([...allResults]);
-        toast.info(`📦 Processed ${Math.min(i + batchSize, allSaasValaRepos.length)}/${allSaasValaRepos.length} repos...`);
+        toast.info(`📦 Processed ${Math.min(i + batchSize, allRepos.length)}/${allRepos.length} repos...`);
       }
 
       const successCount = allResults.filter(r => r.success).length;
