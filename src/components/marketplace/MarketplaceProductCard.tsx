@@ -144,7 +144,7 @@ export function MarketplaceProductCard({
           action: 'github_demo_accessed',
           performed_by: user?.id || null,
           details: { product_id: product.id, product_name: product.title, github_repo: githubRepo },
-        }).then(() => {}).catch(() => {});
+        });
       }
       return;
     }
