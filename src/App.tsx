@@ -123,6 +123,7 @@ function AppRoutes() {
       <Route path="/social-pwa" element={<SocialPwa />} />
       <Route path="/ai-tools-pwa" element={<AiToolsPwa />} />
       <Route path="/devtools-pwa" element={<DevToolsPwa />} />
+      <Route path="/productivity-pwa" element={<ProductivityPwa />} />
       <Route path="/invest-pwa" element={<InvestPwa />} />
       <Route path="/manufacturing-pwa" element={<ManufacturingPwa />} />
       <Route path="/construction-pwa" element={<ConstructionPwa />} />
