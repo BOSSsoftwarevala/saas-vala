@@ -48,6 +48,7 @@ import InvestPwa from "./pages/InvestPwa";
 import ManufacturingPwa from "./pages/ManufacturingPwa";
 import ConstructionPwa from "./pages/ConstructionPwa";
 import AutomotivePwa from "./pages/AutomotivePwa";
+import AgriculturePwa from "./pages/AgriculturePwa";
 
 const queryClient = new QueryClient();
 
