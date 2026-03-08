@@ -48,9 +48,6 @@ function getCatStyle(cat: string) {
   return categoryColors[cat] || categoryColors.default;
 }
 
-// Demo credentials (global for all SaaS Vala products)
-const DEMO_EMAIL = 'demo@softwarevala.com';
-const DEMO_PASSWORD = 'Demo@2026';
 
 export function MarketplaceProductCard({
   product,
