@@ -61,7 +61,7 @@ export function MarketplaceProductCard({
   const [demoOpen, setDemoOpen] = useState(false);
   const [featuresOpen, setFeaturesOpen] = useState(false);
   const [demoLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [_showPassword, _setShowPassword] = useState(false);
   const { user } = useAuth();
 
   const isPipeline = !product.isAvailable || product.status === 'draft' || product.status === 'upcoming';
