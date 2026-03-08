@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   ShoppingCart, Bell, Heart, Star, Info,
-  Package, Play, Box, Copy, Eye, EyeOff, ExternalLink
+  Package, Play, Box, Copy, ExternalLink
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -60,8 +60,7 @@ export function MarketplaceProductCard({
   const [activeTab, setActiveTab] = useState<'features' | 'tech'>('features');
   const [demoOpen, setDemoOpen] = useState(false);
   const [featuresOpen, setFeaturesOpen] = useState(false);
-  const [demoLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
   const { user } = useAuth();
 
   const isPipeline = !product.isAvailable || product.status === 'draft' || product.status === 'upcoming';
@@ -118,28 +117,31 @@ export function MarketplaceProductCard({
   // Helper: check if an ID looks like a valid UUID
   const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
-  // Generate a demo/source URL from the product
-  const getCurrentDemoUrl = (): string => {
-    const gitRepo = (product as any).github_repo || (product as any).gitRepoUrl || (product as any).git_repo_url;
-    if (gitRepo) return gitRepo;
+  // Generate demo URL - prioritize live subdomain
+  const getDemoUrl = (): string => {
     const demoUrl = (product as any).demoUrl || (product as any).demo_url;
     if (demoUrl && demoUrl.startsWith('http')) return demoUrl;
     const slug = (product as any).slug || product.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    // Remove any business_type prefix from slug for cleaner GitHub URL
+    const cleanSlug = slug.replace(/^[a-z_]+-/, '');
+    return `https://${cleanSlug}.saasvala.com`;
+  };
+
+  const _getSourceUrl = (): string => {
+    const gitRepo = (product as any).github_repo || (product as any).gitRepoUrl || (product as any).git_repo_url;
+    if (gitRepo) return gitRepo;
+    const slug = (product as any).slug || product.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const cleanSlug = slug.replace(/^[a-z_]+-/, '');
     return `https://github.com/saasvala/${cleanSlug}`;
   };
 
   const handleDemo = () => {
-    const url = getCurrentDemoUrl();
-    window.open(url, '_blank', 'noopener,noreferrer');
-    toast.success(`Opening demo for ${product.title}`);
     setDemoOpen(true);
+    toast.success(`Loading live demo for ${product.title}`);
     if (isUuid(product.id)) {
       supabase.from('activity_logs').insert({
         entity_type: 'demo', entity_id: product.id, action: 'demo_opened',
         performed_by: user?.id || null,
-        details: { product_id: product.id, product_name: product.title, demo_url: url },
+        details: { product_id: product.id, product_name: product.title, demo_url: getDemoUrl() },
       });
     }
   };
@@ -352,10 +354,9 @@ export function MarketplaceProductCard({
                     variant="outline"
                     className="flex-1 h-10 text-[12px] font-bold gap-1.5 rounded-xl border-border hover:border-primary/50 hover:text-primary"
                     onClick={handleDemo}
-                    disabled={demoLoading}
                   >
                     <Play style={{ width: 14, height: 14 }} />
-                    {demoLoading ? 'LOADING...' : 'DEMO'}
+                    DEMO
                   </Button>
                   <Button
                     size="sm"
@@ -394,74 +395,59 @@ export function MarketplaceProductCard({
         </div>
       </motion.div>
 
-      {/* ── DEMO CREDENTIALS DIALOG ── */}
-      <Dialog open={demoOpen} onOpenChange={setDemoOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
+      {/* ── LIVE DEMO iFrame DIALOG ── */}
+      <Dialog open={demoOpen} onOpenChange={(open) => { setDemoOpen(open); if (!open) setIframeLoaded(false); }}>
+        <DialogContent className="max-w-4xl w-[95vw] h-[85vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-4 pt-4 pb-2 border-b border-border shrink-0">
             <DialogTitle className="flex items-center gap-2 text-base font-black uppercase">
               <Play className="text-primary" style={{ width: 18, height: 18 }} />
               {product.title} — Live Demo
             </DialogTitle>
-            <DialogDescription className="sr-only">Live demo credentials for {product.title}</DialogDescription>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Interactive preview • Login: demo@softwarevala.com / Demo@2026
+            </DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-col gap-4 py-2">
-            {/* Demo URL */}
-            <div className="rounded-xl border border-border/60 p-3 flex flex-col gap-2">
-              <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Live Demo URL</p>
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-mono text-primary flex-1 break-all">{getCurrentDemoUrl()}</p>
-                <Button size="sm" variant="outline" className="h-8 w-8 p-0 shrink-0" onClick={() => handleCopy(getCurrentDemoUrl(), 'URL')}>
-                  <Copy style={{ width: 13, height: 13 }} />
-                </Button>
-              </div>
-            </div>
-
-            {/* Credentials */}
-            <div className="rounded-xl border border-border/60 p-3 flex flex-col gap-3">
-              <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Demo Login Credentials</p>
-
-              <div className="flex flex-col gap-1">
-                <span className="text-[11px] text-muted-foreground">Email</span>
-                <div className="flex items-center gap-2">
-                  <code className="text-sm bg-muted px-2 py-1 rounded flex-1">demo@softwarevala.com</code>
-                  <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => handleCopy('demo@softwarevala.com', 'Email')}>
-                    <Copy style={{ width: 12, height: 12 }} />
-                  </Button>
+          {/* iFrame Demo */}
+          <div className="flex-1 relative bg-muted/30 overflow-hidden">
+            <iframe
+              src={getDemoUrl()}
+              className="w-full h-full border-0"
+              title={`${product.title} Live Demo`}
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+              loading="lazy"
+              onLoad={() => setIframeLoaded(true)}
+            />
+            {!iframeLoaded && (
+              <div className="absolute inset-0 flex items-center justify-center bg-background/80 pointer-events-none">
+                <div className="text-center space-y-2">
+                  <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+                  <p className="text-sm text-muted-foreground">Loading demo...</p>
                 </div>
               </div>
+            )}
+          </div>
 
-              <div className="flex flex-col gap-1">
-                <span className="text-[11px] text-muted-foreground">Password</span>
-                <div className="flex items-center gap-2">
-                  <code className="text-sm bg-muted px-2 py-1 rounded flex-1">
-                    {showPassword ? 'Demo@2026' : '••••••••'}
-                  </code>
-                  <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => setShowPassword(v => !v)}>
-                    {showPassword ? <EyeOff style={{ width: 12, height: 12 }} /> : <Eye style={{ width: 12, height: 12 }} />}
-                  </Button>
-                  <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => handleCopy('Demo@2026', 'Password')}>
-                    <Copy style={{ width: 12, height: 12 }} />
-                  </Button>
-                </div>
-              </div>
+          {/* Bottom bar */}
+          <div className="px-4 py-3 border-t border-border flex items-center gap-3 shrink-0 flex-wrap">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <code className="text-xs bg-muted px-2 py-1 rounded truncate max-w-[200px] md:max-w-[400px]">{getDemoUrl()}</code>
+              <Button size="sm" variant="outline" className="h-7 px-2 shrink-0" onClick={() => handleCopy(getDemoUrl(), 'Demo URL')}>
+                <Copy style={{ width: 12, height: 12 }} />
+              </Button>
             </div>
-
-            {/* Open Demo Button */}
-            <Button
-              className="w-full h-11 text-sm font-black gap-2"
-              onClick={() => {
-                window.open(getCurrentDemoUrl(), '_blank', 'noopener,noreferrer');
-                toast.success(`Opening live demo for ${product.title}`);
-              }}
-            >
-              <ExternalLink style={{ width: 15, height: 15 }} />
-              OPEN LIVE DEMO
-            </Button>
-
-            <p className="text-[10px] text-muted-foreground text-center">
-              ⚠️ Demo credentials are for evaluation only. Purchase to get your own license key & full source code.
-            </p>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => handleCopy('demo@softwarevala.com', 'Email')}>
+                📧 Copy Login
+              </Button>
+              <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => handleCopy('Demo@2026', 'Password')}>
+                🔑 Copy Password
+              </Button>
+              <Button size="sm" className="h-8 text-xs gap-1 font-bold" onClick={() => window.open(getDemoUrl(), '_blank', 'noopener,noreferrer')}>
+                <ExternalLink style={{ width: 13, height: 13 }} />
+                Open Full Screen
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
