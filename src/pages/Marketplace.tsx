@@ -395,10 +395,7 @@ export default function Marketplace() {
         {/* ━━━ SECTION 38: RECRUITMENT & JOB PLATFORMS ━━━ */}
         <RecruitmentJobSection onBuyNow={handleBuyNow} />
 
-        {/* ━━━ SECTION 39: TRAVEL & BOOKING PLATFORMS ━━━ */}
-        <TravelBookingSection onBuyNow={handleBuyNow} />
-
-        {/* ━━━ SECTION 40: REAL ESTATE & PROPERTY PLATFORMS ━━━ */}
+        {/* ━━━ SECTION 39: REAL ESTATE & PROPERTY PLATFORMS ━━━ */}
         <RealEstatePropertySection onBuyNow={handleBuyNow} />
 
         {/* ━━━ DYNAMIC CATEGORY ROWS (Rows 41+) ━━━ */}
