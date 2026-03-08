@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   ShoppingCart, Bell, Heart, Star, Info, Download,
-  Package, Play, Box, Copy, ExternalLink, AlertCircle
+  Package, Play, Box, Copy, ExternalLink
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
