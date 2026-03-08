@@ -34,10 +34,15 @@ export function useApkPurchase() {
     return `TXN-${cleanId.substring(0, 8)}-${cleanId.substring(cleanId.length - 4)}`;
   };
 
+  // Helper: check if an ID looks like a valid UUID
+  const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
   const purchaseApk = async (product: ApkProduct): Promise<PurchaseResult> => {
     if (!user) {
       return { success: false, error: 'Please sign in to download APK' };
     }
+
+    const isGeneratedProduct = !isUuid(product.id);
 
     setProcessing(true);
 
