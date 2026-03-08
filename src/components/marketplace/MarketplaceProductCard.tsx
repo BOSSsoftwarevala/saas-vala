@@ -117,19 +117,27 @@ export function MarketplaceProductCard({
   // Helper: check if an ID looks like a valid UUID
   const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
-  // Generate demo URL - prioritize explicit demo/git URLs
+  // Get the best available demo/source URL
   const getDemoUrl = (): string | null => {
-    // 1. Explicit demo URL from database
+    // 1. Explicit demo URL (actual deployed app — can iframe)
     const demoUrl = (product as any).demoUrl || (product as any).demo_url;
-    if (demoUrl && demoUrl.startsWith('http')) return demoUrl;
-    // 2. GitHub repo (real source code link — works as demo for open-source)
-    const gitRepo = (product as any).github_repo || (product as any).gitRepoUrl || (product as any).git_repo_url;
+    if (demoUrl && demoUrl.startsWith('http') && !demoUrl.includes('github.com') && !demoUrl.includes('saasvala.com')) return demoUrl;
+    // 2. GitHub repo URL (always works, opens in new tab)
+    const gitRepo = (product as any).github_repo || (product as any).gitRepoUrl || (product as any).git_repo_url || (product as any).githubUrl;
     if (gitRepo && gitRepo.startsWith('http')) return gitRepo;
-    // 3. APK URL means product exists but no web demo
-    const apkUrl = (product as any).apkUrl || (product as any).apk_url;
-    if (apkUrl) return null; // has APK but no web demo
-    // 4. No demo available for generated/placeholder products
+    // 3. Generate GitHub URL from slug if available
+    const slug = (product as any).slug;
+    if (slug) return `https://github.com/saasvala/${slug}`;
+    // 4. No demo available
     return null;
+  };
+
+  // Check if the URL can be embedded in iframe (not GitHub, not dead subdomain)
+  const isIframeable = (url: string | null): boolean => {
+    if (!url) return false;
+    if (url.includes('github.com')) return false;
+    if (url.includes('saasvala.com')) return false; // subdomains not deployed
+    return true;
   };
 
   const getApkUrl = (): string | null => {
