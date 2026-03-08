@@ -118,18 +118,27 @@ export function MarketplaceProductCard({
   const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
   // Generate a demo/source URL from the product
-  const getDemoUrl = (): string => {
-    // Priority 1: explicit GitHub repo URL
+  const getCurrentDemoUrl = (): string => {
     const gitRepo = (product as any).github_repo || (product as any).gitRepoUrl;
     if (gitRepo) return gitRepo;
-    
-    // Priority 2: explicit demoUrl that's a real link
     const demoUrl = (product as any).demoUrl;
     if (demoUrl && demoUrl.startsWith('http')) return demoUrl;
-    
-    // Priority 3: generate GitHub URL from slug
     const slug = (product as any).slug || product.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     return `https://github.com/saasvala/${slug}`;
+  };
+
+  const handleDemo = () => {
+    const url = getCurrentDemoUrl();
+    window.open(url, '_blank', 'noopener,noreferrer');
+    toast.success(`Opening demo for ${product.title}`);
+    setDemoOpen(true);
+    if (isUuid(product.id)) {
+      supabase.from('activity_logs').insert({
+        entity_type: 'demo', entity_id: product.id, action: 'demo_opened',
+        performed_by: user?.id || null,
+        details: { product_id: product.id, product_name: product.title, demo_url: url },
+      });
+    }
   };
 
   const handleCopy = (text: string, label: string) => {
