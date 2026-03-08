@@ -44,6 +44,7 @@ import HospitalityPwa from "./pages/HospitalityPwa";
 import TransportPwa from "./pages/TransportPwa";
 import LogisticsPwa from "./pages/LogisticsPwa";
 import FinancePwa from "./pages/FinancePwa";
+import MediaPwa from "./pages/MediaPwa";
 import InvestPwa from "./pages/InvestPwa";
 import ManufacturingPwa from "./pages/ManufacturingPwa";
 import ConstructionPwa from "./pages/ConstructionPwa";
@@ -114,6 +115,7 @@ function AppRoutes() {
       <Route path="/transport-pwa" element={<TransportPwa />} />
       <Route path="/logistics-pwa" element={<LogisticsPwa />} />
       <Route path="/finance-pwa" element={<FinancePwa />} />
+      <Route path="/media-pwa" element={<MediaPwa />} />
       <Route path="/invest-pwa" element={<InvestPwa />} />
       <Route path="/manufacturing-pwa" element={<ManufacturingPwa />} />
       <Route path="/construction-pwa" element={<ConstructionPwa />} />
