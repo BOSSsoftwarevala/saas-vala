@@ -2575,8 +2575,116 @@ async function executeGenerateCode(args: any, supabase: any): Promise<ToolResult
       repoUrl = rd.html_url;
     }
 
-    // Step 2: Use provided files or generate template files
-    const filesToPush = providedFiles || generateTemplateFiles(project_type, project_name, description, features);
+    // Step 2: Generate REAL code using AI if no files provided
+    let filesToPush = providedFiles;
+
+    if (!filesToPush || filesToPush.length === 0) {
+      console.log(`[TOOL] No files provided — generating real code via AI for ${project_type} project`);
+
+      // Try OpenAI first, then Lovable AI Gateway
+      const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') ?? '';
+      const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY') ?? '';
+
+      const codeGenPrompt = `You are a senior full-stack developer. Generate a COMPLETE, PRODUCTION-READY ${project_type} project.
+
+PROJECT: ${project_name}
+DESCRIPTION: ${description}
+FEATURES: ${features.join(', ') || 'Standard CRUD, Authentication, Dashboard, API'}
+TYPE: ${project_type}
+
+REQUIREMENTS:
+- Generate REAL working code, NOT placeholder or boilerplate
+- Include proper error handling, input validation, and security
+- Include proper package.json with all dependencies
+- Include proper README with setup instructions
+- Include at least 8-15 files for a complete project
+- For React: Include components, pages, hooks, utils, styles, routing
+- For Node/Express: Include routes, controllers, middleware, models, config
+- For PHP: Include classes, views, config, database schema
+- For Python: Include app, routes, models, templates, requirements.txt
+
+RESPOND WITH ONLY a valid JSON array of file objects. No markdown, no explanation.
+Format: [{"path": "src/App.tsx", "content": "actual code here"}, ...]`;
+
+      let aiGeneratedFiles: { path: string; content: string }[] | null = null;
+
+      // Try OpenAI
+      if (OPENAI_API_KEY) {
+        try {
+          console.log('[TOOL] Generating code via OpenAI...');
+          const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'gpt-4o',
+              messages: [{ role: 'user', content: codeGenPrompt }],
+              max_tokens: 16384,
+              temperature: 0.2,
+              response_format: { type: 'json_object' },
+            }),
+          });
+          if (aiRes.ok) {
+            const aiData = await aiRes.json();
+            const rawContent = aiData.choices?.[0]?.message?.content || '';
+            try {
+              const parsed = JSON.parse(rawContent);
+              aiGeneratedFiles = Array.isArray(parsed) ? parsed : (parsed.files || []);
+              console.log(`[TOOL] OpenAI generated ${aiGeneratedFiles?.length || 0} files`);
+            } catch (parseErr) {
+              console.warn('[TOOL] Failed to parse OpenAI response as JSON:', parseErr);
+            }
+          } else {
+            console.warn(`[TOOL] OpenAI code gen failed: ${aiRes.status}`);
+          }
+        } catch (e) {
+          console.warn('[TOOL] OpenAI code gen error:', e);
+        }
+      }
+
+      // Fallback to Lovable AI Gateway
+      if (!aiGeneratedFiles && LOVABLE_API_KEY) {
+        try {
+          console.log('[TOOL] Generating code via Lovable AI Gateway...');
+          const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'google/gemini-2.5-flash',
+              messages: [{ role: 'user', content: codeGenPrompt }],
+              max_tokens: 16384,
+              temperature: 0.2,
+            }),
+          });
+          if (aiRes.ok) {
+            const aiData = await aiRes.json();
+            const rawContent = aiData.choices?.[0]?.message?.content || '';
+            // Extract JSON from response (may have markdown wrapping)
+            const jsonMatch = rawContent.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+              try {
+                aiGeneratedFiles = JSON.parse(jsonMatch[0]);
+                console.log(`[TOOL] Lovable AI generated ${aiGeneratedFiles?.length || 0} files`);
+              } catch (parseErr) {
+                console.warn('[TOOL] Failed to parse Lovable AI response:', parseErr);
+              }
+            }
+          } else {
+            console.warn(`[TOOL] Lovable AI code gen failed: ${aiRes.status}`);
+          }
+        } catch (e) {
+          console.warn('[TOOL] Lovable AI code gen error:', e);
+        }
+      }
+
+      // Use AI-generated files or fallback to enhanced templates
+      if (aiGeneratedFiles && aiGeneratedFiles.length > 0) {
+        filesToPush = aiGeneratedFiles;
+        console.log(`[TOOL] Using ${filesToPush.length} AI-generated files`);
+      } else {
+        console.warn('[TOOL] AI code gen failed, using template fallback');
+        filesToPush = generateTemplateFiles(project_type, project_name, description, features);
+      }
+    }
 
     // Step 3: Push all files via Contents API
     const pushed: string[] = [];
@@ -2584,7 +2692,6 @@ async function executeGenerateCode(args: any, supabase: any): Promise<ToolResult
     
     for (const f of filesToPush) {
       try {
-        // Check if exists (need SHA for update)
         const existRes = await fetch(`https://api.github.com/repos/${account}/${repoName}/contents/${f.path}`, { headers: ghHeaders });
         const putBody: any = {
           message: `Add ${f.path} via VALA AI`,
@@ -2617,14 +2724,16 @@ async function executeGenerateCode(args: any, supabase: any): Promise<ToolResult
       status: 'uploaded', uploaded_at: new Date().toISOString()
     }, { onConflict: 'slug' });
 
+    const aiGenerated = !providedFiles || providedFiles.length === 0;
     return {
       tool_call_id: '',
       content: JSON.stringify({
         success: true, project: repoName, type: project_type, url: repoUrl, account,
         files_pushed: pushed.length, pushed_files: pushed,
+        ai_generated: aiGenerated,
         errors: errors.length > 0 ? errors : undefined,
         latest_commit: latestCommit,
-        message: `✅ ${pushed.length} files created and pushed to ${repoUrl}`
+        message: `✅ ${pushed.length} ${aiGenerated ? 'AI-generated' : 'custom'} files created and pushed to ${repoUrl}`
       }, null, 2),
       success: true
     };
