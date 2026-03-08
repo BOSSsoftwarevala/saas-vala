@@ -876,7 +876,6 @@ export function generateCategoryProducts(
     if (usedTitles.has(name)) continue;
     usedTitles.add(name);
 
-    const meta = getProductGitHubMeta(categoryId, i);
     products.push({
       id: `gen-${categoryId}-${i}`,
       title: name,
@@ -888,8 +887,8 @@ export function generateCategoryProducts(
       techStack: defaultTechStack,
       category: categoryLabel,
       businessType: categoryId,
-      gitRepoUrl: meta.github,
-      demoUrl: meta.demo,
+      gitRepoUrl: undefined,
+      demoUrl: undefined,
       featured: i < 3,
       trending: i < 5,
       isAvailable: true,
