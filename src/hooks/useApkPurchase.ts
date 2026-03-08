@@ -105,29 +105,33 @@ export function useApkPurchase() {
         .update({ balance: newBalance, updated_at: new Date().toISOString() })
         .eq('id', wallet.id);
 
-      // Step 6: Create APK download record
-      await supabase.from('apk_downloads').insert({
-        user_id: user.id,
-        product_id: product.id,
-        transaction_id: transaction.id,
-        license_key: licenseKey,
-        is_verified: true,
-        verification_attempts: 0,
-        is_blocked: false
-      });
-
-      // Step 7: Create marketplace order
-      await supabase
-        .from('marketplace_orders')
-        .insert({
-          buyer_id: user.id,
-          seller_id: user.id,
-          amount: product.price,
-          status: 'completed',
-          payment_method: 'wallet',
+      // Step 6: Create APK download record (only for real DB products)
+      if (!isGeneratedProduct) {
+        await supabase.from('apk_downloads').insert({
+          user_id: user.id,
+          product_id: product.id,
           transaction_id: transaction.id,
-          completed_at: new Date().toISOString()
+          license_key: licenseKey,
+          is_verified: true,
+          verification_attempts: 0,
+          is_blocked: false
         });
+      }
+
+      // Step 7: Create marketplace order (only for real DB products)
+      if (!isGeneratedProduct) {
+        await supabase
+          .from('marketplace_orders')
+          .insert({
+            buyer_id: user.id,
+            seller_id: user.id,
+            amount: product.price,
+            status: 'completed',
+            payment_method: 'wallet',
+            transaction_id: transaction.id,
+            completed_at: new Date().toISOString()
+          });
+      }
 
       // Step 8: Log activity
       await supabase.from('activity_logs').insert({
@@ -140,7 +144,8 @@ export function useApkPurchase() {
           product_title: product.title,
           license_key: licenseKey,
           amount: product.price,
-          transaction_id: transaction.id
+          transaction_id: transaction.id,
+          is_generated: isGeneratedProduct
         }
       });
 
