@@ -21,6 +21,7 @@ import {
   FileText,
   Activity,
   Bot,
+  Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import saasValaLogo from '@/assets/saas-vala-logo.jpg';
