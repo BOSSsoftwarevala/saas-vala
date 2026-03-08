@@ -119,12 +119,14 @@ export function MarketplaceProductCard({
 
   // Generate a demo/source URL from the product
   const getCurrentDemoUrl = (): string => {
-    const gitRepo = (product as any).github_repo || (product as any).gitRepoUrl;
+    const gitRepo = (product as any).github_repo || (product as any).gitRepoUrl || (product as any).git_repo_url;
     if (gitRepo) return gitRepo;
-    const demoUrl = (product as any).demoUrl;
+    const demoUrl = (product as any).demoUrl || (product as any).demo_url;
     if (demoUrl && demoUrl.startsWith('http')) return demoUrl;
     const slug = (product as any).slug || product.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    return `https://github.com/saasvala/${slug}`;
+    // Remove any business_type prefix from slug for cleaner GitHub URL
+    const cleanSlug = slug.replace(/^[a-z_]+-/, '');
+    return `https://github.com/saasvala/${cleanSlug}`;
   };
 
   const handleDemo = () => {
