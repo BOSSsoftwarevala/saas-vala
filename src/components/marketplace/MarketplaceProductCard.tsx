@@ -14,6 +14,7 @@ import type { MarketplaceProduct } from '@/hooks/useMarketplaceProducts';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -463,6 +464,7 @@ export function MarketplaceProductCard({
               <Play className="text-primary" style={{ width: 18, height: 18 }} />
               {product.title} — Live Demo
             </DialogTitle>
+            <DialogDescription className="sr-only">Live demo details for {product.title}</DialogDescription>
           </DialogHeader>
 
           {demoLoading ? (

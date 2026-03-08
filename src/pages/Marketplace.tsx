@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MarketplaceHeader } from '@/components/marketplace/MarketplaceHeader';
 import { ProductSlider } from '@/components/marketplace/ProductSlider';
@@ -109,6 +110,7 @@ export default function Marketplace() {
   const { purchaseApk, processing } = useApkPurchase();
   const { checkUserStatus } = useFraudDetection();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { allRows } = useMarketplaceProducts();
 
   const logPaymentAttempt = async (
@@ -395,10 +397,7 @@ export default function Marketplace() {
         {/* ━━━ SECTION 38: RECRUITMENT & JOB PLATFORMS ━━━ */}
         <RecruitmentJobSection onBuyNow={handleBuyNow} />
 
-        {/* ━━━ SECTION 39: TRAVEL & BOOKING PLATFORMS ━━━ */}
-        <TravelBookingSection onBuyNow={handleBuyNow} />
-
-        {/* ━━━ SECTION 40: REAL ESTATE & PROPERTY PLATFORMS ━━━ */}
+        {/* ━━━ SECTION 39: REAL ESTATE & PROPERTY PLATFORMS ━━━ */}
         <RealEstatePropertySection onBuyNow={handleBuyNow} />
 
         {/* ━━━ DYNAMIC CATEGORY ROWS (Rows 41+) ━━━ */}
@@ -817,7 +816,7 @@ export default function Marketplace() {
                       </div>
                     )}
                   </div>
-                  <Button className="w-full gap-2">
+                  <Button className="w-full gap-2" onClick={() => { setShowPayment(false); navigate('/keys'); }}>
                     <Download className="h-4 w-4" />
                     Download Now
                   </Button>
