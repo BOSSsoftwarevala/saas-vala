@@ -121,6 +121,23 @@ export function MarketplaceProductCard({
 
   // ── REAL DEMO BUTTON ──
   const handleDemo = async () => {
+    // If product has a github_repo field, open it directly
+    const githubRepo = (product as any).github_repo;
+    if (githubRepo) {
+      window.open(githubRepo, '_blank', 'noopener,noreferrer');
+      // Log demo access (fire and forget)
+      try {
+        await supabase.from('activity_logs').insert({
+          entity_type: 'demo',
+          entity_id: product.id,
+          action: 'github_demo_accessed',
+          performed_by: user?.id || null,
+          details: { product_id: product.id, product_name: product.title, github_repo: githubRepo },
+        });
+      } catch { /* non-critical */ }
+      return;
+    }
+
     setDemoLoading(true);
     setDemoOpen(true);
     setDemoInfo(null);
