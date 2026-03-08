@@ -139,7 +139,7 @@ export function MarketplaceProductCard({
     return true;
   };
 
-  const getApkUrl = (): string | null => {
+  const _getApkUrl = (): string | null => {
     return (product as any).apkUrl || (product as any).apk_url || null;
   };
 

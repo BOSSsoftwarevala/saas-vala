@@ -819,7 +819,7 @@ export default function Marketplace() {
                   <Button className="w-full gap-2" onClick={async () => {
                     if (selectedProduct && generatedLicenseKey) {
                       try {
-                        const { data, error } = await supabase.functions.invoke('download-apk', {
+                        const { data } = await supabase.functions.invoke('download-apk', {
                           body: { product_id: selectedProduct.id, license_key: generatedLicenseKey },
                         });
                         if (data?.success && data?.download_url) {
