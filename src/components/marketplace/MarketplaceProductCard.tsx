@@ -64,8 +64,8 @@ export function MarketplaceProductCard({
   const [notified, setNotified] = useState(false);
   const [activeTab, setActiveTab] = useState<'features' | 'tech'>('features');
   const [demoOpen, setDemoOpen] = useState(false);
-  const [demoLoading, setDemoLoading] = useState(false);
-  const [demoInfo, setDemoInfo] = useState<DemoInfo | null>(null);
+  const [demoLoading] = useState(false);
+  const [demoInfo] = useState<DemoInfo | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const { user } = useAuth();
 
