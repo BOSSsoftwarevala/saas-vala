@@ -21,6 +21,7 @@ import { AiAutomationSection } from '@/components/marketplace/AiAutomationSectio
 import { DevToolsSection } from '@/components/marketplace/DevToolsSection';
 import { ProductivitySection } from '@/components/marketplace/ProductivitySection';
 import { CybersecuritySection } from '@/components/marketplace/CybersecuritySection';
+import { DataAnalyticsSection } from '@/components/marketplace/DataAnalyticsSection';
 import { MarketplaceSectionDivider } from '@/components/marketplace/MarketplaceSectionDivider';
 import { MarketplaceCategoryRow } from '@/components/marketplace/MarketplaceCategoryRow';
 import { MARKETPLACE_CATEGORIES } from '@/data/marketplaceCategories';
@@ -318,8 +319,11 @@ export default function Marketplace() {
         {/* ━━━ SECTION 19: CYBERSECURITY & PRIVACY ━━━ */}
         <CybersecuritySection onBuyNow={handleBuyNow} />
 
-        {/* ━━━ DYNAMIC CATEGORY ROWS (Rows 20–40) ━━━ */}
-        {MARKETPLACE_CATEGORIES.filter(cat => !['healthcare', 'real_estate', 'ecommerce', 'retail', 'restaurant', 'hotel', 'transport', 'finance', 'media_gaming', 'marketing', 'ai_automation', 'cloud_devops', 'it_software', 'cybersecurity'].includes(cat.id)).map((cat, idx) => (
+        {/* ━━━ SECTION 20: DATA ANALYTICS & BI ━━━ */}
+        <DataAnalyticsSection onBuyNow={handleBuyNow} />
+
+        {/* ━━━ DYNAMIC CATEGORY ROWS (Rows 21–40) ━━━ */}
+        {MARKETPLACE_CATEGORIES.filter(cat => !['healthcare', 'real_estate', 'ecommerce', 'retail', 'restaurant', 'hotel', 'transport', 'finance', 'media_gaming', 'marketing', 'ai_automation', 'cloud_devops', 'it_software', 'cybersecurity', 'investment'].includes(cat.id)).map((cat, idx) => (
           <motion.div key={cat.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: (idx + 6) * 0.03 }}>
             <MarketplaceCategoryRow category={cat} onBuyNow={handleBuyNow} />
             {idx < MARKETPLACE_CATEGORIES.length - 1 && (
