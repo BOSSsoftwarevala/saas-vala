@@ -13,20 +13,19 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* Ambient background effects */}
+      {/* Subtle premium background */}
       <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute inset-0 bg-mesh-gradient opacity-60" />
-        <div className="absolute inset-0 grid-bg-dots opacity-40" />
+        <div className="absolute inset-0 bg-mesh-gradient opacity-40" />
         <div 
-          className="absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full opacity-[0.04]"
+          className="absolute -top-40 -right-40 w-[600px] h-[600px] rounded-full opacity-[0.03]"
           style={{
-            background: 'radial-gradient(circle, hsl(25, 95%, 53%) 0%, transparent 70%)',
+            background: 'radial-gradient(circle, hsl(215, 75%, 42%) 0%, transparent 70%)',
           }}
         />
         <div 
-          className="absolute -bottom-40 -right-40 w-[500px] h-[500px] rounded-full opacity-[0.03]"
+          className="absolute -bottom-40 -left-40 w-[500px] h-[500px] rounded-full opacity-[0.02]"
           style={{
-            background: 'radial-gradient(circle, hsl(187, 85%, 53%) 0%, transparent 70%)',
+            background: 'radial-gradient(circle, hsl(195, 85%, 45%) 0%, transparent 70%)',
           }}
         />
       </div>
