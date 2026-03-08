@@ -118,28 +118,31 @@ export function MarketplaceProductCard({
   // Helper: check if an ID looks like a valid UUID
   const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
-  // Generate a demo/source URL from the product
-  const getCurrentDemoUrl = (): string => {
-    const gitRepo = (product as any).github_repo || (product as any).gitRepoUrl || (product as any).git_repo_url;
-    if (gitRepo) return gitRepo;
+  // Generate demo URL - prioritize live subdomain
+  const getDemoUrl = (): string => {
     const demoUrl = (product as any).demoUrl || (product as any).demo_url;
     if (demoUrl && demoUrl.startsWith('http')) return demoUrl;
     const slug = (product as any).slug || product.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    // Remove any business_type prefix from slug for cleaner GitHub URL
+    const cleanSlug = slug.replace(/^[a-z_]+-/, '');
+    return `https://${cleanSlug}.saasvala.com`;
+  };
+
+  const getSourceUrl = (): string => {
+    const gitRepo = (product as any).github_repo || (product as any).gitRepoUrl || (product as any).git_repo_url;
+    if (gitRepo) return gitRepo;
+    const slug = (product as any).slug || product.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const cleanSlug = slug.replace(/^[a-z_]+-/, '');
     return `https://github.com/saasvala/${cleanSlug}`;
   };
 
   const handleDemo = () => {
-    const url = getCurrentDemoUrl();
-    window.open(url, '_blank', 'noopener,noreferrer');
-    toast.success(`Opening demo for ${product.title}`);
     setDemoOpen(true);
+    toast.success(`Loading live demo for ${product.title}`);
     if (isUuid(product.id)) {
       supabase.from('activity_logs').insert({
         entity_type: 'demo', entity_id: product.id, action: 'demo_opened',
         performed_by: user?.id || null,
-        details: { product_id: product.id, product_name: product.title, demo_url: url },
+        details: { product_id: product.id, product_name: product.title, demo_url: getDemoUrl() },
       });
     }
   };
