@@ -443,44 +443,60 @@ export function MarketplaceProductCard({
 
           {/* iFrame Demo */}
           <div className="flex-1 relative bg-muted/30 overflow-hidden">
-            <iframe
-              src={getDemoUrl()}
-              className="w-full h-full border-0"
-              title={`${product.title} Live Demo`}
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-              loading="lazy"
-              onLoad={() => setIframeLoaded(true)}
-            />
-            {!iframeLoaded && (
-              <div className="absolute inset-0 flex items-center justify-center bg-background/80 pointer-events-none">
-                <div className="text-center space-y-2">
-                  <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-                  <p className="text-sm text-muted-foreground">Loading demo...</p>
+            {getDemoUrl() ? (
+              <>
+                <iframe
+                  src={getDemoUrl()!}
+                  className="w-full h-full border-0"
+                  title={`${product.title} Live Demo`}
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                  loading="lazy"
+                  onLoad={() => setIframeLoaded(true)}
+                />
+                {!iframeLoaded && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-background/80 pointer-events-none">
+                    <div className="text-center space-y-2">
+                      <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+                      <p className="text-sm text-muted-foreground">Loading demo...</p>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center space-y-3 p-8">
+                  <div className="text-5xl">🚧</div>
+                  <p className="text-lg font-bold text-foreground">Live demo will be available soon</p>
+                  <p className="text-sm text-muted-foreground">This product is being prepared for launch. Check back later!</p>
                 </div>
               </div>
             )}
           </div>
 
           {/* Bottom bar */}
-          <div className="px-4 py-3 border-t border-border flex items-center gap-3 shrink-0 flex-wrap">
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              <code className="text-xs bg-muted px-2 py-1 rounded truncate max-w-[200px] md:max-w-[400px]">{getDemoUrl()}</code>
-              <Button size="sm" variant="outline" className="h-7 px-2 shrink-0" onClick={() => handleCopy(getDemoUrl(), 'Demo URL')}>
-                <Copy style={{ width: 12, height: 12 }} />
-              </Button>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => handleCopy('demo@softwarevala.com', 'Email')}>
-                📧 Copy Login
-              </Button>
-              <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => handleCopy('Demo@2026', 'Password')}>
-                🔑 Copy Password
-              </Button>
-              <Button size="sm" className="h-8 text-xs gap-1 font-bold" onClick={() => window.open(getDemoUrl(), '_blank', 'noopener,noreferrer')}>
-                <ExternalLink style={{ width: 13, height: 13 }} />
-                Open Full Screen
-              </Button>
-            </div>
+          <div className="px-4 py-3 border-t border-border flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 shrink-0">
+            {getDemoUrl() && (
+              <>
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <code className="text-xs bg-muted px-2 py-1 rounded truncate max-w-[200px] md:max-w-[400px]">{getDemoUrl()}</code>
+                  <Button size="sm" variant="outline" className="h-7 px-2 shrink-0" onClick={() => handleCopy(getDemoUrl()!, 'Demo URL')}>
+                    <Copy style={{ width: 12, height: 12 }} />
+                  </Button>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => handleCopy('demo@softwarevala.com', 'Email')}>
+                    📧 Copy Login
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => handleCopy('Demo@2026', 'Password')}>
+                    🔑 Copy Password
+                  </Button>
+                  <Button size="sm" className="h-8 text-xs gap-1 font-bold" onClick={() => window.open(getDemoUrl()!, '_blank', 'noopener,noreferrer')}>
+                    <ExternalLink style={{ width: 13, height: 13 }} />
+                    Open Full Screen
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>
