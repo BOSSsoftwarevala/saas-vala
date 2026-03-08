@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -11,7 +11,7 @@ interface SectionSliderProps {
  * Reusable horizontal slider with left/right arrow navigation.
  * Wraps any horizontally scrollable card list.
  */
-export function SectionSlider({ children, className }: SectionSliderProps) {
+export const SectionSlider = React.forwardRef<HTMLDivElement, SectionSliderProps>(({ children, className }, ref) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
@@ -120,4 +120,5 @@ export function SectionSlider({ children, className }: SectionSliderProps) {
       )}
     </div>
   );
-}
+});
+SectionSlider.displayName = 'SectionSlider';

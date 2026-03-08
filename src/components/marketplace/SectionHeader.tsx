@@ -1,3 +1,4 @@
+import React from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,7 +25,7 @@ const badgeStyles = {
   top: 'bg-primary text-primary-foreground',
 };
 
-export function SectionHeader({
+export const SectionHeader = React.forwardRef<HTMLDivElement, SectionHeaderProps>(({
   icon,
   title,
   subtitle,
@@ -33,9 +34,9 @@ export function SectionHeader({
   totalCount,
   onViewAll,
   accentColor,
-}: SectionHeaderProps) {
+}, ref) => {
   return (
-    <div className="px-4 md:px-8 mb-5 flex items-start justify-between">
+    <div ref={ref} className="px-4 md:px-8 mb-5 flex items-start justify-between">
       <div>
         <div className="flex items-center gap-3 mb-1">
           <span className="text-2xl">{icon}</span>
@@ -76,4 +77,5 @@ export function SectionHeader({
       )}
     </div>
   );
-}
+});
+SectionHeader.displayName = 'SectionHeader';
