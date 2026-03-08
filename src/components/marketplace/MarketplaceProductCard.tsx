@@ -374,11 +374,14 @@ export function MarketplaceProductCard({
                   <Button
                     size="sm"
                     variant="outline"
-                    className="flex-1 h-10 text-[12px] font-bold gap-1.5 rounded-xl border-border hover:border-primary/50 hover:text-primary"
+                    className={cn(
+                      "flex-1 h-10 text-[12px] font-bold gap-1.5 rounded-xl border-border",
+                      hasDemoAvailable ? "hover:border-primary/50 hover:text-primary" : "opacity-70"
+                    )}
                     onClick={handleDemo}
                   >
                     <Play style={{ width: 14, height: 14 }} />
-                    DEMO
+                    {hasDemoAvailable ? 'DEMO' : 'DEMO SOON'}
                   </Button>
                   <Button
                     size="sm"
