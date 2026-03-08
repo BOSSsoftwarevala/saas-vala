@@ -112,10 +112,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
           console.error('Error fetching role:', error);
           setRole(null);
+          setRoleLoading(false);
           return;
         }
 
         setRole(data?.role as AppRole);
+        setRoleLoading(false);
         return;
       } catch (err) {
         if (attempt < retries) {
@@ -124,6 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         console.error('Error in fetchUserRole:', err);
         setRole(null);
+        setRoleLoading(false);
       }
     }
     setRoleLoading(false);
