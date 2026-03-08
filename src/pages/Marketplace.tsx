@@ -34,6 +34,7 @@ import { LogisticsDeliverySection } from '@/components/marketplace/LogisticsDeli
 import { IoTSmartDeviceSection } from '@/components/marketplace/IoTSmartDeviceSection';
 import { BlockchainWeb3Section } from '@/components/marketplace/BlockchainWeb3Section';
 import { DesignCreativeSection } from '@/components/marketplace/DesignCreativeSection';
+import { TravelBookingSection } from '@/components/marketplace/TravelBookingSection';
 import { MarketplaceSectionDivider } from '@/components/marketplace/MarketplaceSectionDivider';
 import { MarketplaceCategoryRow } from '@/components/marketplace/MarketplaceCategoryRow';
 import { MARKETPLACE_CATEGORIES } from '@/data/marketplaceCategories';
