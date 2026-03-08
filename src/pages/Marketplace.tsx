@@ -387,8 +387,11 @@ export default function Marketplace() {
         {/* ━━━ SECTION 36: EDUCATION & E-LEARNING PLATFORMS ━━━ */}
         <EducationElearningSection onBuyNow={handleBuyNow} />
 
-        {/* ━━━ DYNAMIC CATEGORY ROWS (Rows 37–40) ━━━ */}
-        {MARKETPLACE_CATEGORIES.filter(cat => !['healthcare', 'real_estate', 'ecommerce', 'retail', 'restaurant', 'hotel', 'transport', 'finance', 'media_gaming', 'marketing', 'ai_automation', 'cloud_devops', 'it_software', 'cybersecurity', 'investment', 'logistics', 'manufacturing', 'construction', 'automotive', 'agriculture', 'energy', 'telecom', 'legal', 'beauty_fashion', 'home_services', 'security_systems', 'government', 'gym_sports', 'research', 'environment', 'mining'].includes(cat.id)).map((cat, idx) => (
+        {/* ━━━ SECTION 37: FINANCE & FINTECH PLATFORMS ━━━ */}
+        <FinanceFintechSection onBuyNow={handleBuyNow} />
+
+        {/* ━━━ DYNAMIC CATEGORY ROWS (Rows 38–40) ━━━ */}
+        {MARKETPLACE_CATEGORIES.filter(cat => !['healthcare', 'real_estate', 'ecommerce', 'retail', 'restaurant', 'hotel', 'transport', 'finance', 'media_gaming', 'marketing', 'ai_automation', 'cloud_devops', 'it_software', 'cybersecurity', 'investment', 'logistics', 'manufacturing', 'construction', 'automotive', 'agriculture', 'energy', 'telecom', 'legal', 'beauty_fashion', 'home_services', 'security_systems', 'government', 'gym_sports', 'research', 'environment', 'mining', 'wholesale'].includes(cat.id)).map((cat, idx) => (
           <motion.div key={cat.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: (idx + 6) * 0.03 }}>
             <MarketplaceCategoryRow category={cat} onBuyNow={handleBuyNow} />
             {idx < MARKETPLACE_CATEGORIES.length - 1 && (
