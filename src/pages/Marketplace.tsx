@@ -631,7 +631,7 @@ export default function Marketplace() {
                     {paymentSubmitting || processing ? (
                       <><Loader2 className="h-4 w-4 animate-spin" /> Processing... Do not close</>
                     ) : (
-                      <><ShoppingCart className="h-4 w-4" /> Pay ₹{selectedProduct?.price?.toLocaleString()} from Wallet</>
+                      <><ShoppingCart className="h-4 w-4" /> Pay ${selectedProduct?.price} from Wallet</>
                     )}
                   </Button>
                 )}
