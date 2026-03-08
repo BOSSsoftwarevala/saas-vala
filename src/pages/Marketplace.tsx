@@ -16,6 +16,7 @@ import { HospitalitySection } from '@/components/marketplace/HospitalitySection'
 import { TransportationSection } from '@/components/marketplace/TransportationSection';
 import { FinanceSection } from '@/components/marketplace/FinanceSection';
 import { MediaStreamingSection } from '@/components/marketplace/MediaStreamingSection';
+import { SocialMediaSection } from '@/components/marketplace/SocialMediaSection';
 import { MarketplaceSectionDivider } from '@/components/marketplace/MarketplaceSectionDivider';
 import { MarketplaceCategoryRow } from '@/components/marketplace/MarketplaceCategoryRow';
 import { MARKETPLACE_CATEGORIES } from '@/data/marketplaceCategories';
