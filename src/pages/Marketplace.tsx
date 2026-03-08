@@ -29,6 +29,7 @@ import { GamingPlatformSection } from '@/components/marketplace/GamingPlatformSe
 import { MarketingGrowthSection } from '@/components/marketplace/MarketingGrowthSection';
 import { CustomerSupportSection } from '@/components/marketplace/CustomerSupportSection';
 import { HrRecruitmentSection } from '@/components/marketplace/HrRecruitmentSection';
+import { LegalTechSection } from '@/components/marketplace/LegalTechSection';
 import { MarketplaceSectionDivider } from '@/components/marketplace/MarketplaceSectionDivider';
 import { MarketplaceCategoryRow } from '@/components/marketplace/MarketplaceCategoryRow';
 import { MARKETPLACE_CATEGORIES } from '@/data/marketplaceCategories';
