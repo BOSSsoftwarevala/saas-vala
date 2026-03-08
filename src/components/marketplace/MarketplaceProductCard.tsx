@@ -3,8 +3,8 @@ import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  ShoppingCart, Bell, Heart, Star,
-  Package, Play, Box, Copy, Eye, EyeOff, ExternalLink
+  ShoppingCart, Bell, Heart, Star, Info,
+  Package, Play, Box, Copy, Eye, EyeOff, ExternalLink, CheckCircle, Zap, Shield, Globe
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
