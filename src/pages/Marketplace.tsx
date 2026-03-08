@@ -23,6 +23,7 @@ import { ProductivitySection } from '@/components/marketplace/ProductivitySectio
 import { CybersecuritySection } from '@/components/marketplace/CybersecuritySection';
 import { DataAnalyticsSection } from '@/components/marketplace/DataAnalyticsSection';
 import { ElearningSection } from '@/components/marketplace/ElearningSection';
+import { TelemedicineSection } from '@/components/marketplace/TelemedicineSection';
 import { MarketplaceSectionDivider } from '@/components/marketplace/MarketplaceSectionDivider';
 import { MarketplaceCategoryRow } from '@/components/marketplace/MarketplaceCategoryRow';
 import { MARKETPLACE_CATEGORIES } from '@/data/marketplaceCategories';
@@ -326,8 +327,11 @@ export default function Marketplace() {
         {/* ━━━ SECTION 21: EDUCATION & E-LEARNING ━━━ */}
         <ElearningSection onBuyNow={handleBuyNow} />
 
-        {/* ━━━ DYNAMIC CATEGORY ROWS (Rows 22–40) ━━━ */}
-        {MARKETPLACE_CATEGORIES.filter(cat => !['healthcare', 'real_estate', 'ecommerce', 'retail', 'restaurant', 'hotel', 'transport', 'finance', 'media_gaming', 'marketing', 'ai_automation', 'cloud_devops', 'it_software', 'cybersecurity', 'investment', 'logistics'].includes(cat.id)).map((cat, idx) => (
+        {/* ━━━ SECTION 22: HEALTHCARE & TELEMEDICINE ━━━ */}
+        <TelemedicineSection onBuyNow={handleBuyNow} />
+
+        {/* ━━━ DYNAMIC CATEGORY ROWS (Rows 23–40) ━━━ */}
+        {MARKETPLACE_CATEGORIES.filter(cat => !['healthcare', 'real_estate', 'ecommerce', 'retail', 'restaurant', 'hotel', 'transport', 'finance', 'media_gaming', 'marketing', 'ai_automation', 'cloud_devops', 'it_software', 'cybersecurity', 'investment', 'logistics', 'manufacturing'].includes(cat.id)).map((cat, idx) => (
           <motion.div key={cat.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: (idx + 6) * 0.03 }}>
             <MarketplaceCategoryRow category={cat} onBuyNow={handleBuyNow} />
             {idx < MARKETPLACE_CATEGORIES.length - 1 && (
