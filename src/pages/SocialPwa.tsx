@@ -148,7 +148,7 @@ export default function SocialPwa() {
                 <div className="grid grid-cols-2 gap-2">{demoProduct?.features.map(f => <div key={f} className="flex items-center gap-1.5 text-xs text-muted-foreground"><CheckCircle2 className="h-3 w-3 text-green-500" />{f}</div>)}</div>
                 <div className="flex gap-2">
                   <Button variant="outline" className="flex-1 text-xs gap-1" onClick={() => window.open(demoProduct?.repo, '_blank')}><ExternalLink className="h-3 w-3" /> GitHub Repo</Button>
-                  <Button className="flex-1 text-xs gap-1" onClick={() => { toast.success(`Opening local demo: /demo/${demoProduct?.demoFolder}/demo.html`); }}><Play className="h-3 w-3" /> Open Demo</Button>
+                  <Button className="flex-1 text-xs gap-1" onClick={() => { window.open(demoProduct?.repo, '_blank', 'noopener,noreferrer'); toast.success('Opening demo repository...'); }}><Play className="h-3 w-3" /> Open Demo</Button>
                 </div>
               </>
             ) : (
