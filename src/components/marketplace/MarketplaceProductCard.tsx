@@ -310,7 +310,7 @@ export function MarketplaceProductCard({
             </div>
 
             {/* ── BUTTONS ── */}
-            <div className="mt-1">
+            <div className="mt-1 flex flex-col gap-2">
               {isPipeline ? (
                 <div className="flex gap-2">
                   <Button
@@ -347,7 +347,6 @@ export function MarketplaceProductCard({
                 </div>
               ) : (
                 <div className="flex gap-2">
-                  {/* DEMO — fetches REAL data from DB */}
                   <Button
                     size="sm"
                     variant="outline"
@@ -358,7 +357,6 @@ export function MarketplaceProductCard({
                     <Play style={{ width: 14, height: 14 }} />
                     {demoLoading ? 'LOADING...' : 'DEMO'}
                   </Button>
-                  {/* ADD TO CART (heart) */}
                   <Button
                     size="sm"
                     variant="outline"
@@ -371,7 +369,6 @@ export function MarketplaceProductCard({
                   >
                     <Heart style={{ width: 16, height: 16 }} className={wishlisted ? 'fill-pink-400 text-pink-400' : ''} />
                   </Button>
-                  {/* BUY */}
                   <Button
                     size="sm"
                     className="flex-1 h-10 text-[12px] font-black gap-1.5 rounded-xl"
@@ -382,6 +379,16 @@ export function MarketplaceProductCard({
                   </Button>
                 </div>
               )}
+              {/* FEATURES & ADVANTAGES BUTTON */}
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full h-9 text-[11px] font-bold gap-1.5 rounded-xl border-border hover:border-accent hover:bg-accent/10"
+                onClick={() => setFeaturesOpen(true)}
+              >
+                <Info style={{ width: 13, height: 13 }} />
+                FEATURES & ADVANTAGES
+              </Button>
             </div>
           </div>
         </div>
