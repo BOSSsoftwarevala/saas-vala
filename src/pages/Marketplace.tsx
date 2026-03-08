@@ -10,6 +10,7 @@ import { EducationSection } from '@/components/marketplace/EducationSection';
 import { HealthcareSection } from '@/components/marketplace/HealthcareSection';
 import { RealEstateSection } from '@/components/marketplace/RealEstateSection';
 import { EcommerceSection } from '@/components/marketplace/EcommerceSection';
+import { RetailSection } from '@/components/marketplace/RetailSection';
 import { MarketplaceSectionDivider } from '@/components/marketplace/MarketplaceSectionDivider';
 import { MarketplaceCategoryRow } from '@/components/marketplace/MarketplaceCategoryRow';
 import { MARKETPLACE_CATEGORIES } from '@/data/marketplaceCategories';
@@ -262,8 +263,13 @@ export default function Marketplace() {
         {/* ━━━ SECTION 8: E-COMMERCE & ONLINE MARKETPLACES ━━━ */}
         <EcommerceSection onBuyNow={handleBuyNow} />
 
-        {/* ━━━ DYNAMIC CATEGORY ROWS (Rows 9–40) ━━━ */}
-        {MARKETPLACE_CATEGORIES.filter(cat => !['healthcare', 'real_estate', 'ecommerce'].includes(cat.id)).map((cat, idx) => (
+        <MarketplaceSectionDivider label="retail" />
+
+        {/* ━━━ SECTION 9: RETAIL & POS SYSTEMS ━━━ */}
+        <RetailSection onBuyNow={handleBuyNow} />
+
+        {/* ━━━ DYNAMIC CATEGORY ROWS (Rows 10–40) ━━━ */}
+        {MARKETPLACE_CATEGORIES.filter(cat => !['healthcare', 'real_estate', 'ecommerce', 'retail'].includes(cat.id)).map((cat, idx) => (
           <motion.div key={cat.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: (idx + 6) * 0.03 }}>
             <MarketplaceCategoryRow category={cat} onBuyNow={handleBuyNow} />
             {idx < MARKETPLACE_CATEGORIES.length - 1 && (
