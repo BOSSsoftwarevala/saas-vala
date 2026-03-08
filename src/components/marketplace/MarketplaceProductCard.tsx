@@ -171,7 +171,7 @@ export function MarketplaceProductCard({
         action: 'demo_fallback_accessed',
         performed_by: user?.id || null,
         details: { product_id: product.id, product_name: product.title, fallback_url: fallbackUrl },
-      }).then(() => {}).catch(() => {});
+      });
     }
   };
 
