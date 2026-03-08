@@ -39,7 +39,7 @@ export const educationProducts: EducationProduct[] = [
     price: 24999, originalPrice: 49999, status: 'bestseller',
     subcategory: 'School ERP',
     github_repo: 'https://github.com/saasvala/schoolmanagementsoftware',
-    demoUrl: 'https://github.com/saasvala/schoolmanagementsoftware',
+    demoUrl: 'https://schoolmanagementsoftware.saasvala.com',
     slug: 'schoolmanagementsoftware',
     techStack: ['React', 'Node.js', 'PostgreSQL', 'JWT Auth'],
     description: 'Complete school management software with student records, attendance, timetable, and fee management. Real SaaS Vala product.',

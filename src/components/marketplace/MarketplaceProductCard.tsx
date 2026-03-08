@@ -129,50 +129,47 @@ export function MarketplaceProductCard({
     return `https://github.com/saasvala/${slug}-software`;
   };
 
-  // ── REAL DEMO BUTTON ──
+  // Generate demo URL from slug
+  const generateDemoUrl = (title: string): string => {
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    return `https://${slug}-software.saasvala.com`;
+  };
+
+  // ── DEMO BUTTON — show credentials dialog ──
   const handleDemo = () => {
-    // If product has a github_repo or gitRepoUrl field, open it directly
-    const githubRepo = (product as any).github_repo || (product as any).gitRepoUrl;
-    if (githubRepo) {
-      window.open(githubRepo, '_blank', 'noopener,noreferrer');
-      toast.success(`Opening demo for ${product.title}`);
-      // Fire-and-forget activity log
-      if (isUuid(product.id)) {
-        supabase.from('activity_logs').insert({
-          entity_type: 'demo',
-          entity_id: product.id,
-          action: 'github_demo_accessed',
-          performed_by: user?.id || null,
-          details: { product_id: product.id, product_name: product.title, github_repo: githubRepo },
-        });
-      }
-      return;
-    }
-
-    // If product has a demoUrl, open it directly
+    // Build demo URL: prefer explicit demoUrl, then generate from slug
     const demoUrl = (product as any).demoUrl;
-    if (demoUrl) {
-      window.open(demoUrl, '_blank', 'noopener,noreferrer');
-      toast.success(`Opening demo for ${product.title}`);
-      return;
-    }
+    const slug = (product as any).slug;
+    const liveUrl = demoUrl && !demoUrl.includes('github.com') 
+      ? demoUrl 
+      : slug 
+        ? `https://${slug}.saasvala.com`
+        : generateDemoUrl(product.title);
 
-    // For ALL products without explicit URLs — open generated GitHub URL immediately
-    // This avoids popup blockers that block window.open after async awaits
-    const fallbackUrl = generateGitHubUrl(product.title);
-    window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
-    toast.success(`Opening demo for ${product.title}`);
+    // Set demo info with credentials and open dialog
+    setDemoOpen(true);
+    // We use a local computed approach — no async needed
+    (window as any).__currentDemoUrl = liveUrl;
 
-    // Fire-and-forget: log the demo access
+    // Fire-and-forget activity log
     if (isUuid(product.id)) {
       supabase.from('activity_logs').insert({
         entity_type: 'demo',
         entity_id: product.id,
-        action: 'demo_fallback_accessed',
+        action: 'demo_credentials_shown',
         performed_by: user?.id || null,
-        details: { product_id: product.id, product_name: product.title, fallback_url: fallbackUrl },
+        details: { product_id: product.id, product_name: product.title, demo_url: liveUrl },
       });
     }
+  };
+
+  // Get current demo URL for dialog
+  const getCurrentDemoUrl = (): string => {
+    const demoUrl = (product as any).demoUrl;
+    const slug = (product as any).slug;
+    if (demoUrl && !demoUrl.includes('github.com')) return demoUrl;
+    if (slug) return `https://${slug}.saasvala.com`;
+    return generateDemoUrl(product.title);
   };
 
   const handleCopy = (text: string, label: string) => {
