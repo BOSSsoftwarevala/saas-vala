@@ -7,15 +7,15 @@ import { fillToTarget } from '@/data/marketplaceProductGenerator';
 export function PopularProductsSection({ onBuyNow }: { onBuyNow: (p: any) => void }) {
   const { products: dbProducts, loading } = useProductsByCategory(['marketing', 'finance', 'hr', 'crm', 'accounting', 'hospitality', 'logistics', 'construction']);
 
-  const displayProducts = fillToTarget(dbProducts as any, 'popular', 'Popular', 50);
+  const displayProducts = fillToTarget(dbProducts as any, 'popular', 'Evergreen', 50);
 
   return (
     <section className="py-4">
       <SectionHeader
-        icon="🌟"
-        title="Popular Products"
-        subtitle="Community-loved software. Trusted by thousands of businesses."
-        badge="COMMUNITY CHOICE"
+        icon="🌿"
+        title="Evergreen Software"
+        subtitle="Time-tested solutions. Trusted by thousands of businesses worldwide."
+        badge="EVERGREEN"
         badgeVariant="trending"
         totalCount={displayProducts.length}
       />
