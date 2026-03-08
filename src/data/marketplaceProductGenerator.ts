@@ -863,7 +863,6 @@ export function generateCategoryProducts(
       businessType: categoryId,
       gitRepoUrl: r.githubUrl,
       demoUrl: r.demoUrl,
-      slug: r.slug,
       featured: i < 3,
       trending: i < 5,
       isAvailable: true,
