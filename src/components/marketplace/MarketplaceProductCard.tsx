@@ -14,6 +14,7 @@ import type { MarketplaceProduct } from '@/hooks/useMarketplaceProducts';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
