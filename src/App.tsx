@@ -92,6 +92,7 @@ function AppRoutes() {
       <Route path="/install" element={<Install />} />
       <Route path="/health-pwa" element={<HealthPwa />} />
       <Route path="/realestate-pwa" element={<RealEstatePwa />} />
+      <Route path="/ecom-pwa" element={<EcomPwa />} />
 
       {/* Protected routes */}
       <Route
