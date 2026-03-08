@@ -50,6 +50,7 @@ import ConstructionPwa from "./pages/ConstructionPwa";
 import AutomotivePwa from "./pages/AutomotivePwa";
 import AgriculturePwa from "./pages/AgriculturePwa";
 import EnergyPwa from "./pages/EnergyPwa";
+import TelecomPwa from "./pages/TelecomPwa";
 
 const queryClient = new QueryClient();
 
