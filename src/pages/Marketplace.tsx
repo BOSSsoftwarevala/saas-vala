@@ -2,7 +2,6 @@ import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MarketplaceHeader } from '@/components/marketplace/MarketplaceHeader';
-import { ProductSlider } from '@/components/marketplace/ProductSlider';
 import { UpcomingSection } from '@/components/marketplace/UpcomingSection';
 import { OnDemandSection } from '@/components/marketplace/OnDemandSection';
 import { TopSellingSection } from '@/components/marketplace/TopSellingSection';
