@@ -412,6 +412,168 @@ export default function Marketplace() {
         ))}
       </main>
 
+      {/* ━━━ PRICING SECTION ━━━ */}
+      <section id="pricing" className="py-16 px-4 md:px-8 border-t border-border">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="max-w-4xl mx-auto text-center"
+        >
+          <h2 className="text-3xl md:text-4xl font-black uppercase text-foreground mb-4">
+            💰 Simple Pricing
+          </h2>
+          <p className="text-muted-foreground mb-8">Every software. One price. No hidden fees.</p>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {/* Free */}
+            <div className="rounded-2xl border border-border p-6 flex flex-col items-center gap-3">
+              <h3 className="font-bold text-lg text-foreground">Free Trial</h3>
+              <p className="text-4xl font-black text-foreground">$0</p>
+              <p className="text-sm text-muted-foreground">7-day demo access</p>
+              <ul className="text-sm text-muted-foreground space-y-2 mt-3">
+                <li>✅ Live demo access</li>
+                <li>✅ View all features</li>
+                <li>❌ No source code</li>
+                <li>❌ No license key</li>
+              </ul>
+              <Button variant="outline" className="w-full mt-4" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+                Browse Software
+              </Button>
+            </div>
+
+            {/* Pro — highlighted */}
+            <div className="rounded-2xl border-2 border-primary p-6 flex flex-col items-center gap-3 relative bg-primary/5">
+              <Badge className="absolute -top-3 bg-primary text-primary-foreground text-xs font-black px-3">MOST POPULAR</Badge>
+              <h3 className="font-bold text-lg text-foreground">Pro License</h3>
+              <div className="flex items-baseline gap-1">
+                <span className="text-sm line-through text-muted-foreground">$10</span>
+                <p className="text-4xl font-black text-primary">$5</p>
+                <span className="text-sm text-muted-foreground">/software</span>
+              </div>
+              <p className="text-sm text-muted-foreground">30-day license + source code</p>
+              <ul className="text-sm text-muted-foreground space-y-2 mt-3">
+                <li>✅ Full source code</li>
+                <li>✅ License key</li>
+                <li>✅ APK download</li>
+                <li>✅ 30-day access</li>
+              </ul>
+              <Button className="w-full mt-4" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+                Buy Now — $5
+              </Button>
+            </div>
+
+            {/* Enterprise */}
+            <div className="rounded-2xl border border-border p-6 flex flex-col items-center gap-3">
+              <h3 className="font-bold text-lg text-foreground">Enterprise</h3>
+              <p className="text-4xl font-black text-foreground">Custom</p>
+              <p className="text-sm text-muted-foreground">White-label + deployment</p>
+              <ul className="text-sm text-muted-foreground space-y-2 mt-3">
+                <li>✅ Everything in Pro</li>
+                <li>✅ White-label branding</li>
+                <li>✅ Custom deployment</li>
+                <li>✅ Priority support</li>
+              </ul>
+              <Button variant="outline" className="w-full mt-4" onClick={() => {
+                const el = document.getElementById('contact');
+                el?.scrollIntoView({ behavior: 'smooth' });
+              }}>
+                Contact Sales
+              </Button>
+            </div>
+          </div>
+        </motion.div>
+      </section>
+
+      {/* ━━━ DEMO SECTION ━━━ */}
+      <section id="demo" className="py-16 px-4 md:px-8 border-t border-border">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="max-w-4xl mx-auto text-center"
+        >
+          <h2 className="text-3xl md:text-4xl font-black uppercase text-foreground mb-4">
+            🎮 Try Live Demos
+          </h2>
+          <p className="text-muted-foreground mb-8">Every product has a live demo. Click "DEMO" on any product card to try instantly.</p>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="rounded-2xl border border-border p-6 text-center">
+              <div className="text-4xl mb-3">🖥️</div>
+              <h3 className="font-bold text-foreground mb-2">Instant Access</h3>
+              <p className="text-sm text-muted-foreground">Click the green "LIVE DEMO" badge on any product card to get demo credentials instantly.</p>
+            </div>
+            <div className="rounded-2xl border border-border p-6 text-center">
+              <div className="text-4xl mb-3">🔑</div>
+              <h3 className="font-bold text-foreground mb-2">Demo Credentials</h3>
+              <p className="text-sm text-muted-foreground">Each demo comes with pre-configured login credentials. Copy & paste to access.</p>
+            </div>
+            <div className="rounded-2xl border border-border p-6 text-center">
+              <div className="text-4xl mb-3">📱</div>
+              <h3 className="font-bold text-foreground mb-2">GitHub Source</h3>
+              <p className="text-sm text-muted-foreground">Most products link directly to GitHub repos. Browse code before you buy.</p>
+            </div>
+          </div>
+
+          <Button className="mt-8 gap-2" size="lg" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+            Browse All 2000+ Products
+          </Button>
+        </motion.div>
+      </section>
+
+      {/* ━━━ CONTACT SECTION ━━━ */}
+      <section id="contact" className="py-16 px-4 md:px-8 border-t border-border">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="max-w-2xl mx-auto text-center"
+        >
+          <h2 className="text-3xl md:text-4xl font-black uppercase text-foreground mb-4">
+            📬 Contact Us
+          </h2>
+          <p className="text-muted-foreground mb-8">Have questions? Need custom software? We're here to help.</p>
+
+          <div className="grid gap-4 text-left">
+            <a
+              href="mailto:support@saasvala.com"
+              className="rounded-2xl border border-border p-5 flex items-center gap-4 hover:border-primary/50 transition-colors"
+            >
+              <div className="text-2xl">📧</div>
+              <div>
+                <p className="font-bold text-foreground">Email</p>
+                <p className="text-sm text-muted-foreground">support@saasvala.com</p>
+              </div>
+            </a>
+            <a
+              href="https://wa.me/919876543210"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-2xl border border-border p-5 flex items-center gap-4 hover:border-primary/50 transition-colors"
+            >
+              <div className="text-2xl">💬</div>
+              <div>
+                <p className="font-bold text-foreground">WhatsApp</p>
+                <p className="text-sm text-muted-foreground">Chat with us instantly</p>
+              </div>
+            </a>
+            <a
+              href="https://github.com/softwarevala"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-2xl border border-border p-5 flex items-center gap-4 hover:border-primary/50 transition-colors"
+            >
+              <div className="text-2xl">🐙</div>
+              <div>
+                <p className="font-bold text-foreground">GitHub</p>
+                <p className="text-sm text-muted-foreground">View our open-source repos</p>
+              </div>
+            </a>
+          </div>
+        </motion.div>
+      </section>
+
       {/* Footer */}
       <footer className="border-t border-border py-6 px-4 md:px-8">
         <p className="text-center text-sm text-muted-foreground">
