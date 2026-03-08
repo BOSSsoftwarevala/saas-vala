@@ -39,6 +39,7 @@ import { FoodDeliveryPlatformSection } from '@/components/marketplace/FoodDelive
 import { HealthcareTelemedicineSection } from '@/components/marketplace/HealthcareTelemedicineSection';
 import { EducationElearningSection } from '@/components/marketplace/EducationElearningSection';
 import { FinanceFintechSection } from '@/components/marketplace/FinanceFintechSection';
+import { RecruitmentJobSection } from '@/components/marketplace/RecruitmentJobSection';
 import { MarketplaceSectionDivider } from '@/components/marketplace/MarketplaceSectionDivider';
 import { MarketplaceCategoryRow } from '@/components/marketplace/MarketplaceCategoryRow';
 import { MARKETPLACE_CATEGORIES } from '@/data/marketplaceCategories';
