@@ -64,8 +64,8 @@ export function MarketplaceProductCard({
   const [notified, setNotified] = useState(false);
   const [activeTab, setActiveTab] = useState<'features' | 'tech'>('features');
   const [demoOpen, setDemoOpen] = useState(false);
-  const [demoLoading, setDemoLoading] = useState(false);
-  const [demoInfo, setDemoInfo] = useState<DemoInfo | null>(null);
+  const [demoLoading] = useState(false);
+  const [demoInfo] = useState<DemoInfo | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const { user } = useAuth();
 
@@ -130,22 +130,22 @@ export function MarketplaceProductCard({
   };
 
   // ── REAL DEMO BUTTON ──
-  const handleDemo = async () => {
+  const handleDemo = () => {
     // If product has a github_repo or gitRepoUrl field, open it directly
     const githubRepo = (product as any).github_repo || (product as any).gitRepoUrl;
     if (githubRepo) {
       window.open(githubRepo, '_blank', 'noopener,noreferrer');
-      try {
-        if (isUuid(product.id)) {
-          await supabase.from('activity_logs').insert({
-            entity_type: 'demo',
-            entity_id: product.id,
-            action: 'github_demo_accessed',
-            performed_by: user?.id || null,
-            details: { product_id: product.id, product_name: product.title, github_repo: githubRepo },
-          });
-        }
-      } catch { /* non-critical */ }
+      toast.success(`Opening demo for ${product.title}`);
+      // Fire-and-forget activity log
+      if (isUuid(product.id)) {
+        supabase.from('activity_logs').insert({
+          entity_type: 'demo',
+          entity_id: product.id,
+          action: 'github_demo_accessed',
+          performed_by: user?.id || null,
+          details: { product_id: product.id, product_name: product.title, github_repo: githubRepo },
+        });
+      }
       return;
     }
 
@@ -153,84 +153,25 @@ export function MarketplaceProductCard({
     const demoUrl = (product as any).demoUrl;
     if (demoUrl) {
       window.open(demoUrl, '_blank', 'noopener,noreferrer');
-      return;
-    }
-
-    // For non-UUID (generated) products, use generated GitHub URL
-    if (!isUuid(product.id)) {
-      const fallbackUrl = generateGitHubUrl(product.title);
-      window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
       toast.success(`Opening demo for ${product.title}`);
       return;
     }
 
-    // For UUID (DB) products, try DB lookup first, then fallback to generated URL
-    setDemoLoading(true);
-    setDemoOpen(true);
-    setDemoInfo(null);
+    // For ALL products without explicit URLs — open generated GitHub URL immediately
+    // This avoids popup blockers that block window.open after async awaits
+    const fallbackUrl = generateGitHubUrl(product.title);
+    window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
+    toast.success(`Opening demo for ${product.title}`);
 
-    try {
-      const { data: demos, error } = await supabase
-        .from('demos')
-        .select('id, name, url, credentials, status')
-        .eq('product_id', product.id)
-        .eq('status', 'active')
-        .limit(1);
-
-      if (error) throw error;
-
-      if (demos && demos.length > 0) {
-        const demo = demos[0];
-        setDemoInfo({
-          url: demo.url,
-          name: demo.name,
-          credentials: demo.credentials as DemoInfo['credentials'],
-        });
-        try {
-          await supabase.from('activity_logs').insert({
-            entity_type: 'demo',
-            entity_id: demo.id,
-            action: 'demo_accessed',
-            performed_by: user?.id || null,
-            details: { product_id: product.id, product_name: product.title },
-          });
-        } catch { /* non-critical */ }
-      } else {
-        // Check products table for demo_url
-        const { data: productData } = await supabase
-          .from('products')
-          .select('demo_url, git_repo_url')
-          .eq('id', product.id)
-          .single();
-
-        if (productData?.demo_url) {
-          setDemoInfo({
-            url: productData.demo_url,
-            name: product.title + ' Demo',
-            credentials: null,
-          });
-        } else if (productData?.git_repo_url) {
-          // Open GitHub repo directly
-          setDemoOpen(false);
-          window.open(productData.git_repo_url, '_blank', 'noopener,noreferrer');
-          toast.success(`Opening demo for ${product.title}`);
-        } else {
-          // Fallback: generate GitHub URL from product name
-          const fallbackUrl = generateGitHubUrl(product.title);
-          setDemoOpen(false);
-          window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
-          toast.success(`Opening demo for ${product.title}`);
-        }
-      }
-    } catch (err) {
-      console.error('Demo fetch error:', err);
-      // Even on error, open a generated GitHub URL
-      const fallbackUrl = generateGitHubUrl(product.title);
-      setDemoOpen(false);
-      window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
-      toast.success(`Opening demo for ${product.title}`);
-    } finally {
-      setDemoLoading(false);
+    // Fire-and-forget: log the demo access
+    if (isUuid(product.id)) {
+      supabase.from('activity_logs').insert({
+        entity_type: 'demo',
+        entity_id: product.id,
+        action: 'demo_fallback_accessed',
+        performed_by: user?.id || null,
+        details: { product_id: product.id, product_name: product.title, fallback_url: fallbackUrl },
+      });
     }
   };
 
