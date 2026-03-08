@@ -28,6 +28,7 @@ import { RealEstateMarketplaceSection } from '@/components/marketplace/RealEstat
 import { GamingPlatformSection } from '@/components/marketplace/GamingPlatformSection';
 import { MarketingGrowthSection } from '@/components/marketplace/MarketingGrowthSection';
 import { CustomerSupportSection } from '@/components/marketplace/CustomerSupportSection';
+import { HrRecruitmentSection } from '@/components/marketplace/HrRecruitmentSection';
 import { MarketplaceSectionDivider } from '@/components/marketplace/MarketplaceSectionDivider';
 import { MarketplaceCategoryRow } from '@/components/marketplace/MarketplaceCategoryRow';
 import { MARKETPLACE_CATEGORIES } from '@/data/marketplaceCategories';
