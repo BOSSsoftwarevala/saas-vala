@@ -462,7 +462,7 @@ export function MarketplaceProductCard({
 
           {/* iFrame Demo */}
           <div className="flex-1 relative bg-muted/30 overflow-hidden">
-            {getDemoUrl() ? (
+            {getDemoUrl() && isIframeable(getDemoUrl()) ? (
               <>
                 <iframe
                   src={getDemoUrl()!}
