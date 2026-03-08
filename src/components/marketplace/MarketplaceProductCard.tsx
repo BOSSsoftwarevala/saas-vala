@@ -119,22 +119,41 @@ export function MarketplaceProductCard({
     toast.success(`🔔 You'll be notified when ${product.title} is ready!`);
   };
 
+  // Helper: check if an ID looks like a valid UUID
+  const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
   // ── REAL DEMO BUTTON ──
   const handleDemo = async () => {
-    // If product has a github_repo field, open it directly
-    const githubRepo = (product as any).github_repo;
+    // If product has a github_repo or gitRepoUrl field, open it directly
+    const githubRepo = (product as any).github_repo || (product as any).gitRepoUrl;
     if (githubRepo) {
       window.open(githubRepo, '_blank', 'noopener,noreferrer');
-      // Log demo access (fire and forget)
       try {
-        await supabase.from('activity_logs').insert({
-          entity_type: 'demo',
-          entity_id: product.id,
-          action: 'github_demo_accessed',
-          performed_by: user?.id || null,
-          details: { product_id: product.id, product_name: product.title, github_repo: githubRepo },
-        });
+        if (isUuid(product.id)) {
+          await supabase.from('activity_logs').insert({
+            entity_type: 'demo',
+            entity_id: product.id,
+            action: 'github_demo_accessed',
+            performed_by: user?.id || null,
+            details: { product_id: product.id, product_name: product.title, github_repo: githubRepo },
+          });
+        }
       } catch { /* non-critical */ }
+      return;
+    }
+
+    // If product has a demoUrl, open it directly
+    const demoUrl = (product as any).demoUrl;
+    if (demoUrl) {
+      window.open(demoUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    // For non-UUID (generated) products, skip DB queries
+    if (!isUuid(product.id)) {
+      setDemoOpen(true);
+      setDemoLoading(false);
+      setDemoInfo(null);
       return;
     }
 
@@ -143,7 +162,6 @@ export function MarketplaceProductCard({
     setDemoInfo(null);
 
     try {
-      // 1. Check demos table for this product
       const { data: demos, error } = await supabase
         .from('demos')
         .select('id, name, url, credentials, status')
@@ -160,8 +178,6 @@ export function MarketplaceProductCard({
           name: demo.name,
           credentials: demo.credentials as DemoInfo['credentials'],
         });
-
-        // Log demo access (fire and forget)
         try {
           await supabase.from('activity_logs').insert({
             entity_type: 'demo',
@@ -171,9 +187,7 @@ export function MarketplaceProductCard({
             details: { product_id: product.id, product_name: product.title },
           });
         } catch { /* non-critical */ }
-
       } else {
-        // 2. Check if product has a direct demo_url in products table
         const { data: productData } = await supabase
           .from('products')
           .select('demo_url')
@@ -187,7 +201,6 @@ export function MarketplaceProductCard({
             credentials: null,
           });
         } else {
-          // No demo available — show clear message
           setDemoInfo(null);
         }
       }
