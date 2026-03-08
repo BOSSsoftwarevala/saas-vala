@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Rocket, GitBranch, Globe, Code, Database, Bug, Wrench, Package,
-  Store, Loader2, CheckCircle2, Circle, ArrowDown, Mic, Send,
+  Store, Loader2, CheckCircle2, Circle, ArrowDown,
   Sparkles, Server, Shield, Zap
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
