@@ -6,26 +6,37 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Heart, Star, ExternalLink, Download, KeyRound, CheckCircle2, Lock, ShieldCheck } from 'lucide-react';
+import { Heart, Star, ExternalLink, Download, KeyRound, CheckCircle2, Lock, ShieldCheck, Play, Clock, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 const PRODUCTS = [
-  { id: 'fnb-pwa-1', name: 'Zomato Clone', repo: 'https://github.com/saasvala/zomato-clone-software', price: 5, old_price: 10, rating: 4.9, description: 'Full-featured restaurant discovery and food delivery platform.', features: ['Menu Management', 'Order Tracking', 'Table Booking', 'Billing System', 'Inventory Management'] },
-  { id: 'fnb-pwa-2', name: 'Swiggy Clone', repo: 'https://github.com/saasvala/swiggy-clone-software', price: 5, old_price: 10, rating: 4.9, description: 'On-demand food delivery with restaurant dashboard and reviews.', features: ['Food Delivery', 'Order Management', 'Restaurant Dashboard', 'Customer Reviews', 'Mobile App'] },
-  { id: 'fnb-pwa-3', name: 'UberEats Clone', repo: 'https://github.com/saasvala/ubereats-clone-software', price: 5, old_price: 10, rating: 4.9, description: 'Restaurant listing with order tracking and delivery management.', features: ['Restaurant Listing', 'Order Tracking', 'Payment Integration', 'Delivery Management', 'Mobile App'] },
-  { id: 'fnb-pwa-4', name: 'FoodPanda Clone', repo: 'https://github.com/saasvala/foodpanda-clone-software', price: 5, old_price: 10, rating: 4.9, description: 'Online food ordering with delivery tracking and billing.', features: ['Restaurant Menu', 'Order Management', 'Delivery Tracking', 'Billing System', 'Mobile App'] },
-  { id: 'fnb-pwa-5', name: 'DoorDash Clone', repo: 'https://github.com/saasvala/doordash-clone-software', price: 5, old_price: 10, rating: 4.9, description: 'Food delivery platform with driver dashboard and customer reviews.', features: ['Restaurant Listings', 'Order Tracking', 'Delivery Dashboard', 'Customer Reviews', 'Mobile App'] },
+  { id: 'food-apk-1', name: 'Uber Eats Clone', demoFolder: 'ubereats-fooddelivery', repo: 'https://github.com/saasvala/ubereats-fooddelivery-clone-software', price: 5, old_price: 10, rating: 4.9, description: 'Food delivery platform connecting restaurants with customers.', features: ['Restaurant Listings', 'Online Ordering', 'Delivery Tracking', 'Restaurant Dashboard', 'Payment Gateway', 'Customer Reviews', 'Order Management'] },
+  { id: 'food-apk-2', name: 'Zomato Clone', demoFolder: 'zomato-fooddelivery', repo: 'https://github.com/saasvala/zomato-fooddelivery-clone-software', price: 5, old_price: 10, rating: 4.9, description: 'Restaurant discovery and food delivery platform.', features: ['Restaurant Listings', 'Online Ordering', 'Delivery Tracking', 'Restaurant Dashboard', 'Payment Gateway', 'Customer Reviews', 'Order Management'] },
+  { id: 'food-apk-3', name: 'Swiggy Clone', demoFolder: 'swiggy-fooddelivery', repo: 'https://github.com/saasvala/swiggy-fooddelivery-clone-software', price: 5, old_price: 10, rating: 4.9, description: 'Food delivery and restaurant ordering platform with fast logistics.', features: ['Restaurant Listings', 'Online Ordering', 'Delivery Tracking', 'Restaurant Dashboard', 'Payment Gateway', 'Customer Reviews', 'Order Management'] },
+  { id: 'food-apk-4', name: 'DoorDash Clone', demoFolder: 'doordash-fooddelivery', repo: 'https://github.com/saasvala/doordash-fooddelivery-clone-software', price: 5, old_price: 10, rating: 4.9, description: 'Large-scale food delivery marketplace connecting restaurants and customers.', features: ['Restaurant Listings', 'Online Ordering', 'Delivery Tracking', 'Restaurant Dashboard', 'Payment Gateway', 'Customer Reviews', 'Order Management'] },
+  { id: 'food-apk-5', name: 'Talabat Food Delivery Clone', demoFolder: 'talabat-fooddelivery', repo: 'https://github.com/saasvala/talabat-fooddelivery-clone-software', price: 5, old_price: 10, rating: 4.9, description: 'Online food ordering and restaurant marketplace platform.', features: ['Restaurant Listings', 'Online Ordering', 'Delivery Tracking', 'Restaurant Dashboard', 'Payment Gateway', 'Customer Reviews', 'Order Management'] },
 ];
 
-const VALID_KEYS = ['FNB-PWA-2026-001', 'FNB-PWA-2026-002', 'FNB-PWA-2026-003', 'FNB-APK-2026-001'];
-const PFX = 'fnb-pwa';
+const VALID_KEYS = ['FOOD-APK-2026-001', 'FOOD-APK-2026-002', 'FOOD-APK-2026-003', 'FOOD-PWA-2026-001', 'FNB-PWA-2026-001', 'FNB-APK-2026-001'];
+const PFX = 'food-pwa';
+const LICENSE_DAYS = 30;
+
+const isLicenseValid = () => {
+  try {
+    const lic = JSON.parse(localStorage.getItem(`${PFX}-license`) || 'null');
+    if (!lic) return { valid: false, expired: false, daysLeft: 0 };
+    const diff = new Date(lic.expiry).getTime() - Date.now();
+    return { valid: diff > 0, expired: diff <= 0, daysLeft: Math.max(0, Math.ceil(diff / 86400000)) };
+  } catch { return { valid: false, expired: false, daysLeft: 0 }; }
+};
 
 export default function FoodPwa() {
-  const [activated, setActivated] = useState(() => localStorage.getItem(`${PFX}-activated`) === 'true');
+  const [licenseState, setLicenseState] = useState(isLicenseValid);
   const [wishlist, setWishlist] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem(`${PFX}-wishlist`) || '[]'); } catch { return []; } });
   const [showKey, setShowKey] = useState(false);
   const [keyInput, setKeyInput] = useState('');
+  const [demoProduct, setDemoProduct] = useState<typeof PRODUCTS[0] | null>(null);
 
   useEffect(() => { localStorage.setItem(`${PFX}-products`, JSON.stringify(PRODUCTS)); }, []);
 
@@ -37,38 +48,53 @@ export default function FoodPwa() {
 
   const activate = () => {
     if (VALID_KEYS.includes(keyInput.trim().toUpperCase())) {
-      setActivated(true); localStorage.setItem(`${PFX}-activated`, 'true'); setShowKey(false); setKeyInput('');
-      toast.success('🎉 License activated! All 5 Food & Beverage software demos unlocked.');
+      const now = new Date();
+      const expiry = new Date(now.getTime() + LICENSE_DAYS * 86400000);
+      const lic = { key: keyInput.trim().toUpperCase(), activated: now.toISOString(), expiry: expiry.toISOString() };
+      localStorage.setItem(`${PFX}-license`, JSON.stringify(lic));
+      localStorage.setItem(`${PFX}-activated`, 'true');
+      setLicenseState({ valid: true, expired: false, daysLeft: LICENSE_DAYS });
+      setShowKey(false); setKeyInput('');
+      toast.success(`🎉 License activated! Valid for ${LICENSE_DAYS} days. All 5 Food Delivery software demos unlocked.`);
     } else toast.error('Invalid license key.');
   };
 
-  const download = () => {
-    if (!activated) { setShowKey(true); return; }
-    const blob = new Blob([JSON.stringify({ bundle: 'SaaS VALA Food & Beverage Master Copy', version: '2026.1', activated: true, products: PRODUCTS.map(p => ({ name: p.name, repo: p.repo, features: p.features })), generatedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' });
-    const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = 'saas-vala-food-beverage-master-copy.json'; a.click(); URL.revokeObjectURL(u);
+  const handleMasterDownload = () => {
+    if (!licenseState.valid) { setShowKey(true); return; }
+    const lic = JSON.parse(localStorage.getItem(`${PFX}-license`) || '{}');
+    const blob = new Blob([JSON.stringify({ bundle: 'SaaS VALA Food Delivery & Restaurant Systems Master Copy', version: '2026.1', row: 10, license: lic, products: PRODUCTS.map(p => ({ name: p.name, repo: p.repo, features: p.features, demoFolder: p.demoFolder })), generatedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' });
+    const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = 'saas-vala-food-delivery-master-copy.json'; a.click(); URL.revokeObjectURL(u);
     toast.success('Master Copy downloaded!');
+  };
+
+  const openLocalDemo = (product: typeof PRODUCTS[0]) => {
+    if (!licenseState.valid) { setShowKey(true); return; }
+    setDemoProduct(product);
   };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border px-4 md:px-8 py-4 flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold text-primary">SaaS VALA</h1><p className="text-xs text-muted-foreground">Food & Beverage Services — Offline PWA</p></div>
-        {activated ? <Badge className="bg-green-500/20 text-green-400 border-green-500/30 gap-1"><ShieldCheck className="h-3 w-3" /> Licensed</Badge> : <Button size="sm" variant="outline" onClick={() => setShowKey(true)} className="gap-1 text-xs"><KeyRound className="h-3 w-3" /> Activate</Button>}
+        <div><h1 className="text-2xl font-bold text-primary">SaaS VALA</h1><p className="text-xs text-muted-foreground">Food Delivery & Restaurant Systems — Offline PWA</p></div>
+        <div className="flex items-center gap-2">
+          {licenseState.valid && <Badge variant="outline" className="text-[10px] gap-1 border-primary/30 text-primary"><Clock className="h-3 w-3" />{licenseState.daysLeft}d left</Badge>}
+          {licenseState.valid ? <Badge className="bg-green-500/20 text-green-400 border-green-500/30 gap-1"><ShieldCheck className="h-3 w-3" /> Licensed</Badge> : licenseState.expired ? <Badge className="bg-destructive/20 text-destructive border-destructive/30 gap-1"><AlertTriangle className="h-3 w-3" /> Expired</Badge> : <Button size="sm" variant="outline" onClick={() => setShowKey(true)} className="gap-1 text-xs"><KeyRound className="h-3 w-3" /> Activate</Button>}
+        </div>
       </header>
       <main className="py-6 space-y-6">
-        {!activated && (
-          <div className="mx-4 md:mx-8 p-4 rounded-lg border border-primary/30 bg-primary/5 flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-3"><Lock className="h-5 w-5 text-primary" /><div><p className="font-semibold text-sm">Activate to unlock all 5 Food & Beverage Software Demos</p><p className="text-xs text-muted-foreground">Enter license key: FNB-PWA-2026-001</p></div></div>
+        {!licenseState.valid && (
+          <div className={cn("mx-4 md:mx-8 p-4 rounded-lg border flex items-center justify-between gap-4 flex-wrap", licenseState.expired ? "border-destructive/30 bg-destructive/5" : "border-primary/30 bg-primary/5")}>
+            <div className="flex items-center gap-3">{licenseState.expired ? <AlertTriangle className="h-5 w-5 text-destructive" /> : <Lock className="h-5 w-5 text-primary" />}<div><p className="font-semibold text-sm">{licenseState.expired ? 'License Expired — Enter a new key to continue' : 'Activate to unlock all 5 Food Delivery Software Demos'}</p><p className="text-xs text-muted-foreground">Enter license key: FOOD-APK-2026-001</p></div></div>
             <Button size="sm" onClick={() => setShowKey(true)} className="gap-1"><KeyRound className="h-3 w-3" /> Enter Key</Button>
           </div>
         )}
-        {activated && (
+        {licenseState.valid && (
           <div className="mx-4 md:mx-8 p-4 rounded-lg border border-green-500/30 bg-green-500/5 flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-3"><CheckCircle2 className="h-5 w-5 text-green-500" /><div><p className="font-semibold text-sm">Master Copy Ready — All 5 Food & Beverage Software Unlocked</p><p className="text-xs text-muted-foreground">Download the complete offline bundle</p></div></div>
-            <Button size="sm" onClick={download} className="gap-1 bg-green-600 hover:bg-green-700 text-white"><Download className="h-3 w-3" /> Download Master Copy</Button>
+            <div className="flex items-center gap-3"><CheckCircle2 className="h-5 w-5 text-green-500" /><div><p className="font-semibold text-sm">Master Copy Ready — All 5 Food Delivery Software Unlocked</p><p className="text-xs text-muted-foreground">License valid for {licenseState.daysLeft} days · Download the complete offline bundle</p></div></div>
+            <Button size="sm" onClick={handleMasterDownload} className="gap-1 bg-green-600 hover:bg-green-700 text-white"><Download className="h-3 w-3" /> Download Master Copy</Button>
           </div>
         )}
-        <SectionHeader icon="🍔" title="Food & Beverage Services" subtitle="Top 5 Food & Beverage Software Clones — Offline Ready." badge="ROW 10" badgeVariant="hot" totalCount={5} />
+        <SectionHeader icon="🍕" title="Food Delivery & Restaurant Systems" subtitle="Top 5 Food Delivery & Restaurant Software Clones — Offline Ready." badge="ROW 10" badgeVariant="hot" totalCount={5} />
         <SectionSlider>
           {PRODUCTS.map((p, i) => (
             <div key={p.id} className="min-w-[280px] max-w-[320px] flex-shrink-0 group">
@@ -76,17 +102,17 @@ export default function FoodPwa() {
                 <div className="absolute top-2 left-2 z-10"><Badge className="bg-primary text-primary-foreground text-[10px] font-black px-1.5 py-0.5">#{i + 1}</Badge></div>
                 <div className="absolute top-2 right-2 z-10"><Badge className="bg-green-500 text-white text-[9px] font-bold px-1.5 py-0.5 animate-pulse">LIVE DEMO</Badge></div>
                 <button onClick={() => toggleWish(p.id)} className="absolute top-10 right-2 z-10"><Heart className={cn('h-4 w-4 transition-colors', wishlist.includes(p.id) ? 'fill-red-500 text-red-500' : 'text-muted-foreground hover:text-red-400')} /></button>
-                <div className="h-32 bg-gradient-to-br from-primary/20 via-primary/5 to-transparent flex items-center justify-center"><div className="w-16 h-16 rounded-xl bg-primary/20 border border-primary/30 flex items-center justify-center text-3xl">🍔</div></div>
+                <div className="h-32 bg-gradient-to-br from-primary/20 via-primary/5 to-transparent flex items-center justify-center"><div className="w-16 h-16 rounded-xl bg-primary/20 border border-primary/30 flex items-center justify-center text-3xl">🍕</div></div>
                 <CardContent className="p-4 space-y-3">
-                  <Badge variant="outline" className="text-[9px] uppercase tracking-widest text-primary border-primary/30">Food & Beverage</Badge>
+                  <Badge variant="outline" className="text-[9px] uppercase tracking-widest text-primary border-primary/30">Food Delivery</Badge>
                   <h3 className="font-bold text-sm leading-tight line-clamp-2 uppercase tracking-tight">{p.name}</h3>
                   <p className="text-[11px] text-muted-foreground line-clamp-2">{p.description}</p>
                   <div className="flex flex-wrap gap-1">{p.features.slice(0, 4).map(f => <Badge key={f} variant="secondary" className="text-[8px] px-1.5 py-0 font-medium">{f}</Badge>)}{p.features.length > 4 && <Badge variant="secondary" className="text-[8px] px-1.5 py-0 font-medium">+{p.features.length - 4}</Badge>}</div>
-                  <div className="flex items-center gap-2"><span className="text-xs text-muted-foreground line-through">${p.old_price}</span><span className="text-lg font-black text-primary">${p.price}</span><Badge className="bg-destructive text-destructive-foreground text-[9px] font-bold px-1.5 py-0">90% OFF</Badge></div>
+                  <div className="flex items-center gap-2"><span className="text-xs text-muted-foreground line-through">${p.old_price}</span><span className="text-lg font-black text-primary">${p.price}</span><Badge className="bg-destructive text-destructive-foreground text-[9px] font-bold px-1.5 py-0">50% OFF</Badge></div>
                   <div className="flex items-center gap-1"><Star className="h-3 w-3 fill-yellow-500 text-yellow-500" /><span className="text-xs font-semibold">{p.rating}</span></div>
                   <div className="flex gap-2 pt-1">
-                    <Button size="sm" variant="outline" className="flex-1 text-xs gap-1" onClick={() => window.open(p.repo, '_blank')}><ExternalLink className="h-3 w-3" /> DEMO</Button>
-                    <Button size="sm" className="flex-1 text-xs gap-1" onClick={() => activated ? toast.success('Already unlocked!') : setShowKey(true)}>{activated ? <><CheckCircle2 className="h-3 w-3" /> UNLOCKED</> : <><KeyRound className="h-3 w-3" /> BUY ${p.price}</>}</Button>
+                    <Button size="sm" variant="outline" className="flex-1 text-xs gap-1" onClick={() => openLocalDemo(p)}><Play className="h-3 w-3" /> DEMO</Button>
+                    <Button size="sm" className="flex-1 text-xs gap-1" onClick={() => licenseState.valid ? toast.success('Already unlocked!') : setShowKey(true)}>{licenseState.valid ? <><CheckCircle2 className="h-3 w-3" /> UNLOCKED</> : <><KeyRound className="h-3 w-3" /> BUY ${p.price}</>}</Button>
                   </div>
                 </CardContent>
               </Card>
@@ -94,14 +120,46 @@ export default function FoodPwa() {
           ))}
         </SectionSlider>
       </main>
+
+      {/* License Key Dialog */}
       <Dialog open={showKey} onOpenChange={setShowKey}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle className="flex items-center gap-2"><KeyRound className="h-5 w-5 text-primary" /> License Key Activation</DialogTitle></DialogHeader>
           <div className="space-y-4 pt-2">
-            <p className="text-sm text-muted-foreground">Enter your license key to unlock all 5 Food & Beverage software demos offline.</p>
-            <Input placeholder="FNB-PWA-2026-001" value={keyInput} onChange={e => setKeyInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && activate()} className="font-mono text-center tracking-widest" />
+            <p className="text-sm text-muted-foreground">Enter your license key to unlock all 5 Food Delivery software demos offline for {LICENSE_DAYS} days.</p>
+            <Input placeholder="FOOD-APK-2026-001" value={keyInput} onChange={e => setKeyInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && activate()} className="font-mono text-center tracking-widest" />
             <Button onClick={activate} className="w-full gap-2"><ShieldCheck className="h-4 w-4" /> Activate License</Button>
-            <p className="text-[10px] text-center text-muted-foreground">Keys are validated offline. No internet required.</p>
+            <p className="text-[10px] text-center text-muted-foreground">Keys are validated offline. No internet required. Valid for {LICENSE_DAYS} days.</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Local Demo Viewer Dialog */}
+      <Dialog open={!!demoProduct} onOpenChange={() => setDemoProduct(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><Play className="h-5 w-5 text-primary" /> {demoProduct?.name} — Local Demo</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-2">
+            {licenseState.valid ? (
+              <>
+                <div className="rounded-lg border border-border bg-muted/30 p-6 text-center space-y-3">
+                  <div className="text-4xl">🍕</div>
+                  <p className="font-semibold text-sm">{demoProduct?.name}</p>
+                  <p className="text-xs text-muted-foreground">Local demo loaded from device storage</p>
+                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Offline Ready</Badge>
+                </div>
+                <div className="grid grid-cols-2 gap-2">{demoProduct?.features.map(f => <div key={f} className="flex items-center gap-1.5 text-xs text-muted-foreground"><CheckCircle2 className="h-3 w-3 text-green-500" />{f}</div>)}</div>
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex-1 text-xs gap-1" onClick={() => window.open(demoProduct?.repo, '_blank')}><ExternalLink className="h-3 w-3" /> GitHub Repo</Button>
+                  <Button className="flex-1 text-xs gap-1" onClick={() => { toast.success(`Opening local demo: /demo/${demoProduct?.demoFolder}/demo.html`); }}><Play className="h-3 w-3" /> Open Demo</Button>
+                </div>
+              </>
+            ) : (
+              <div className="text-center space-y-3 py-4">
+                <Lock className="h-8 w-8 text-muted-foreground mx-auto" />
+                <p className="text-sm text-muted-foreground">Activate license to access local demos</p>
+                <Button size="sm" onClick={() => { setDemoProduct(null); setShowKey(true); }} className="gap-1"><KeyRound className="h-3 w-3" /> Enter Key</Button>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
