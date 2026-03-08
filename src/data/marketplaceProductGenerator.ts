@@ -1,9 +1,11 @@
 /**
  * Generates exactly 50 products per category for the marketplace.
  * Each product follows the standardized card structure.
+ * Real SaaSVala repos are prioritized as top products.
  */
 
 import type { MarketplaceProduct } from '@/hooks/useMarketplaceProducts';
+import { allReposByCategory, type RepoProduct } from './saasvalaRepoMapping';
 
 const stockImages = [
   'https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&h=300&fit=crop',
@@ -805,6 +807,35 @@ export function getProductGitHubMeta(categoryId: string, productIndex: number): 
   };
 }
 
+// Map generator category IDs to repo mapping category names
+const CATEGORY_TO_REPO_MAP: Record<string, string> = {
+  healthcare: 'Healthcare',
+  education: 'Education',
+  finance: 'Finance',
+  investment: 'Finance',
+  retail: 'Retail',
+  restaurant: 'Food',
+  hotel: 'Hospitality',
+  transport: 'Transport',
+  logistics: 'Transport',
+  construction: 'Construction',
+  real_estate: 'Real Estate',
+  agriculture: 'Agriculture',
+  beauty_fashion: 'Beauty',
+  legal: 'Legal',
+  gym_sports: 'Beauty',
+  it_software: 'IT',
+  cloud_devops: 'IT',
+  ai_automation: 'IT',
+  energy: 'Energy',
+  government: 'Government',
+  ngo: 'Government',
+  home_services: 'Services',
+  manufacturing: 'Services',
+  ecommerce: 'Retail',
+  pharma: 'Healthcare',
+};
+
 export function generateCategoryProducts(
   categoryId: string,
   categoryLabel: string,
@@ -813,10 +844,39 @@ export function generateCategoryProducts(
   const names = categoryProducts[categoryId] || categoryProducts.popular || [];
   const products: MarketplaceProduct[] = [];
 
-  for (let i = 0; i < count; i++) {
-    const name = names[i % names.length] || `${categoryLabel.toUpperCase()} SOFTWARE ${i + 1}`;
-    const meta = getProductGitHubMeta(categoryId, i);
+  // 1. First, inject REAL repos for this category
+  const repoCategoryKey = CATEGORY_TO_REPO_MAP[categoryId];
+  const realRepos: RepoProduct[] = repoCategoryKey ? (allReposByCategory[repoCategoryKey] || []) : [];
 
+  for (let i = 0; i < realRepos.length && products.length < count; i++) {
+    const r = realRepos[i];
+    products.push({
+      id: `repo-${r.slug}`,
+      title: r.title,
+      subtitle: generateDescription(r.title, categoryLabel),
+      image: stockImages[i % stockImages.length],
+      status: 'live',
+      price: 5,
+      features: defaultFeatures,
+      techStack: defaultTechStack,
+      category: categoryLabel,
+      businessType: categoryId,
+      gitRepoUrl: r.githubUrl,
+      demoUrl: r.demoUrl,
+      featured: i < 3,
+      trending: i < 5,
+      isAvailable: true,
+    });
+  }
+
+  // 2. Fill remaining slots with generated products
+  const usedTitles = new Set(products.map(p => p.title));
+  for (let i = 0; i < count && products.length < count; i++) {
+    const name = names[i % names.length] || `${categoryLabel.toUpperCase()} SOFTWARE ${i + 1}`;
+    if (usedTitles.has(name)) continue;
+    usedTitles.add(name);
+
+    const meta = getProductGitHubMeta(categoryId, i);
     products.push({
       id: `gen-${categoryId}-${i}`,
       title: name,
@@ -836,7 +896,7 @@ export function generateCategoryProducts(
     });
   }
 
-  return products;
+  return products.slice(0, count);
 }
 
 /**
