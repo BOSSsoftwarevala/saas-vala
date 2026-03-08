@@ -234,7 +234,7 @@ export default function Marketplace() {
         {/* ━━━ SECTION 3: THIS WEEK TOP SELLING ━━━ */}
         <TopSellingSection onBuyNow={handleBuyNow} />
 
-        <MarketplaceSectionDivider label="popular" />
+        <MarketplaceSectionDivider label="evergreen" />
 
         {/* ━━━ SECTION 4: POPULAR PRODUCTS ━━━ */}
         <PopularProductsSection onBuyNow={handleBuyNow} />
