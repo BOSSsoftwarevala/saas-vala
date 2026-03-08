@@ -40,6 +40,7 @@ import RealEstatePwa from "./pages/RealEstatePwa";
 import EcomPwa from "./pages/EcomPwa";
 import RetailPwa from "./pages/RetailPwa";
 import FoodPwa from "./pages/FoodPwa";
+import HospitalityPwa from "./pages/HospitalityPwa";
 
 const queryClient = new QueryClient();
 
