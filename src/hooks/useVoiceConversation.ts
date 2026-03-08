@@ -166,6 +166,10 @@ export function useVoiceConversation({
   }, [updateState]);
 
   // Start recording from microphone
+  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const silenceStartRef = useRef<number>(0);
+
   const startListening = useCallback(async () => {
     try {
       // Stop any playing audio
@@ -175,9 +179,57 @@ export function useVoiceConversation({
       }
       window.speechSynthesis?.cancel();
 
-      // Get microphone access
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.log('[VOICE] Requesting microphone access...');
+
+      // Get microphone access with noise suppression
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 16000,
+        }
+      });
       streamRef.current = stream;
+      console.log('[VOICE] Microphone access granted. Tracks:', stream.getAudioTracks().length);
+
+      // Setup audio analyser for silence detection
+      const audioContext = new AudioContext();
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 512;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+
+      // Monitor audio level
+      let hasSpeech = false;
+      silenceStartRef.current = 0;
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      
+      const checkSilence = () => {
+        if (!analyserRef.current) return;
+        analyser.getByteFrequencyData(dataArray);
+        const volume = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+        
+        if (volume > 10) {
+          hasSpeech = true;
+          silenceStartRef.current = 0;
+        } else if (hasSpeech && silenceStartRef.current === 0) {
+          silenceStartRef.current = Date.now();
+        }
+        
+        // Auto-stop after 2.5s silence (only if speech was detected)
+        if (hasSpeech && silenceStartRef.current > 0 && Date.now() - silenceStartRef.current > 2500) {
+          console.log('[VOICE] Auto-stopping after silence');
+          if (mediaRecorderRef.current?.state === 'recording') {
+            mediaRecorderRef.current.stop();
+          }
+          return;
+        }
+        
+        silenceTimerRef.current = setTimeout(checkSilence, 100);
+      };
+      silenceTimerRef.current = setTimeout(checkSilence, 500);
 
       // Determine supported MIME type
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
@@ -185,6 +237,8 @@ export function useVoiceConversation({
         : MediaRecorder.isTypeSupported('audio/webm')
           ? 'audio/webm'
           : 'audio/mp4';
+
+      console.log('[VOICE] Using MIME type:', mimeType);
 
       const recorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = recorder;
@@ -197,27 +251,33 @@ export function useVoiceConversation({
       };
 
       recorder.onstop = async () => {
+        // Clear silence timer
+        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+        analyserRef.current = null;
+        
         // Stop mic tracks
         stream.getTracks().forEach(track => track.stop());
 
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        console.log('[VOICE] Recording stopped. Blob size:', audioBlob.size);
 
         if (audioBlob.size < 1000) {
-          toast.info('No speech detected. Tap mic and speak clearly.');
+          toast.info('🎤 Koi awaaz nahi mili. Mic ke paas bolein aur retry karein.', { duration: 4000 });
           updateState('idle');
           return;
         }
 
         // Transcribe with ElevenLabs Scribe
         updateState('processing');
-        setTranscript('Transcribing...');
+        setTranscript('Samajh raha hoon...');
 
         try {
           abortControllerRef.current = new AbortController();
           const text = await transcribeAudio(audioBlob);
+          console.log('[VOICE] Transcription result:', text);
 
           if (!text.trim()) {
-            toast.info('Could not understand speech. Try again.');
+            toast.info('🎤 Awaaz samajh nahi aayi. Clear bolein aur retry karein.');
             updateState('idle');
             setTranscript('');
             return;
@@ -230,22 +290,33 @@ export function useVoiceConversation({
           await processVoiceInput(text);
         } catch (error: any) {
           if (error.name !== 'AbortError') {
-            console.error('Transcription error:', error);
-            toast.error('Voice recognition failed. Try again.');
+            console.error('[VOICE] Transcription error:', error);
+            toast.error('🎤 Voice recognition fail. Retry karein.');
           }
           updateState('idle');
           setTranscript('');
         }
       };
 
-      recorder.onerror = () => {
-        toast.error('Recording failed. Check microphone.');
+      recorder.onerror = (e) => {
+        console.error('[VOICE] Recorder error:', e);
+        toast.error('Recording fail. Microphone check karein.');
         updateState('idle');
       };
 
-      recorder.start(250); // Collect data every 250ms
+      // Auto-stop after 30 seconds max
+      const maxTimer = setTimeout(() => {
+        if (mediaRecorderRef.current?.state === 'recording') {
+          console.log('[VOICE] Max duration reached, stopping');
+          mediaRecorderRef.current.stop();
+        }
+      }, 30000);
+
+      recorder.addEventListener('stop', () => clearTimeout(maxTimer), { once: true });
+
+      recorder.start(250);
       updateState('listening');
-      toast.success('🎤 Listening... Tap mic again when done.', { duration: 3000 });
+      toast.success('🎤 Sun raha hoon... Boliye! (Auto-stop on silence)', { duration: 4000 });
 
     } catch (error: any) {
       console.error('Mic error:', error);
