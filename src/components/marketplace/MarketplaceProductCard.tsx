@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  ShoppingCart, Bell, Heart, Star,
+  ShoppingCart, Bell, Heart, Star, Info,
   Package, Play, Box, Copy, Eye, EyeOff, ExternalLink
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -59,6 +59,7 @@ export function MarketplaceProductCard({
   const [notified, setNotified] = useState(false);
   const [activeTab, setActiveTab] = useState<'features' | 'tech'>('features');
   const [demoOpen, setDemoOpen] = useState(false);
+  const [featuresOpen, setFeaturesOpen] = useState(false);
   const [demoLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const { user } = useAuth();
@@ -309,7 +310,7 @@ export function MarketplaceProductCard({
             </div>
 
             {/* ── BUTTONS ── */}
-            <div className="mt-1">
+            <div className="mt-1 flex flex-col gap-2">
               {isPipeline ? (
                 <div className="flex gap-2">
                   <Button
@@ -346,7 +347,6 @@ export function MarketplaceProductCard({
                 </div>
               ) : (
                 <div className="flex gap-2">
-                  {/* DEMO — fetches REAL data from DB */}
                   <Button
                     size="sm"
                     variant="outline"
@@ -357,7 +357,6 @@ export function MarketplaceProductCard({
                     <Play style={{ width: 14, height: 14 }} />
                     {demoLoading ? 'LOADING...' : 'DEMO'}
                   </Button>
-                  {/* ADD TO CART (heart) */}
                   <Button
                     size="sm"
                     variant="outline"
@@ -370,7 +369,6 @@ export function MarketplaceProductCard({
                   >
                     <Heart style={{ width: 16, height: 16 }} className={wishlisted ? 'fill-pink-400 text-pink-400' : ''} />
                   </Button>
-                  {/* BUY */}
                   <Button
                     size="sm"
                     className="flex-1 h-10 text-[12px] font-black gap-1.5 rounded-xl"
@@ -381,6 +379,16 @@ export function MarketplaceProductCard({
                   </Button>
                 </div>
               )}
+              {/* FEATURES & ADVANTAGES BUTTON */}
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full h-9 text-[11px] font-bold gap-1.5 rounded-xl border-border hover:border-accent hover:bg-accent/10"
+                onClick={() => setFeaturesOpen(true)}
+              >
+                <Info style={{ width: 13, height: 13 }} />
+                FEATURES & ADVANTAGES
+              </Button>
             </div>
           </div>
         </div>
@@ -454,6 +462,123 @@ export function MarketplaceProductCard({
             <p className="text-[10px] text-muted-foreground text-center">
               ⚠️ Demo credentials are for evaluation only. Purchase to get your own license key & full source code.
             </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── FEATURES & ADVANTAGES DIALOG ── */}
+      <Dialog open={featuresOpen} onOpenChange={setFeaturesOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-black uppercase">
+              <Info className="text-primary" style={{ width: 18, height: 18 }} />
+              {product.title}
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm">
+              Complete features, benefits & use cases
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-5 py-2">
+            {/* APP FEATURES */}
+            <div className="rounded-xl border border-border/60 p-4">
+              <h4 className="text-[12px] font-black text-primary uppercase tracking-wider mb-3 flex items-center gap-2">
+                <Box style={{ width: 14, height: 14 }} /> App Features
+              </h4>
+              <ul className="space-y-2">
+                {showFeatures.map((f, i) => (
+                  <li key={i} className="flex items-start gap-2 text-[13px] text-foreground">
+                    <span className="text-primary mt-0.5">✓</span>
+                    <span>{f}</span>
+                  </li>
+                ))}
+                <li className="flex items-start gap-2 text-[13px] text-foreground">
+                  <span className="text-primary mt-0.5">✓</span>
+                  <span>Full Source Code Included</span>
+                </li>
+                <li className="flex items-start gap-2 text-[13px] text-foreground">
+                  <span className="text-primary mt-0.5">✓</span>
+                  <span>Lifetime License Key</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* TECH STACK */}
+            <div className="rounded-xl border border-border/60 p-4">
+              <h4 className="text-[12px] font-black text-primary uppercase tracking-wider mb-3 flex items-center gap-2">
+                <Box style={{ width: 14, height: 14 }} /> Tech Stack
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {techStack.map((t, i) => (
+                  <span key={i} className="text-[12px] font-semibold px-3 py-1 rounded-lg bg-muted text-foreground border border-border/50">
+                    {t}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* ADVANTAGES */}
+            <div className="rounded-xl border border-border/60 p-4">
+              <h4 className="text-[12px] font-black text-primary uppercase tracking-wider mb-3 flex items-center gap-2">
+                <Star style={{ width: 14, height: 14 }} /> Advantages
+              </h4>
+              <ul className="space-y-2">
+                {[
+                  'Ready-to-deploy business solution',
+                  'Offline demo included — test before you buy',
+                  'Full source architecture visible',
+                  'Fast deployment — live in minutes',
+                  'Low cost licensing — one-time $5 payment',
+                  'No recurring fees or subscriptions',
+                  'White-label ready — rebrand as your own',
+                ].map((adv, i) => (
+                  <li key={i} className="flex items-start gap-2 text-[13px] text-foreground">
+                    <span className="text-primary mt-0.5">⚡</span>
+                    <span>{adv}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* USE CASES */}
+            <div className="rounded-xl border border-border/60 p-4">
+              <h4 className="text-[12px] font-black text-primary uppercase tracking-wider mb-3 flex items-center gap-2">
+                <Play style={{ width: 14, height: 14 }} /> Use Cases
+              </h4>
+              <ul className="space-y-2">
+                {[
+                  `Launch your own ${product.category} business`,
+                  'Resell as a white-label SaaS product',
+                  'Use as a base for custom client projects',
+                  'Internal tool for your organization',
+                  'Portfolio showcase & demonstration',
+                ].map((uc, i) => (
+                  <li key={i} className="flex items-start gap-2 text-[13px] text-foreground">
+                    <span className="text-primary mt-0.5">→</span>
+                    <span>{uc}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* CTA */}
+            <div className="flex gap-2">
+              <Button
+                className="flex-1 h-11 text-sm font-black gap-2"
+                onClick={() => { setFeaturesOpen(false); onBuyNow(product); }}
+              >
+                <ShoppingCart style={{ width: 15, height: 15 }} />
+                BUY NOW — $5
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1 h-11 text-sm font-bold gap-2"
+                onClick={() => { setFeaturesOpen(false); handleDemo(); }}
+              >
+                <Play style={{ width: 15, height: 15 }} />
+                VIEW DEMO
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
