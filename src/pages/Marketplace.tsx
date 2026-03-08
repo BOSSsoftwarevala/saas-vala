@@ -14,6 +14,7 @@ import { RetailSection } from '@/components/marketplace/RetailSection';
 import { FoodDeliverySection } from '@/components/marketplace/FoodDeliverySection';
 import { HospitalitySection } from '@/components/marketplace/HospitalitySection';
 import { TransportationSection } from '@/components/marketplace/TransportationSection';
+import { FinanceSection } from '@/components/marketplace/FinanceSection';
 import { MarketplaceSectionDivider } from '@/components/marketplace/MarketplaceSectionDivider';
 import { MarketplaceCategoryRow } from '@/components/marketplace/MarketplaceCategoryRow';
 import { MARKETPLACE_CATEGORIES } from '@/data/marketplaceCategories';
@@ -286,8 +287,13 @@ export default function Marketplace() {
         {/* ━━━ SECTION 12: TRANSPORTATION & RIDE SHARING APPS ━━━ */}
         <TransportationSection onBuyNow={handleBuyNow} />
 
-        {/* ━━━ DYNAMIC CATEGORY ROWS (Rows 13–40) ━━━ */}
-        {MARKETPLACE_CATEGORIES.filter(cat => !['healthcare', 'real_estate', 'ecommerce', 'retail', 'restaurant', 'hotel', 'transport'].includes(cat.id)).map((cat, idx) => (
+        <MarketplaceSectionDivider label="finance" />
+
+        {/* ━━━ SECTION 13: FINANCE & FINTECH PLATFORMS ━━━ */}
+        <FinanceSection onBuyNow={handleBuyNow} />
+
+        {/* ━━━ DYNAMIC CATEGORY ROWS (Rows 14–40) ━━━ */}
+        {MARKETPLACE_CATEGORIES.filter(cat => !['healthcare', 'real_estate', 'ecommerce', 'retail', 'restaurant', 'hotel', 'transport', 'finance'].includes(cat.id)).map((cat, idx) => (
           <motion.div key={cat.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: (idx + 6) * 0.03 }}>
             <MarketplaceCategoryRow category={cat} onBuyNow={handleBuyNow} />
             {idx < MARKETPLACE_CATEGORIES.length - 1 && (
