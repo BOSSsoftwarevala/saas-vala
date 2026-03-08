@@ -539,13 +539,12 @@ const developerTools = [
     type: "function",
     function: {
       name: "factory_deploy",
-      description: "Deploy an app via VPS Factory (Hostinger). Clones repo, installs deps, builds, and starts with PM2. Returns live URL and port.",
+      description: "Deploy an app to Vercel. Connects GitHub repo, triggers build and returns live .vercel.app URL.",
       parameters: {
         type: "object",
         properties: {
           repo_url: { type: "string", description: "GitHub repo URL to deploy" },
-          app_name: { type: "string", description: "App name for PM2 process" },
-          port: { type: "number", description: "Port number to run on (auto-assign if empty)" }
+          app_name: { type: "string", description: "App/project name on Vercel" }
         },
         required: ["repo_url", "app_name"]
       }
