@@ -110,7 +110,7 @@ export default function Marketplace() {
   const { checkUserStatus } = useFraudDetection();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { } = useMarketplaceProducts();
+  useMarketplaceProducts(); // warm cache
 
   const logPaymentAttempt = async (
     product: Product, 
