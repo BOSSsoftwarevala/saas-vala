@@ -354,10 +354,9 @@ export function MarketplaceProductCard({
                     variant="outline"
                     className="flex-1 h-10 text-[12px] font-bold gap-1.5 rounded-xl border-border hover:border-primary/50 hover:text-primary"
                     onClick={handleDemo}
-                    disabled={demoLoading}
                   >
                     <Play style={{ width: 14, height: 14 }} />
-                    {demoLoading ? 'LOADING...' : 'DEMO'}
+                    DEMO
                   </Button>
                   <Button
                     size="sm"
