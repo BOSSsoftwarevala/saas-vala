@@ -816,11 +816,33 @@ export default function Marketplace() {
                       </div>
                     )}
                   </div>
-                  <Button className="w-full gap-2" onClick={() => { setShowPayment(false); navigate('/keys'); }}>
+                  <Button className="w-full gap-2" onClick={async () => {
+                    if (selectedProduct && generatedLicenseKey) {
+                      try {
+                        const { data, error } = await supabase.functions.invoke('download-apk', {
+                          body: { product_id: selectedProduct.id, license_key: generatedLicenseKey },
+                        });
+                        if (data?.success && data?.download_url) {
+                          window.open(data.download_url, '_blank');
+                          toast.success('APK download started!');
+                        } else {
+                          toast.info('APK file will be uploaded soon. Your license key is saved.');
+                          navigate('/keys');
+                        }
+                      } catch {
+                        toast.info('APK will be available soon. License key saved.');
+                        navigate('/keys');
+                      }
+                    }
+                    setShowPayment(false);
+                  }}>
                     <Download className="h-4 w-4" />
-                    Download Now
+                    Download APK
                   </Button>
-                  <Button variant="outline" className="w-full" onClick={() => setShowPayment(false)}>
+                  <Button variant="outline" className="w-full gap-2" onClick={() => { setShowPayment(false); navigate('/keys'); }}>
+                    View License Keys
+                  </Button>
+                  <Button variant="ghost" className="w-full text-muted-foreground" onClick={() => setShowPayment(false)}>
                     Continue Shopping
                   </Button>
                 </div>

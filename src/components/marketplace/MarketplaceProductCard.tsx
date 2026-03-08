@@ -460,9 +460,10 @@ export function MarketplaceProductCard({
                   variant="outline"
                   className="flex-1 h-9 text-[11px] font-bold gap-1.5 rounded-xl border-border hover:border-green-500/50 hover:text-green-500"
                   onClick={handleDownloadApk}
+                  disabled={downloadChecking}
                 >
                   <Download style={{ width: 13, height: 13 }} />
-                  {getApkUrl() ? 'DOWNLOAD APK' : 'APK SOON'}
+                  {downloadChecking ? 'CHECKING...' : 'DOWNLOAD APK'}
                 </Button>
                 <Button
                   size="sm"
