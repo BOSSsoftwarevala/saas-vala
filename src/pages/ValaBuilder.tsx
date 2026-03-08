@@ -115,7 +115,7 @@ export default function ValaBuilder() {
 
       const slug = appName.toLowerCase().replace(/\s+/g, '-');
 
-      const { data: deployData, error: deployError } = await supabase.functions.invoke('factory-deploy', {
+      const { data: deployData } = await supabase.functions.invoke('factory-deploy', {
         body: {
           action: 'deploy',
           repo_name: slug,
