@@ -817,7 +817,7 @@ export default function Marketplace() {
                       </div>
                     )}
                   </div>
-                  <Button className="w-full gap-2">
+                  <Button className="w-full gap-2" onClick={() => { setShowPayment(false); navigate('/keys'); }}>
                     <Download className="h-4 w-4" />
                     Download Now
                   </Button>
