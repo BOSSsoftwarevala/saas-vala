@@ -63,6 +63,8 @@ import ItSoftwarePwa from "./pages/ItSoftwarePwa";
 import CloudDevopsPwa from "./pages/CloudDevopsPwa";
 import AnalyticsPwa from "./pages/AnalyticsPwa";
 import Cart from "./pages/Cart";
+import ApkPipeline from "./pages/ApkPipeline";
+import OfflineAppTemplate from "./pages/OfflineAppTemplate";
 
 const queryClient = new QueryClient();
 
@@ -141,6 +143,7 @@ function AppRoutes() {
       <Route path="/cloud-devops-pwa" element={<CloudDevopsPwa />} />
       <Route path="/analytics-pwa" element={<AnalyticsPwa />} />
       <Route path="/cart" element={<Cart />} />
+      <Route path="/offline-app" element={<OfflineAppTemplate />} />
 
       {/* Protected routes */}
       <Route
@@ -309,6 +312,16 @@ function AppRoutes() {
           <ProtectedRoute>
             <AdminRoute>
               <Automation />
+            </AdminRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/apk-pipeline"
+        element={
+          <ProtectedRoute>
+            <AdminRoute>
+              <ApkPipeline />
             </AdminRoute>
           </ProtectedRoute>
         }

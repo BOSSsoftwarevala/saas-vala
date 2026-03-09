@@ -22,6 +22,7 @@ import {
   Activity,
   Bot,
   Zap,
+  Smartphone,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import saasValaLogo from '@/assets/saas-vala-logo.jpg';
@@ -45,6 +46,7 @@ const navItems: NavItem[] = [
   { title: 'AI Chat', icon: MessageSquare, href: '/ai-chat' },
   { title: 'AI APIs', icon: MessageSquare, href: '/ai-apis', adminOnly: true },
   { title: 'Auto-Pilot', icon: Bot, href: '/automation', adminOnly: true },
+  { title: 'APK Pipeline', icon: Smartphone, href: '/apk-pipeline', adminOnly: true },
   { title: 'Wallet', icon: Wallet, href: '/wallet' },
   { title: 'SEO & Leads', icon: TrendingUp, href: '/seo-leads' },
   { title: 'Resellers', icon: Users, href: '/resellers', adminOnly: true },
