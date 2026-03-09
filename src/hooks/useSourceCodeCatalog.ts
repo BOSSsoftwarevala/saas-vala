@@ -239,6 +239,27 @@ export function useSourceCodeCatalog() {
     }
   }, [bulkAnalyze, bulkUploadGitHub, getStats]);
 
+  // Sync all repos from GitHub account into catalog
+  const syncGitHubRepos = useCallback(async (accountName = 'SaaSVala') => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('source-code-manager', {
+        body: { action: 'sync_github_repos', data: { accountName } },
+      });
+      if (error) throw error;
+      if (data?.success) {
+        toast.success(data.message);
+      }
+      return data;
+    } catch (err: any) {
+      console.error('GitHub sync error:', err);
+      toast.error('GitHub sync failed');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   return {
     loading,
     catalog,
@@ -252,5 +273,6 @@ export function useSourceCodeCatalog() {
     getStats,
     searchCatalog,
     runFullPipeline,
+    syncGitHubRepos,
   };
 }

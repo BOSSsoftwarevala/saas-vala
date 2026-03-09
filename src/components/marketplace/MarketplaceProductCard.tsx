@@ -188,36 +188,77 @@ export function MarketplaceProductCard({
     setDownloadChecking(true);
 
     try {
-      // Check if user has purchased this product (has a valid license)
-      const { data: license } = await supabase
-        .from('apk_downloads')
-        .select('license_key')
-        .eq('user_id', user.id)
-        .eq('product_id', product.id)
-        .eq('is_blocked', false)
-        .maybeSingle();
+      // Step 1: Check license_keys table (works for ALL products — generated & real)
+      const { data: licenseRecord } = await supabase
+        .from('license_keys')
+        .select('license_key, status, expires_at, meta')
+        .eq('created_by', user.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(50);
 
-      if (!license) {
-        toast.error('Please purchase this software first to download the APK');
-        setDownloadChecking(false);
-        return;
-      }
-
-      // User has license → trigger secure download via edge function
-      const { data, error } = await supabase.functions.invoke('download-apk', {
-        body: { product_id: product.id, license_key: license.license_key },
+      // Find license matching this product (by product_id in meta or by product_id column)
+      const matchingLicense = licenseRecord?.find((l: any) => {
+        const meta = l.meta as any;
+        return meta?.product_id === product.id || meta?.product_title === product.title;
       });
 
-      if (error || !data?.success) {
-        // Fallback: if no APK file uploaded yet
-        toast.info('APK file will be available for download soon. Your license key is valid.');
+      // Also check apk_downloads for real DB products
+      let apkLicense = null;
+      if (!matchingLicense && isUuid(product.id)) {
+        const { data: dl } = await supabase
+          .from('apk_downloads')
+          .select('license_key')
+          .eq('user_id', user.id)
+          .eq('product_id', product.id)
+          .eq('is_blocked', false)
+          .maybeSingle();
+        apkLicense = dl;
+      }
+
+      const finalLicenseKey = matchingLicense?.license_key || apkLicense?.license_key;
+
+      if (!finalLicenseKey) {
+        toast.error('Please purchase this software first to download the APK', {
+          action: { label: 'BUY NOW', onClick: () => onBuyNow(product) },
+        });
         setDownloadChecking(false);
         return;
       }
 
-      // Open signed download URL
-      window.open(data.download_url, '_blank');
-      toast.success(`Downloading APK for ${product.title}`);
+      // Check expiry
+      if (matchingLicense?.expires_at && new Date(matchingLicense.expires_at) < new Date()) {
+        toast.error('Your license has expired. Please renew to download.');
+        setDownloadChecking(false);
+        return;
+      }
+
+      // For real DB products, try secure download via edge function
+      if (isUuid(product.id)) {
+        const { data, error } = await supabase.functions.invoke('download-apk', {
+          body: { product_id: product.id, license_key: finalLicenseKey },
+        });
+
+        if (!error && data?.success) {
+          window.open(data.download_url, '_blank');
+          toast.success(`✅ Downloading APK for ${product.title}`);
+          setDownloadChecking(false);
+          return;
+        }
+      }
+
+      // Fallback: Show license key + info
+      toast.success(`✅ Your License Key: ${finalLicenseKey}`, {
+        duration: 10000,
+        description: 'APK file is being prepared. Use this key to activate after installation.',
+        action: {
+          label: 'Copy Key',
+          onClick: () => {
+            navigator.clipboard.writeText(finalLicenseKey);
+            toast.success('License key copied!');
+          },
+        },
+      });
     } catch {
       toast.info('APK download will be available soon.');
     }
