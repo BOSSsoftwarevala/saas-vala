@@ -461,6 +461,66 @@ export type Database = {
           },
         ]
       }
+      apk_build_queue: {
+        Row: {
+          apk_file_path: string | null
+          apk_file_size: number | null
+          build_attempts: number | null
+          build_completed_at: string | null
+          build_error: string | null
+          build_started_at: string | null
+          build_status: string
+          created_at: string
+          id: string
+          license_template: string | null
+          marketplace_listed: boolean | null
+          product_id: string | null
+          repo_name: string
+          repo_url: string
+          slug: string
+          target_industry: string | null
+          updated_at: string
+        }
+        Insert: {
+          apk_file_path?: string | null
+          apk_file_size?: number | null
+          build_attempts?: number | null
+          build_completed_at?: string | null
+          build_error?: string | null
+          build_started_at?: string | null
+          build_status?: string
+          created_at?: string
+          id?: string
+          license_template?: string | null
+          marketplace_listed?: boolean | null
+          product_id?: string | null
+          repo_name: string
+          repo_url: string
+          slug: string
+          target_industry?: string | null
+          updated_at?: string
+        }
+        Update: {
+          apk_file_path?: string | null
+          apk_file_size?: number | null
+          build_attempts?: number | null
+          build_completed_at?: string | null
+          build_error?: string | null
+          build_started_at?: string | null
+          build_status?: string
+          created_at?: string
+          id?: string
+          license_template?: string | null
+          marketplace_listed?: boolean | null
+          product_id?: string | null
+          repo_name?: string
+          repo_url?: string
+          slug?: string
+          target_industry?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       apk_download_logs: {
         Row: {
           created_at: string
