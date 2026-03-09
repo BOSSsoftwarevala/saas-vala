@@ -93,8 +93,8 @@ interface Product {
          console.error('Wallet update error:', updateError);
        }
  
-       // Step 5: Generate license key
-       const licenseKey = generateLicenseKey();
+        // Step 5: Generate license key (SV-YEAR-CATEGORY-XXXNNN format)
+        const licenseKey = generateLicenseKey((product as any).category);
  
        // Step 6: Log activity
        await supabase.from('activity_logs').insert({
