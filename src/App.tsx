@@ -63,6 +63,8 @@ import ItSoftwarePwa from "./pages/ItSoftwarePwa";
 import CloudDevopsPwa from "./pages/CloudDevopsPwa";
 import AnalyticsPwa from "./pages/AnalyticsPwa";
 import Cart from "./pages/Cart";
+import ApkPipeline from "./pages/ApkPipeline";
+import OfflineAppTemplate from "./pages/OfflineAppTemplate";
 
 const queryClient = new QueryClient();
 
