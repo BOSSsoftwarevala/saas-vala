@@ -103,6 +103,28 @@ export function Header() {
 
       {/* Right section */}
       <div className="flex items-center gap-3">
+        {/* Cart */}
+        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative text-muted-foreground hover:text-foreground"
+            onClick={() => navigate('/cart')}
+          >
+            <ShoppingCart className="h-5 w-5" />
+            {cartCount > 0 && (
+              <motion.span
+                key={cartCount}
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-primary text-[10px] font-bold text-primary-foreground flex items-center justify-center"
+              >
+                {cartCount > 9 ? '9+' : cartCount}
+              </motion.span>
+            )}
+          </Button>
+        </motion.div>
+
         {/* Wallet */}
         <WalletHeaderButton />
 
