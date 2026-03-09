@@ -42,7 +42,7 @@ const TOP_5_DEVTOOLS_CLONES = [
     price: 5, old_price: 10, rating: 4.9, isAvailable: true, status: 'active', slug: 'gitlab-devops-clone-software',
   },
   {
-    id: 'devtools-clone-3', title: 'Bitbucket Code Repository Clone',
+    id: 'devtools-clone-5', title: 'Bitbucket Code Repository Clone',
     subtitle: 'Git repository hosting platform designed for professional teams.',
     category: 'Developer Tools', description: 'Git repository hosting platform designed for professional teams.',
     features: ['Git Repository Hosting', 'Pull Requests', 'Code Reviews', 'Access Control', 'Team Collaboration'],
