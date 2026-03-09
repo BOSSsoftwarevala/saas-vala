@@ -143,7 +143,7 @@ export function Sidebar() {
                   <Icon
                     className={cn(
                       'h-5 w-5 shrink-0 transition-colors duration-200',
-                      isActive ? 'text-primary' : 'group-hover:text-foreground'
+                      isActive ? 'text-white' : 'group-hover:text-white/90'
                     )}
                   />
                 </motion.div>
