@@ -84,27 +84,43 @@ export function MarketplaceProductCard({
     ? (product as any).techStack.slice(0, 5)
     : ['React', 'Node.js', 'PostgreSQL', 'AWS', 'SSL'];
 
-  const handleWishlist = async () => {
-    if (!user) { toast.error('Sign in to add to cart'); return; }
+  const handleFavorite = async () => {
+    if (!user) { toast.error('Sign in to add to favorites'); return; }
     try {
-      if (wishlisted) {
+      if (favorited) {
         await supabase.from('product_wishlists').delete()
           .eq('user_id', user.id).eq('product_id', product.id);
-        setWishlisted(false);
-        toast('Removed from cart');
+        setFavorited(false);
+        toast('Removed from favorites');
       } else {
         await supabase.from('product_wishlists').insert({
           user_id: user.id,
           product_id: product.id,
           product_name: product.title,
         });
-        setWishlisted(true);
-        toast.success(`🛒 ${product.title} added to cart!`);
+        setFavorited(true);
+        toast.success(`❤️ ${product.title} added to favorites!`);
       }
     } catch {
-      setWishlisted(!wishlisted);
-      toast.success(wishlisted ? 'Removed from cart' : `🛒 Added to cart!`);
+      setFavorited(!favorited);
+      toast.success(favorited ? 'Removed from favorites' : `❤️ Added to favorites!`);
     }
+  };
+
+  const handleAddToCart = () => {
+    const cart: string[] = JSON.parse(localStorage.getItem('sv_cart') || '[]');
+    if (inCart) {
+      const newCart = cart.filter(id => id !== product.id);
+      localStorage.setItem('sv_cart', JSON.stringify(newCart));
+      setInCart(false);
+      toast('Removed from cart');
+    } else {
+      cart.push(product.id);
+      localStorage.setItem('sv_cart', JSON.stringify(cart));
+      setInCart(true);
+      toast.success(`🛒 ${product.title} added to cart!`);
+    }
+    window.dispatchEvent(new Event('sv_cart_update'));
   };
 
   const handleNotifyMe = async () => {
