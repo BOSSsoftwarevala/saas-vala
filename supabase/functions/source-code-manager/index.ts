@@ -553,6 +553,77 @@ Deno.serve(async (req) => {
         );
       }
 
+      // ============= AUTO-SYNC GITHUB REPOS =============
+      case "sync_github_repos": {
+        const { accountName = "SaaSVala" } = data || {};
+        const account = getGitHubAccount(accountName);
+        if (!account.token) {
+          throw new Error(`GitHub token not configured for ${accountName}`);
+        }
+
+        // Fetch all repos with pagination
+        const allRepos: any[] = [];
+        let page = 1;
+        let hasMore = true;
+
+        while (hasMore) {
+          const res = await fetch(
+            `https://api.github.com/user/repos?per_page=100&page=${page}&sort=updated&type=owner`,
+            {
+              headers: {
+                Authorization: `Bearer ${account.token}`,
+                Accept: "application/vnd.github.v3+json",
+                "User-Agent": "SoftwareVala-Sync",
+              },
+            }
+          );
+          if (!res.ok) break;
+          const repos = await res.json();
+          if (!repos.length) break;
+          allRepos.push(...repos);
+          hasMore = repos.length === 100;
+          page++;
+        }
+
+        // Upsert each repo into source_code_catalog
+        let added = 0;
+        let skipped = 0;
+        for (const repo of allRepos) {
+          const slug = repo.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+          const { error } = await supabase.from("source_code_catalog").upsert(
+            {
+              project_name: repo.name,
+              slug,
+              github_repo_url: repo.html_url,
+              github_account: accountName,
+              status: "uploaded",
+              uploaded_to_github: true,
+              uploaded_at: repo.pushed_at || new Date().toISOString(),
+              target_industry: "general",
+            },
+            { onConflict: "slug" }
+          );
+
+          if (error) {
+            skipped++;
+          } else {
+            added++;
+          }
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: `Synced ${added} repos from ${accountName} (${skipped} skipped)`,
+            total_fetched: allRepos.length,
+            added,
+            skipped,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       default:
         return new Response(
           JSON.stringify({ error: "Unknown action" }),
