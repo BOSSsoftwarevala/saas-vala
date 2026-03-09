@@ -337,11 +337,13 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <SidebarProvider>
-            <GlobalActivityPanel />
-            <WorkingDeveloperIndicator />
-            <AppRoutes />
-          </SidebarProvider>
+          <CartProvider>
+            <SidebarProvider>
+              <GlobalActivityPanel />
+              <WorkingDeveloperIndicator />
+              <AppRoutes />
+            </SidebarProvider>
+          </CartProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
