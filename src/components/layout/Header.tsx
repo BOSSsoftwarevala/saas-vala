@@ -40,6 +40,7 @@ export function Header() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, role, signOut, isSuperAdmin } = useAuth();
+  const { count: cartCount } = useCart();
 
   const pageTitle = pageTitles[location.pathname] || 'SaaS VALA';
   const canGoBack = location.pathname !== '/';
