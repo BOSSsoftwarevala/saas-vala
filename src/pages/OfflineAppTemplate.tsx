@@ -62,7 +62,7 @@ export default function OfflineAppTemplate() {
       return;
     }
     // Device binding (simulated)
-    const deviceId = navigator.userAgent.slice(0, 40) + '-' + screen.width;
+    const deviceId = navigator.userAgent.slice(0, 40) + '-' + window.screen.width;
     setLocal('license', {
       key: licenseKey.trim(),
       activated: true,
