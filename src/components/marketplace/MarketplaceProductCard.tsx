@@ -119,15 +119,15 @@ export function MarketplaceProductCard({
 
   // Get the best available demo/source URL
   const getDemoUrl = (): string | null => {
-    // 1. Explicit demo URL (saasvala.com, vercel.app, or any deployed app) — only if manually set
+    // 1. Explicit demo URL (vercel.app or deployed app) — only if manually set and NOT a saasvala.com subdomain (most are not deployed)
     const demoUrl = (product as any).demoUrl || (product as any).demo_url;
-    if (demoUrl && demoUrl.startsWith('http') && !demoUrl.includes('github.com')) return demoUrl;
-    // 2. GitHub repo URL (always real & accessible)
+    if (demoUrl && demoUrl.startsWith('http') && !demoUrl.includes('github.com') && !demoUrl.match(/^https?:\/\/[a-z0-9-]+\.saasvala\.com$/)) return demoUrl;
+    // 2. Live URL if available
+    const liveUrl = (product as any).liveUrl || (product as any).live_url;
+    if (liveUrl && liveUrl.startsWith('http')) return liveUrl;
+    // 3. GitHub repo URL (always real & accessible)
     const gitRepo = (product as any).github_repo || (product as any).gitRepoUrl || (product as any).git_repo_url || (product as any).githubUrl;
     if (gitRepo && gitRepo.startsWith('http')) return gitRepo;
-    // 3. Auto-generate GitHub URL from slug (saasvala org)
-    const slug = (product as any).slug;
-    if (slug) return `https://github.com/saasvala/${slug}`;
     // 4. No demo available
     return null;
   };
