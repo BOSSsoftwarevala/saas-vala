@@ -69,7 +69,7 @@ export function Sidebar() {
         collapsed ? 'w-16' : 'w-64'
       )}
       style={{
-        background: 'linear-gradient(180deg, hsl(215, 65%, 18%) 0%, hsl(215, 65%, 14%) 100%)',
+        background: 'linear-gradient(180deg, hsl(215, 72%, 12%) 0%, hsl(215, 75%, 8%) 100%)',
       }}
     >
       {/* Subtle ambient glow on sidebar */}
