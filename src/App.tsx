@@ -332,11 +332,11 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-       <GlobalActivityPanel />
-       <WorkingDeveloperIndicator />
       <BrowserRouter>
         <AuthProvider>
           <SidebarProvider>
+            <GlobalActivityPanel />
+            <WorkingDeveloperIndicator />
             <AppRoutes />
           </SidebarProvider>
         </AuthProvider>
