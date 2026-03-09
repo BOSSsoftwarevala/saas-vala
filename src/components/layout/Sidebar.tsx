@@ -190,7 +190,7 @@ export function Sidebar() {
                 onClick={signOut}
                 className={cn(
                   'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
-                  'text-sidebar-foreground hover:bg-destructive/10 hover:text-destructive'
+                  'text-white/70 hover:bg-red-500/15 hover:text-red-400'
                 )}
               >
                 <LogOut className="h-5 w-5 shrink-0" />
