@@ -144,7 +144,7 @@ export function Sidebar() {
                   <Icon
                     className={cn(
                       'h-5 w-5 shrink-0 transition-colors duration-200',
-                      isActive ? 'text-white' : 'group-hover:text-white/90'
+                      isActive ? 'text-white' : 'text-white/70 group-hover:text-white'
                     )}
                   />
                 </motion.div>
