@@ -76,7 +76,7 @@ export function mapDbProduct(product: any, index: number): MarketplaceProduct {
     price: Number(product.price) || 5,
     features,
     techStack: defaultTechStack,
-    category: product.business_type || product.category_name || 'Software',
+    category: product.business_type || product.deep_category || 'Software',
     businessType: product.business_type || '',
     gitRepoUrl: product.git_repo_url,
     apkUrl: product.apk_url || undefined,
