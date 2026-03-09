@@ -540,32 +540,46 @@ export function MarketplaceProductCard({
                   </Button>
                 </>
               ) : (
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className={cn(
-                      "flex-1 h-10 text-[12px] font-bold gap-1.5 rounded-xl border-border transition-all duration-200",
-                      hasDemoAvailable ? "hover:border-primary/50 hover:text-primary hover:shadow-[0_2px_12px_rgba(37,99,235,0.1)]" : "opacity-70"
-                    )}
-                    onClick={handleDemo}
-                  >
-                    <Play style={{ width: 14, height: 14 }} />
-                    {hasDemoAvailable ? 'DEMO' : 'VIEW'}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className={cn(
-                      'h-10 w-11 p-0 rounded-xl transition-all duration-200',
-                      wishlisted ? 'border-pink-500/60 text-pink-400 bg-pink-500/10' : 'border-border text-muted-foreground hover:text-pink-400 hover:border-pink-400/50'
-                    )}
-                    onClick={handleWishlist}
-                    title="Add to Cart"
-                  >
-                    <Heart style={{ width: 16, height: 16 }} className={wishlisted ? 'fill-pink-400 text-pink-400' : ''} />
-                  </Button>
-                  <motion.div className="flex-1" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                <>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className={cn(
+                        "flex-1 h-9 text-[11px] font-bold gap-1.5 rounded-xl border-border transition-all duration-200",
+                        hasDemoAvailable ? "hover:border-primary/50 hover:text-primary hover:shadow-[0_2px_12px_rgba(37,99,235,0.1)]" : "opacity-70"
+                      )}
+                      onClick={handleDemo}
+                    >
+                      <Play style={{ width: 13, height: 13 }} />
+                      {hasDemoAvailable ? 'DEMO' : 'VIEW'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className={cn(
+                        'h-9 w-10 p-0 rounded-xl transition-all duration-200',
+                        favorited ? 'border-pink-500/60 text-pink-400 bg-pink-500/10' : 'border-border text-muted-foreground hover:text-pink-400 hover:border-pink-400/50'
+                      )}
+                      onClick={handleFavorite}
+                      title="Add to Favorites"
+                    >
+                      <Heart style={{ width: 15, height: 15 }} className={favorited ? 'fill-pink-400 text-pink-400' : ''} />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className={cn(
+                        'h-9 w-10 p-0 rounded-xl transition-all duration-200',
+                        inCart ? 'border-blue-500/60 text-blue-400 bg-blue-500/10' : 'border-border text-muted-foreground hover:text-blue-400 hover:border-blue-400/50'
+                      )}
+                      onClick={handleAddToCart}
+                      title="Add to Cart"
+                    >
+                      <ShoppingCart style={{ width: 15, height: 15 }} className={inCart ? 'text-blue-400' : ''} />
+                    </Button>
+                  </div>
+                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                     <Button
                       size="sm"
                       className="w-full h-10 text-[12px] font-black gap-1.5 rounded-xl text-white border-0"
@@ -575,11 +589,11 @@ export function MarketplaceProductCard({
                       }}
                       onClick={() => onBuyNow(product)}
                     >
-                      <ShoppingCart style={{ width: 14, height: 14 }} />
-                      BUY $5
+                      <Package style={{ width: 14, height: 14 }} />
+                      BUY NOW — $5
                     </Button>
                   </motion.div>
-                </div>
+                </>
               )}
               {/* DOWNLOAD APK + FEATURES BUTTONS */}
               <div className="flex gap-2">
