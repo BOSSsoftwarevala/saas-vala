@@ -62,6 +62,7 @@ import TelecomPwa from "./pages/TelecomPwa";
 import ItSoftwarePwa from "./pages/ItSoftwarePwa";
 import CloudDevopsPwa from "./pages/CloudDevopsPwa";
 import AnalyticsPwa from "./pages/AnalyticsPwa";
+import Cart from "./pages/Cart";
 
 const queryClient = new QueryClient();
 
