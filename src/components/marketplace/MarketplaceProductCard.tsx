@@ -485,6 +485,7 @@ export function MarketplaceProductCard({
               <div className="ml-auto flex items-center gap-0.5">
                 <Star className="fill-yellow-400 text-yellow-400" style={{ width: 13, height: 13 }} />
                 <span className="text-[11px] font-bold text-yellow-500">4.9</span>
+                <span className="text-[10px] text-muted-foreground ml-0.5">(248)</span>
               </div>
             </div>
 
