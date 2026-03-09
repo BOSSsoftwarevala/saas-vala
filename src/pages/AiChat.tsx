@@ -136,9 +136,9 @@ export default function AiChat() {
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [activeSession?.messages]);
   useEffect(() => { if (isMobile) setSessionListOpen(false); }, [isMobile]);
 
-  // Auto-load latest deployed project URL in preview
+  // Auto-load latest deployed project URL in preview (with health check)
   useEffect(() => {
-    if (previewUrl) return; // already has a URL
+    if (previewUrl) return;
     const loadLatestDeployment = async () => {
       try {
         const { data } = await supabase
@@ -147,10 +147,19 @@ export default function AiChat() {
           .not('deployed_url', 'is', null)
           .eq('status', 'success')
           .order('created_at', { ascending: false })
-          .limit(1);
-        if (data && data.length > 0 && data[0].deployed_url) {
-          setPreviewUrl(data[0].deployed_url);
-          setPreviewInput(data[0].deployed_url);
+          .limit(3);
+        if (data && data.length > 0) {
+          // Try each URL to find one that's actually alive
+          for (const row of data) {
+            try {
+              const check = await fetch(row.deployed_url, { method: 'HEAD', mode: 'no-cors' });
+              setPreviewUrl(row.deployed_url);
+              setPreviewInput(row.deployed_url);
+              break;
+            } catch {
+              console.log('Preview URL unreachable, trying next:', row.deployed_url);
+            }
+          }
         }
       } catch (e) {
         console.log('Auto-preview load skipped:', e);
