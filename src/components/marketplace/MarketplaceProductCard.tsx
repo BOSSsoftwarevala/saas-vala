@@ -65,10 +65,10 @@ export function MarketplaceProductCard({
   const { user } = useAuth();
 
   // Check localStorage cart on mount
-  useState(() => {
+  useEffect(() => {
     const cart = JSON.parse(localStorage.getItem('sv_cart') || '[]');
     if (cart.includes(product.id)) setInCart(true);
-  });
+  }, [product.id]);
 
   const isPipeline = !product.isAvailable || product.status === 'draft' || product.status === 'upcoming';
   const cat = getCatStyle(product.category);
