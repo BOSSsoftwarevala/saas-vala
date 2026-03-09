@@ -317,6 +317,15 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/apk-pipeline"
+        element={
+          <ProtectedRoute>
+            <AdminRoute>
+              <ApkPipeline />
+            </AdminRoute>
+        }
+      />
+      <Route
         path="/admin/add-product"
         element={
           <ProtectedRoute>
