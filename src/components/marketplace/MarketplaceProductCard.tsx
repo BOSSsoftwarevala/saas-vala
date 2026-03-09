@@ -726,8 +726,19 @@ export function MarketplaceProductCard({
 export function ComingSoonCard({ label }: { label: string }) {
   return (
     <div className="flex-shrink-0" style={{ width: '340px' }}>
-      <div className="rounded-2xl border border-dashed border-border bg-card/50 flex flex-col items-center justify-center gap-3 text-center" style={{ minHeight: 420 }}>
-        <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center">
+      <div
+        className="rounded-2xl border border-dashed flex flex-col items-center justify-center gap-3 text-center"
+        style={{
+          minHeight: 420,
+          borderColor: 'hsl(var(--border) / 0.4)',
+          background: 'hsl(var(--card) / 0.6)',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+        }}
+      >
+        <div
+          className="h-16 w-16 rounded-2xl flex items-center justify-center"
+          style={{ background: 'hsl(var(--muted))', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)' }}
+        >
           <Package style={{ width: 28, height: 28 }} className="text-muted-foreground" />
         </div>
         <div>
