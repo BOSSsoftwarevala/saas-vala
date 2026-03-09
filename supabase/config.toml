@@ -44,3 +44,9 @@ verify_jwt = false
 
 [functions.verify-license]
 verify_jwt = false
+
+[functions.bulk-vercel-deploy]
+verify_jwt = false
+
+[functions.factory-deploy]
+verify_jwt = false
