@@ -231,7 +231,7 @@ export function Sidebar() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="mt-4 text-center text-xs text-muted-foreground"
+                className="mt-4 text-center text-xs text-white/40"
               >
                 Powered by{' '}
                 <span className="font-semibold text-gradient-primary">SoftwareVala™</span>
