@@ -4104,15 +4104,22 @@ POWERED BY SOFTWAREVALA™ | VALA AI SOVEREIGN FACTORY v10.0 — FULL AUTONOMOUS
         .limit(5);
 
       // 2. Load project/session memories relevant to current message
-      const keywords = lastUserMessage.toLowerCase().split(/\s+/).filter(w => w.length > 3).slice(0, 10);
-      const { data: relevantMemories } = await supabase
-        .from('ai_memories')
-        .select('id, title, content, category, memory_type, tags, priority')
-        .eq('is_active', true)
-        .neq('priority', 'HIGH') // already got HIGH above
-        .or(`memory_type.eq.project,memory_type.eq.session`)
-        .order('last_accessed_at', { ascending: false })
-        .limit(10);
+      // For simple/short messages (greetings etc.), skip loading extra memories
+      const isSimpleMessage = lastUserMessage.split(/\s+/).length <= 5 && 
+        !lastUserMessage.match(/deploy|server|fix|scan|build|github|repo|status|check|setup|install|test|analyze/i);
+      
+      let relevantMemories: any[] | null = null;
+      if (!isSimpleMessage) {
+        const { data } = await supabase
+          .from('ai_memories')
+          .select('id, title, content, category, memory_type, tags, priority')
+          .eq('is_active', true)
+          .neq('priority', 'HIGH')
+          .or(`memory_type.eq.project,memory_type.eq.session`)
+          .order('last_accessed_at', { ascending: false })
+          .limit(5);
+        relevantMemories = data;
+      }
 
       // 3. Filter TEMP memories - expire old ones
       const now = new Date().toISOString();
