@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -55,13 +55,20 @@ export function MarketplaceProductCard({
   onBuyNow,
   rank,
 }: MarketplaceProductCardProps) {
-  const [wishlisted, setWishlisted] = useState(false);
+  const [favorited, setFavorited] = useState(false);
+  const [inCart, setInCart] = useState(false);
   const [notified, setNotified] = useState(false);
   const [activeTab, setActiveTab] = useState<'features' | 'tech'>('features');
   const [demoOpen, setDemoOpen] = useState(false);
   const [featuresOpen, setFeaturesOpen] = useState(false);
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const { user } = useAuth();
+
+  // Check localStorage cart on mount
+  useEffect(() => {
+    const cart = JSON.parse(localStorage.getItem('sv_cart') || '[]');
+    if (cart.includes(product.id)) setInCart(true);
+  }, [product.id]);
 
   const isPipeline = !product.isAvailable || product.status === 'draft' || product.status === 'upcoming';
   const cat = getCatStyle(product.category);
@@ -77,27 +84,43 @@ export function MarketplaceProductCard({
     ? (product as any).techStack.slice(0, 5)
     : ['React', 'Node.js', 'PostgreSQL', 'AWS', 'SSL'];
 
-  const handleWishlist = async () => {
-    if (!user) { toast.error('Sign in to add to cart'); return; }
+  const handleFavorite = async () => {
+    if (!user) { toast.error('Sign in to add to favorites'); return; }
     try {
-      if (wishlisted) {
+      if (favorited) {
         await supabase.from('product_wishlists').delete()
           .eq('user_id', user.id).eq('product_id', product.id);
-        setWishlisted(false);
-        toast('Removed from cart');
+        setFavorited(false);
+        toast('Removed from favorites');
       } else {
         await supabase.from('product_wishlists').insert({
           user_id: user.id,
           product_id: product.id,
           product_name: product.title,
         });
-        setWishlisted(true);
-        toast.success(`🛒 ${product.title} added to cart!`);
+        setFavorited(true);
+        toast.success(`❤️ ${product.title} added to favorites!`);
       }
     } catch {
-      setWishlisted(!wishlisted);
-      toast.success(wishlisted ? 'Removed from cart' : `🛒 Added to cart!`);
+      setFavorited(!favorited);
+      toast.success(favorited ? 'Removed from favorites' : `❤️ Added to favorites!`);
     }
+  };
+
+  const handleAddToCart = () => {
+    const cart: string[] = JSON.parse(localStorage.getItem('sv_cart') || '[]');
+    if (inCart) {
+      const newCart = cart.filter(id => id !== product.id);
+      localStorage.setItem('sv_cart', JSON.stringify(newCart));
+      setInCart(false);
+      toast('Removed from cart');
+    } else {
+      cart.push(product.id);
+      localStorage.setItem('sv_cart', JSON.stringify(cart));
+      setInCart(true);
+      toast.success(`🛒 ${product.title} added to cart!`);
+    }
+    window.dispatchEvent(new Event('sv_cart_update'));
   };
 
   const handleNotifyMe = async () => {
@@ -462,72 +485,101 @@ export function MarketplaceProductCard({
               <div className="ml-auto flex items-center gap-0.5">
                 <Star className="fill-yellow-400 text-yellow-400" style={{ width: 13, height: 13 }} />
                 <span className="text-[11px] font-bold text-yellow-500">4.9</span>
+                <span className="text-[10px] text-muted-foreground ml-0.5">(248)</span>
               </div>
             </div>
 
             {/* ── BUTTONS ── */}
             <div className="mt-1 flex flex-col gap-2">
               {isPipeline ? (
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    className={cn(
-                      'flex-1 h-10 text-[12px] font-bold gap-1.5 rounded-xl transition-all duration-200',
-                      notified ? 'bg-green-600 hover:bg-green-500 text-white' : 'bg-yellow-500 hover:bg-yellow-400 text-black'
-                    )}
-                    onClick={handleNotifyMe}
-                  >
-                    <Bell style={{ width: 14, height: 14 }} />
-                    {notified ? 'NOTIFIED' : 'NOTIFY ME'}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className={cn(
-                      'h-10 w-11 p-0 rounded-xl transition-all duration-200',
-                      wishlisted ? 'border-pink-500/60 text-pink-400 bg-pink-500/10' : 'border-border text-muted-foreground hover:text-pink-400 hover:border-pink-400/50'
-                    )}
-                    onClick={handleWishlist}
-                    title="Add to Cart"
-                  >
-                    <Heart style={{ width: 16, height: 16 }} className={wishlisted ? 'fill-pink-400 text-pink-400' : ''} />
-                  </Button>
+                <>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      className={cn(
+                        'flex-1 h-9 text-[11px] font-bold gap-1.5 rounded-xl transition-all duration-200',
+                        notified ? 'bg-green-600 hover:bg-green-500 text-white' : 'bg-yellow-500 hover:bg-yellow-400 text-black'
+                      )}
+                      onClick={handleNotifyMe}
+                    >
+                      <Bell style={{ width: 13, height: 13 }} />
+                      {notified ? 'NOTIFIED' : 'NOTIFY ME'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className={cn(
+                        'h-9 w-10 p-0 rounded-xl transition-all duration-200',
+                        favorited ? 'border-pink-500/60 text-pink-400 bg-pink-500/10' : 'border-border text-muted-foreground hover:text-pink-400 hover:border-pink-400/50'
+                      )}
+                      onClick={handleFavorite}
+                      title="Add to Favorites"
+                    >
+                      <Heart style={{ width: 15, height: 15 }} className={favorited ? 'fill-pink-400 text-pink-400' : ''} />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className={cn(
+                        'h-9 w-10 p-0 rounded-xl transition-all duration-200',
+                        inCart ? 'border-blue-500/60 text-blue-400 bg-blue-500/10' : 'border-border text-muted-foreground hover:text-blue-400 hover:border-blue-400/50'
+                      )}
+                      onClick={handleAddToCart}
+                      title="Add to Cart"
+                    >
+                      <ShoppingCart style={{ width: 15, height: 15 }} className={inCart ? 'text-blue-400' : ''} />
+                    </Button>
+                  </div>
                   <Button
                     size="sm"
                     disabled
-                    className="flex-1 h-10 text-[12px] font-bold rounded-xl opacity-40 gap-1.5"
+                    className="h-10 text-[12px] font-bold rounded-xl opacity-40 gap-1.5"
                   >
-                    <ShoppingCart style={{ width: 14, height: 14 }} />
+                    <Package style={{ width: 14, height: 14 }} />
                     BUY $5
                   </Button>
-                </div>
+                </>
               ) : (
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className={cn(
-                      "flex-1 h-10 text-[12px] font-bold gap-1.5 rounded-xl border-border transition-all duration-200",
-                      hasDemoAvailable ? "hover:border-primary/50 hover:text-primary hover:shadow-[0_2px_12px_rgba(37,99,235,0.1)]" : "opacity-70"
-                    )}
-                    onClick={handleDemo}
-                  >
-                    <Play style={{ width: 14, height: 14 }} />
-                    {hasDemoAvailable ? 'DEMO' : 'VIEW'}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className={cn(
-                      'h-10 w-11 p-0 rounded-xl transition-all duration-200',
-                      wishlisted ? 'border-pink-500/60 text-pink-400 bg-pink-500/10' : 'border-border text-muted-foreground hover:text-pink-400 hover:border-pink-400/50'
-                    )}
-                    onClick={handleWishlist}
-                    title="Add to Cart"
-                  >
-                    <Heart style={{ width: 16, height: 16 }} className={wishlisted ? 'fill-pink-400 text-pink-400' : ''} />
-                  </Button>
-                  <motion.div className="flex-1" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                <>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className={cn(
+                        "flex-1 h-9 text-[11px] font-bold gap-1.5 rounded-xl border-border transition-all duration-200",
+                        hasDemoAvailable ? "hover:border-primary/50 hover:text-primary hover:shadow-[0_2px_12px_rgba(37,99,235,0.1)]" : "opacity-70"
+                      )}
+                      onClick={handleDemo}
+                    >
+                      <Play style={{ width: 13, height: 13 }} />
+                      {hasDemoAvailable ? 'DEMO' : 'VIEW'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className={cn(
+                        'h-9 w-10 p-0 rounded-xl transition-all duration-200',
+                        favorited ? 'border-pink-500/60 text-pink-400 bg-pink-500/10' : 'border-border text-muted-foreground hover:text-pink-400 hover:border-pink-400/50'
+                      )}
+                      onClick={handleFavorite}
+                      title="Add to Favorites"
+                    >
+                      <Heart style={{ width: 15, height: 15 }} className={favorited ? 'fill-pink-400 text-pink-400' : ''} />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className={cn(
+                        'h-9 w-10 p-0 rounded-xl transition-all duration-200',
+                        inCart ? 'border-blue-500/60 text-blue-400 bg-blue-500/10' : 'border-border text-muted-foreground hover:text-blue-400 hover:border-blue-400/50'
+                      )}
+                      onClick={handleAddToCart}
+                      title="Add to Cart"
+                    >
+                      <ShoppingCart style={{ width: 15, height: 15 }} className={inCart ? 'text-blue-400' : ''} />
+                    </Button>
+                  </div>
+                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                     <Button
                       size="sm"
                       className="w-full h-10 text-[12px] font-black gap-1.5 rounded-xl text-white border-0"
@@ -537,11 +589,11 @@ export function MarketplaceProductCard({
                       }}
                       onClick={() => onBuyNow(product)}
                     >
-                      <ShoppingCart style={{ width: 14, height: 14 }} />
-                      BUY $5
+                      <Package style={{ width: 14, height: 14 }} />
+                      BUY NOW — $5
                     </Button>
                   </motion.div>
-                </div>
+                </>
               )}
               {/* DOWNLOAD APK + FEATURES BUTTONS */}
               <div className="flex gap-2">
