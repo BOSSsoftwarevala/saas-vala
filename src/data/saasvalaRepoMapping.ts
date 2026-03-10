@@ -95,6 +95,17 @@ export const educationRepos: RepoProduct[] = [
   repo('wonder-box-kids', 'WONDER BOX KIDS', 'Education'),
   repo('research-hub-secure', 'RESEARCH HUB SECURE', 'Education'),
   repo('sports-register-plus', 'SPORTS REGISTER PLUS', 'Education'),
+  repo('academy-flow', 'ACADEMY FLOW', 'Education'),
+];
+
+// ══════════════════════════════════════════
+// SPORTS & RECREATION (5 repos)
+// ══════════════════════════════════════════
+export const sportsRepos: RepoProduct[] = [
+  repo('cricket-academy-manager', 'CRICKET ACADEMY MGR', 'Sports'),
+  repo('club-manager-suite', 'CLUB MANAGER SUITE', 'Sports'),
+  repo('splash-swim-manager', 'SWIM ACADEMY MANAGER', 'Sports'),
+  repo('trekmaster-pro', 'TREK MASTER PRO', 'Sports'),
 ];
 
 // ══════════════════════════════════════════
