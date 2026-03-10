@@ -34,6 +34,7 @@ export const healthcareRepos: RepoProduct[] = [
   repo('ent-clinic-pro', 'ENT CLINIC MANAGER', 'Healthcare'),
   repo('harmony-care-suite', 'HARMONY CARE SUITE', 'Healthcare'),
   repo('clinic-flow-pro', 'CLINIC FLOW PRO', 'Healthcare'),
+  repo('clinicflow-pro', 'CLINIC FLOW ADVANCED', 'Healthcare'),
   repo('oncology-care-suite', 'ONCOLOGY CARE SUITE', 'Healthcare'),
   repo('dialysis-flow-pro', 'DIALYSIS FLOW PRO', 'Healthcare'),
   repo('vaccine-hub-pro', 'VACCINE HUB PRO', 'Healthcare'),
@@ -64,6 +65,7 @@ export const healthcareRepos: RepoProduct[] = [
   repo('recovery-navigator', 'RECOVERY NAVIGATOR', 'Healthcare'),
   repo('secure-lab-suite', 'PATHOLOGY LAB SUITE', 'Healthcare'),
   repo('stellar-admin-suite', 'HOSPITAL ADMIN SUITE', 'Healthcare'),
+  repo('optical-brilliance-suite', 'OPTICAL BRILLIANCE SUITE', 'Healthcare'),
 ];
 
 // ══════════════════════════════════════════
