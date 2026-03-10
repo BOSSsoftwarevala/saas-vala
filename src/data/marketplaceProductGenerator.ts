@@ -823,7 +823,7 @@ const CATEGORY_TO_REPO_MAP: Record<string, string> = {
   agriculture: 'Agriculture',
   beauty_fashion: 'Beauty',
   legal: 'Legal',
-  gym_sports: 'Beauty',
+  gym_sports: 'Sports',
   it_software: 'IT',
   cloud_devops: 'IT',
   ai_automation: 'IT',
@@ -834,6 +834,9 @@ const CATEGORY_TO_REPO_MAP: Record<string, string> = {
   manufacturing: 'Services',
   ecommerce: 'Retail',
   pharma: 'Healthcare',
+  cybersecurity: 'IT',
+  marketing: 'Services',
+  security_systems: 'IT',
 };
 
 export function generateCategoryProducts(
