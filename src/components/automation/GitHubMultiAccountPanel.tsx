@@ -71,6 +71,16 @@ export function GitHubMultiAccountPanel() {
                 Refresh
               </Button>
               <Button
+                onClick={() => bulkSetVisibility('public', 'SaaSVala')}
+                disabled={loading}
+                variant="outline"
+                size="sm"
+                className="border-green-500/30 text-green-400 hover:bg-green-500/10"
+              >
+                <Eye className="h-4 w-4 mr-1" />
+                Make All Public
+              </Button>
+              <Button
                 onClick={() => runFullAutomation()}
                 disabled={loading}
                 className="bg-gradient-to-r from-purple-600 to-blue-600"
