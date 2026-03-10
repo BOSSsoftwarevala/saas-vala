@@ -518,6 +518,91 @@ Deno.serve(async (req) => {
         );
       }
 
+      // ============= BULK SET VISIBILITY =============
+      case "bulk_set_visibility": {
+        const targetVisibility = data?.visibility || "public"; // "public" or "private"
+        const targetAccount = data?.account || "SaaSVala";
+        const batchSize = data?.batch_size || 30;
+        const offset = data?.offset || 0;
+
+        const account = accounts.find(a => a.name === targetAccount);
+        if (!account) {
+          return new Response(
+            JSON.stringify({ error: `Account ${targetAccount} not found` }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const allRepos = await fetchAllRepos(account);
+        const reposToUpdate = allRepos
+          .filter(r => targetVisibility === "public" ? r.private : !r.private)
+          .slice(offset, offset + batchSize);
+
+        const results: { name: string; success: boolean; error?: string }[] = [];
+
+        for (const repo of reposToUpdate) {
+          try {
+            const resp = await fetch(
+              `https://api.github.com/repos/${repo.full_name}`,
+              {
+                method: "PATCH",
+                headers: {
+                  Authorization: `Bearer ${account.token}`,
+                  Accept: "application/vnd.github.v3+json",
+                  "User-Agent": "SoftwareVala-AutoPilot",
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ private: targetVisibility !== "public" }),
+              }
+            );
+            const body = await resp.text();
+            if (resp.ok) {
+              results.push({ name: repo.name, success: true });
+            } else {
+              results.push({ name: repo.name, success: false, error: body.substring(0, 200) });
+            }
+          } catch (e) {
+            results.push({ name: repo.name, success: false, error: String(e).substring(0, 200) });
+          }
+        }
+
+        const totalNeedingUpdate = allRepos.filter(r => targetVisibility === "public" ? r.private : !r.private).length;
+        const successCount = results.filter(r => r.success).length;
+        const hasMore = (offset + batchSize) < totalNeedingUpdate;
+
+        // Log
+        await supabase.from("activity_logs").insert({
+          entity_type: "github_visibility",
+          entity_id: crypto.randomUUID(),
+          action: "bulk_set_visibility",
+          details: {
+            account: targetAccount,
+            visibility: targetVisibility,
+            batch: { offset, size: batchSize },
+            updated: successCount,
+            failed: results.length - successCount,
+            total_remaining: totalNeedingUpdate - offset - results.length,
+            timestamp: new Date().toISOString(),
+          },
+        });
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            account: targetAccount,
+            visibility: targetVisibility,
+            total_needing_update: totalNeedingUpdate,
+            batch_processed: results.length,
+            updated: successCount,
+            failed: results.length - successCount,
+            has_more: hasMore,
+            next_offset: offset + batchSize,
+            results,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       default:
         return new Response(
           JSON.stringify({ error: "Unknown action" }),
