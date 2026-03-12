@@ -5,7 +5,7 @@
  */
 
 import type { MarketplaceProduct } from '@/hooks/useMarketplaceProducts';
-import { allReposByCategory, type RepoProduct } from './saasvalaRepoMapping';
+import { allRepos, allReposByCategory, type RepoProduct } from './saasvalaRepoMapping';
 
 const stockImages = [
   'https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&h=300&fit=crop',
