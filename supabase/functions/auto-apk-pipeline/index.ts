@@ -344,6 +344,7 @@ Deno.serve(async (req) => {
         const githubToken = Deno.env.get("SAASVALA_GITHUB_TOKEN");
         if (!githubToken) return respond({ error: "GitHub token not configured" }, 500);
 
+        const since = new Date(Date.now() - 86400000).toISOString();
         const repos = await fetchSaasvalaRepos(githubToken);
         const recentlyUpdated = (repos || []).filter(
           (r: any) => new Date(r.pushed_at) > new Date(since)
