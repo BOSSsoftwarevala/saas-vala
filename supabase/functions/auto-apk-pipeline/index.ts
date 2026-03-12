@@ -458,6 +458,106 @@ Deno.serve(async (req) => {
       }
 
       // ═══════════════════════════════════════════
+      // Scheduled daily maintenance: missing checks + auto updates
+      // ═══════════════════════════════════════════
+      case "scheduled_daily_sync": {
+        const githubToken = Deno.env.get("SAASVALA_GITHUB_TOKEN");
+        if (!githubToken) return respond({ error: "GitHub token not configured" }, 500);
+
+        const allRepos = await fetchSaasvalaRepos(githubToken);
+        const repairedMissingSlugs = await repairMissingCatalogSlugs(admin);
+
+        const { data: existing } = await admin.from("source_code_catalog").select("slug, id, status");
+        const catalogMap = new Map((existing || []).map((e: any) => [e.slug, e]));
+
+        const newEntries: any[] = [];
+        for (const repo of allRepos || []) {
+          const slug = slugify(repo.name);
+          if (!slug || catalogMap.has(slug)) continue;
+
+          newEntries.push({
+            project_name: repo.name,
+            slug,
+            github_repo_url: repo.html_url,
+            github_account: "saasvala",
+            status: "pending_build",
+            target_industry: detectIndustry(repo.name, repo.description || ""),
+            ai_description: repo.description || `${repo.name} - SaaS Vala Software`,
+            tech_stack: { languages: [repo.language || "Unknown"] },
+            uploaded_to_github: true,
+          });
+        }
+
+        let newlyRegistered = 0;
+        if (newEntries.length > 0) {
+          const { error } = await admin.from("source_code_catalog").upsert(newEntries, { onConflict: "slug" });
+          if (!error) newlyRegistered = newEntries.length;
+        }
+
+        const { data: pendingToQueue } = await admin
+          .from("source_code_catalog")
+          .select("id")
+          .in("status", ["pending", "analyzed", "uploaded"])
+          .limit(200);
+
+        let buildsQueued = 0;
+        for (const row of pendingToQueue || []) {
+          await admin.from("bulk_upload_queue").insert({
+            catalog_id: row.id,
+            upload_type: "apk_build",
+            status: "queued",
+            priority: 5,
+          });
+
+          await admin
+            .from("source_code_catalog")
+            .update({ status: "pending_build" })
+            .eq("id", row.id);
+
+          buildsQueued++;
+        }
+
+        const since = new Date(Date.now() - 86400000).toISOString();
+        const recentlyUpdated = (allRepos || []).filter((r: any) => new Date(r.pushed_at) > new Date(since));
+
+        let rebuildsQueued = 0;
+        for (const repo of recentlyUpdated) {
+          const slug = slugify(repo.name);
+          const { data: catalogEntry } = await admin
+            .from("source_code_catalog")
+            .select("id, status")
+            .eq("slug", slug)
+            .single();
+
+          if (catalogEntry && ["completed", "listed"].includes(catalogEntry.status || "")) {
+            await admin.from("bulk_upload_queue").insert({
+              catalog_id: catalogEntry.id,
+              upload_type: "apk_rebuild",
+              status: "queued",
+              priority: 3,
+            });
+
+            await admin
+              .from("source_code_catalog")
+              .update({ status: "rebuilding" })
+              .eq("id", catalogEntry.id);
+
+            rebuildsQueued++;
+          }
+        }
+
+        return respond({
+          success: true,
+          total_repos: allRepos.length,
+          newly_registered: newlyRegistered,
+          builds_queued: buildsQueued,
+          rebuilds_queued: rebuildsQueued,
+          repaired_missing_slugs: repairedMissingSlugs,
+          message: `✅ Daily sync complete: ${newlyRegistered} new repos, ${buildsQueued} builds, ${rebuildsQueued} rebuilds, ${repairedMissingSlugs} slug repairs`,
+        });
+      }
+
+      // ═══════════════════════════════════════════
       // Get pipeline stats
       // ═══════════════════════════════════════════
       case "get_stats": {
