@@ -344,13 +344,7 @@ Deno.serve(async (req) => {
         const githubToken = Deno.env.get("SAASVALA_GITHUB_TOKEN");
         if (!githubToken) return respond({ error: "GitHub token not configured" }, 500);
 
-        // Get repos updated in last 24 hours
-        const since = new Date(Date.now() - 86400000).toISOString();
-        const res = await fetch(
-          `https://api.github.com/users/saasvala/repos?per_page=100&sort=updated&direction=desc`,
-          { headers: { Authorization: `Bearer ${githubToken}`, "User-Agent": "SaaSVala-APK-Pipeline" } }
-        );
-        const repos = await res.json();
+        const repos = await fetchSaasvalaRepos(githubToken);
         const recentlyUpdated = (repos || []).filter(
           (r: any) => new Date(r.pushed_at) > new Date(since)
         );
