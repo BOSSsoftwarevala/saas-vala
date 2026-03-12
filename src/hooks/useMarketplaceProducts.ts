@@ -58,6 +58,34 @@ function formatProductName(name: string): string {
   return (name || '').substring(0, 50).toUpperCase();
 }
 
+function getProductPriorityScore(product: MarketplaceProduct): number {
+  const repoUrl = (product.gitRepoUrl || '').toLowerCase();
+  const demoUrl = (product.demoUrl || '').toLowerCase();
+
+  const hasLiveDemo = Boolean(demoUrl && demoUrl.startsWith('http') && !demoUrl.includes('github.com'));
+  const hasRealRepo = repoUrl.includes('github.com/saasvala/') || repoUrl.includes('github.com/softwarevala/');
+  const hasAnyRepo = Boolean(repoUrl);
+  const isLive = product.status === 'live' || product.status === 'bestseller';
+  const isAvailable = product.isAvailable !== false;
+
+  return (
+    (hasLiveDemo ? 500 : 0) +
+    (hasRealRepo ? 300 : 0) +
+    (!hasRealRepo && hasAnyRepo ? 120 : 0) +
+    (isLive ? 80 : 0) +
+    (isAvailable ? 40 : 0) +
+    (product.featured ? 15 : 0) +
+    (product.trending ? 10 : 0)
+  );
+}
+
+function prioritizeProducts(products: MarketplaceProduct[]): MarketplaceProduct[] {
+  return products
+    .map((product, index) => ({ product, index, score: getProductPriorityScore(product) }))
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .map(({ product }) => product);
+}
+
 export function mapDbProduct(product: any, index: number): MarketplaceProduct {
   const features = Array.isArray(product.features) && product.features.length > 0
     ? product.features.slice(0, 4).map((f: any) =>
