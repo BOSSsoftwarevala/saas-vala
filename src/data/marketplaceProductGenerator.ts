@@ -837,6 +837,10 @@ const CATEGORY_TO_REPO_MAP: Record<string, string> = {
   cybersecurity: 'IT',
   marketing: 'Services',
   security_systems: 'IT',
+  top_selling: 'ALL_REAL',
+  popular: 'ALL_REAL',
+  evergreen: 'ALL_REAL',
+  on_demand: 'ALL_REAL',
 };
 
 export function generateCategoryProducts(
