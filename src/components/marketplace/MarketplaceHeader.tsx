@@ -69,7 +69,7 @@ export function MarketplaceHeader() {
   }, [location.hash]);
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-background/95 backdrop-blur-md border-b border-border">
+    <header className="fixed top-0 left-0 right-0 z-50 h-16 border-b" style={{ background: 'rgba(11,16,32,0.92)', backdropFilter: 'blur(16px)', borderColor: 'rgba(255,255,255,0.06)' }}>
       <div className="h-full px-4 md:px-8 flex items-center justify-between">
         {/* Left - Logo */}
         <div 

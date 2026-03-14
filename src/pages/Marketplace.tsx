@@ -235,7 +235,7 @@ export default function Marketplace() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen" style={{ background: 'linear-gradient(180deg, #0B1020 0%, #0d1428 50%, #0B1020 100%)' }}>
       {/* Fixed Header */}
       <MarketplaceHeader />
 

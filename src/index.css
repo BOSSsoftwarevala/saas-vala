@@ -12,104 +12,104 @@
 
 @layer base {
   :root {
-    /* Premium Light Background */
-    --background: 220 20% 97%;
-    --foreground: 220 30% 15%;
+    /* Premium Deep Navy Dark Theme */
+    --background: 225 50% 6%;
+    --foreground: 210 20% 90%;
 
-    /* Card - Pure white with depth */
-    --card: 0 0% 100%;
-    --card-foreground: 220 30% 15%;
+    /* Card - Dark glass */
+    --card: 225 40% 10%;
+    --card-foreground: 210 20% 90%;
 
     /* Popover */
-    --popover: 0 0% 100%;
-    --popover-foreground: 220 30% 15%;
+    --popover: 225 40% 10%;
+    --popover-foreground: 210 20% 90%;
 
-    /* Primary - Royal Blue (from logo) */
-    --primary: 215 75% 42%;
+    /* Primary - Electric Blue */
+    --primary: 217 83% 53%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary - Rich Red (from logo accent) */
-    --secondary: 358 72% 48%;
+    /* Secondary - Vivid Purple */
+    --secondary: 258 83% 58%;
     --secondary-foreground: 0 0% 100%;
 
-    /* Muted - Soft blue-grey */
-    --muted: 220 14% 92%;
-    --muted-foreground: 220 10% 46%;
+    /* Muted - Dark slate */
+    --muted: 225 30% 14%;
+    --muted-foreground: 215 15% 55%;
 
     /* Accent - Deep Blue */
-    --accent: 220 60% 95%;
-    --accent-foreground: 215 75% 42%;
+    --accent: 225 40% 15%;
+    --accent-foreground: 217 83% 65%;
 
     /* Destructive */
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Success - Emerald */
-    --success: 152 69% 40%;
+    /* Success - Neon Green */
+    --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
 
-    /* Warning - Warm Amber */
+    /* Warning - Amber */
     --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
+    --warning-foreground: 0 0% 10%;
 
     /* Borders and Inputs */
-    --border: 220 15% 88%;
-    --input: 220 15% 88%;
-    --ring: 215 75% 42%;
+    --border: 225 20% 18%;
+    --input: 225 20% 18%;
+    --ring: 217 83% 53%;
 
     --radius: 0.75rem;
 
-    /* Sidebar - Deep Royal Blue (high contrast) */
-    --sidebar-background: 215 72% 12%;
-    --sidebar-foreground: 0 0% 85%;
+    /* Sidebar */
+    --sidebar-background: 225 50% 5%;
+    --sidebar-foreground: 210 20% 80%;
     --sidebar-primary: 0 0% 100%;
-    --sidebar-primary-foreground: 215 72% 12%;
-    --sidebar-accent: 215 65% 32%;
+    --sidebar-primary-foreground: 225 50% 5%;
+    --sidebar-accent: 217 60% 25%;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 215 50% 20%;
-    --sidebar-ring: 0 0% 100%;
+    --sidebar-border: 225 30% 15%;
+    --sidebar-ring: 217 83% 53%;
 
     /* Custom accent colors */
     --cyan: 195 85% 45%;
-    --purple: 255 60% 55%;
-    --green: 152 69% 40%;
+    --purple: 258 83% 58%;
+    --green: 142 71% 45%;
     --gold: 45 93% 47%;
 
     /* Premium additions */
-    --royal-blue: 215 75% 42%;
-    --royal-blue-light: 215 80% 60%;
-    --royal-blue-dark: 215 70% 30%;
+    --royal-blue: 217 83% 53%;
+    --royal-blue-light: 217 90% 65%;
+    --royal-blue-dark: 217 75% 35%;
   }
 
   .dark {
-    /* Keep same - single premium theme */
-    --background: 220 20% 97%;
-    --foreground: 220 30% 15%;
-    --card: 0 0% 100%;
-    --card-foreground: 220 30% 15%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 220 30% 15%;
-    --primary: 215 75% 42%;
+    /* Same as root - unified dark theme */
+    --background: 225 50% 6%;
+    --foreground: 210 20% 90%;
+    --card: 225 40% 10%;
+    --card-foreground: 210 20% 90%;
+    --popover: 225 40% 10%;
+    --popover-foreground: 210 20% 90%;
+    --primary: 217 83% 53%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 358 72% 48%;
+    --secondary: 258 83% 58%;
     --secondary-foreground: 0 0% 100%;
-    --muted: 220 14% 92%;
-    --muted-foreground: 220 10% 46%;
-    --accent: 220 60% 95%;
-    --accent-foreground: 215 75% 42%;
+    --muted: 225 30% 14%;
+    --muted-foreground: 215 15% 55%;
+    --accent: 225 40% 15%;
+    --accent-foreground: 217 83% 65%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 220 15% 88%;
-    --input: 220 15% 88%;
-    --ring: 215 75% 42%;
-    --sidebar-background: 215 72% 12%;
-    --sidebar-foreground: 0 0% 85%;
+    --border: 225 20% 18%;
+    --input: 225 20% 18%;
+    --ring: 217 83% 53%;
+    --sidebar-background: 225 50% 5%;
+    --sidebar-foreground: 210 20% 80%;
     --sidebar-primary: 0 0% 100%;
-    --sidebar-primary-foreground: 215 72% 12%;
-    --sidebar-accent: 215 65% 32%;
+    --sidebar-primary-foreground: 225 50% 5%;
+    --sidebar-accent: 217 60% 25%;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 215 50% 20%;
-    --sidebar-ring: 0 0% 100%;
+    --sidebar-border: 225 30% 15%;
+    --sidebar-ring: 217 83% 53%;
   }
 }
 
@@ -142,10 +142,13 @@
   /* ═══════════════════════════════════════ */
   
   .glass-card {
-    @apply bg-card border border-border rounded-2xl;
+    @apply rounded-2xl;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(12px);
     box-shadow: 
-      0 1px 3px 0 hsl(220 30% 15% / 0.04),
-      0 4px 16px -2px hsl(220 30% 15% / 0.06);
+      0 4px 16px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
 
   .glass-card-hover {
@@ -153,10 +156,11 @@
   }
 
   .glass-card-hover:hover {
-    @apply border-primary/30;
+    border-color: rgba(37, 99, 235, 0.3);
     box-shadow: 
-      0 4px 12px -2px hsl(var(--primary) / 0.12),
-      0 12px 36px -8px hsl(var(--primary) / 0.08);
+      0 8px 32px rgba(37, 99, 235, 0.15),
+      0 16px 48px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
     transform: translateY(-4px);
   }
 
@@ -165,10 +169,13 @@
   /* ═══════════════════════════════════════ */
   
   .premium-card {
-    @apply relative bg-card border border-border rounded-2xl overflow-hidden;
+    @apply relative rounded-2xl overflow-hidden;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(16px);
     box-shadow: 
-      0 1px 3px hsl(220 30% 15% / 0.04),
-      0 8px 24px -4px hsl(220 30% 15% / 0.08);
+      0 4px 24px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
 
   .premium-card::before {
@@ -176,9 +183,9 @@
     @apply absolute inset-0 opacity-0 transition-opacity duration-500;
     background: linear-gradient(
       135deg,
-      hsl(var(--primary) / 0.04) 0%,
+      rgba(37, 99, 235, 0.06) 0%,
       transparent 50%,
-      hsl(var(--primary) / 0.02) 100%
+      rgba(124, 58, 237, 0.04) 100%
     );
   }
 

@@ -300,79 +300,80 @@ export const MarketplaceProductCard = React.forwardRef<HTMLDivElement, Marketpla
         <div
           className="rounded-2xl overflow-hidden h-full flex flex-col relative group"
           style={{
-            background: 'hsl(var(--card))',
-            border: '1px solid hsl(var(--border) / 0.5)',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.08)',
-            transition: 'box-shadow 0.3s ease, border-color 0.3s ease',
+            background: 'rgba(255, 255, 255, 0.04)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            backdropFilter: 'blur(16px)',
+            boxShadow: '0 4px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+            transition: 'box-shadow 0.3s ease, border-color 0.3s ease, transform 0.3s ease',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.boxShadow = '0 8px 32px rgba(37,99,235,0.12), 0 16px 48px rgba(0,0,0,0.14), 0 2px 8px rgba(37,99,235,0.08)';
-            e.currentTarget.style.borderColor = 'rgba(37,99,235,0.3)';
+            e.currentTarget.style.boxShadow = '0 8px 40px rgba(37, 99, 235, 0.2), 0 20px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08)';
+            e.currentTarget.style.borderColor = 'rgba(37, 99, 235, 0.35)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.08)';
-            e.currentTarget.style.borderColor = 'hsl(var(--border) / 0.5)';
+            e.currentTarget.style.boxShadow = '0 4px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)';
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
           }}
         >
-          {/* ── TOP ICON AREA — Premium Gradient ── */}
+          {/* ── TOP ICON AREA — Deep gradient ── */}
           <div
             className="relative flex items-center justify-between px-5 py-5 overflow-hidden"
             style={{
-              background: `linear-gradient(135deg, ${cat.bg} 0%, ${cat.bg}ee 40%, hsl(215, 50%, 18%) 100%)`,
+              background: `linear-gradient(135deg, ${cat.bg} 0%, #0B1020 100%)`,
               minHeight: '110px',
             }}
           >
-            {/* Subtle mesh overlay */}
+            {/* Mesh overlay */}
             <div
-              className="absolute inset-0 pointer-events-none opacity-20"
+              className="absolute inset-0 pointer-events-none"
               style={{
-                background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.08) 0%, transparent 60%), radial-gradient(circle at 80% 20%, rgba(255,255,255,0.05) 0%, transparent 50%)',
+                background: 'radial-gradient(circle at 20% 50%, rgba(37,99,235,0.08) 0%, transparent 60%), radial-gradient(circle at 80% 20%, rgba(124,58,237,0.06) 0%, transparent 50%)',
               }}
             />
 
-            {/* Glowing icon container */}
+            {/* Glowing icon */}
             <div
               className="relative flex items-center justify-center rounded-xl"
               style={{
                 width: 68,
                 height: 68,
-                background: 'linear-gradient(135deg, rgba(249,115,22,0.3) 0%, rgba(249,115,22,0.1) 100%)',
-                border: '1.5px solid rgba(249,115,22,0.4)',
-                boxShadow: '0 0 20px rgba(249,115,22,0.2), inset 0 1px 0 rgba(255,255,255,0.1)',
+                background: 'linear-gradient(135deg, rgba(37,99,235,0.2) 0%, rgba(124,58,237,0.15) 100%)',
+                border: '1.5px solid rgba(37,99,235,0.35)',
+                boxShadow: '0 0 24px rgba(37,99,235,0.2), inset 0 1px 0 rgba(255,255,255,0.08)',
                 backdropFilter: 'blur(8px)',
               }}
             >
-              <Box style={{ width: 32, height: 32, color: '#f97316', filter: 'drop-shadow(0 0 6px rgba(249,115,22,0.4))' }} />
+              <Box style={{ width: 32, height: 32, color: '#60a5fa', filter: 'drop-shadow(0 0 8px rgba(96,165,250,0.5))' }} />
             </div>
 
-            {/* LIVE DEMO badge — center with glow */}
+            {/* LIVE DEMO badge */}
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
               {!isPipeline ? (
                 <span
                   className="flex items-center gap-1.5 font-black text-white text-[11px] px-4 py-1.5 rounded-full"
                   style={{
-                    background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                    boxShadow: '0 0 16px rgba(22,163,74,0.5), 0 2px 4px rgba(0,0,0,0.2)',
+                    background: 'linear-gradient(90deg, #22C55E, #16A34A)',
+                    boxShadow: '0 0 20px rgba(34,197,94,0.4), 0 2px 4px rgba(0,0,0,0.3)',
                   }}
                 >
                   <span
                     className="inline-block rounded-full animate-pulse"
-                    style={{ width: 6, height: 6, background: '#fff', boxShadow: '0 0 6px #fff' }}
+                    style={{ width: 6, height: 6, background: '#fff', boxShadow: '0 0 8px #fff' }}
                   />
                   LIVE DEMO
                 </span>
               ) : (
                 <span
                   className="flex items-center gap-1.5 font-black text-black text-[11px] px-4 py-1.5 rounded-full"
-                  style={{ background: 'linear-gradient(135deg, #eab308, #ca8a04)', boxShadow: '0 2px 8px rgba(234,179,8,0.3)' }}
+                  style={{ background: 'linear-gradient(90deg, #F59E0B, #D97706)', boxShadow: '0 2px 12px rgba(245,158,11,0.3)' }}
                 >
                   ON PIPELINE
                 </span>
               )}
             </div>
 
-            {/* Rank — right */}
-            <span className="text-xs font-bold text-white/40 self-start select-none">#{cardRank}</span>
+            {/* Rank */}
+            <span className="text-xs font-bold text-white/30 self-start select-none">#{cardRank}</span>
           </div>
 
           {/* ── CARD BODY ── */}
@@ -459,10 +460,10 @@ export const MarketplaceProductCard = React.forwardRef<HTMLDivElement, Marketpla
 
             {/* ── PRICE ── */}
             <div className="flex items-center gap-2 mt-1">
-              <span className="text-sm line-through text-muted-foreground/60">$10</span>
+              <span className="text-sm line-through text-muted-foreground/50">$10</span>
               <motion.span
                 className="text-[28px] font-black leading-none"
-                style={{ color: '#2563eb', textShadow: '0 0 20px rgba(37,99,235,0.15)' }}
+                style={{ color: '#60a5fa', textShadow: '0 0 24px rgba(96,165,250,0.3)' }}
                 whileHover={{ scale: 1.08 }}
                 transition={{ type: 'spring', stiffness: 400 }}
               >
@@ -470,13 +471,13 @@ export const MarketplaceProductCard = React.forwardRef<HTMLDivElement, Marketpla
               </motion.span>
               <span
                 className="text-[11px] font-black px-2.5 py-0.5 rounded-full"
-                style={{ background: 'linear-gradient(135deg, rgba(239,68,68,0.15), rgba(239,68,68,0.08))', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}
+                style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.25)' }}
               >
                 90% OFF
               </span>
               <div className="ml-auto flex items-center gap-0.5">
                 <Star className="fill-yellow-400 text-yellow-400" style={{ width: 13, height: 13 }} />
-                <span className="text-[11px] font-bold text-yellow-500">4.9</span>
+                <span className="text-[11px] font-bold text-yellow-400">4.9</span>
                 <span className="text-[10px] text-muted-foreground ml-0.5">(248)</span>
               </div>
             </div>
@@ -534,25 +535,31 @@ export const MarketplaceProductCard = React.forwardRef<HTMLDivElement, Marketpla
               ) : (
                 <>
                   <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className={cn(
-                        "flex-1 h-9 text-[11px] font-bold gap-1.5 rounded-xl border-border transition-all duration-200",
-                        hasDemoAvailable ? "hover:border-primary/50 hover:text-primary hover:shadow-[0_2px_12px_rgba(37,99,235,0.1)]" : "opacity-70"
-                      )}
-                      onClick={handleDemo}
-                    >
-                      <Play style={{ width: 13, height: 13 }} />
-                      {hasDemoAvailable ? 'DEMO' : 'VIEW'}
-                    </Button>
+                    <motion.div className="flex-1" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full h-9 text-[11px] font-bold gap-1.5 rounded-xl transition-all duration-200"
+                        style={{
+                          background: 'rgba(255,255,255,0.04)',
+                          border: '1px solid rgba(255,255,255,0.12)',
+                          backdropFilter: 'blur(8px)',
+                          color: hasDemoAvailable ? '#e2e8f0' : '#64748b',
+                        }}
+                        onClick={handleDemo}
+                      >
+                        <Play style={{ width: 13, height: 13 }} />
+                        {hasDemoAvailable ? 'DEMO' : 'VIEW'}
+                      </Button>
+                    </motion.div>
                     <Button
                       size="sm"
                       variant="outline"
                       className={cn(
                         'h-9 w-10 p-0 rounded-xl transition-all duration-200',
-                        favorited ? 'border-pink-500/60 text-pink-400 bg-pink-500/10' : 'border-border text-muted-foreground hover:text-pink-400 hover:border-pink-400/50'
+                        favorited ? 'border-pink-500/40 text-pink-400 bg-pink-500/10' : 'text-muted-foreground hover:text-pink-400 hover:border-pink-400/40'
                       )}
+                      style={{ background: favorited ? 'rgba(236,72,153,0.1)' : 'rgba(255,255,255,0.04)', border: favorited ? '1px solid rgba(236,72,153,0.3)' : '1px solid rgba(255,255,255,0.1)' }}
                       onClick={handleFavorite}
                       title="Add to Favorites"
                     >
@@ -563,21 +570,22 @@ export const MarketplaceProductCard = React.forwardRef<HTMLDivElement, Marketpla
                       variant="outline"
                       className={cn(
                         'h-9 w-10 p-0 rounded-xl transition-all duration-200',
-                        inCart ? 'border-blue-500/60 text-blue-400 bg-blue-500/10' : 'border-border text-muted-foreground hover:text-blue-400 hover:border-blue-400/50'
+                        inCart ? 'border-blue-400/40 text-blue-400 bg-blue-500/10' : 'text-muted-foreground hover:text-blue-400 hover:border-blue-400/40'
                       )}
+                      style={{ background: inCart ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.04)', border: inCart ? '1px solid rgba(59,130,246,0.3)' : '1px solid rgba(255,255,255,0.1)' }}
                       onClick={handleAddToCart}
                       title="Add to Cart"
                     >
                       <ShoppingCart style={{ width: 15, height: 15 }} className={inCart ? 'text-blue-400' : ''} />
                     </Button>
                   </div>
-                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}>
                     <Button
                       size="sm"
                       className="w-full h-10 text-[12px] font-black gap-1.5 rounded-xl text-white border-0"
                       style={{
-                        background: 'linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)',
-                        boxShadow: '0 4px 14px rgba(37,99,235,0.35), 0 1px 3px rgba(0,0,0,0.1)',
+                        background: 'linear-gradient(90deg, #2563EB, #1D4ED8)',
+                        boxShadow: '0 4px 20px rgba(37,99,235,0.4), 0 1px 3px rgba(0,0,0,0.2)',
                       }}
                       onClick={() => onBuyNow(product)}
                     >
@@ -589,20 +597,31 @@ export const MarketplaceProductCard = React.forwardRef<HTMLDivElement, Marketpla
               )}
               {/* DOWNLOAD APK + FEATURES BUTTONS */}
               <div className="flex gap-2">
+                <motion.div className="flex-1" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full h-9 text-[11px] font-bold gap-1.5 rounded-xl text-white border-0 transition-all duration-200"
+                    style={{
+                      background: 'linear-gradient(90deg, #7C3AED, #6D28D9)',
+                      boxShadow: '0 2px 12px rgba(124,58,237,0.3)',
+                    }}
+                    onClick={handleDownloadApk}
+                    disabled={downloadChecking}
+                  >
+                    <Download style={{ width: 13, height: 13 }} />
+                    {downloadChecking ? 'CHECKING...' : 'DOWNLOAD APK'}
+                  </Button>
+                </motion.div>
                 <Button
                   size="sm"
                   variant="outline"
-                  className="flex-1 h-9 text-[11px] font-bold gap-1.5 rounded-xl border-border hover:border-green-500/50 hover:text-green-600 hover:shadow-[0_2px_10px_rgba(34,197,94,0.1)] transition-all duration-200"
-                  onClick={handleDownloadApk}
-                  disabled={downloadChecking}
-                >
-                  <Download style={{ width: 13, height: 13 }} />
-                  {downloadChecking ? 'CHECKING...' : 'DOWNLOAD APK'}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="flex-1 h-9 text-[11px] font-bold gap-1.5 rounded-xl border-border hover:border-primary/40 hover:text-primary hover:shadow-[0_2px_10px_rgba(37,99,235,0.08)] transition-all duration-200"
+                  className="flex-1 h-9 text-[11px] font-bold gap-1.5 rounded-xl transition-all duration-200"
+                  style={{
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    color: '#94a3b8',
+                  }}
                   onClick={() => setFeaturesOpen(true)}
                 >
                   <Info style={{ width: 13, height: 13 }} />
@@ -816,14 +835,15 @@ export function ComingSoonCard({ label }: { label: string }) {
         className="rounded-2xl border border-dashed flex flex-col items-center justify-center gap-3 text-center"
         style={{
           minHeight: 420,
-          borderColor: 'hsl(var(--border) / 0.4)',
-          background: 'hsl(var(--card) / 0.6)',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+          borderColor: 'rgba(255,255,255,0.1)',
+          background: 'rgba(255,255,255,0.02)',
+          backdropFilter: 'blur(8px)',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
         }}
       >
         <div
           className="h-16 w-16 rounded-2xl flex items-center justify-center"
-          style={{ background: 'hsl(var(--muted))', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)' }}
+          style={{ background: 'rgba(255,255,255,0.05)', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.2)' }}
         >
           <Package style={{ width: 28, height: 28 }} className="text-muted-foreground" />
         </div>
