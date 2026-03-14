@@ -665,7 +665,7 @@ Deno.serve(async (req) => {
                         continue;
                       }
                     }
-                  } catch (uploadErr) {
+                  } catch (_uploadErr) {
                     // Upload failed, still mark build as queued
                   }
                 }
