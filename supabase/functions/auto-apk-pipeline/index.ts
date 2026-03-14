@@ -684,7 +684,7 @@ Deno.serve(async (req) => {
                 built++;
                 continue;
               }
-            } catch (factoryErr) {
+            } catch (_factoryErr) {
               // Factory unreachable, fallback to queue
             }
           }
