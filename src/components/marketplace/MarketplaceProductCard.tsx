@@ -460,10 +460,10 @@ export const MarketplaceProductCard = React.forwardRef<HTMLDivElement, Marketpla
 
             {/* ── PRICE ── */}
             <div className="flex items-center gap-2 mt-1">
-              <span className="text-sm line-through text-muted-foreground/60">$10</span>
+              <span className="text-sm line-through text-muted-foreground/50">$10</span>
               <motion.span
                 className="text-[28px] font-black leading-none"
-                style={{ color: '#2563eb', textShadow: '0 0 20px rgba(37,99,235,0.15)' }}
+                style={{ color: '#60a5fa', textShadow: '0 0 24px rgba(96,165,250,0.3)' }}
                 whileHover={{ scale: 1.08 }}
                 transition={{ type: 'spring', stiffness: 400 }}
               >
@@ -471,13 +471,13 @@ export const MarketplaceProductCard = React.forwardRef<HTMLDivElement, Marketpla
               </motion.span>
               <span
                 className="text-[11px] font-black px-2.5 py-0.5 rounded-full"
-                style={{ background: 'linear-gradient(135deg, rgba(239,68,68,0.15), rgba(239,68,68,0.08))', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}
+                style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.25)' }}
               >
                 90% OFF
               </span>
               <div className="ml-auto flex items-center gap-0.5">
                 <Star className="fill-yellow-400 text-yellow-400" style={{ width: 13, height: 13 }} />
-                <span className="text-[11px] font-bold text-yellow-500">4.9</span>
+                <span className="text-[11px] font-bold text-yellow-400">4.9</span>
                 <span className="text-[10px] text-muted-foreground ml-0.5">(248)</span>
               </div>
             </div>
