@@ -300,79 +300,80 @@ export const MarketplaceProductCard = React.forwardRef<HTMLDivElement, Marketpla
         <div
           className="rounded-2xl overflow-hidden h-full flex flex-col relative group"
           style={{
-            background: 'hsl(var(--card))',
-            border: '1px solid hsl(var(--border) / 0.5)',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.08)',
-            transition: 'box-shadow 0.3s ease, border-color 0.3s ease',
+            background: 'rgba(255, 255, 255, 0.04)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            backdropFilter: 'blur(16px)',
+            boxShadow: '0 4px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+            transition: 'box-shadow 0.3s ease, border-color 0.3s ease, transform 0.3s ease',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.boxShadow = '0 8px 32px rgba(37,99,235,0.12), 0 16px 48px rgba(0,0,0,0.14), 0 2px 8px rgba(37,99,235,0.08)';
-            e.currentTarget.style.borderColor = 'rgba(37,99,235,0.3)';
+            e.currentTarget.style.boxShadow = '0 8px 40px rgba(37, 99, 235, 0.2), 0 20px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08)';
+            e.currentTarget.style.borderColor = 'rgba(37, 99, 235, 0.35)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.08)';
-            e.currentTarget.style.borderColor = 'hsl(var(--border) / 0.5)';
+            e.currentTarget.style.boxShadow = '0 4px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)';
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
           }}
         >
-          {/* ── TOP ICON AREA — Premium Gradient ── */}
+          {/* ── TOP ICON AREA — Deep gradient ── */}
           <div
             className="relative flex items-center justify-between px-5 py-5 overflow-hidden"
             style={{
-              background: `linear-gradient(135deg, ${cat.bg} 0%, ${cat.bg}ee 40%, hsl(215, 50%, 18%) 100%)`,
+              background: `linear-gradient(135deg, ${cat.bg} 0%, #0B1020 100%)`,
               minHeight: '110px',
             }}
           >
-            {/* Subtle mesh overlay */}
+            {/* Mesh overlay */}
             <div
-              className="absolute inset-0 pointer-events-none opacity-20"
+              className="absolute inset-0 pointer-events-none"
               style={{
-                background: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.08) 0%, transparent 60%), radial-gradient(circle at 80% 20%, rgba(255,255,255,0.05) 0%, transparent 50%)',
+                background: 'radial-gradient(circle at 20% 50%, rgba(37,99,235,0.08) 0%, transparent 60%), radial-gradient(circle at 80% 20%, rgba(124,58,237,0.06) 0%, transparent 50%)',
               }}
             />
 
-            {/* Glowing icon container */}
+            {/* Glowing icon */}
             <div
               className="relative flex items-center justify-center rounded-xl"
               style={{
                 width: 68,
                 height: 68,
-                background: 'linear-gradient(135deg, rgba(249,115,22,0.3) 0%, rgba(249,115,22,0.1) 100%)',
-                border: '1.5px solid rgba(249,115,22,0.4)',
-                boxShadow: '0 0 20px rgba(249,115,22,0.2), inset 0 1px 0 rgba(255,255,255,0.1)',
+                background: 'linear-gradient(135deg, rgba(37,99,235,0.2) 0%, rgba(124,58,237,0.15) 100%)',
+                border: '1.5px solid rgba(37,99,235,0.35)',
+                boxShadow: '0 0 24px rgba(37,99,235,0.2), inset 0 1px 0 rgba(255,255,255,0.08)',
                 backdropFilter: 'blur(8px)',
               }}
             >
-              <Box style={{ width: 32, height: 32, color: '#f97316', filter: 'drop-shadow(0 0 6px rgba(249,115,22,0.4))' }} />
+              <Box style={{ width: 32, height: 32, color: '#60a5fa', filter: 'drop-shadow(0 0 8px rgba(96,165,250,0.5))' }} />
             </div>
 
-            {/* LIVE DEMO badge — center with glow */}
+            {/* LIVE DEMO badge */}
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
               {!isPipeline ? (
                 <span
                   className="flex items-center gap-1.5 font-black text-white text-[11px] px-4 py-1.5 rounded-full"
                   style={{
-                    background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
-                    boxShadow: '0 0 16px rgba(22,163,74,0.5), 0 2px 4px rgba(0,0,0,0.2)',
+                    background: 'linear-gradient(90deg, #22C55E, #16A34A)',
+                    boxShadow: '0 0 20px rgba(34,197,94,0.4), 0 2px 4px rgba(0,0,0,0.3)',
                   }}
                 >
                   <span
                     className="inline-block rounded-full animate-pulse"
-                    style={{ width: 6, height: 6, background: '#fff', boxShadow: '0 0 6px #fff' }}
+                    style={{ width: 6, height: 6, background: '#fff', boxShadow: '0 0 8px #fff' }}
                   />
                   LIVE DEMO
                 </span>
               ) : (
                 <span
                   className="flex items-center gap-1.5 font-black text-black text-[11px] px-4 py-1.5 rounded-full"
-                  style={{ background: 'linear-gradient(135deg, #eab308, #ca8a04)', boxShadow: '0 2px 8px rgba(234,179,8,0.3)' }}
+                  style={{ background: 'linear-gradient(90deg, #F59E0B, #D97706)', boxShadow: '0 2px 12px rgba(245,158,11,0.3)' }}
                 >
                   ON PIPELINE
                 </span>
               )}
             </div>
 
-            {/* Rank — right */}
-            <span className="text-xs font-bold text-white/40 self-start select-none">#{cardRank}</span>
+            {/* Rank */}
+            <span className="text-xs font-bold text-white/30 self-start select-none">#{cardRank}</span>
           </div>
 
           {/* ── CARD BODY ── */}
