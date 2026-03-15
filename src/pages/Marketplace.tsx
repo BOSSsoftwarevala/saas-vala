@@ -244,20 +244,8 @@ export default function Marketplace() {
 
       {/* Main Content */}
       <main className="pt-20 pb-8">
-        {/* Hero Banner */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="px-4 md:px-8 mb-6"
-        >
-          <div className="relative rounded-2xl overflow-hidden">
-            <img
-              src={saasValaBanner}
-              alt="SaaS VALA - All Software Only $5 per month"
-              className="w-full h-auto object-contain rounded-2xl"
-            />
-          </div>
-        </motion.div>
+        {/* Netflix-style Hero Banner Slider */}
+        <HeroBannerSlider />
 
         {/* ━━━ SECTION 1: UPCOMING SOFTWARE ━━━ */}
         <UpcomingSection />
