@@ -16,7 +16,7 @@ import { useApkPurchase } from '@/hooks/useApkPurchase';
 import { useFraudDetection } from '@/hooks/useFraudDetection';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import saasValaBanner from '@/assets/saas-vala-banner.jpg';
+import { HeroBannerSlider } from '@/components/marketplace/HeroBannerSlider';
 
 // Lazy load heavy section components — only render when scrolled into view
 const EducationSection = lazy(() => import('@/components/marketplace/EducationSection').then(m => ({ default: m.EducationSection })));
