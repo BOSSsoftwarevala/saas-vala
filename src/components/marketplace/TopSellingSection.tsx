@@ -28,7 +28,7 @@ export function TopSellingSection({ onBuyNow }: { onBuyNow: (p: any) => void }) 
             index={i}
             onBuyNow={onBuyNow}
             rank={i + 1}
-            borderColor={i < 3 ? 'border-warning/40' : 'border-border'}
+            
           />
         ))}
         {!loading && displayProducts.length === 0 && <ComingSoonCard label="Top Selling" />}
