@@ -44,7 +44,7 @@ export default function Marketplace() {
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const [buyPayMethod, setBuyPayMethod] = useState<BuyPayMethod>('wallet');
   const [manualTxnRef, setManualTxnRef] = useState('');
-  const [manualSubmitted, setManualSubmitted] = useState(false);
+  const [_manualSubmitted, setManualSubmitted] = useState(false);
   const paymentLockRef = useRef(false);
   const { purchaseApk, processing } = useApkPurchase();
   const { checkUserStatus } = useFraudDetection();
