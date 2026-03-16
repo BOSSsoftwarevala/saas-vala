@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,844 +12,284 @@ import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/hooks/useCart';
 import type { MarketplaceProduct } from '@/hooks/useMarketplaceProducts';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 
 interface MarketplaceProductCardProps {
   product: MarketplaceProduct;
   index?: number;
   onBuyNow: (p: any) => void;
-  onAddProduct?: (p: MarketplaceProduct) => void;
-  accentColor?: string;
-  borderColor?: string;
-  iconColor?: string;
   rank?: number;
 }
 
-// Category → icon color + emoji
-const categoryColors: Record<string, { bg: string; icon: string; dot: string }> = {
-  Healthcare: { bg: '#1a3a5c', icon: '#60a5fa', dot: '🏥' },
-  Finance:    { bg: '#1a3b2a', icon: '#4ade80', dot: '💰' },
-  Education:  { bg: '#2d1f5a', icon: '#a78bfa', dot: '📚' },
-  Retail:     { bg: '#3b2010', icon: '#fb923c', dot: '🛒' },
-  Food:       { bg: '#3b1a1a', icon: '#f87171', dot: '🍽️' },
-  Transport:  { bg: '#0f3040', icon: '#22d3ee', dot: '🚗' },
-  Marketing:  { bg: '#3a1040', icon: '#e879f9', dot: '📣' },
-  HR:         { bg: '#1a1f5a', icon: '#818cf8', dot: '👥' },
-  Logistics:  { bg: '#3a3010', icon: '#facc15', dot: '📦' },
-  default:    { bg: '#1e2235', icon: '#f97316', dot: '⚡' },
+const catColors: Record<string, string> = {
+  Healthcare: '#60a5fa', Finance: '#4ade80', Education: '#a78bfa',
+  Retail: '#fb923c', Food: '#f87171', Transport: '#22d3ee',
+  Marketing: '#e879f9', HR: '#818cf8', Logistics: '#facc15',
 };
 
-function getCatStyle(cat: string) {
-  return categoryColors[cat] || categoryColors.default;
-}
-
-
-export const MarketplaceProductCard = React.forwardRef<HTMLDivElement, MarketplaceProductCardProps>(({
-  product,
-  index = 0,
-  onBuyNow,
-  rank,
-}, _ref) => {
+export const MarketplaceProductCard = React.memo<MarketplaceProductCardProps>(({
+  product, index = 0, onBuyNow, rank,
+}) => {
   const [favorited, setFavorited] = useState(false);
   const [notified, setNotified] = useState(false);
-  const [activeTab, setActiveTab] = useState<'features' | 'tech'>('features');
   const [demoOpen, setDemoOpen] = useState(false);
   const [featuresOpen, setFeaturesOpen] = useState(false);
-  const [iframeLoaded, setIframeLoaded] = useState(false);
+  const [downloadChecking, setDownloadChecking] = useState(false);
   const { user } = useAuth();
   const { isInCart, toggleItem } = useCart();
   const inCart = isInCart(product.id);
 
   const isPipeline = !product.isAvailable || product.status === 'draft' || product.status === 'upcoming';
-  const cat = getCatStyle(product.category);
-
-  // Features list
-  const features: string[] = Array.isArray(product.features)
-    ? product.features.slice(0, 4).map((f: any) => typeof f === 'string' ? f : f.text)
-    : [];
-  const defaultFeatures = ['Dashboard', 'Reports', 'Analytics', 'API'];
-  const showFeatures = features.length > 0 ? features : defaultFeatures;
-
-  const techStack: string[] = Array.isArray((product as any).techStack)
-    ? (product as any).techStack.slice(0, 5)
-    : ['React', 'Node.js', 'PostgreSQL', 'AWS', 'SSL'];
-
-  const handleFavorite = async () => {
-    if (!user) { toast.error('Sign in to add to favorites'); return; }
-    try {
-      if (favorited) {
-        await supabase.from('product_wishlists').delete()
-          .eq('user_id', user.id).eq('product_id', product.id);
-        setFavorited(false);
-        toast('Removed from favorites');
-      } else {
-        await supabase.from('product_wishlists').insert({
-          user_id: user.id,
-          product_id: product.id,
-          product_name: product.title,
-        });
-        setFavorited(true);
-        toast.success(`❤️ ${product.title} added to favorites!`);
-      }
-    } catch {
-      setFavorited(!favorited);
-      toast.success(favorited ? 'Removed from favorites' : `❤️ Added to favorites!`);
-    }
-  };
-
-  const handleAddToCart = () => {
-    toggleItem({
-      id: product.id,
-      title: product.title,
-      subtitle: product.subtitle || '',
-      image: product.image || '',
-      price: 5,
-      category: product.category,
-    });
-    toast.success(inCart ? 'Removed from cart' : `🛒 ${product.title} added to cart!`);
-  };
-
-  const handleNotifyMe = async () => {
-    if (!user) { toast.error('Sign in to get notified'); return; }
-    try {
-      await supabase.from('product_notify_me').insert({
-        user_id: user.id,
-        email: user.email || '',
-        product_id: product.id,
-        product_name: product.title,
-      });
-    } catch { /* duplicate ok */ }
-    setNotified(true);
-    toast.success(`🔔 You'll be notified when ${product.title} is ready!`);
-  };
-
-  // Helper: check if an ID looks like a valid UUID
-  const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-
-  // Get the best available demo/source URL
-  const getDemoUrl = (): string | null => {
-    // 1. Explicit demo URL from database (trust DB values — they were set intentionally)
-    const demoUrl = (product as any).demoUrl || (product as any).demo_url;
-    if (demoUrl && demoUrl.startsWith('http') && !demoUrl.includes('github.com')) return demoUrl;
-    // 2. Live URL if available
-    const liveUrl = (product as any).liveUrl || (product as any).live_url;
-    if (liveUrl && liveUrl.startsWith('http')) return liveUrl;
-    // 3. GitHub repo URL (always real & accessible)
-    const gitRepo = (product as any).github_repo || (product as any).gitRepoUrl || (product as any).git_repo_url || (product as any).githubUrl;
-    if (gitRepo && gitRepo.startsWith('http')) return gitRepo;
-    // 4. No demo available
-    return null;
-  };
-
-  // Check if the URL can be embedded in iframe (not GitHub)
-  const isIframeable = (url: string | null): boolean => {
-    if (!url) return false;
-    if (url.includes('github.com')) return false;
-    return true;
-  };
-
-  const _getApkUrl = (): string | null => {
-    return (product as any).apkUrl || (product as any).apk_url || null;
-  };
-
-  const hasDemoAvailable = getDemoUrl() !== null;
-
-  const handleDemo = () => {
-    const demoUrl = getDemoUrl();
-    if (!demoUrl) {
-      // No URL available — open features panel instead
-      setFeaturesOpen(true);
-      toast.info(`${product.title} — View features & details`, { duration: 3000 });
-      return;
-    }
-    // GitHub or non-iframeable URLs → open in new tab
-    if (!isIframeable(demoUrl)) {
-      const w = window.open(demoUrl, '_blank', 'noopener,noreferrer');
-      if (!w) {
-        // Popup blocked fallback
-        navigator.clipboard.writeText(demoUrl);
-        toast.success(`Link copied! Open: ${demoUrl}`);
-      } else {
-        toast.success(`Opening ${product.title} source code`);
-      }
-    } else {
-      // Actual deployed app → open in iframe dialog
-      setDemoOpen(true);
-      toast.success(`Loading live demo for ${product.title}`);
-    }
-    if (isUuid(product.id)) {
-      supabase.from('activity_logs').insert({
-        entity_type: 'demo', entity_id: product.id, action: 'demo_opened',
-        performed_by: user?.id || null,
-        details: { product_id: product.id, product_name: product.title, demo_url: demoUrl },
-      });
-    }
-  };
-
-  const [downloadChecking, setDownloadChecking] = useState(false);
-
-  const handleDownloadApk = async () => {
-    if (!user) {
-      toast.error('Please sign in to download APK');
-      return;
-    }
-
-    setDownloadChecking(true);
-
-    try {
-      // Step 1: Check license_keys table (works for ALL products — generated & real)
-      const { data: licenseRecord } = await supabase
-        .from('license_keys')
-        .select('license_key, status, expires_at, meta')
-        .eq('created_by', user.id)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      // Find license matching this product (by product_id in meta or by product_id column)
-      const matchingLicense = licenseRecord?.find((l: any) => {
-        const meta = l.meta as any;
-        return meta?.product_id === product.id || meta?.product_title === product.title;
-      });
-
-      // Also check apk_downloads for real DB products
-      let apkLicense = null;
-      if (!matchingLicense && isUuid(product.id)) {
-        const { data: dl } = await supabase
-          .from('apk_downloads')
-          .select('license_key')
-          .eq('user_id', user.id)
-          .eq('product_id', product.id)
-          .eq('is_blocked', false)
-          .maybeSingle();
-        apkLicense = dl;
-      }
-
-      const finalLicenseKey = matchingLicense?.license_key || apkLicense?.license_key;
-
-      if (!finalLicenseKey) {
-        toast.error('Please purchase this software first to download the APK', {
-          action: { label: 'BUY NOW', onClick: () => onBuyNow(product) },
-        });
-        setDownloadChecking(false);
-        return;
-      }
-
-      // Check expiry
-      if (matchingLicense?.expires_at && new Date(matchingLicense.expires_at) < new Date()) {
-        toast.error('Your license has expired. Please renew to download.');
-        setDownloadChecking(false);
-        return;
-      }
-
-      // For real DB products, try secure download via edge function
-      if (isUuid(product.id)) {
-        const { data, error } = await supabase.functions.invoke('download-apk', {
-          body: { product_id: product.id, license_key: finalLicenseKey },
-        });
-
-        if (!error && data?.success) {
-          window.open(data.download_url, '_blank');
-          toast.success(`✅ Downloading APK for ${product.title}`);
-          setDownloadChecking(false);
-          return;
-        }
-      }
-
-      // Fallback: Show license key + info
-      toast.success(`✅ Your License Key: ${finalLicenseKey}`, {
-        duration: 10000,
-        description: 'APK file is being prepared. Use this key to activate after installation.',
-        action: {
-          label: 'Copy Key',
-          onClick: () => {
-            navigator.clipboard.writeText(finalLicenseKey);
-            toast.success('License key copied!');
-          },
-        },
-      });
-    } catch {
-      toast.info('APK download will be available soon.');
-    }
-    setDownloadChecking(false);
-  };
-
-  const handleCopy = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success(`${label} copied!`);
-  };
-
+  const iconColor = catColors[product.category] || '#f97316';
   const cardRank = rank ?? index + 1;
 
-    return (
+  const features: string[] = Array.isArray(product.features)
+    ? product.features.slice(0, 4).map((f: any) => typeof f === 'string' ? f : f.text)
+    : ['Dashboard', 'Reports', 'Analytics', 'API'];
+
+  const getDemoUrl = useCallback((): string | null => {
+    const d = (product as any).demoUrl || (product as any).demo_url;
+    if (d && d.startsWith('http') && !d.includes('github.com')) return d;
+    const g = (product as any).gitRepoUrl || (product as any).git_repo_url;
+    if (g && g.startsWith('http')) return g;
+    return null;
+  }, [product]);
+
+  const isIframeable = (url: string | null) => url ? !url.includes('github.com') : false;
+  const hasDemoAvailable = getDemoUrl() !== null;
+
+  const handleFavorite = useCallback(() => {
+    if (!user) { toast.error('Sign in to add to favorites'); return; }
+    setFavorited(p => !p);
+    toast.success(favorited ? 'Removed from favorites' : `❤️ Added to favorites!`);
+  }, [user, favorited]);
+
+  const handleAddToCart = useCallback(() => {
+    toggleItem({ id: product.id, title: product.title, subtitle: product.subtitle || '', image: product.image || '', price: 5, category: product.category });
+    toast.success(inCart ? 'Removed from cart' : `🛒 Added to cart!`);
+  }, [product, inCart, toggleItem]);
+
+  const handleNotifyMe = useCallback(() => {
+    if (!user) { toast.error('Sign in to get notified'); return; }
+    setNotified(true);
+    toast.success(`🔔 You'll be notified when ${product.title} is ready!`);
+  }, [user, product.title]);
+
+  const handleDemo = useCallback(() => {
+    const url = getDemoUrl();
+    if (!url) { setFeaturesOpen(true); return; }
+    if (!isIframeable(url)) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } else {
+      setDemoOpen(true);
+    }
+  }, [getDemoUrl]);
+
+  const handleDownloadApk = useCallback(async () => {
+    if (!user) { toast.error('Please sign in to download APK'); return; }
+    setDownloadChecking(true);
+    try {
+      const { data: licenseRecord } = await supabase
+        .from('license_keys').select('license_key, status, expires_at, meta')
+        .eq('created_by', user.id).eq('status', 'active').limit(50);
+      const match = licenseRecord?.find((l: any) => {
+        const m = l.meta as any;
+        return m?.product_id === product.id || m?.product_title === product.title;
+      });
+      if (!match?.license_key) {
+        toast.error('Please purchase first', { action: { label: 'BUY NOW', onClick: () => onBuyNow(product) } });
+        setDownloadChecking(false); return;
+      }
+      if (match.expires_at && new Date(match.expires_at) < new Date()) {
+        toast.error('License expired. Please renew.'); setDownloadChecking(false); return;
+      }
+      const isUuid = /^[0-9a-f]{8}-/.test(product.id);
+      if (isUuid) {
+        const { data, error } = await supabase.functions.invoke('download-apk', {
+          body: { product_id: product.id, license_key: match.license_key },
+        });
+        if (!error && data?.success) { window.open(data.download_url, '_blank'); setDownloadChecking(false); return; }
+      }
+      toast.success(`✅ License Key: ${match.license_key}`, {
+        duration: 10000,
+        action: { label: 'Copy', onClick: () => navigator.clipboard.writeText(match.license_key) },
+      });
+    } catch { toast.info('APK download will be available soon.'); }
+    setDownloadChecking(false);
+  }, [user, product, onBuyNow]);
+
+  const demoUrl = getDemoUrl();
+
+  return (
     <>
-      <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: index * 0.04, type: 'spring', stiffness: 260, damping: 24 }}
-        whileHover={{ y: -8, zIndex: 10 }}
-        className="flex-shrink-0"
-        style={{ width: '340px' }}
+      <div
+        className="flex-shrink-0 rounded-2xl overflow-hidden flex flex-col group cursor-pointer"
+        style={{
+          width: 280,
+          background: 'rgba(255,255,255,0.03)',
+          border: '1px solid rgba(255,255,255,0.07)',
+          transition: 'transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 8px 32px rgba(37,99,235,0.15)'; e.currentTarget.style.borderColor = 'rgba(37,99,235,0.3)'; }}
+        onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; }}
       >
-        <div
-          className="rounded-2xl overflow-hidden h-full flex flex-col relative group"
-          style={{
-            background: 'rgba(255, 255, 255, 0.04)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            backdropFilter: 'blur(16px)',
-            boxShadow: '0 4px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
-            transition: 'box-shadow 0.3s ease, border-color 0.3s ease, transform 0.3s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.boxShadow = '0 8px 40px rgba(37, 99, 235, 0.2), 0 20px 60px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08)';
-            e.currentTarget.style.borderColor = 'rgba(37, 99, 235, 0.35)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.boxShadow = '0 4px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)';
-            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
-          }}
-        >
-          {/* ── TOP ICON AREA — Deep gradient ── */}
-          <div
-            className="relative flex items-center justify-between px-5 py-5 overflow-hidden"
-            style={{
-              background: `linear-gradient(135deg, ${cat.bg} 0%, #0B1020 100%)`,
-              minHeight: '110px',
-            }}
-          >
-            {/* Mesh overlay */}
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                background: 'radial-gradient(circle at 20% 50%, rgba(37,99,235,0.08) 0%, transparent 60%), radial-gradient(circle at 80% 20%, rgba(124,58,237,0.06) 0%, transparent 50%)',
-              }}
-            />
+        {/* Header */}
+        <div className="relative px-4 py-4 flex items-center gap-3" style={{ background: `linear-gradient(135deg, rgba(37,99,235,0.08), transparent)` }}>
+          <div className="h-12 w-12 rounded-xl flex items-center justify-center" style={{ background: 'rgba(37,99,235,0.15)', border: '1px solid rgba(37,99,235,0.25)' }}>
+            <Box style={{ width: 24, height: 24, color: iconColor }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-bold text-[13px] text-foreground truncate leading-tight">{product.title}</h3>
+            <p className="text-[11px] truncate" style={{ color: iconColor }}>{product.category}</p>
+          </div>
+          {!isPipeline ? (
+            <span className="text-[9px] font-black text-white px-2 py-0.5 rounded-full" style={{ background: 'linear-gradient(90deg,#22C55E,#16A34A)' }}>LIVE</span>
+          ) : (
+            <span className="text-[9px] font-black text-black px-2 py-0.5 rounded-full bg-amber-400">SOON</span>
+          )}
+          <span className="absolute top-2 right-3 text-[10px] font-bold text-white/20">#{cardRank}</span>
+        </div>
 
-            {/* Glowing icon */}
-            <div
-              className="relative flex items-center justify-center rounded-xl"
-              style={{
-                width: 68,
-                height: 68,
-                background: 'linear-gradient(135deg, rgba(37,99,235,0.2) 0%, rgba(124,58,237,0.15) 100%)',
-                border: '1.5px solid rgba(37,99,235,0.35)',
-                boxShadow: '0 0 24px rgba(37,99,235,0.2), inset 0 1px 0 rgba(255,255,255,0.08)',
-                backdropFilter: 'blur(8px)',
-              }}
-            >
-              <Box style={{ width: 32, height: 32, color: '#60a5fa', filter: 'drop-shadow(0 0 8px rgba(96,165,250,0.5))' }} />
-            </div>
+        {/* Body */}
+        <div className="flex-1 px-4 py-3 flex flex-col gap-2">
+          <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
+            {product.subtitle || 'Complete solution with all features, reports, and integrations.'}
+          </p>
 
-            {/* LIVE DEMO badge */}
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-              {!isPipeline ? (
-                <span
-                  className="flex items-center gap-1.5 font-black text-white text-[11px] px-4 py-1.5 rounded-full"
-                  style={{
-                    background: 'linear-gradient(90deg, #22C55E, #16A34A)',
-                    boxShadow: '0 0 20px rgba(34,197,94,0.4), 0 2px 4px rgba(0,0,0,0.3)',
-                  }}
-                >
-                  <span
-                    className="inline-block rounded-full animate-pulse"
-                    style={{ width: 6, height: 6, background: '#fff', boxShadow: '0 0 8px #fff' }}
-                  />
-                  LIVE DEMO
-                </span>
-              ) : (
-                <span
-                  className="flex items-center gap-1.5 font-black text-black text-[11px] px-4 py-1.5 rounded-full"
-                  style={{ background: 'linear-gradient(90deg, #F59E0B, #D97706)', boxShadow: '0 2px 12px rgba(245,158,11,0.3)' }}
-                >
-                  ON PIPELINE
-                </span>
-              )}
-            </div>
-
-            {/* Rank */}
-            <span className="text-xs font-bold text-white/30 self-start select-none">#{cardRank}</span>
+          {/* Feature chips */}
+          <div className="flex flex-wrap gap-1">
+            {features.slice(0, 3).map((f, i) => (
+              <span key={i} className="text-[10px] px-2 py-0.5 rounded bg-muted/80 text-muted-foreground border border-border/50">{f}</span>
+            ))}
           </div>
 
-          {/* ── CARD BODY ── */}
-          <div className="flex flex-col flex-1 p-5 gap-2">
-
-            {/* Product name */}
-            <h3 className="font-black text-[15px] text-foreground uppercase leading-tight tracking-wide">
-              {product.title}
-            </h3>
-
-            {/* Category + short subtitle */}
-            <p className="text-[12px] font-semibold flex items-center gap-1" style={{ color: cat.icon }}>
-              <span>📍</span>
-              <span>{product.category}</span>
-              {product.subtitle && (
-                <span className="text-muted-foreground font-normal ml-1 truncate">
-                  — {product.subtitle.slice(0, 28)}{product.subtitle.length > 28 ? '…' : ''}
-                </span>
-              )}
-            </p>
-
-            {/* Description */}
-            <p className="text-[12px] text-muted-foreground leading-relaxed line-clamp-2">
-              {(product as any).description || product.subtitle || 'Complete solution with all features, reports, and integrations...'}
-            </p>
-
-            {/* ── FEATURES / TECH TABS ── */}
-            <div className="flex gap-2 mt-1">
-              <button
-                onClick={() => setActiveTab('features')}
-                className={cn(
-                  'text-[11px] font-bold px-3 py-1 rounded-full border transition-all duration-200',
-                  activeTab === 'features'
-                    ? 'text-white border-transparent'
-                    : 'border-border/60 text-muted-foreground hover:border-primary/50 hover:text-primary'
-                )}
-                style={activeTab === 'features' ? { background: 'linear-gradient(135deg, #2563eb, #4f46e5)', boxShadow: '0 2px 8px rgba(37,99,235,0.3)' } : undefined}
-              >
-                Features
-              </button>
-              <button
-                onClick={() => setActiveTab('tech')}
-                className={cn(
-                  'text-[11px] font-bold px-3 py-1 rounded-full border transition-all duration-200',
-                  activeTab === 'tech'
-                    ? 'text-white border-transparent'
-                    : 'border-border/60 text-muted-foreground hover:border-primary/50 hover:text-primary'
-                )}
-                style={activeTab === 'tech' ? { background: 'linear-gradient(135deg, #2563eb, #4f46e5)', boxShadow: '0 2px 8px rgba(37,99,235,0.3)' } : undefined}
-              >
-                Tech Stack
-              </button>
-            </div>
-
-            {/* Chips */}
-            <div className="flex flex-wrap gap-1.5 min-h-[52px]">
-              {activeTab === 'features'
-                ? showFeatures.map((f, i) => (
-                    <span
-                      key={i}
-                      className="inline-flex items-center gap-1 text-[11px] text-foreground px-2.5 py-1 rounded-lg"
-                      style={{ background: 'hsl(var(--muted))', border: '1px solid hsl(var(--border) / 0.6)' }}
-                    >
-                      <Box style={{ width: 11, height: 11, color: '#9ca3af' }} />
-                      {f}
-                    </span>
-                  ))
-                : techStack.map((t, i) => (
-                    <span
-                      key={i}
-                      className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border"
-                      style={
-                        i === 0 ? { background: 'rgba(59,130,246,0.12)', color: '#3b82f6', borderColor: 'rgba(59,130,246,0.25)' }
-                        : i === 1 ? { background: 'rgba(34,197,94,0.12)', color: '#22c55e', borderColor: 'rgba(34,197,94,0.25)' }
-                        : i === 2 ? { background: 'rgba(249,115,22,0.12)', color: '#f97316', borderColor: 'rgba(249,115,22,0.25)' }
-                        : { background: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))', borderColor: 'hsl(var(--border) / 0.5)' }
-                      }
-                    >
-                      {t}
-                    </span>
-                  ))
-              }
-            </div>
-
-            {/* ── PRICE ── */}
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-sm line-through text-muted-foreground/50">$10</span>
-              <motion.span
-                className="text-[28px] font-black leading-none"
-                style={{ color: '#60a5fa', textShadow: '0 0 24px rgba(96,165,250,0.3)' }}
-                whileHover={{ scale: 1.08 }}
-                transition={{ type: 'spring', stiffness: 400 }}
-              >
-                $5
-              </motion.span>
-              <span
-                className="text-[11px] font-black px-2.5 py-0.5 rounded-full"
-                style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.25)' }}
-              >
-                90% OFF
-              </span>
-              <div className="ml-auto flex items-center gap-0.5">
-                <Star className="fill-yellow-400 text-yellow-400" style={{ width: 13, height: 13 }} />
-                <span className="text-[11px] font-bold text-yellow-400">4.9</span>
-                <span className="text-[10px] text-muted-foreground ml-0.5">(248)</span>
-              </div>
-            </div>
-
-            {/* ── BUTTONS ── */}
-            <div className="mt-1 flex flex-col gap-2">
-              {isPipeline ? (
-                <>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      className={cn(
-                        'flex-1 h-9 text-[11px] font-bold gap-1.5 rounded-xl transition-all duration-200',
-                        notified ? 'bg-green-600 hover:bg-green-500 text-white' : 'bg-yellow-500 hover:bg-yellow-400 text-black'
-                      )}
-                      onClick={handleNotifyMe}
-                    >
-                      <Bell style={{ width: 13, height: 13 }} />
-                      {notified ? 'NOTIFIED' : 'NOTIFY ME'}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className={cn(
-                        'h-9 w-10 p-0 rounded-xl transition-all duration-200',
-                        favorited ? 'border-pink-500/60 text-pink-400 bg-pink-500/10' : 'border-border text-muted-foreground hover:text-pink-400 hover:border-pink-400/50'
-                      )}
-                      onClick={handleFavorite}
-                      title="Add to Favorites"
-                    >
-                      <Heart style={{ width: 15, height: 15 }} className={favorited ? 'fill-pink-400 text-pink-400' : ''} />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className={cn(
-                        'h-9 w-10 p-0 rounded-xl transition-all duration-200',
-                        inCart ? 'border-blue-500/60 text-blue-400 bg-blue-500/10' : 'border-border text-muted-foreground hover:text-blue-400 hover:border-blue-400/50'
-                      )}
-                      onClick={handleAddToCart}
-                      title="Add to Cart"
-                    >
-                      <ShoppingCart style={{ width: 15, height: 15 }} className={inCart ? 'text-blue-400' : ''} />
-                    </Button>
-                  </div>
-                  <Button
-                    size="sm"
-                    disabled
-                    className="h-10 text-[12px] font-bold rounded-xl opacity-40 gap-1.5"
-                  >
-                    <Package style={{ width: 14, height: 14 }} />
-                    BUY $5
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <div className="flex gap-2">
-                    <motion.div className="flex-1" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="w-full h-9 text-[11px] font-bold gap-1.5 rounded-xl transition-all duration-200"
-                        style={{
-                          background: 'rgba(255,255,255,0.04)',
-                          border: '1px solid rgba(255,255,255,0.12)',
-                          backdropFilter: 'blur(8px)',
-                          color: hasDemoAvailable ? '#e2e8f0' : '#64748b',
-                        }}
-                        onClick={handleDemo}
-                      >
-                        <Play style={{ width: 13, height: 13 }} />
-                        {hasDemoAvailable ? 'DEMO' : 'VIEW'}
-                      </Button>
-                    </motion.div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className={cn(
-                        'h-9 w-10 p-0 rounded-xl transition-all duration-200',
-                        favorited ? 'border-pink-500/40 text-pink-400 bg-pink-500/10' : 'text-muted-foreground hover:text-pink-400 hover:border-pink-400/40'
-                      )}
-                      style={{ background: favorited ? 'rgba(236,72,153,0.1)' : 'rgba(255,255,255,0.04)', border: favorited ? '1px solid rgba(236,72,153,0.3)' : '1px solid rgba(255,255,255,0.1)' }}
-                      onClick={handleFavorite}
-                      title="Add to Favorites"
-                    >
-                      <Heart style={{ width: 15, height: 15 }} className={favorited ? 'fill-pink-400 text-pink-400' : ''} />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className={cn(
-                        'h-9 w-10 p-0 rounded-xl transition-all duration-200',
-                        inCart ? 'border-blue-400/40 text-blue-400 bg-blue-500/10' : 'text-muted-foreground hover:text-blue-400 hover:border-blue-400/40'
-                      )}
-                      style={{ background: inCart ? 'rgba(59,130,246,0.1)' : 'rgba(255,255,255,0.04)', border: inCart ? '1px solid rgba(59,130,246,0.3)' : '1px solid rgba(255,255,255,0.1)' }}
-                      onClick={handleAddToCart}
-                      title="Add to Cart"
-                    >
-                      <ShoppingCart style={{ width: 15, height: 15 }} className={inCart ? 'text-blue-400' : ''} />
-                    </Button>
-                  </div>
-                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}>
-                    <Button
-                      size="sm"
-                      className="w-full h-10 text-[12px] font-black gap-1.5 rounded-xl text-white border-0"
-                      style={{
-                        background: 'linear-gradient(90deg, #2563EB, #1D4ED8)',
-                        boxShadow: '0 4px 20px rgba(37,99,235,0.4), 0 1px 3px rgba(0,0,0,0.2)',
-                      }}
-                      onClick={() => onBuyNow(product)}
-                    >
-                      <Package style={{ width: 14, height: 14 }} />
-                      BUY NOW — $5
-                    </Button>
-                  </motion.div>
-                </>
-              )}
-              {/* DOWNLOAD APK + FEATURES BUTTONS */}
-              <div className="flex gap-2">
-                <motion.div className="flex-1" whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-full h-9 text-[11px] font-bold gap-1.5 rounded-xl text-white border-0 transition-all duration-200"
-                    style={{
-                      background: 'linear-gradient(90deg, #7C3AED, #6D28D9)',
-                      boxShadow: '0 2px 12px rgba(124,58,237,0.3)',
-                    }}
-                    onClick={handleDownloadApk}
-                    disabled={downloadChecking}
-                  >
-                    <Download style={{ width: 13, height: 13 }} />
-                    {downloadChecking ? 'CHECKING...' : 'DOWNLOAD APK'}
-                  </Button>
-                </motion.div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="flex-1 h-9 text-[11px] font-bold gap-1.5 rounded-xl transition-all duration-200"
-                  style={{
-                    background: 'rgba(255,255,255,0.04)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    color: '#94a3b8',
-                  }}
-                  onClick={() => setFeaturesOpen(true)}
-                >
-                  <Info style={{ width: 13, height: 13 }} />
-                  FEATURES
-                </Button>
-              </div>
+          {/* Price row */}
+          <div className="flex items-center gap-2 mt-auto pt-1">
+            <span className="text-xs line-through text-muted-foreground/40">$10</span>
+            <span className="text-xl font-black text-primary">$5</span>
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.12)', color: '#f87171' }}>90% OFF</span>
+            <div className="ml-auto flex items-center gap-0.5">
+              <Star className="fill-yellow-400 text-yellow-400" style={{ width: 11, height: 11 }} />
+              <span className="text-[10px] font-bold text-yellow-400">4.9</span>
             </div>
           </div>
         </div>
-      </motion.div>
 
-      {/* ── LIVE DEMO iFrame DIALOG ── */}
-      <Dialog open={demoOpen} onOpenChange={(open) => { setDemoOpen(open); if (!open) setIframeLoaded(false); }}>
-        <DialogContent className="max-w-4xl w-[95vw] h-[85vh] flex flex-col p-0 gap-0">
-          <DialogHeader className="px-4 pt-4 pb-2 border-b border-border shrink-0">
-            <DialogTitle className="flex items-center gap-2 text-base font-black uppercase">
-              <Play className="text-primary" style={{ width: 18, height: 18 }} />
-              {product.title} — Live Demo
-            </DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground">
-              Interactive preview • Login: demo@softwarevala.com / Demo@2026
-            </DialogDescription>
-          </DialogHeader>
-
-          {/* iFrame Demo */}
-          <div className="flex-1 relative bg-muted/30 overflow-hidden">
-            {getDemoUrl() && isIframeable(getDemoUrl()) ? (
-              <>
-                <iframe
-                  src={getDemoUrl()!}
-                  className="w-full h-full border-0"
-                  title={`${product.title} Live Demo`}
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                  loading="lazy"
-                  onLoad={() => setIframeLoaded(true)}
-                />
-                {!iframeLoaded && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-background/80 pointer-events-none">
-                    <div className="text-center space-y-2">
-                      <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-                      <p className="text-sm text-muted-foreground">Loading demo...</p>
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center space-y-3 p-8">
-                  <div className="text-5xl">🚧</div>
-                  <p className="text-lg font-bold text-foreground">Live demo will be available soon</p>
-                  <p className="text-sm text-muted-foreground">This product is being prepared for launch. Check back later!</p>
-                </div>
+        {/* Buttons */}
+        <div className="px-4 pb-4 flex flex-col gap-1.5">
+          {isPipeline ? (
+            <div className="flex gap-1.5">
+              <Button size="sm" className={cn('flex-1 h-8 text-[10px] font-bold rounded-lg', notified ? 'bg-emerald-600' : 'bg-amber-500 text-black hover:bg-amber-400')} onClick={handleNotifyMe}>
+                <Bell style={{ width: 12, height: 12 }} className="mr-1" />{notified ? 'NOTIFIED' : 'NOTIFY ME'}
+              </Button>
+              <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={handleFavorite}>
+                <Heart style={{ width: 14, height: 14 }} className={favorited ? 'fill-pink-400 text-pink-400' : 'text-muted-foreground'} />
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="flex gap-1.5">
+                <Button size="sm" variant="outline" className="flex-1 h-8 text-[10px] font-bold rounded-lg border-white/10 text-foreground/70 hover:border-white/20" onClick={handleDemo}>
+                  <Play style={{ width: 11, height: 11 }} className="mr-1" />{hasDemoAvailable ? 'DEMO' : 'VIEW'}
+                </Button>
+                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={handleFavorite}>
+                  <Heart style={{ width: 14, height: 14 }} className={favorited ? 'fill-pink-400 text-pink-400' : 'text-muted-foreground'} />
+                </Button>
+                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={handleAddToCart}>
+                  <ShoppingCart style={{ width: 14, height: 14 }} className={inCart ? 'text-primary' : 'text-muted-foreground'} />
+                </Button>
               </div>
-            )}
+              <Button size="sm" className="w-full h-9 text-[11px] font-black rounded-lg text-white border-0" style={{ background: 'linear-gradient(90deg,#2563EB,#1D4ED8)' }} onClick={() => onBuyNow(product)}>
+                <Package style={{ width: 13, height: 13 }} className="mr-1" /> BUY NOW — $5
+              </Button>
+            </>
+          )}
+          <div className="flex gap-1.5">
+            <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] font-bold rounded-lg text-white border-0" style={{ background: 'linear-gradient(90deg,#7C3AED,#6D28D9)' }} onClick={handleDownloadApk} disabled={downloadChecking}>
+              <Download style={{ width: 11, height: 11 }} className="mr-1" />{downloadChecking ? '...' : 'APK'}
+            </Button>
+            <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] font-bold rounded-lg border-white/10 text-muted-foreground" onClick={() => setFeaturesOpen(true)}>
+              <Info style={{ width: 11, height: 11 }} className="mr-1" /> FEATURES
+            </Button>
           </div>
+        </div>
+      </div>
 
-          {/* Bottom bar */}
-          <div className="px-4 py-3 border-t border-border flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 shrink-0">
-            {getDemoUrl() && (
-              <>
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <code className="text-xs bg-muted px-2 py-1 rounded truncate max-w-[200px] md:max-w-[400px]">{getDemoUrl()}</code>
-                  <Button size="sm" variant="outline" className="h-7 px-2 shrink-0" onClick={() => handleCopy(getDemoUrl()!, 'Demo URL')}>
+      {/* Demo Dialog */}
+      {demoOpen && (
+        <Dialog open={demoOpen} onOpenChange={setDemoOpen}>
+          <DialogContent className="max-w-4xl w-[95vw] h-[80vh] flex flex-col p-0 gap-0">
+            <DialogHeader className="px-4 pt-3 pb-2 border-b border-border shrink-0">
+              <DialogTitle className="text-sm font-black uppercase">{product.title} — Live Demo</DialogTitle>
+              <DialogDescription className="text-xs">demo@softwarevala.com / Demo@2026</DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 relative bg-muted/30 overflow-hidden">
+              {demoUrl && isIframeable(demoUrl) ? (
+                <iframe src={demoUrl} className="w-full h-full border-0" title="Demo" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" loading="lazy" />
+              ) : (
+                <div className="flex items-center justify-center h-full"><p className="text-muted-foreground">Demo coming soon</p></div>
+              )}
+            </div>
+            <div className="px-4 py-2 border-t border-border flex items-center gap-2 shrink-0">
+              {demoUrl && (
+                <>
+                  <code className="text-xs bg-muted px-2 py-1 rounded truncate flex-1">{demoUrl}</code>
+                  <Button size="sm" variant="outline" className="h-7" onClick={() => { navigator.clipboard.writeText(demoUrl); toast.success('Copied!'); }}>
                     <Copy style={{ width: 12, height: 12 }} />
                   </Button>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => handleCopy('demo@softwarevala.com', 'Email')}>
-                    📧 Copy Login
+                  <Button size="sm" className="h-7 text-xs" onClick={() => window.open(demoUrl, '_blank')}>
+                    <ExternalLink style={{ width: 12, height: 12 }} className="mr-1" /> Open
                   </Button>
-                  <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => handleCopy('Demo@2026', 'Password')}>
-                    🔑 Copy Password
-                  </Button>
-                  <Button size="sm" className="h-8 text-xs gap-1 font-bold" onClick={() => window.open(getDemoUrl()!, '_blank', 'noopener,noreferrer')}>
-                    <ExternalLink style={{ width: 13, height: 13 }} />
-                    Open Full Screen
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── FEATURES & ADVANTAGES DIALOG ── */}
-      <Dialog open={featuresOpen} onOpenChange={setFeaturesOpen}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base font-black uppercase">
-              <Info className="text-primary" style={{ width: 18, height: 18 }} />
-              {product.title}
-            </DialogTitle>
-            <DialogDescription className="text-muted-foreground text-sm">
-              Complete features, benefits & use cases
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex flex-col gap-5 py-2">
-            {/* APP FEATURES */}
-            <div className="rounded-xl border border-border/60 p-4">
-              <h4 className="text-[12px] font-black text-primary uppercase tracking-wider mb-3 flex items-center gap-2">
-                <Box style={{ width: 14, height: 14 }} /> App Features
-              </h4>
-              <ul className="space-y-2">
-                {showFeatures.map((f, i) => (
-                  <li key={i} className="flex items-start gap-2 text-[13px] text-foreground">
-                    <span className="text-primary mt-0.5">✓</span>
-                    <span>{f}</span>
-                  </li>
-                ))}
-                <li className="flex items-start gap-2 text-[13px] text-foreground">
-                  <span className="text-primary mt-0.5">✓</span>
-                  <span>Full Source Code Included</span>
-                </li>
-                <li className="flex items-start gap-2 text-[13px] text-foreground">
-                  <span className="text-primary mt-0.5">✓</span>
-                  <span>Lifetime License Key</span>
-                </li>
-              </ul>
+                </>
+              )}
             </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
-            {/* TECH STACK */}
-            <div className="rounded-xl border border-border/60 p-4">
-              <h4 className="text-[12px] font-black text-primary uppercase tracking-wider mb-3 flex items-center gap-2">
-                <Box style={{ width: 14, height: 14 }} /> Tech Stack
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                {techStack.map((t, i) => (
-                  <span key={i} className="text-[12px] font-semibold px-3 py-1 rounded-lg bg-muted text-foreground border border-border/50">
-                    {t}
-                  </span>
-                ))}
+      {/* Features Dialog */}
+      {featuresOpen && (
+        <Dialog open={featuresOpen} onOpenChange={setFeaturesOpen}>
+          <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-sm font-black uppercase">{product.title}</DialogTitle>
+              <DialogDescription>Features & details</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <div className="rounded-lg border border-border/60 p-3">
+                <h4 className="text-[11px] font-black text-primary uppercase mb-2">Features</h4>
+                <ul className="space-y-1">
+                  {features.map((f, i) => <li key={i} className="text-[12px] text-foreground flex gap-2"><span className="text-primary">✓</span>{f}</li>)}
+                  <li className="text-[12px] text-foreground flex gap-2"><span className="text-primary">✓</span>Full Source Code</li>
+                  <li className="text-[12px] text-foreground flex gap-2"><span className="text-primary">✓</span>Lifetime License</li>
+                </ul>
+              </div>
+              <div className="flex gap-2">
+                <Button className="flex-1 h-10 text-xs font-black" onClick={() => { setFeaturesOpen(false); onBuyNow(product); }}>
+                  <ShoppingCart style={{ width: 14, height: 14 }} className="mr-1" /> BUY — $5
+                </Button>
+                <Button variant="outline" className="flex-1 h-10 text-xs font-bold" onClick={() => { setFeaturesOpen(false); handleDemo(); }}>
+                  <Play style={{ width: 14, height: 14 }} className="mr-1" /> DEMO
+                </Button>
               </div>
             </div>
-
-            {/* ADVANTAGES */}
-            <div className="rounded-xl border border-border/60 p-4">
-              <h4 className="text-[12px] font-black text-primary uppercase tracking-wider mb-3 flex items-center gap-2">
-                <Star style={{ width: 14, height: 14 }} /> Advantages
-              </h4>
-              <ul className="space-y-2">
-                {[
-                  'Ready-to-deploy business solution',
-                  'Offline demo included — test before you buy',
-                  'Full source architecture visible',
-                  'Fast deployment — live in minutes',
-                  'Low cost licensing — one-time $5 payment',
-                  'No recurring fees or subscriptions',
-                  'White-label ready — rebrand as your own',
-                ].map((adv, i) => (
-                  <li key={i} className="flex items-start gap-2 text-[13px] text-foreground">
-                    <span className="text-primary mt-0.5">⚡</span>
-                    <span>{adv}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* USE CASES */}
-            <div className="rounded-xl border border-border/60 p-4">
-              <h4 className="text-[12px] font-black text-primary uppercase tracking-wider mb-3 flex items-center gap-2">
-                <Play style={{ width: 14, height: 14 }} /> Use Cases
-              </h4>
-              <ul className="space-y-2">
-                {[
-                  `Launch your own ${product.category} business`,
-                  'Resell as a white-label SaaS product',
-                  'Use as a base for custom client projects',
-                  'Internal tool for your organization',
-                  'Portfolio showcase & demonstration',
-                ].map((uc, i) => (
-                  <li key={i} className="flex items-start gap-2 text-[13px] text-foreground">
-                    <span className="text-primary mt-0.5">→</span>
-                    <span>{uc}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* CTA */}
-            <div className="flex gap-2">
-              <Button
-                className="flex-1 h-11 text-sm font-black gap-2"
-                onClick={() => { setFeaturesOpen(false); onBuyNow(product); }}
-              >
-                <ShoppingCart style={{ width: 15, height: 15 }} />
-                BUY NOW — $5
-              </Button>
-              <Button
-                variant="outline"
-                className="flex-1 h-11 text-sm font-bold gap-2"
-                onClick={() => { setFeaturesOpen(false); handleDemo(); }}
-              >
-                <Play style={{ width: 15, height: 15 }} />
-                VIEW DEMO
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 });
 MarketplaceProductCard.displayName = 'MarketplaceProductCard';
 
-/* ─── COMING SOON PLACEHOLDER ─── */
 export function ComingSoonCard({ label }: { label: string }) {
   return (
-    <div className="flex-shrink-0" style={{ width: '340px' }}>
-      <div
-        className="rounded-2xl border border-dashed flex flex-col items-center justify-center gap-3 text-center"
-        style={{
-          minHeight: 420,
-          borderColor: 'rgba(255,255,255,0.1)',
-          background: 'rgba(255,255,255,0.02)',
-          backdropFilter: 'blur(8px)',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
-        }}
-      >
-        <div
-          className="h-16 w-16 rounded-2xl flex items-center justify-center"
-          style={{ background: 'rgba(255,255,255,0.05)', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.2)' }}
-        >
-          <Package style={{ width: 28, height: 28 }} className="text-muted-foreground" />
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-foreground">Coming Soon</p>
-          <p className="text-xs text-muted-foreground mt-1">{label} products launching soon</p>
-        </div>
+    <div className="flex-shrink-0" style={{ width: 280 }}>
+      <div className="rounded-2xl border border-dashed flex flex-col items-center justify-center gap-3 text-center"
+        style={{ minHeight: 320, borderColor: 'rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)' }}>
+        <Package style={{ width: 28, height: 28 }} className="text-muted-foreground" />
+        <p className="text-sm font-semibold text-foreground">Coming Soon</p>
+        <p className="text-xs text-muted-foreground">{label}</p>
         <Badge variant="outline" className="text-[10px]">ON PIPELINE</Badge>
       </div>
     </div>
