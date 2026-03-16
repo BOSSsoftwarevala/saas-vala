@@ -49,7 +49,7 @@ export default function Marketplace() {
   const { purchaseApk, processing } = useApkPurchase();
   const { checkUserStatus } = useFraudDetection();
   const { user } = useAuth();
-  const navigate = useNavigate();
+  
   useMarketplaceProducts();
 
   const handleBuyNow = async (product: Product) => {
