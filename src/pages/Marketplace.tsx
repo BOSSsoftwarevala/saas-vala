@@ -31,7 +31,7 @@ const bankDetails = {
   accountNumber: '8045924772', ifsc: 'IDIB000K196',
   branchName: 'KANKAR BAGH', upiId: 'softwarevala@indianbank',
 };
-const cryptoDetails = { binanceId: '1078928519' };
+
 
 type BuyPayMethod = 'wallet' | 'upi' | 'bank' | 'crypto';
 
