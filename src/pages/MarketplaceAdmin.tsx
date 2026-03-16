@@ -49,7 +49,7 @@ export default function MarketplaceAdmin() {
   const [page, setPage] = useState(0);
   const [banners, setBanners] = useState<BannerSlide[]>(defaultBanners);
   const [editBanner, setEditBanner] = useState<BannerSlide | null>(null);
-  const [bulkAction, setBulkAction] = useState<string>('');
+  
   const [bulkRunning, setBulkRunning] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const PAGE_SIZE = 25;
