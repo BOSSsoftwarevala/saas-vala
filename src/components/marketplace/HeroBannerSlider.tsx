@@ -100,7 +100,7 @@ export function HeroBannerSlider({ slides = defaultSlides, autoPlayInterval = 40
     <div className="mb-4">
       {/* Offer Ticker */}
       <div className="overflow-hidden" style={{ background: 'linear-gradient(90deg, #dc2626, #ea580c, #d97706)', height: 32 }}>
-        <div className="flex items-center h-full animate-marquee whitespace-nowrap">
+        <div className="flex items-center h-full animate-marquee whitespace-nowrap" style={{ width: 'max-content' }}>
           {[...offerTicker, ...offerTicker].map((t, i) => (
             <span key={i} className="text-white text-[11px] font-bold mx-6">{t}</span>
           ))}
