@@ -104,7 +104,7 @@ export default function Marketplace() {
         <HeroBannerSlider />
 
         {/* All categories as dynamic rows — no duplicate hardcoded sections */}
-        {MARKETPLACE_CATEGORIES.map((cat, idx) => (
+        {MARKETPLACE_CATEGORIES.map((cat) => (
           <LazySection key={cat.id} height={280}>
             <MarketplaceCategoryRow category={cat} onBuyNow={handleBuyNow} />
           </LazySection>
