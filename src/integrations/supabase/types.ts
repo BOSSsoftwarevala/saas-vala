@@ -1824,6 +1824,108 @@ export type Database = {
         }
         Relationships: []
       }
+      marketplace_banners: {
+        Row: {
+          badge: string | null
+          badge_color: string | null
+          coupon_code: string | null
+          created_at: string | null
+          end_date: string | null
+          id: string
+          image_url: string | null
+          is_active: boolean | null
+          link_url: string | null
+          offer_text: string | null
+          sort_order: number | null
+          start_date: string | null
+          subtitle: string | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          badge?: string | null
+          badge_color?: string | null
+          coupon_code?: string | null
+          created_at?: string | null
+          end_date?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          link_url?: string | null
+          offer_text?: string | null
+          sort_order?: number | null
+          start_date?: string | null
+          subtitle?: string | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          badge?: string | null
+          badge_color?: string | null
+          coupon_code?: string | null
+          created_at?: string | null
+          end_date?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          link_url?: string | null
+          offer_text?: string | null
+          sort_order?: number | null
+          start_date?: string | null
+          subtitle?: string | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      marketplace_coupons: {
+        Row: {
+          code: string
+          created_at: string | null
+          description: string | null
+          discount_type: string | null
+          discount_value: number | null
+          end_date: string | null
+          id: string
+          is_active: boolean | null
+          max_uses: number | null
+          min_order: number | null
+          start_date: string | null
+          updated_at: string | null
+          used_count: number | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          description?: string | null
+          discount_type?: string | null
+          discount_value?: number | null
+          end_date?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_uses?: number | null
+          min_order?: number | null
+          start_date?: string | null
+          updated_at?: string | null
+          used_count?: number | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          description?: string | null
+          discount_type?: string | null
+          discount_value?: number | null
+          end_date?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_uses?: number | null
+          min_order?: number | null
+          start_date?: string | null
+          updated_at?: string | null
+          used_count?: number | null
+        }
+        Relationships: []
+      }
       marketplace_listings: {
         Row: {
           created_at: string | null
@@ -2027,6 +2129,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      marketplace_tickers: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          sort_order: number | null
+          text: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          sort_order?: number | null
+          text: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          sort_order?: number | null
+          text?: string
+        }
+        Relationships: []
       }
       notifications: {
         Row: {
@@ -2321,6 +2447,7 @@ export type Database = {
       }
       products: {
         Row: {
+          apk_enabled: boolean | null
           apk_file_size: number | null
           apk_url: string | null
           apk_version_code: number | null
@@ -2340,6 +2467,7 @@ export type Database = {
           description: string | null
           device_bind: boolean | null
           device_limit: number | null
+          discount_percent: number | null
           download_count: number | null
           expiry_type: string | null
           featured: boolean | null
@@ -2362,6 +2490,7 @@ export type Database = {
           package_name: string | null
           price: number | null
           product_code: string
+          rating: number | null
           require_payment: boolean | null
           secure_download: boolean | null
           seo_description: string | null
@@ -2372,6 +2501,7 @@ export type Database = {
           status: Database["public"]["Enums"]["product_status"] | null
           storage_path: string | null
           sub_category: string | null
+          tags: string[] | null
           tags_json: Json | null
           target_industry: string | null
           tech_stack_json: Json | null
@@ -2383,6 +2513,7 @@ export type Database = {
           visibility: string | null
         }
         Insert: {
+          apk_enabled?: boolean | null
           apk_file_size?: number | null
           apk_url?: string | null
           apk_version_code?: number | null
@@ -2402,6 +2533,7 @@ export type Database = {
           description?: string | null
           device_bind?: boolean | null
           device_limit?: number | null
+          discount_percent?: number | null
           download_count?: number | null
           expiry_type?: string | null
           featured?: boolean | null
@@ -2424,6 +2556,7 @@ export type Database = {
           package_name?: string | null
           price?: number | null
           product_code?: string
+          rating?: number | null
           require_payment?: boolean | null
           secure_download?: boolean | null
           seo_description?: string | null
@@ -2434,6 +2567,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["product_status"] | null
           storage_path?: string | null
           sub_category?: string | null
+          tags?: string[] | null
           tags_json?: Json | null
           target_industry?: string | null
           tech_stack_json?: Json | null
@@ -2445,6 +2579,7 @@ export type Database = {
           visibility?: string | null
         }
         Update: {
+          apk_enabled?: boolean | null
           apk_file_size?: number | null
           apk_url?: string | null
           apk_version_code?: number | null
@@ -2464,6 +2599,7 @@ export type Database = {
           description?: string | null
           device_bind?: boolean | null
           device_limit?: number | null
+          discount_percent?: number | null
           download_count?: number | null
           expiry_type?: string | null
           featured?: boolean | null
@@ -2486,6 +2622,7 @@ export type Database = {
           package_name?: string | null
           price?: number | null
           product_code?: string
+          rating?: number | null
           require_payment?: boolean | null
           secure_download?: boolean | null
           seo_description?: string | null
@@ -2496,6 +2633,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["product_status"] | null
           storage_path?: string | null
           sub_category?: string | null
+          tags?: string[] | null
           tags_json?: Json | null
           target_industry?: string | null
           tech_stack_json?: Json | null
