@@ -34,7 +34,7 @@ export function HeroBannerSlider({ autoPlayInterval = 4000 }: { autoPlayInterval
   const [current, setCurrent] = useState(0);
   const [paused, setPaused] = useState(false);
 
-  // Fetch banners from DB
+  // ✅ ADD: Fetch banners from DB and listen for updates
   useEffect(() => {
     const fetchData = async () => {
       const [bannersRes, tickersRes] = await Promise.all([
@@ -69,6 +69,58 @@ export function HeroBannerSlider({ autoPlayInterval = 4000 }: { autoPlayInterval
       }
     };
     fetchData();
+  }, []);
+
+  // ✅ ADD: Listen for admin banner updates
+  useEffect(() => {
+    const MARKETPLACE_BANNERS_UPDATED = 'marketplace:banners-updated';
+    
+    const handleBannerUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      console.log('[HeroBannerSlider] Admin updated banners');
+      
+      // Refetch banners from DB
+      const refetchData = async () => {
+        const [bannersRes, tickersRes] = await Promise.all([
+          supabase.from('marketplace_banners').select('*').eq('is_active', true).order('sort_order'),
+          supabase.from('marketplace_tickers').select('*').eq('is_active', true).order('sort_order'),
+        ]);
+
+        if (bannersRes.data && bannersRes.data.length > 0) {
+          const now = new Date();
+          const valid = bannersRes.data.filter((b: any) => {
+            if (b.start_date && new Date(b.start_date) > now) return false;
+            if (b.end_date && new Date(b.end_date) < now) return false;
+            return true;
+          });
+          if (valid.length > 0) {
+            setSlides(valid.map((b: any) => ({
+              id: b.id,
+              image: b.image_url || 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200&h=400&fit=crop',
+              title: b.title,
+              subtitle: b.subtitle || '',
+              badge: b.badge || undefined,
+              badgeColor: b.badge_color || 'from-blue-500 to-indigo-500',
+              offerText: b.offer_text || undefined,
+              couponCode: b.coupon_code || undefined,
+            })));
+            setCurrent(0); // Reset to first slide
+          }
+        }
+
+        if (tickersRes.data && tickersRes.data.length > 0) {
+          setTickerItems(tickersRes.data.map((t: any) => ({ id: t.id, text: t.text })));
+        }
+      };
+      
+      refetchData();
+    };
+
+    window.addEventListener(MARKETPLACE_BANNERS_UPDATED, handleBannerUpdate);
+    
+    return () => {
+      window.removeEventListener(MARKETPLACE_BANNERS_UPDATED, handleBannerUpdate);
+    };
   }, []);
 
   const next = useCallback(() => setCurrent(p => (p + 1) % slides.length), [slides.length]);
