@@ -20,7 +20,12 @@ export interface MarketplaceProduct {
   demoEnabled?: boolean;
   featured: boolean;
   trending: boolean;
-  isAvailable: boolean; // false = On Pipeline
+  isAvailable: boolean;
+  discount_percent: number;
+  rating: number;
+  tags: string[];
+  apk_enabled: boolean;
+  license_enabled: boolean;
 }
 
 const stockImages = [
