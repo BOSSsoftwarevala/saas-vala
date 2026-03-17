@@ -115,6 +115,11 @@ export function mapDbProduct(product: any, index: number): MarketplaceProduct {
     featured: Boolean(product.featured),
     trending: Boolean(product.trending),
     isAvailable,
+    discount_percent: Number(product.discount_percent) || 0,
+    rating: Number(product.rating) || 4.5,
+    tags: product.tags || [],
+    apk_enabled: product.apk_enabled !== false,
+    license_enabled: product.license_enabled !== false,
   };
 }
 
