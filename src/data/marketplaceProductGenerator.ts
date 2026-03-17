@@ -905,6 +905,7 @@ export function generateCategoryProducts(
       featured: i < 3,
       trending: i < 5,
       isAvailable: true,
+      discount_percent: 0, rating: 4.5, tags: [], apk_enabled: true, license_enabled: true,
     });
   }
 
