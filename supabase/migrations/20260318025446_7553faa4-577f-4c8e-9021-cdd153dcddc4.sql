@@ -1,0 +1,2 @@
+ALTER TABLE public.products
+  ADD COLUMN IF NOT EXISTS buy_enabled BOOLEAN NOT NULL DEFAULT true;

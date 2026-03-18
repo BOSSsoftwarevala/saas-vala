@@ -21,6 +21,7 @@ const pageTitles: Record<string, string> = {
   '/': 'Marketplace',
   '/dashboard': 'Dashboard',
   '/products': 'Product Manager',
+  '/admin/marketplace': 'Marketplace Admin',
   '/keys': 'Key Management',
   '/servers': 'Server Manager',
   '/ai-chat': 'SaaS AI Chat',

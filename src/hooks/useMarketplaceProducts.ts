@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface MarketplaceProduct {
@@ -50,6 +50,7 @@ const defaultFeatures = [
 
 const defaultTechStack = ['React', 'Node.js', 'PostgreSQL'];
 
+// Category row mapping
 export const CATEGORY_ROW_MAP: Record<string, string[]> = {
   upcoming: ['upcoming', 'coming_soon', 'pipeline'],
   ondemand: ['on_demand', 'on demand', 'ondemand', 'saas', 'cloud'],
@@ -130,67 +131,29 @@ export function mapDbProduct(product: any, index: number): MarketplaceProduct {
 export function useMarketplaceProducts() {
   const [products, setProducts] = useState<MarketplaceProduct[]>([]);
   const [loading, setLoading] = useState(true);
-  const subscriptionRef = useRef<any>(null);
-  const refetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const fetchProducts = useCallback(async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('products')
-      .select('id, name, slug, description, short_description, price, status, features, thumbnail_url, git_repo_url, marketplace_visible, apk_url, demo_url, demo_login, demo_password, demo_enabled, featured, trending, business_type, deploy_status, discount_percent, rating, tags, apk_enabled, license_enabled')
-      .eq('marketplace_visible', true)
-      .order('created_at', { ascending: false })
-      .limit(500);
-
-    if (error) {
-      console.error('Failed to fetch marketplace products:', error);
-      setProducts([]);
-    } else {
-      const mapped = (data || []).map((p, i) => mapDbProduct(p, i));
-      setProducts(prioritizeProducts(mapped));
-    }
-    setLoading(false);
-  }, []);
 
   useEffect(() => {
-    // Initial fetch
-    fetchProducts();
+    const fetchProducts = async () => {
+      setLoading(true);
+  const { data, error } = await supabase
+        .from('products')
+        .select('id, name, slug, description, short_description, price, status, features, thumbnail_url, git_repo_url, marketplace_visible, apk_url, demo_url, demo_login, demo_password, demo_enabled, featured, trending, business_type, deploy_status, discount_percent, rating, tags, apk_enabled, license_enabled')
+        .eq('marketplace_visible', true)
+        .order('created_at', { ascending: false })
+        .limit(500);
 
-    // Subscribe to realtime changes on products table
-    // Only triggers on INSERT, UPDATE, DELETE for marketplace_visible products
-    subscriptionRef.current = supabase
-      .channel('marketplace-products-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // Listen to all changes (INSERT, UPDATE, DELETE)
-          schema: 'public',
-          table: 'products',
-          filter: 'marketplace_visible=eq.true', // Only marketplace-visible products
-        },
-        (payload) => {
-          // Debounce rapid changes (e.g., bulk updates) with 500ms timeout
-          if (refetchTimeoutRef.current) {
-            clearTimeout(refetchTimeoutRef.current);
-          }
-          refetchTimeoutRef.current = setTimeout(() => {
-            console.log('🔄 Product change detected, refetching marketplace data...');
-            fetchProducts();
-          }, 500);
-        }
-      )
-      .subscribe();
-
-    // Cleanup: Unsubscribe and clear timeouts
-    return () => {
-      if (subscriptionRef.current) {
-        supabase.removeChannel(subscriptionRef.current);
+      if (error) {
+        console.error('Failed to fetch marketplace products:', error);
+        setProducts([]);
+      } else {
+        const mapped = (data || []).map((p, i) => mapDbProduct(p, i));
+        setProducts(prioritizeProducts(mapped));
       }
-      if (refetchTimeoutRef.current) {
-        clearTimeout(refetchTimeoutRef.current);
-      }
+      setLoading(false);
     };
-  }, [fetchProducts]);
+
+    fetchProducts();
+  }, []);
 
   // Split into category rows for the "catalog" section
   const dbRow1 = products.slice(0, 30);
@@ -225,73 +188,37 @@ export function useMarketplaceProducts() {
 export function useProductsByCategory(categories: string[]) {
   const [products, setProducts] = useState<MarketplaceProduct[]>([]);
   const [loading, setLoading] = useState(true);
-  const subscriptionRef = useRef<any>(null);
-  const refetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const fetchProducts = useCallback(async () => {
-    setLoading(true);
-    // Fetch all marketplace visible products and filter client-side by category
-    const { data, error } = await supabase
-      .from('products')
-      .select('id, name, slug, description, short_description, price, status, features, thumbnail_url, git_repo_url, marketplace_visible, apk_url, demo_url, demo_login, demo_password, demo_enabled, featured, trending, business_type, deploy_status, discount_percent, rating, tags, apk_enabled, license_enabled')
-      .eq('marketplace_visible', true)
-      .order('created_at', { ascending: false })
-      .limit(500);
-
-    if (error) {
-      setProducts([]);
-    } else {
-      const mapped = (data || []).map((p, i) => mapDbProduct(p, i));
-      // Filter by category keywords OR return all if no match
-      const filtered = prioritizeProducts(
-        mapped.filter(p => {
-          const bt = (p.businessType || '').toLowerCase();
-          const cat = (p.category || '').toLowerCase();
-          return categories.some(c => bt.includes(c.toLowerCase()) || cat.includes(c.toLowerCase()));
-        })
-      );
-      setProducts(filtered);
-    }
-    setLoading(false);
-  }, [categories]);
 
   useEffect(() => {
-    fetchProducts();
+    const fetchProducts = async () => {
+      setLoading(true);
+      // Fetch all marketplace visible products and filter client-side by category
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, slug, description, short_description, price, status, features, thumbnail_url, git_repo_url, marketplace_visible, apk_url, demo_url, demo_login, demo_password, demo_enabled, featured, trending, business_type, deploy_status, discount_percent, rating, tags, apk_enabled, license_enabled')
+        .eq('marketplace_visible', true)
+        .order('created_at', { ascending: false })
+        .limit(500);
 
-    // Subscribe to realtime changes
-    subscriptionRef.current = supabase
-      .channel(`category-products-${categories.join('-')}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'products',
-          filter: 'marketplace_visible=eq.true',
-        },
-        (payload) => {
-          // Debounce rapid changes with 500ms timeout
-          if (refetchTimeoutRef.current) {
-            clearTimeout(refetchTimeoutRef.current);
-          }
-          refetchTimeoutRef.current = setTimeout(() => {
-            console.log('🔄 Category product change detected, refetching...');
-            fetchProducts();
-          }, 500);
-        }
-      )
-      .subscribe();
-
-    // Cleanup
-    return () => {
-      if (subscriptionRef.current) {
-        supabase.removeChannel(subscriptionRef.current);
+      if (error) {
+        setProducts([]);
+      } else {
+        const mapped = (data || []).map((p, i) => mapDbProduct(p, i));
+        // Filter by category keywords OR return all if no match
+        const filtered = prioritizeProducts(
+          mapped.filter(p => {
+            const bt = (p.businessType || '').toLowerCase();
+            const cat = (p.category || '').toLowerCase();
+            return categories.some(c => bt.includes(c.toLowerCase()) || cat.includes(c.toLowerCase()));
+          })
+        );
+        setProducts(filtered);
       }
-      if (refetchTimeoutRef.current) {
-        clearTimeout(refetchTimeoutRef.current);
-      }
+      setLoading(false);
     };
-  }, [categories, fetchProducts]);
+
+    fetchProducts();
+  }, [categories.join(',')]);
 
   return { products, loading };
 }

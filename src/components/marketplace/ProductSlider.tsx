@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
  import { ChevronLeft, ChevronRight, Bell, ShoppingCart, Play, Heart } from 'lucide-react';
@@ -70,15 +70,10 @@ function getIconComponent(category: string) {
   return IconComponent || LucideIcons.Box;
 }
 
-// ✅ ADD: Global event constant
-const MARKETPLACE_PRODUCT_UPDATED = 'marketplace:product-updated';
-
 export function ProductSlider({ title, products, onBuyNow, onFavorite, onNotify, onLiveDemo, onDownloadApk, showTechStack = false }: ProductSliderProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
-  // ✅ ADD: Track updates to refresh slider
-  const [refreshKey, setRefreshKey] = useState(0);
 
   const checkScroll = () => {
     if (scrollRef.current) {
@@ -99,27 +94,11 @@ export function ProductSlider({ title, products, onBuyNow, onFavorite, onNotify,
     }
   };
 
-  // ✅ ADD: Listen for product updates from admin
-  useEffect(() => {
-    const handleProductUpdate = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      console.log('[ProductSlider] Products updated');
-      // Force re-render by incrementing refresh key
-      setRefreshKey(prev => prev + 1);
-    };
-
-    window.addEventListener(MARKETPLACE_PRODUCT_UPDATED, handleProductUpdate);
-    
-    return () => {
-      window.removeEventListener(MARKETPLACE_PRODUCT_UPDATED, handleProductUpdate);
-    };
-  }, []);
-
   // Extract category from title
   const categoryName = title.replace(/^[^\s]+\s/, '').toLowerCase();
 
   return (
-    <div className="relative group py-4" key={refreshKey}>
+    <div className="relative group py-4">
       {/* Row Title */}
       <h2 className="text-lg md:text-xl font-display font-bold text-foreground mb-4 px-4 md:px-8 uppercase tracking-wide">
         {title}

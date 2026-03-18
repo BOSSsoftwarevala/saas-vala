@@ -15,8 +15,6 @@ export const SectionSlider = React.forwardRef<HTMLDivElement, SectionSliderProps
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
-  // ✅ ADD: Track refresh key to reset scroll position on updates
-  const [refreshKey, setRefreshKey] = useState(0);
 
   const checkScroll = () => {
     if (!scrollRef.current) return;
@@ -62,29 +60,6 @@ export const SectionSlider = React.forwardRef<HTMLDivElement, SectionSliderProps
     };
   }, []);
 
-  // ✅ ADD: Listen for slider refresh events
-  useEffect(() => {
-    const MARKETPLACE_SLIDER_REFRESH = 'marketplace:slider-refresh';
-    
-    const handleSliderRefresh = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      console.log('[SectionSlider] Slider refreshed');
-      
-      // Reset scroll position and refresh state
-      if (scrollRef.current) {
-        scrollRef.current.scrollTo({ left: 0, behavior: 'auto' });
-      }
-      
-      setRefreshKey(prev => prev + 1);
-    };
-
-    window.addEventListener(MARKETPLACE_SLIDER_REFRESH, handleSliderRefresh);
-    
-    return () => {
-      window.removeEventListener(MARKETPLACE_SLIDER_REFRESH, handleSliderRefresh);
-    };
-  }, []);
-
   const scroll = (direction: 'left' | 'right') => {
     if (!scrollRef.current) return;
     const amount = scrollRef.current.clientWidth * 0.75;
@@ -93,7 +68,7 @@ export const SectionSlider = React.forwardRef<HTMLDivElement, SectionSliderProps
   };
 
   return (
-    <div className="relative group" key={refreshKey}>
+    <div className="relative group">
       {/* Left arrow */}
       {canScrollLeft && (
         <button

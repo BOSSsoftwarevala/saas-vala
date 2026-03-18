@@ -39,6 +39,7 @@ const navItems: NavItem[] = [
   { title: 'Marketplace', icon: Store, href: '/' },
   { title: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
   { title: 'Products', icon: Package, href: '/products' },
+  { title: 'Marketplace Admin', icon: Store, href: '/admin/marketplace', adminOnly: true },
   { title: 'Keys', icon: Key, href: '/keys' },
   { title: 'Servers', icon: Server, href: '/servers' },
   { title: 'SaaS AI', icon: Cpu, href: '/saas-ai-dashboard' },

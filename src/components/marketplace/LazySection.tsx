@@ -10,32 +10,10 @@ interface LazySectionProps {
 /**
  * Renders children only when the section scrolls into viewport.
  * Uses IntersectionObserver for zero-cost offscreen sections.
- * ✅ AUTO-REFRESH: Listens for product updates and triggers child re-render
  */
 export function LazySection({ children, height = 320, rootMargin = '400px' }: LazySectionProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
-  // ✅ ADD: Refresh key to force child re-renders when products update
-  const [refreshKey, setRefreshKey] = useState(0);
-
-  // ✅ ADD: Listen for admin product updates and trigger re-render
-  useEffect(() => {
-    const MARKETPLACE_PRODUCT_UPDATED = 'marketplace:product-updated';
-    
-    const handleProductUpdate = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      console.log('[LazySection] Product updated, re-rendering children...');
-      
-      // Increment key to force all children to re-mount with fresh data
-      setRefreshKey(prev => prev + 1);
-    };
-
-    window.addEventListener(MARKETPLACE_PRODUCT_UPDATED, handleProductUpdate);
-    
-    return () => {
-      window.removeEventListener(MARKETPLACE_PRODUCT_UPDATED, handleProductUpdate);
-    };
-  }, []);
 
   useEffect(() => {
     const el = ref.current;
@@ -69,6 +47,5 @@ export function LazySection({ children, height = 320, rootMargin = '400px' }: La
     );
   }
 
-  // ✅ ADD: key={refreshKey} forces all children to re-mount when products update
-  return <div ref={ref} key={refreshKey}>{children}</div>;
+  return <div ref={ref}>{children}</div>;
 }

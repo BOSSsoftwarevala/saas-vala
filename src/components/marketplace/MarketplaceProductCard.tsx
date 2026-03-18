@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -28,9 +28,6 @@ const catColors: Record<string, string> = {
   Marketing: '#e879f9', HR: '#818cf8', Logistics: '#facc15',
 };
 
-// ✅ GLOBAL EVENT CONSTANT
-const MARKETPLACE_PRODUCT_UPDATED = 'marketplace:product-updated';
-
 export const MarketplaceProductCard = React.memo<MarketplaceProductCardProps>(({
   product, index = 0, onBuyNow, rank,
 }) => {
@@ -39,74 +36,33 @@ export const MarketplaceProductCard = React.memo<MarketplaceProductCardProps>(({
   const [demoOpen, setDemoOpen] = useState(false);
   const [featuresOpen, setFeaturesOpen] = useState(false);
   const [downloadChecking, setDownloadChecking] = useState(false);
-  // ✅ ADD: Local product state for real-time updates
-  const [localProduct, setLocalProduct] = useState<MarketplaceProduct>(product);
   const { user } = useAuth();
   const { isInCart, toggleItem } = useCart();
-  const inCart = isInCart(localProduct.id);
+  const inCart = isInCart(product.id);
 
-  // ✅ ADD: Listen for admin product updates
-  useEffect(() => {
-    const handleAdminUpdate = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const { productId, source } = customEvent.detail;
-      
-      // Only update if this specific product was changed
-      if (productId === product.id && source === 'admin-save') {
-        console.log('[ProductCard] Admin updated:', productId);
-        
-        // Refetch product from DB
-        const refetchProduct = async () => {
-          try {
-            const { data } = await supabase
-              .from('products')
-              .select('*')
-              .eq('id', productId)
-              .single();
-            
-            if (data) {
-              setLocalProduct(data as MarketplaceProduct);
-              toast.success('⚡ Product updated!');
-            }
-          } catch (error) {
-            console.error('[ProductCard] Refetch failed:', error);
-          }
-        };
-        
-        refetchProduct();
-      }
-    };
-
-    window.addEventListener(MARKETPLACE_PRODUCT_UPDATED, handleAdminUpdate);
-    
-    return () => {
-      window.removeEventListener(MARKETPLACE_PRODUCT_UPDATED, handleAdminUpdate);
-    };
-  }, [product.id]);
-
-  const isPipeline = !localProduct.isAvailable || localProduct.status === 'draft' || localProduct.status === 'upcoming';
-  const iconColor = catColors[localProduct.category] || '#f97316';
+  const isPipeline = !product.isAvailable || product.status === 'draft' || product.status === 'upcoming';
+  const iconColor = catColors[product.category] || '#f97316';
   const cardRank = rank ?? index + 1;
 
   // Dynamic fields from DB
-  const price = localProduct.price || 5;
-  const discount = (localProduct as any).discount_percent || 0;
-  const rating = (localProduct as any).rating || 4.5;
+  const price = product.price || 5;
+  const discount = (product as any).discount_percent || 0;
+  const rating = (product as any).rating || 4.5;
   const originalPrice = discount > 0 ? Math.round(price / (1 - discount / 100)) : price * 2;
-  const apkEnabled = (localProduct as any).apk_enabled !== false;
-  const licenseEnabled = (localProduct as any).license_enabled !== false;
+  const apkEnabled = (product as any).apk_enabled !== false;
+  const licenseEnabled = (product as any).license_enabled !== false;
 
-  const features: string[] = Array.isArray(localProduct.features)
-    ? localProduct.features.slice(0, 4).map((f: any) => typeof f === 'string' ? f : f.text)
+  const features: string[] = Array.isArray(product.features)
+    ? product.features.slice(0, 4).map((f: any) => typeof f === 'string' ? f : f.text)
     : ['Dashboard', 'Reports', 'Analytics', 'API'];
 
   const getDemoUrl = useCallback((): string | null => {
-    const d = (localProduct as any).demoUrl || (localProduct as any).demo_url;
+    const d = (product as any).demoUrl || (product as any).demo_url;
     if (d && d.startsWith('http') && !d.includes('github.com')) return d;
-    const g = (localProduct as any).gitRepoUrl || (localProduct as any).git_repo_url;
+    const g = (product as any).gitRepoUrl || (product as any).git_repo_url;
     if (g && g.startsWith('http')) return g;
     return null;
-  }, [localProduct]);
+  }, [product]);
 
   const isIframeable = (url: string | null) => url ? !url.includes('github.com') : false;
   const hasDemoAvailable = getDemoUrl() !== null;
@@ -118,15 +74,15 @@ export const MarketplaceProductCard = React.memo<MarketplaceProductCardProps>(({
   }, [user, favorited]);
 
   const handleAddToCart = useCallback(() => {
-    toggleItem({ id: localProduct.id, title: localProduct.title, subtitle: localProduct.subtitle || '', image: localProduct.image || '', price, category: localProduct.category });
+    toggleItem({ id: product.id, title: product.title, subtitle: product.subtitle || '', image: product.image || '', price, category: product.category });
     toast.success(inCart ? 'Removed from cart' : `🛒 Added to cart!`);
-  }, [localProduct, inCart, toggleItem, price]);
+  }, [product, inCart, toggleItem, price]);
 
   const handleNotifyMe = useCallback(() => {
     if (!user) { toast.error('Sign in to get notified'); return; }
     setNotified(true);
-    toast.success(`🔔 You'll be notified when ${localProduct.title} is ready!`);
-  }, [user, localProduct.title]);
+    toast.success(`🔔 You'll be notified when ${product.title} is ready!`);
+  }, [user, product.title]);
 
   const handleDemo = useCallback(() => {
     const url = getDemoUrl();
@@ -148,19 +104,19 @@ export const MarketplaceProductCard = React.memo<MarketplaceProductCardProps>(({
         .eq('created_by', user.id).eq('status', 'active').limit(50);
       const match = licenseRecord?.find((l: any) => {
         const m = l.meta as any;
-        return m?.product_id === localProduct.id || m?.product_title === localProduct.title;
+        return m?.product_id === product.id || m?.product_title === product.title;
       });
       if (!match?.license_key) {
-        toast.error('Please purchase first', { action: { label: 'BUY NOW', onClick: () => onBuyNow(localProduct) } });
+        toast.error('Please purchase first', { action: { label: 'BUY NOW', onClick: () => onBuyNow(product) } });
         setDownloadChecking(false); return;
       }
       if (match.expires_at && new Date(match.expires_at) < new Date()) {
         toast.error('License expired. Please renew.'); setDownloadChecking(false); return;
       }
-      const isUuid = /^[0-9a-f]{8}-/.test(localProduct.id);
+      const isUuid = /^[0-9a-f]{8}-/.test(product.id);
       if (isUuid) {
         const { data, error } = await supabase.functions.invoke('download-apk', {
-          body: { product_id: localProduct.id, license_key: match.license_key },
+          body: { product_id: product.id, license_key: match.license_key },
         });
         if (!error && data?.success) { window.open(data.download_url, '_blank'); setDownloadChecking(false); return; }
       }
@@ -170,7 +126,7 @@ export const MarketplaceProductCard = React.memo<MarketplaceProductCardProps>(({
       });
     } catch { toast.info('APK download will be available soon.'); }
     setDownloadChecking(false);
-  }, [user, localProduct, onBuyNow, apkEnabled]);
+  }, [user, product, onBuyNow, apkEnabled]);
 
   const demoUrl = getDemoUrl();
 
@@ -193,8 +149,8 @@ export const MarketplaceProductCard = React.memo<MarketplaceProductCardProps>(({
             <Box style={{ width: 24, height: 24, color: iconColor }} />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-bold text-[13px] text-foreground truncate leading-tight">{localProduct.title}</h3>
-            <p className="text-[11px] truncate" style={{ color: iconColor }}>{localProduct.category}</p>
+            <h3 className="font-bold text-[13px] text-foreground truncate leading-tight">{product.title}</h3>
+            <p className="text-[11px] truncate" style={{ color: iconColor }}>{product.category}</p>
           </div>
           {!isPipeline ? (
             <span className="text-[9px] font-black text-white px-2 py-0.5 rounded-full" style={{ background: 'linear-gradient(90deg,#22C55E,#16A34A)' }}>LIVE</span>
@@ -207,7 +163,7 @@ export const MarketplaceProductCard = React.memo<MarketplaceProductCardProps>(({
         {/* Body */}
         <div className="flex-1 px-4 py-3 flex flex-col gap-2">
           <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
-            {localProduct.subtitle || 'Complete solution with all features, reports, and integrations.'}
+            {product.subtitle || 'Complete solution with all features, reports, and integrations.'}
           </p>
           <div className="flex flex-wrap gap-1">
             {features.slice(0, 3).map((f, i) => (
@@ -250,7 +206,7 @@ export const MarketplaceProductCard = React.memo<MarketplaceProductCardProps>(({
                   <ShoppingCart style={{ width: 14, height: 14 }} className={inCart ? 'text-primary' : 'text-muted-foreground'} />
                 </Button>
               </div>
-              <Button size="sm" className="w-full h-9 text-[11px] font-black rounded-lg text-white border-0" style={{ background: 'linear-gradient(90deg,#2563EB,#1D4ED8)' }} onClick={() => onBuyNow(localProduct)}>
+              <Button size="sm" className="w-full h-9 text-[11px] font-black rounded-lg text-white border-0" style={{ background: 'linear-gradient(90deg,#2563EB,#1D4ED8)' }} onClick={() => onBuyNow(product)}>
                 <Package style={{ width: 13, height: 13 }} className="mr-1" /> BUY NOW — ${price}
               </Button>
             </>
@@ -273,8 +229,8 @@ export const MarketplaceProductCard = React.memo<MarketplaceProductCardProps>(({
         <Dialog open={demoOpen} onOpenChange={setDemoOpen}>
           <DialogContent className="max-w-4xl w-[95vw] h-[80vh] flex flex-col p-0 gap-0">
             <DialogHeader className="px-4 pt-3 pb-2 border-b border-border shrink-0">
-              <DialogTitle className="text-sm font-black uppercase">{localProduct.title} — Live Demo</DialogTitle>
-              <DialogDescription className="text-xs">{(localProduct as any).demoLogin || 'demo@softwarevala.com'} / {(localProduct as any).demoPassword || 'Demo@2026'}</DialogDescription>
+              <DialogTitle className="text-sm font-black uppercase">{product.title} — Live Demo</DialogTitle>
+              <DialogDescription className="text-xs">{(product as any).demoLogin || 'demo@softwarevala.com'} / {(product as any).demoPassword || 'Demo@2026'}</DialogDescription>
             </DialogHeader>
             <div className="flex-1 relative bg-muted/30 overflow-hidden">
               {demoUrl && isIframeable(demoUrl) ? (
@@ -305,7 +261,7 @@ export const MarketplaceProductCard = React.memo<MarketplaceProductCardProps>(({
         <Dialog open={featuresOpen} onOpenChange={setFeaturesOpen}>
           <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-sm font-black uppercase">{localProduct.title}</DialogTitle>
+              <DialogTitle className="text-sm font-black uppercase">{product.title}</DialogTitle>
               <DialogDescription>Features & details</DialogDescription>
             </DialogHeader>
             <div className="space-y-3 py-2">
@@ -318,7 +274,7 @@ export const MarketplaceProductCard = React.memo<MarketplaceProductCardProps>(({
                 </ul>
               </div>
               <div className="flex gap-2">
-                <Button className="flex-1 h-10 text-xs font-black" onClick={() => { setFeaturesOpen(false); onBuyNow(localProduct); }}>
+                <Button className="flex-1 h-10 text-xs font-black" onClick={() => { setFeaturesOpen(false); onBuyNow(product); }}>
                   <ShoppingCart style={{ width: 14, height: 14 }} className="mr-1" /> BUY — ${price}
                 </Button>
                 <Button variant="outline" className="flex-1 h-10 text-xs font-bold" onClick={() => { setFeaturesOpen(false); handleDemo(); }}>

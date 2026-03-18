@@ -1926,6 +1926,93 @@ export type Database = {
         }
         Relationships: []
       }
+      marketplace_discount_rules: {
+        Row: {
+          country_code: string | null
+          coupon_code: string | null
+          created_at: string
+          discount_type: string
+          discount_value: number
+          end_date: string | null
+          festival: string | null
+          id: string
+          is_active: boolean
+          min_order: number
+          name: string
+          region: string | null
+          sort_order: number
+          start_date: string | null
+          updated_at: string
+        }
+        Insert: {
+          country_code?: string | null
+          coupon_code?: string | null
+          created_at?: string
+          discount_type?: string
+          discount_value?: number
+          end_date?: string | null
+          festival?: string | null
+          id?: string
+          is_active?: boolean
+          min_order?: number
+          name: string
+          region?: string | null
+          sort_order?: number
+          start_date?: string | null
+          updated_at?: string
+        }
+        Update: {
+          country_code?: string | null
+          coupon_code?: string | null
+          created_at?: string
+          discount_type?: string
+          discount_value?: number
+          end_date?: string | null
+          festival?: string | null
+          id?: string
+          is_active?: boolean
+          min_order?: number
+          name?: string
+          region?: string | null
+          sort_order?: number
+          start_date?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      marketplace_header_menus: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          label: string
+          link_url: string | null
+          sort_order: number
+          target_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label: string
+          link_url?: string | null
+          sort_order?: number
+          target_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+          link_url?: string | null
+          sort_order?: number
+          target_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       marketplace_listings: {
         Row: {
           created_at: string | null
@@ -1984,42 +2071,60 @@ export type Database = {
           amount: number
           buyer_id: string
           completed_at: string | null
+          coupon_code: string | null
           created_at: string | null
           currency: string | null
+          discount_amount: number
+          final_amount: number | null
           id: string
           license_key_id: string | null
           listing_id: string | null
           payment_method: string | null
+          product_id: string | null
+          product_name: string | null
           seller_id: string
           status: string | null
+          subtotal: number | null
           transaction_id: string | null
         }
         Insert: {
           amount: number
           buyer_id: string
           completed_at?: string | null
+          coupon_code?: string | null
           created_at?: string | null
           currency?: string | null
+          discount_amount?: number
+          final_amount?: number | null
           id?: string
           license_key_id?: string | null
           listing_id?: string | null
           payment_method?: string | null
+          product_id?: string | null
+          product_name?: string | null
           seller_id: string
           status?: string | null
+          subtotal?: number | null
           transaction_id?: string | null
         }
         Update: {
           amount?: number
           buyer_id?: string
           completed_at?: string | null
+          coupon_code?: string | null
           created_at?: string | null
           currency?: string | null
+          discount_amount?: number
+          final_amount?: number | null
           id?: string
           license_key_id?: string | null
           listing_id?: string | null
           payment_method?: string | null
+          product_id?: string | null
+          product_name?: string | null
           seller_id?: string
           status?: string | null
+          subtotal?: number | null
           transaction_id?: string | null
         }
         Relationships: [
@@ -2038,6 +2143,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "marketplace_orders_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "marketplace_orders_transaction_id_fkey"
             columns: ["transaction_id"]
             isOneToOne: false
@@ -2045,6 +2157,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      marketplace_payment_gateways: {
+        Row: {
+          config: Json
+          created_at: string
+          gateway_code: string
+          gateway_name: string
+          id: string
+          is_enabled: boolean
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          gateway_code: string
+          gateway_name: string
+          id?: string
+          is_enabled?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          gateway_code?: string
+          gateway_name?: string
+          id?: string
+          is_enabled?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       marketplace_payouts: {
         Row: {
@@ -2453,6 +2598,7 @@ export type Database = {
           apk_version_code: number | null
           app_hash: string | null
           business_type: string | null
+          buy_enabled: boolean
           category_id: string | null
           created_at: string | null
           created_by: string | null
@@ -2519,6 +2665,7 @@ export type Database = {
           apk_version_code?: number | null
           app_hash?: string | null
           business_type?: string | null
+          buy_enabled?: boolean
           category_id?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -2585,6 +2732,7 @@ export type Database = {
           apk_version_code?: number | null
           app_hash?: string | null
           business_type?: string | null
+          buy_enabled?: boolean
           category_id?: string | null
           created_at?: string | null
           created_by?: string | null
