@@ -189,13 +189,13 @@ export function MarketplaceHeader() {
             </Button>
           )}
 
-          {/* Apply for Reseller - show to logged-in non-admin, non-reseller users */}
-          {user && !isSuperAdmin && !isReseller && (
+          {/* Apply for Reseller - show to everyone except existing resellers */}
+          {!isReseller && (
             <Button
               variant="outline"
               size="sm"
               className="gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
-              onClick={() => navigate('/auth?apply=reseller')}
+              onClick={() => navigate(user ? '/auth?apply=reseller' : '/auth?apply=reseller')}
             >
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Apply for Reseller</span>
