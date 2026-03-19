@@ -5,6 +5,7 @@ import {
   Globe,
   ChevronDown,
   LogIn,
+  Settings,
 } from 'lucide-react';
 import {
   DropdownMenu,
