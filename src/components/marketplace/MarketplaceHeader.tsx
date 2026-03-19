@@ -189,6 +189,32 @@ export function MarketplaceHeader() {
             </Button>
           )}
 
+          {/* Apply for Reseller - show to logged-in non-admin, non-reseller users */}
+          {user && !isSuperAdmin && !isReseller && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+              onClick={() => navigate('/auth?apply=reseller')}
+            >
+              <Users className="h-4 w-4" />
+              <span className="hidden sm:inline">Apply for Reseller</span>
+            </Button>
+          )}
+
+          {/* Reseller Dashboard - show to resellers */}
+          {isReseller && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 border-secondary/30 text-secondary hover:bg-secondary/10"
+              onClick={() => navigate('/reseller-dashboard')}
+            >
+              <Users className="h-4 w-4" />
+              <span className="hidden sm:inline">Reseller Panel</span>
+            </Button>
+          )}
+
           {user ? (
             <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
               <User className="h-4 w-4" />
