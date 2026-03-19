@@ -5,6 +5,7 @@ import {
   Globe,
   ChevronDown,
   LogIn,
+  Settings,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -43,7 +44,7 @@ const fallbackLinks: HeaderMenuItem[] = [
 export function MarketplaceHeader() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
   const [menuLinks, setMenuLinks] = useState<HeaderMenuItem[]>(fallbackLinks);
 
   useEffect(() => {
@@ -174,6 +175,18 @@ export function MarketplaceHeader() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {isSuperAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => navigate('/admin/marketplace')}
+            >
+              <Settings className="h-4 w-4" />
+              <span className="hidden sm:inline">Manage</span>
+            </Button>
+          )}
 
           {user ? (
             <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
