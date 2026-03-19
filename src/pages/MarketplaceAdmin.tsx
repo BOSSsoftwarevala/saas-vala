@@ -52,7 +52,6 @@ import {
 import { cn } from '@/lib/utils';
 
 const db = supabase as any;
-const PAGE_SIZE = 25;
 
 type ProductStatusDb = 'active' | 'suspended' | 'draft' | 'archived';
 
@@ -345,7 +344,6 @@ export default function MarketplaceAdmin() {
   const [productCatalog, setProductCatalog] = useState<Array<{ id: string; name: string; status: string; apk_enabled: boolean }>>([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkRunning, setBulkRunning] = useState(false);
 
@@ -430,8 +428,7 @@ export default function MarketplaceAdmin() {
     let query = db
       .from('products')
       .select('id, name, slug, description, short_description, price, status, business_type, tags, demo_url, demo_login, demo_password, demo_enabled, apk_url, thumbnail_url, featured, trending, marketplace_visible, discount_percent, rating, apk_enabled, license_enabled, buy_enabled, created_at')
-      .order('created_at', { ascending: false })
-      .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
+      .order('created_at', { ascending: false });
 
     if (search.trim()) {
       query = query.or(`name.ilike.%${search}%,slug.ilike.%${search}%,business_type.ilike.%${search}%`);
@@ -566,7 +563,7 @@ export default function MarketplaceAdmin() {
 
   useEffect(() => {
     fetchProducts();
-  }, [page, search]);
+  }, [search]);
 
   useEffect(() => {
     refreshAll();
@@ -1383,13 +1380,6 @@ export default function MarketplaceAdmin() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] text-muted-foreground">Page {page + 1}</p>
-              <div className="flex gap-1">
-                <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>Prev</Button>
-                <Button variant="outline" size="sm" className="h-7 text-xs" disabled={products.length < PAGE_SIZE} onClick={() => setPage((p) => p + 1)}>Next</Button>
-              </div>
-            </div>
           </TabsContent>
 
           <TabsContent value="apk" className="space-y-4 mt-4">
