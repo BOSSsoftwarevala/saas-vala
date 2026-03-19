@@ -6,6 +6,7 @@ import {
   ChevronDown,
   LogIn,
   Settings,
+  Users,
 } from 'lucide-react';
 import {
   DropdownMenu,
