@@ -44,7 +44,7 @@ const fallbackLinks: HeaderMenuItem[] = [
 export function MarketplaceHeader() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
   const [menuLinks, setMenuLinks] = useState<HeaderMenuItem[]>(fallbackLinks);
 
   useEffect(() => {
