@@ -50,7 +50,7 @@ import {
   Loader2,
   CheckCircle2,
   Circle,
-  ArrowDown,
+  
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
