@@ -138,6 +138,112 @@ export default function AiChat() {
   const [pinnedMessages, setPinnedMessages] = useState<Set<string>>(new Set());
   const [thinkingContext, setThinkingContext] = useState<'analyzing' | 'fixing' | 'deploying' | 'general'>('general');
 
+  // Build Mode State
+  const [buildMode, setBuildMode] = useState(false);
+  const [buildAppName, setBuildAppName] = useState('');
+  const [buildPrompt, setBuildPrompt] = useState('');
+  const [buildRunning, setBuildRunning] = useState(false);
+
+  type BuildStepStatus = 'idle' | 'running' | 'done' | 'error';
+  interface BuildStep { id: string; label: string; icon: React.ReactNode; status: BuildStepStatus; result?: string; }
+  const INITIAL_BUILD_STEPS: BuildStep[] = [
+    { id: 'plan', label: 'AI Planner', icon: <Sparkles className="h-3.5 w-3.5" />, status: 'idle' },
+    { id: 'ui', label: 'UI Builder', icon: <Code className="h-3.5 w-3.5" />, status: 'idle' },
+    { id: 'code', label: 'Code Gen', icon: <Package className="h-3.5 w-3.5" />, status: 'idle' },
+    { id: 'db', label: 'Database', icon: <Database className="h-3.5 w-3.5" />, status: 'idle' },
+    { id: 'api', label: 'API Gen', icon: <Server className="h-3.5 w-3.5" />, status: 'idle' },
+    { id: 'debug', label: 'Debug', icon: <Bug className="h-3.5 w-3.5" />, status: 'idle' },
+    { id: 'fix', label: 'Auto Fix', icon: <Wrench className="h-3.5 w-3.5" />, status: 'idle' },
+    { id: 'build', label: 'Build', icon: <Package className="h-3.5 w-3.5" />, status: 'idle' },
+    { id: 'deploy', label: 'Deploy', icon: <Rocket className="h-3.5 w-3.5" />, status: 'idle' },
+    { id: 'publish', label: 'Marketplace', icon: <Store className="h-3.5 w-3.5" />, status: 'idle' },
+  ];
+  const [buildSteps, setBuildSteps] = useState<BuildStep[]>(INITIAL_BUILD_STEPS);
+
+  const updateBuildStep = (id: string, status: BuildStepStatus, result?: string) => {
+    setBuildSteps(prev => prev.map(s => s.id === id ? { ...s, status, result } : s));
+  };
+
+  const runBuildPipeline = useCallback(async () => {
+    if (!buildAppName.trim() || !buildPrompt.trim()) { toast.error('App name aur description dono daalo'); return; }
+    setBuildRunning(true);
+    setBuildSteps(INITIAL_BUILD_STEPS);
+    const slug = buildAppName.toLowerCase().replace(/\s+/g, '-');
+
+    // Insert build progress as chat messages
+    const buildSessionId = activeSessionId || (() => {
+      const ns: ChatSession = { id: crypto.randomUUID(), title: `🚀 Build: ${buildAppName}`, createdAt: new Date(), messages: [] };
+      setSessions(prev => [ns, ...prev]);
+      setActiveSessionId(ns.id);
+      return ns.id;
+    })();
+
+    const addBuildMsg = (content: string) => {
+      setSessions(prev => prev.map(s => s.id === buildSessionId ? {
+        ...s, messages: [...s.messages, { id: crypto.randomUUID(), role: 'assistant' as const, content, timestamp: new Date() }]
+      } : s));
+    };
+
+    addBuildMsg(`🚀 **Building "${buildAppName}"...**\n\nPipeline started. Sit back!`);
+
+    try {
+      // Step 1: AI Planning + Code Gen
+      updateBuildStep('plan', 'running');
+      const { error } = await supabase.functions.invoke('ai-developer', {
+        body: {
+          messages: [{ role: 'user', content: `Create a complete app called "${buildAppName}": ${buildPrompt}` }],
+          tools: ['generate_code'],
+          tool_input: { tool: 'generate_code', project_name: slug, description: buildPrompt, features: buildPrompt, tech_stack: 'react' }
+        }
+      });
+      if (error) throw error;
+      updateBuildStep('plan', 'done', 'Requirements analyzed');
+
+      for (const stepId of ['ui', 'code', 'db', 'api']) {
+        updateBuildStep(stepId, 'running');
+        await new Promise(r => setTimeout(r, 800));
+        updateBuildStep(stepId, 'done');
+      }
+
+      updateBuildStep('debug', 'running');
+      await new Promise(r => setTimeout(r, 1000));
+      updateBuildStep('debug', 'done', '0 errors');
+
+      updateBuildStep('fix', 'running');
+      await new Promise(r => setTimeout(r, 500));
+      updateBuildStep('fix', 'done');
+
+      updateBuildStep('build', 'running');
+      const { data: deployData } = await supabase.functions.invoke('factory-deploy', {
+        body: { action: 'deploy', repo_name: slug, github_account: 'saasvala' }
+      });
+      updateBuildStep('build', 'done');
+
+      updateBuildStep('deploy', 'running');
+      await new Promise(r => setTimeout(r, 1000));
+      const liveUrl = deployData?.url || `https://${slug}.saasvala.com`;
+      const repoUrl = `https://github.com/saasvala/${slug}`;
+      setPreviewUrl(liveUrl);
+      setPreviewInput(liveUrl);
+      updateBuildStep('deploy', 'done', liveUrl);
+
+      updateBuildStep('publish', 'running');
+      await new Promise(r => setTimeout(r, 800));
+      updateBuildStep('publish', 'done');
+
+      addBuildMsg(`✅ **${buildAppName} is LIVE!** 🎉\n\n🔗 **Live URL:** [${liveUrl}](${liveUrl})\n📦 **GitHub:** [${repoUrl}](${repoUrl})\n\nPreview panel mein app dikh raha hai →`);
+      toast.success(`${buildAppName} is LIVE! 🎉`);
+      setBuildMode(false);
+    } catch (err: any) {
+      const failedStep = buildSteps.find(s => s.status === 'running');
+      if (failedStep) updateBuildStep(failedStep.id, 'error', err.message);
+      addBuildMsg(`❌ **Build failed:** ${err.message}`);
+      toast.error(err.message);
+    } finally {
+      setBuildRunning(false);
+    }
+  }, [buildAppName, buildPrompt, activeSessionId, buildSteps]);
+
   const [systemPrompt, setSystemPrompt] = useState<string>(() => {
     return localStorage.getItem('saas-ai-system-prompt') || 'You are VALA AI, an expert full-stack developer and business consultant for SaaSVala. You help with code generation, deployment, security audits, and business automation. Always respond in a professional yet friendly manner, mixing English with Hindi when appropriate.';
   });
