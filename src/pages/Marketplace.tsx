@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { MarketplaceHeader } from '@/components/marketplace/MarketplaceHeader';
 import { LazySection } from '@/components/marketplace/LazySection';
 import { MarketplaceCategoryRow } from '@/components/marketplace/MarketplaceCategoryRow';
+import { EducationSection } from '@/components/marketplace/EducationSection';
 import { MARKETPLACE_CATEGORIES } from '@/data/marketplaceCategories';
 import { useMarketplaceProducts } from '@/hooks/useMarketplaceProducts';
 import { toast } from 'sonner';
