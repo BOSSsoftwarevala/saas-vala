@@ -291,7 +291,7 @@ export default function AiChat() {
           // Try each URL to find one that's actually alive
           for (const row of data) {
             try {
-              const check = await fetch(row.deployed_url, { method: 'HEAD', mode: 'no-cors' });
+              await fetch(row.deployed_url, { method: 'HEAD', mode: 'no-cors' });
               setPreviewUrl(row.deployed_url);
               setPreviewInput(row.deployed_url);
               break;
