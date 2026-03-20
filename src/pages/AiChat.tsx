@@ -8,6 +8,9 @@ import { ChatSearch } from '@/components/ai-chat/ChatSearch';
 import { KeyboardShortcuts, useKeyboardShortcuts } from '@/components/ai-chat/KeyboardShortcuts';
 import { MemoryPanel } from '@/components/ai-chat/MemoryPanel';
 import { ModelSelector } from '@/components/ai-chat/ModelSelector';
+import { SystemPromptEditor } from '@/components/ai-chat/SystemPromptEditor';
+import { ChatControlPanel } from '@/components/ai-chat/ChatControlPanel';
+import { TokenUsageDisplay } from '@/components/ai-chat/TokenUsageDisplay';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -31,6 +34,8 @@ import {
   Search,
   PanelLeftClose,
   PanelLeft,
+  Square,
+  Settings2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
