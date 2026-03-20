@@ -23,7 +23,7 @@ const EducationCategory = React.lazy(() => import("./pages/EducationCategory"));
 const Keys = React.lazy(() => import("./pages/Keys"));
 const Servers = React.lazy(() => import("./pages/Servers"));
 const AiChat = React.lazy(() => import("./pages/AiChat"));
-const ValaBuilder = React.lazy(() => import("./pages/ValaBuilder"));
+// ValaBuilder merged into AiChat
 const SaasAiDashboard = React.lazy(() => import("./pages/SaasAiDashboard"));
 const AiApis = React.lazy(() => import("./pages/AiApis"));
 const Wallet = React.lazy(() => import("./pages/Wallet"));
@@ -140,7 +140,7 @@ function AppRoutes() {
         <Route path="/transport-role-detail" element={<ProtectedRoute><TransportRoleDetail /></ProtectedRoute>} />
         <Route path="/manufacturing-role-detail" element={<ProtectedRoute><ManufacturingRoleDetail /></ProtectedRoute>} />
         <Route path="/education" element={<ProtectedRoute><EducationCategory /></ProtectedRoute>} />
-        <Route path="/vala-builder" element={<ProtectedRoute><ValaBuilder /></ProtectedRoute>} />
+        <Route path="/vala-builder" element={<Navigate to="/ai-chat" replace />} />
         <Route path="/ai-chat" element={<ProtectedRoute><AiChat /></ProtectedRoute>} />
         <Route path="/saas-ai-dashboard" element={<ProtectedRoute><SaasAiDashboard /></ProtectedRoute>} />
         <Route path="/ai-apis" element={<ProtectedRoute><AiApis /></ProtectedRoute>} />

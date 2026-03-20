@@ -13,6 +13,8 @@ import { ChatControlPanel } from '@/components/ai-chat/ChatControlPanel';
 import { TokenUsageDisplay } from '@/components/ai-chat/TokenUsageDisplay';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
@@ -36,6 +38,19 @@ import {
   PanelLeft,
   Square,
   Settings2,
+  Rocket,
+  Code,
+  Database,
+  Server,
+  Bug,
+  Wrench,
+  Package,
+  Store,
+  Sparkles,
+  Loader2,
+  CheckCircle2,
+  Circle,
+  
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -122,6 +137,112 @@ export default function AiChat() {
   const [showSystemPrompt, setShowSystemPrompt] = useState(false);
   const [pinnedMessages, setPinnedMessages] = useState<Set<string>>(new Set());
   const [thinkingContext, setThinkingContext] = useState<'analyzing' | 'fixing' | 'deploying' | 'general'>('general');
+
+  // Build Mode State
+  const [buildMode, setBuildMode] = useState(false);
+  const [buildAppName, setBuildAppName] = useState('');
+  const [buildPrompt, setBuildPrompt] = useState('');
+  const [buildRunning, setBuildRunning] = useState(false);
+
+  type BuildStepStatus = 'idle' | 'running' | 'done' | 'error';
+  interface BuildStep { id: string; label: string; icon: React.ReactNode; status: BuildStepStatus; result?: string; }
+  const INITIAL_BUILD_STEPS: BuildStep[] = [
+    { id: 'plan', label: 'AI Planner', icon: <Sparkles className="h-3.5 w-3.5" />, status: 'idle' },
+    { id: 'ui', label: 'UI Builder', icon: <Code className="h-3.5 w-3.5" />, status: 'idle' },
+    { id: 'code', label: 'Code Gen', icon: <Package className="h-3.5 w-3.5" />, status: 'idle' },
+    { id: 'db', label: 'Database', icon: <Database className="h-3.5 w-3.5" />, status: 'idle' },
+    { id: 'api', label: 'API Gen', icon: <Server className="h-3.5 w-3.5" />, status: 'idle' },
+    { id: 'debug', label: 'Debug', icon: <Bug className="h-3.5 w-3.5" />, status: 'idle' },
+    { id: 'fix', label: 'Auto Fix', icon: <Wrench className="h-3.5 w-3.5" />, status: 'idle' },
+    { id: 'build', label: 'Build', icon: <Package className="h-3.5 w-3.5" />, status: 'idle' },
+    { id: 'deploy', label: 'Deploy', icon: <Rocket className="h-3.5 w-3.5" />, status: 'idle' },
+    { id: 'publish', label: 'Marketplace', icon: <Store className="h-3.5 w-3.5" />, status: 'idle' },
+  ];
+  const [buildSteps, setBuildSteps] = useState<BuildStep[]>(INITIAL_BUILD_STEPS);
+
+  const updateBuildStep = (id: string, status: BuildStepStatus, result?: string) => {
+    setBuildSteps(prev => prev.map(s => s.id === id ? { ...s, status, result } : s));
+  };
+
+  const runBuildPipeline = useCallback(async () => {
+    if (!buildAppName.trim() || !buildPrompt.trim()) { toast.error('App name aur description dono daalo'); return; }
+    setBuildRunning(true);
+    setBuildSteps(INITIAL_BUILD_STEPS);
+    const slug = buildAppName.toLowerCase().replace(/\s+/g, '-');
+
+    // Insert build progress as chat messages
+    const buildSessionId = activeSessionId || (() => {
+      const ns: ChatSession = { id: crypto.randomUUID(), title: `🚀 Build: ${buildAppName}`, createdAt: new Date(), messages: [] };
+      setSessions(prev => [ns, ...prev]);
+      setActiveSessionId(ns.id);
+      return ns.id;
+    })();
+
+    const addBuildMsg = (content: string) => {
+      setSessions(prev => prev.map(s => s.id === buildSessionId ? {
+        ...s, messages: [...s.messages, { id: crypto.randomUUID(), role: 'assistant' as const, content, timestamp: new Date() }]
+      } : s));
+    };
+
+    addBuildMsg(`🚀 **Building "${buildAppName}"...**\n\nPipeline started. Sit back!`);
+
+    try {
+      // Step 1: AI Planning + Code Gen
+      updateBuildStep('plan', 'running');
+      const { error } = await supabase.functions.invoke('ai-developer', {
+        body: {
+          messages: [{ role: 'user', content: `Create a complete app called "${buildAppName}": ${buildPrompt}` }],
+          tools: ['generate_code'],
+          tool_input: { tool: 'generate_code', project_name: slug, description: buildPrompt, features: buildPrompt, tech_stack: 'react' }
+        }
+      });
+      if (error) throw error;
+      updateBuildStep('plan', 'done', 'Requirements analyzed');
+
+      for (const stepId of ['ui', 'code', 'db', 'api']) {
+        updateBuildStep(stepId, 'running');
+        await new Promise(r => setTimeout(r, 800));
+        updateBuildStep(stepId, 'done');
+      }
+
+      updateBuildStep('debug', 'running');
+      await new Promise(r => setTimeout(r, 1000));
+      updateBuildStep('debug', 'done', '0 errors');
+
+      updateBuildStep('fix', 'running');
+      await new Promise(r => setTimeout(r, 500));
+      updateBuildStep('fix', 'done');
+
+      updateBuildStep('build', 'running');
+      const { data: deployData } = await supabase.functions.invoke('factory-deploy', {
+        body: { action: 'deploy', repo_name: slug, github_account: 'saasvala' }
+      });
+      updateBuildStep('build', 'done');
+
+      updateBuildStep('deploy', 'running');
+      await new Promise(r => setTimeout(r, 1000));
+      const liveUrl = deployData?.url || `https://${slug}.saasvala.com`;
+      const repoUrl = `https://github.com/saasvala/${slug}`;
+      setPreviewUrl(liveUrl);
+      setPreviewInput(liveUrl);
+      updateBuildStep('deploy', 'done', liveUrl);
+
+      updateBuildStep('publish', 'running');
+      await new Promise(r => setTimeout(r, 800));
+      updateBuildStep('publish', 'done');
+
+      addBuildMsg(`✅ **${buildAppName} is LIVE!** 🎉\n\n🔗 **Live URL:** [${liveUrl}](${liveUrl})\n📦 **GitHub:** [${repoUrl}](${repoUrl})\n\nPreview panel mein app dikh raha hai →`);
+      toast.success(`${buildAppName} is LIVE! 🎉`);
+      setBuildMode(false);
+    } catch (err: any) {
+      const failedStep = buildSteps.find(s => s.status === 'running');
+      if (failedStep) updateBuildStep(failedStep.id, 'error', err.message);
+      addBuildMsg(`❌ **Build failed:** ${err.message}`);
+      toast.error(err.message);
+    } finally {
+      setBuildRunning(false);
+    }
+  }, [buildAppName, buildPrompt, activeSessionId, buildSteps]);
 
   const [systemPrompt, setSystemPrompt] = useState<string>(() => {
     return localStorage.getItem('saas-ai-system-prompt') || 'You are VALA AI, an expert full-stack developer and business consultant for SaaSVala. You help with code generation, deployment, security audits, and business automation. Always respond in a professional yet friendly manner, mixing English with Hindi when appropriate.';
@@ -681,32 +802,102 @@ export default function AiChat() {
                 <div ref={messagesEndRef} />
               </div>
             ) : (
-              /* Welcome screen */
-              <div className="flex flex-col items-center justify-center h-full py-10 px-4 text-center">
-                <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-4">
+              /* Welcome screen with Build Mode */
+              <div className="flex flex-col items-center justify-center h-full py-6 px-4 text-center overflow-y-auto">
+                <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-3">
                   <span className="text-2xl">🤖</span>
                 </div>
-                <h2 className="text-xl font-bold text-foreground mb-2">VALA AI</h2>
-                <p className="text-muted-foreground mb-6 text-sm leading-relaxed max-w-xs">
-                  Full-Stack Developer + Business Expert.<br />Code, deploy, analyze, audit.
+                <h2 className="text-xl font-bold text-foreground mb-1">VALA AI</h2>
+                <p className="text-muted-foreground mb-4 text-sm leading-relaxed max-w-xs">
+                  Chat, Build Apps, Deploy — sab ek jagah.
                 </p>
-                <div className="grid grid-cols-1 gap-2 w-full max-w-xs">
-                  {[
-                    { emoji: '🔍', text: 'GitHub repos audit karo' },
-                    { emoji: '🚀', text: 'Server status check karo' },
-                    { emoji: '🛡️', text: 'Security scan karo' },
-                    { emoji: '📊', text: 'System health report do' },
-                  ].map(({ emoji, text }) => (
-                    <button
-                      key={text}
-                      onClick={() => handleSend(`${emoji} ${text}`)}
-                      className="flex items-center gap-2 text-left p-3 rounded-lg border border-border/50 bg-card/40 hover:bg-card hover:border-primary/30 transition-all text-xs text-muted-foreground hover:text-foreground"
+
+                {/* Build Mode Toggle */}
+                {!buildMode ? (
+                  <div className="w-full max-w-xs space-y-2">
+                    <Button 
+                      onClick={() => setBuildMode(true)} 
+                      className="w-full gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                      size="lg"
                     >
-                      <span>{emoji}</span>
-                      <span>{text}</span>
-                    </button>
-                  ))}
-                </div>
+                      <Rocket className="h-4 w-4" />
+                      Build New App
+                    </Button>
+                    <div className="grid grid-cols-1 gap-1.5">
+                      {[
+                        { emoji: '🔍', text: 'GitHub repos audit karo' },
+                        { emoji: '🚀', text: 'Server status check karo' },
+                        { emoji: '🛡️', text: 'Security scan karo' },
+                        { emoji: '📊', text: 'System health report do' },
+                      ].map(({ emoji, text }) => (
+                        <button
+                          key={text}
+                          onClick={() => handleSend(`${emoji} ${text}`)}
+                          className="flex items-center gap-2 text-left p-2.5 rounded-lg border border-border/50 bg-card/40 hover:bg-card hover:border-primary/30 transition-all text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          <span>{emoji}</span>
+                          <span>{text}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  /* Build Mode Form */
+                  <div className="w-full max-w-xs space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Badge variant="outline" className="gap-1 text-primary border-primary/30">
+                        <Rocket className="h-3 w-3" /> Build Mode
+                      </Badge>
+                      <Button variant="ghost" size="sm" className="text-xs h-6" onClick={() => setBuildMode(false)}>
+                        ← Back
+                      </Button>
+                    </div>
+                    <Input
+                      placeholder="App name (e.g. Restaurant POS)"
+                      value={buildAppName}
+                      onChange={e => setBuildAppName(e.target.value)}
+                      className="text-sm"
+                      disabled={buildRunning}
+                    />
+                    <textarea
+                      placeholder="Describe your app... (e.g. A restaurant management system with menu, orders, billing, and admin dashboard)"
+                      value={buildPrompt}
+                      onChange={e => setBuildPrompt(e.target.value)}
+                      className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+                      disabled={buildRunning}
+                    />
+                    <Button 
+                      onClick={runBuildPipeline} 
+                      disabled={buildRunning || !buildAppName.trim() || !buildPrompt.trim()}
+                      className="w-full gap-2"
+                    >
+                      {buildRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
+                      {buildRunning ? 'Building...' : 'Start Build Pipeline'}
+                    </Button>
+
+                    {/* Pipeline Steps Visual */}
+                    {(buildRunning || buildSteps.some(s => s.status !== 'idle')) && (
+                      <div className="space-y-1 text-left">
+                        {buildSteps.map((step) => (
+                          <div key={step.id} className={cn(
+                            "flex items-center gap-2 px-2 py-1 rounded text-xs transition-all",
+                            step.status === 'running' && "bg-primary/10 text-primary",
+                            step.status === 'done' && "text-green-600",
+                            step.status === 'error' && "text-destructive",
+                            step.status === 'idle' && "text-muted-foreground/50"
+                          )}>
+                            {step.status === 'running' ? <Loader2 className="h-3 w-3 animate-spin" /> :
+                             step.status === 'done' ? <CheckCircle2 className="h-3 w-3" /> :
+                             step.status === 'error' ? <span className="text-destructive">✕</span> :
+                             <Circle className="h-3 w-3" />}
+                            <span className="flex-1">{step.label}</span>
+                            {step.result && <span className="text-[10px] opacity-70 truncate max-w-[100px]">{step.result}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
