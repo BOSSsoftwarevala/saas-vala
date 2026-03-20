@@ -104,8 +104,11 @@ export default function Marketplace() {
       <main className="pt-16 pb-8">
         <HeroBannerSlider />
 
-        {/* All categories as dynamic rows — no duplicate hardcoded sections */}
-        {MARKETPLACE_CATEGORIES.map((cat) => (
+        {/* Education — always visible, not lazy */}
+        <EducationSection onBuyNow={handleBuyNow} />
+
+        {/* Remaining categories as dynamic rows */}
+        {MARKETPLACE_CATEGORIES.filter(cat => cat.id !== 'education').map((cat) => (
           <LazySection key={cat.id} height={280}>
             <MarketplaceCategoryRow category={cat} onBuyNow={handleBuyNow} />
           </LazySection>
