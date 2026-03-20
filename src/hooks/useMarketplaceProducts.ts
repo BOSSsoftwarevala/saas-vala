@@ -186,14 +186,11 @@ export function useMarketplaceProducts() {
   }
 
   // Category-specific row fetchers
-  const getByCategory = (cats: string[]) =>
-    prioritizeProducts(
-      products.filter(p => {
-        const bt = (p.businessType || '').toLowerCase();
-        const cat = (p.category || '').toLowerCase();
-        return cats.some(c => bt.includes(c) || cat.includes(c));
-      })
-    );
+  const getByCategory = (cats: string[]) => {
+    const matched = products.filter(p => matchesCategory(p, cats));
+    const fallbackReal = products.filter(isSaasvalaRepo);
+    return prioritizeProducts(matched.length > 0 ? matched : fallbackReal);
+  };
 
   return {
     products,
