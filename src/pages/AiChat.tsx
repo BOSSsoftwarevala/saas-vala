@@ -759,6 +759,14 @@ export default function AiChat() {
             <div className="flex items-center gap-1">
               <Tooltip>
                 <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={openBuilderMode} className="h-7 w-7 text-muted-foreground hover:text-primary">
+                    <Rocket className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Builder + APK Pipeline</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
                   <Button variant="ghost" size="icon" onClick={() => setShowSearchPanel(true)} className="h-7 w-7 text-muted-foreground hover:text-foreground">
                     <Search className="h-3.5 w-3.5" />
                   </Button>
