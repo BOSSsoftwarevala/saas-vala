@@ -8,7 +8,6 @@ import {
   Package,
   Key,
   Server,
-  MessageSquare,
   Cpu,
   Wallet,
   TrendingUp,
@@ -19,6 +18,7 @@ import {
   Users,
   Store,
   Bot,
+  Rocket,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import saasValaLogo from '@/assets/saas-vala-logo.jpg';
@@ -37,8 +37,8 @@ const navItems: NavItem[] = [
   { title: 'Keys', icon: Key, href: '/keys' },
   { title: 'Servers', icon: Server, href: '/servers' },
   { title: 'SaaS AI', icon: Cpu, href: '/saas-ai-dashboard' },
-  { title: 'VALA AI', icon: Bot, href: '/ai-chat' },
-  { title: 'AI APIs', icon: MessageSquare, href: '/ai-apis', adminOnly: true },
+  { title: 'Builder + APK Pipeline', icon: Rocket, href: '/ai-chat' },
+  { title: 'AI APIs', icon: Bot, href: '/ai-apis', adminOnly: true },
   { title: 'Auto-Pilot', icon: Bot, href: '/automation', adminOnly: true },
   { title: 'Wallet', icon: Wallet, href: '/wallet' },
   { title: 'SEO & Leads', icon: TrendingUp, href: '/seo-leads' },
@@ -52,8 +52,10 @@ export function Sidebar() {
   const location = useLocation();
   const { isSuperAdmin, signOut } = useAuth();
 
+  const blockedNavPaths = new Set(['/marketplace', '/audit-logs', '/system-health', '/apk-pipeline', '/vala-builder']);
+
   const filteredNavItems = navItems.filter(
-    (item) => !item.adminOnly || isSuperAdmin
+    (item) => (!item.adminOnly || isSuperAdmin) && !blockedNavPaths.has(item.href)
   );
 
   return (
