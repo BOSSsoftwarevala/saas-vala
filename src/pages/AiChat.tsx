@@ -524,7 +524,7 @@ export default function AiChat() {
     setTimeout(() => handleSend(lastUserMsg.content), 100);
   }, [activeSessionId, sessions, isLoading]);
 
-
+  const handleExport = () => {
     if (!activeSession) return;
     const content = activeSession.messages.map(m => `${m.role === 'user' ? 'You' : 'VALA AI'}: ${m.content}`).join('\n\n');
     const blob = new Blob([content], { type: 'text/plain' });
