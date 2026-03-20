@@ -37,7 +37,6 @@ const navItems: NavItem[] = [
   { title: 'Marketplace', icon: Store, href: '/' },
   { title: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
   { title: 'Products', icon: Package, href: '/products' },
-  { title: 'Marketplace View', icon: Store, href: '/', adminOnly: true },
   { title: 'Keys', icon: Key, href: '/keys' },
   { title: 'Servers', icon: Server, href: '/servers' },
   { title: 'SaaS AI', icon: Cpu, href: '/saas-ai-dashboard' },
@@ -47,6 +46,7 @@ const navItems: NavItem[] = [
   { title: 'Wallet', icon: Wallet, href: '/wallet' },
   { title: 'SEO & Leads', icon: TrendingUp, href: '/seo-leads' },
   { title: 'Resellers', icon: Users, href: '/resellers', adminOnly: true },
+  { title: 'Marketplace Admin', icon: Store, href: '/admin/marketplace', adminOnly: true },
   { title: 'Audit Logs', icon: FileText, href: '/audit-logs', adminOnly: true },
   { title: 'System Health', icon: Activity, href: '/system-health', adminOnly: true },
   { title: 'Settings', icon: Settings, href: '/settings', adminOnly: true },
@@ -57,17 +57,7 @@ export function Sidebar() {
   const location = useLocation();
   const { isSuperAdmin, signOut } = useAuth();
 
-  const resolvedNavItems = navItems.map((item) => {
-    if (item.title === 'Marketplace') {
-      return {
-        ...item,
-        href: isSuperAdmin ? '/admin/marketplace' : '/',
-      };
-    }
-    return item;
-  });
-
-  const filteredNavItems = resolvedNavItems.filter(
+  const filteredNavItems = navItems.filter(
     (item) => !item.adminOnly || isSuperAdmin
   );
 
