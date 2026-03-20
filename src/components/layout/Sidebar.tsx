@@ -42,7 +42,7 @@ const navItems: NavItem[] = [
   { title: 'Auto-Pilot', icon: Bot, href: '/automation', adminOnly: true },
   { title: 'Wallet', icon: Wallet, href: '/wallet' },
   { title: 'SEO & Leads', icon: TrendingUp, href: '/seo-leads' },
-  { title: 'Resellers', icon: Users, href: '/resellers', adminOnly: true },
+  { title: 'Reseller Management', icon: Users, href: '/resellers', adminOnly: true },
   { title: 'Marketplace Admin', icon: Store, href: '/admin/marketplace', adminOnly: true },
   { title: 'Settings', icon: Settings, href: '/settings', adminOnly: true },
 ];
