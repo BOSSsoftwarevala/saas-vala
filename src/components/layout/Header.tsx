@@ -30,8 +30,6 @@ const pageTitles: Record<string, string> = {
   '/wallet': 'Wallet & Billing',
   '/seo-leads': 'SEO & Lead Manager',
   '/resellers': 'Reseller Manager',
-  '/audit-logs': 'Audit Logs',
-  '/system-health': 'System Health',
   '/settings': 'Settings & Security',
   '/education': 'Education Systems',
   '/role-detail': 'Role Configuration',
