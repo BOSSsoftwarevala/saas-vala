@@ -91,6 +91,26 @@ function prioritizeProducts(products: MarketplaceProduct[]): MarketplaceProduct[
     .map(({ product }) => product);
 }
 
+function matchesCategory(product: MarketplaceProduct, categories: string[]) {
+  const terms = categories.map(c => c.toLowerCase().trim());
+  const haystack = [
+    product.businessType || '',
+    product.category || '',
+    product.title || '',
+    product.subtitle || '',
+    product.gitRepoUrl || '',
+    (product.tags || []).join(' '),
+  ]
+    .join(' ')
+    .toLowerCase();
+
+  return terms.some(term => haystack.includes(term));
+}
+
+function isSaasvalaRepo(product: MarketplaceProduct) {
+  return (product.gitRepoUrl || '').toLowerCase().includes('github.com/saasvala/');
+}
+
 export function mapDbProduct(product: any, index: number): MarketplaceProduct {
   const features = Array.isArray(product.features) && product.features.length > 0
     ? product.features.slice(0, 4).map((f: any) =>
