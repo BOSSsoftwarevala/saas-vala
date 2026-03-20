@@ -76,11 +76,11 @@ export const SectionSlider = React.forwardRef<HTMLDivElement, SectionSliderProps
           className={cn(
             'absolute left-1 top-1/2 -translate-y-1/2 z-20',
             'h-10 w-10 rounded-full',
-            'bg-background/90 border border-border shadow-xl',
+            'bg-background/80 border border-border/50 shadow-xl',
             'flex items-center justify-center',
             'text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary',
-            'transition-all duration-200',
-            'opacity-0 group-hover:opacity-100'
+            'opacity-0 group-hover:opacity-100',
+            'slider-arrow-10d'
           )}
           aria-label="Scroll left"
         >
@@ -107,11 +107,11 @@ export const SectionSlider = React.forwardRef<HTMLDivElement, SectionSliderProps
           className={cn(
             'absolute right-1 top-1/2 -translate-y-1/2 z-20',
             'h-10 w-10 rounded-full',
-            'bg-background/90 border border-border shadow-xl',
+            'bg-background/80 border border-border/50 shadow-xl',
             'flex items-center justify-center',
             'text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary',
-            'transition-all duration-200',
-            'opacity-0 group-hover:opacity-100'
+            'opacity-0 group-hover:opacity-100',
+            'slider-arrow-10d'
           )}
           aria-label="Scroll right"
         >

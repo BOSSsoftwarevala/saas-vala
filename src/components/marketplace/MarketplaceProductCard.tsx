@@ -134,17 +134,16 @@ export const MarketplaceProductCard = React.memo<MarketplaceProductCardProps>(({
   return (
     <>
       <div
-        className="flex-shrink-0 rounded-2xl overflow-hidden flex flex-col group cursor-pointer snap-start"
+        className="flex-shrink-0 rounded-2xl overflow-hidden flex flex-col group cursor-pointer snap-start card-10d card-stagger"
         style={{
           width: 'clamp(220px, 28vw, 280px)',
           minWidth: 220,
           maxWidth: 280,
-          background: 'rgba(255,255,255,0.03)',
-          border: '1px solid rgba(255,255,255,0.07)',
-          transition: 'transform 0.25s ease-out, box-shadow 0.25s ease-out, border-color 0.25s ease-out',
+          background: 'rgba(255,255,255,0.04)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          backdropFilter: 'blur(12px)',
+          animationDelay: `${index * 80}ms`,
         }}
-        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 8px 32px rgba(37,99,235,0.15)'; e.currentTarget.style.borderColor = 'rgba(37,99,235,0.3)'; }}
-        onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; }}
       >
         {/* Header */}
         <div className="relative px-4 py-4 flex items-center gap-3" style={{ background: `linear-gradient(135deg, rgba(37,99,235,0.08), transparent)` }}>
@@ -199,28 +198,28 @@ export const MarketplaceProductCard = React.memo<MarketplaceProductCardProps>(({
           ) : (
             <>
               <div className="flex gap-1.5">
-                <Button size="sm" variant="outline" className="flex-1 h-8 text-[10px] font-bold rounded-lg border-white/10 text-foreground/70 hover:border-white/20" onClick={handleDemo}>
+                <Button size="sm" variant="outline" className="flex-1 h-8 text-[10px] font-bold rounded-lg border-white/10 text-foreground/70 hover:border-white/20 btn-glow ripple-container" onClick={handleDemo}>
                   <Play style={{ width: 11, height: 11 }} className="mr-1" />{hasDemoAvailable ? 'DEMO' : 'VIEW'}
                 </Button>
-                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={handleFavorite}>
-                  <Heart style={{ width: 14, height: 14 }} className={favorited ? 'fill-pink-400 text-pink-400' : 'text-muted-foreground'} />
+                <Button size="sm" variant="ghost" className="h-8 w-8 p-0 ripple-container" onClick={handleFavorite}>
+                  <Heart style={{ width: 14, height: 14 }} className={cn('transition-transform duration-200', favorited ? 'fill-pink-400 text-pink-400 scale-110' : 'text-muted-foreground')} />
                 </Button>
-                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={handleAddToCart}>
-                  <ShoppingCart style={{ width: 14, height: 14 }} className={inCart ? 'text-primary' : 'text-muted-foreground'} />
+                <Button size="sm" variant="ghost" className="h-8 w-8 p-0 ripple-container" onClick={handleAddToCart}>
+                  <ShoppingCart style={{ width: 14, height: 14 }} className={cn('transition-transform duration-200', inCart ? 'text-primary scale-110' : 'text-muted-foreground')} />
                 </Button>
               </div>
-              <Button size="sm" className="w-full h-9 text-[11px] font-black rounded-lg text-white border-0" style={{ background: 'linear-gradient(90deg,#2563EB,#1D4ED8)' }} onClick={() => onBuyNow(product)}>
+              <Button size="sm" className="w-full h-9 text-[11px] font-black rounded-lg text-white border-0 btn-glow ripple-container" style={{ background: 'linear-gradient(135deg,#2563EB,#1D4ED8,#3B82F6)' }} onClick={() => onBuyNow(product)}>
                 <Package style={{ width: 13, height: 13 }} className="mr-1" /> BUY NOW — ${price}
               </Button>
             </>
           )}
           <div className="flex gap-1.5">
             {apkEnabled && (
-              <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] font-bold rounded-lg text-white border-0" style={{ background: 'linear-gradient(90deg,#7C3AED,#6D28D9)' }} onClick={handleDownloadApk} disabled={downloadChecking || isPipeline}>
+              <Button size="sm" variant="outline" className="flex-1 h-7 text-[10px] font-bold rounded-lg text-white border-0 btn-glow ripple-container" style={{ background: 'linear-gradient(135deg,#7C3AED,#6D28D9,#8B5CF6)' }} onClick={handleDownloadApk} disabled={downloadChecking || isPipeline}>
                 <Download style={{ width: 11, height: 11 }} className="mr-1" />{downloadChecking ? '...' : isPipeline ? 'PIPELINE' : 'APK'}
               </Button>
             )}
-            <Button size="sm" variant="outline" className={cn('h-7 text-[10px] font-bold rounded-lg border-white/10 text-muted-foreground', apkEnabled ? 'flex-1' : 'w-full')} onClick={() => setFeaturesOpen(true)}>
+            <Button size="sm" variant="outline" className={cn('h-7 text-[10px] font-bold rounded-lg border-white/10 text-muted-foreground btn-glow ripple-container', apkEnabled ? 'flex-1' : 'w-full')} onClick={() => setFeaturesOpen(true)}>
               <Info style={{ width: 11, height: 11 }} className="mr-1" /> FEATURES
             </Button>
           </div>
