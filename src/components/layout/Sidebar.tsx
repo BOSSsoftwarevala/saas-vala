@@ -37,6 +37,7 @@ const navItems: NavItem[] = [
   { title: 'Keys', icon: Key, href: '/keys' },
   { title: 'Servers', icon: Server, href: '/servers' },
   { title: 'SaaS AI', icon: Cpu, href: '/saas-ai-dashboard' },
+  { title: 'VALA AI', icon: MessageSquare, href: '/ai-chat' },
   { title: 'AI APIs', icon: MessageSquare, href: '/ai-apis', adminOnly: true },
   { title: 'Auto-Pilot', icon: Bot, href: '/automation', adminOnly: true },
   { title: 'Wallet', icon: Wallet, href: '/wallet' },
