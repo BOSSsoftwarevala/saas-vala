@@ -140,7 +140,7 @@ function AppRoutes() {
         <Route path="/transport-role-detail" element={<ProtectedRoute><TransportRoleDetail /></ProtectedRoute>} />
         <Route path="/manufacturing-role-detail" element={<ProtectedRoute><ManufacturingRoleDetail /></ProtectedRoute>} />
         <Route path="/education" element={<ProtectedRoute><EducationCategory /></ProtectedRoute>} />
-        <Route path="/vala-builder" element={<ProtectedRoute><ValaBuilder /></ProtectedRoute>} />
+        <Route path="/vala-builder" element={<Navigate to="/ai-chat" replace />} />
         <Route path="/ai-chat" element={<ProtectedRoute><AiChat /></ProtectedRoute>} />
         <Route path="/saas-ai-dashboard" element={<ProtectedRoute><SaasAiDashboard /></ProtectedRoute>} />
         <Route path="/ai-apis" element={<ProtectedRoute><AiApis /></ProtectedRoute>} />
