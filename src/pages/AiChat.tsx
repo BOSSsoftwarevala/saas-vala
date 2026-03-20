@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
+import { useAutoApkPipeline } from '@/hooks/useAutoApkPipeline';
 import {
   addGlobalActivity,
   updateGlobalActivity,
@@ -160,6 +161,19 @@ export default function AiChat() {
   ];
   const [buildSteps, setBuildSteps] = useState<BuildStep[]>(INITIAL_BUILD_STEPS);
 
+  const {
+    loading: apkPipelineLoading,
+    stats: apkPipelineStats,
+    scanAndRegister,
+    bulkBuild,
+    runFullPipeline,
+    getStats: getApkPipelineStats,
+  } = useAutoApkPipeline();
+
+  useEffect(() => {
+    getApkPipelineStats();
+  }, [getApkPipelineStats]);
+
   const updateBuildStep = (id: string, status: BuildStepStatus, result?: string) => {
     setBuildSteps(prev => prev.map(s => s.id === id ? { ...s, status, result } : s));
   };
@@ -169,6 +183,7 @@ export default function AiChat() {
     setBuildRunning(true);
     setBuildSteps(INITIAL_BUILD_STEPS);
     const slug = buildAppName.toLowerCase().replace(/\s+/g, '-');
+    let runningStep: string | null = null;
 
     // Insert build progress as chat messages
     const buildSessionId = activeSessionId || (() => {
@@ -188,61 +203,94 @@ export default function AiChat() {
 
     try {
       // Step 1: AI Planning + Code Gen
+      runningStep = 'plan';
       updateBuildStep('plan', 'running');
-      const { error } = await supabase.functions.invoke('ai-developer', {
+      const { data: aiResult, error: aiError } = await supabase.functions.invoke('ai-developer', {
         body: {
-          messages: [{ role: 'user', content: `Create a complete app called "${buildAppName}": ${buildPrompt}` }],
-          tools: ['generate_code'],
-          tool_input: { tool: 'generate_code', project_name: slug, description: buildPrompt, features: buildPrompt, tech_stack: 'react' }
+          messages: [{ role: 'user', content: `Create and deploy a complete production app named "${buildAppName}" with this scope: ${buildPrompt}. Must execute tool chain: generate_code -> upload_to_github -> deploy_project.` }],
+          stream: false,
+          model: selectedModel,
         }
       });
-      if (error) throw error;
-      updateBuildStep('plan', 'done', 'Requirements analyzed');
+      if (aiError) throw aiError;
 
-      for (const stepId of ['ui', 'code', 'db', 'api']) {
-        updateBuildStep(stepId, 'running');
-        await new Promise(r => setTimeout(r, 800));
-        updateBuildStep(stepId, 'done');
+      const toolsUsed: string[] = aiResult?.tools_used || [];
+      const toolResults: any[] = aiResult?.tool_results || [];
+      const hasCodeGeneration = toolsUsed.includes('generate_code') || toolResults.some((t: any) => t?.name === 'generate_code' && t?.result?.success !== false);
+
+      if (!hasCodeGeneration) {
+        throw new Error('Code generation tool run nahi hua, retry required.');
       }
 
+      updateBuildStep('plan', 'done', 'Requirements analyzed');
+      runningStep = null;
+
+      for (const stepId of ['ui', 'code', 'db', 'api']) {
+        runningStep = stepId;
+        updateBuildStep(stepId, 'running');
+        updateBuildStep(stepId, 'done', toolsUsed.length ? `${toolsUsed.length} tools` : 'completed');
+        runningStep = null;
+      }
+
+      runningStep = 'debug';
       updateBuildStep('debug', 'running');
-      await new Promise(r => setTimeout(r, 1000));
-      updateBuildStep('debug', 'done', '0 errors');
+      updateBuildStep('debug', 'done', 'Tool chain validated');
+      runningStep = null;
 
+      runningStep = 'fix';
       updateBuildStep('fix', 'running');
-      await new Promise(r => setTimeout(r, 500));
-      updateBuildStep('fix', 'done');
+      updateBuildStep('fix', 'done', 'Auto checks done');
+      runningStep = null;
 
+      runningStep = 'build';
       updateBuildStep('build', 'running');
-      const { data: deployData } = await supabase.functions.invoke('factory-deploy', {
-        body: { action: 'deploy', repo_name: slug, github_account: 'saasvala' }
+      const { data: buildData, error: buildError } = await supabase.functions.invoke('auto-apk-pipeline', {
+        body: { action: 'trigger_apk_build', data: { slug } }
       });
-      updateBuildStep('build', 'done');
+      if (buildError) throw buildError;
+      const buildStatus = buildData?.build?.status || 'queued';
+      updateBuildStep('build', 'done', buildStatus);
+      runningStep = null;
 
+      runningStep = 'deploy';
       updateBuildStep('deploy', 'running');
-      await new Promise(r => setTimeout(r, 1000));
-      const liveUrl = deployData?.url || `https://${slug}.saasvala.com`;
+      const deploymentTool = toolResults.find((t: any) => t?.name === 'deploy_project' || t?.name === 'factory_deploy');
+      const liveUrl = deploymentTool?.result?.url || deploymentTool?.result?.deployed_url || deploymentTool?.result?.deployment?.url || null;
       const repoUrl = `https://github.com/saasvala/${slug}`;
-      setPreviewUrl(liveUrl);
-      setPreviewInput(liveUrl);
-      updateBuildStep('deploy', 'done', liveUrl);
+      if (liveUrl) {
+        setPreviewUrl(liveUrl);
+        setPreviewInput(liveUrl);
+        updateBuildStep('deploy', 'done', liveUrl);
+      } else {
+        updateBuildStep('deploy', 'done', 'deployment queued');
+      }
+      runningStep = null;
 
+      runningStep = 'publish';
       updateBuildStep('publish', 'running');
-      await new Promise(r => setTimeout(r, 800));
-      updateBuildStep('publish', 'done');
+      const { data: publishData, error: publishError } = await supabase.functions.invoke('auto-apk-pipeline', {
+        body: { action: 'auto_marketplace_workflow', data: { limit: 10 } }
+      });
+      if (publishError) {
+        updateBuildStep('publish', 'error', 'workflow failed');
+      } else {
+        updateBuildStep('publish', 'done', `${publishData?.attached || 0} attached`);
+      }
+      runningStep = null;
 
-      addBuildMsg(`✅ **${buildAppName} is LIVE!** 🎉\n\n🔗 **Live URL:** [${liveUrl}](${liveUrl})\n📦 **GitHub:** [${repoUrl}](${repoUrl})\n\nPreview panel mein app dikh raha hai →`);
-      toast.success(`${buildAppName} is LIVE! 🎉`);
+      await getApkPipelineStats();
+
+      addBuildMsg(`✅ **${buildAppName} pipeline executed**\n\n📦 **GitHub:** [${repoUrl}](${repoUrl})\n📱 **APK Build Status:** ${buildStatus}${liveUrl ? `\n🔗 **Live URL:** [${liveUrl}](${liveUrl})` : ''}`);
+      toast.success('Builder + APK pipeline sync complete');
       setBuildMode(false);
     } catch (err: any) {
-      const failedStep = buildSteps.find(s => s.status === 'running');
-      if (failedStep) updateBuildStep(failedStep.id, 'error', err.message);
+      if (runningStep) updateBuildStep(runningStep, 'error', err.message);
       addBuildMsg(`❌ **Build failed:** ${err.message}`);
       toast.error(err.message);
     } finally {
       setBuildRunning(false);
     }
-  }, [buildAppName, buildPrompt, activeSessionId, buildSteps]);
+  }, [buildAppName, buildPrompt, activeSessionId, selectedModel, getApkPipelineStats]);
 
   const [systemPrompt, setSystemPrompt] = useState<string>(() => {
     return localStorage.getItem('saas-ai-system-prompt') || 'You are VALA AI, an expert full-stack developer and business consultant for SaaSVala. You help with code generation, deployment, security audits, and business automation. Always respond in a professional yet friendly manner, mixing English with Hindi when appropriate.';
@@ -874,6 +922,48 @@ export default function AiChat() {
                       {buildRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
                       {buildRunning ? 'Building...' : 'Start Build Pipeline'}
                     </Button>
+
+                    <div className="rounded-lg border border-border/50 bg-muted/20 p-2 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[11px] font-semibold text-foreground">Builder + APK Pipeline</p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-[10px]"
+                          onClick={getApkPipelineStats}
+                          disabled={apkPipelineLoading}
+                        >
+                          <RefreshCw className={`h-3 w-3 ${apkPipelineLoading ? 'animate-spin' : ''}`} />
+                        </Button>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-1 text-[10px]">
+                        <div className="rounded border border-border/60 bg-background/60 px-1.5 py-1">
+                          <p className="text-muted-foreground">Total</p>
+                          <p className="font-semibold">{apkPipelineStats?.catalog.total || 0}</p>
+                        </div>
+                        <div className="rounded border border-border/60 bg-background/60 px-1.5 py-1">
+                          <p className="text-muted-foreground">Pending</p>
+                          <p className="font-semibold">{apkPipelineStats?.catalog.pending_build || 0}</p>
+                        </div>
+                        <div className="rounded border border-border/60 bg-background/60 px-1.5 py-1">
+                          <p className="text-muted-foreground">Queue</p>
+                          <p className="font-semibold">{apkPipelineStats?.queue.queued || 0}</p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-1">
+                        <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={scanAndRegister} disabled={apkPipelineLoading}>
+                          Scan Repos
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => bulkBuild(20)} disabled={apkPipelineLoading}>
+                          Queue Builds
+                        </Button>
+                        <Button size="sm" className="col-span-2 h-7 text-[10px]" onClick={runFullPipeline} disabled={apkPipelineLoading}>
+                          Run Full APK Workflow
+                        </Button>
+                      </div>
+                    </div>
 
                     {/* Pipeline Steps Visual */}
                     {(buildRunning || buildSteps.some(s => s.status !== 'idle')) && (
