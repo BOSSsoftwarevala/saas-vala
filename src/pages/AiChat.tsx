@@ -13,6 +13,8 @@ import { ChatControlPanel } from '@/components/ai-chat/ChatControlPanel';
 import { TokenUsageDisplay } from '@/components/ai-chat/TokenUsageDisplay';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
@@ -36,6 +38,19 @@ import {
   PanelLeft,
   Square,
   Settings2,
+  Rocket,
+  Code,
+  Database,
+  Server,
+  Bug,
+  Wrench,
+  Package,
+  Store,
+  Sparkles,
+  Loader2,
+  CheckCircle2,
+  Circle,
+  ArrowDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
