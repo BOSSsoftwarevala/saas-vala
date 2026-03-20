@@ -70,23 +70,27 @@ export const MarketplaceProductCard = React.memo<MarketplaceProductCardProps>(({
   const hasDemoAvailable = getDemoUrl() !== null;
 
   const handleFavorite = useCallback(() => {
+    playClickSound();
     if (!user) { toast.error('Sign in to add to favorites'); return; }
     setFavorited(p => !p);
     toast.success(favorited ? 'Removed from favorites' : `❤️ Added to favorites!`);
   }, [user, favorited]);
 
   const handleAddToCart = useCallback(() => {
+    playClickSound();
     toggleItem({ id: product.id, title: product.title, subtitle: product.subtitle || '', image: product.image || '', price, category: product.category });
     toast.success(inCart ? 'Removed from cart' : `🛒 Added to cart!`);
   }, [product, inCart, toggleItem, price]);
 
   const handleNotifyMe = useCallback(() => {
+    playClickSound();
     if (!user) { toast.error('Sign in to get notified'); return; }
     setNotified(true);
     toast.success(`🔔 You'll be notified when ${product.title} is ready!`);
   }, [user, product.title]);
 
   const handleDemo = useCallback(() => {
+    playClickSound();
     const url = getDemoUrl();
     if (!url) { setFeaturesOpen(true); return; }
     if (!isIframeable(url)) {
