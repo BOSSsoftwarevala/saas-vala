@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -54,8 +55,16 @@ import {
   CheckCircle,
   Download,
 } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { useResellers, type Reseller } from '@/hooks/useResellers';
+import { supabase } from '@/integrations/supabase/client';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { Switch } from '@/components/ui/switch';
  import { ResellerActivityPanel } from '@/components/reseller/ResellerActivityPanel';
@@ -64,7 +73,8 @@ import { Switch } from '@/components/ui/switch';
 const ITEMS_PER_PAGE = 25;
 
 export default function Resellers() {
-   const { resellers, loading, total, fetchResellers, updateReseller, deleteReseller } = useResellers();
+  const navigate = useNavigate();
+  const { resellers, loading, total, fetchResellers, createReseller, updateReseller, deleteReseller } = useResellers();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -72,6 +82,8 @@ export default function Resellers() {
   const [editReseller, setEditReseller] = useState<Reseller | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [availableUsers, setAvailableUsers] = useState<{ user_id: string; full_name: string | null; email: string | null }[]>([]);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -113,8 +125,9 @@ export default function Resellers() {
     fetchResellers(1, ITEMS_PER_PAGE, query);
   };
 
-  const openCreateDialog = () => {
+  const openCreateDialog = async () => {
     setEditReseller(null);
+    setSelectedUserId('');
     setFormData({
       company_name: '',
       commission_percent: 10,
@@ -122,6 +135,17 @@ export default function Resellers() {
       is_active: true,
       is_verified: false,
     });
+    // Fetch users not already resellers for the dropdown
+    const { data: existingResellers } = await supabase.from('resellers').select('user_id');
+    const existingIds = (existingResellers || []).map((r: any) => r.user_id);
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('user_id, full_name')
+      .order('full_name', { ascending: true });
+    const users = (profiles || [])
+      .filter((p: any) => !existingIds.includes(p.user_id))
+      .map((p: any) => ({ user_id: p.user_id, full_name: p.full_name, email: null }));
+    setAvailableUsers(users);
     setDialogOpen(true);
   };
 
@@ -138,12 +162,14 @@ export default function Resellers() {
   };
 
   const handleSubmit = async () => {
+    if (!editReseller && !selectedUserId) return;
     setSubmitting(true);
     try {
       if (editReseller) {
         await updateReseller(editReseller.id, formData);
+      } else {
+        await createReseller({ ...formData, user_id: selectedUserId });
       }
-      // Note: Creating new reseller requires user_id from an existing user
       setDialogOpen(false);
     } finally {
       setSubmitting(false);
@@ -173,10 +199,10 @@ export default function Resellers() {
             <Button
               variant="outline"
               className="gap-2 border-border"
-              onClick={() => window.location.assign('/reseller-dashboard')}
+              onClick={() => navigate('/dashboard')}
             >
               <Users className="h-4 w-4" />
-              Reseller Dashboard
+              Admin Dashboard
             </Button>
             <Button variant="outline" className="gap-2 border-border">
               <Download className="h-4 w-4" />
@@ -398,10 +424,31 @@ export default function Resellers() {
           <DialogHeader>
             <DialogTitle>{editReseller ? 'Edit Reseller' : 'Add Reseller'}</DialogTitle>
             <DialogDescription>
-              {editReseller ? 'Update reseller details' : 'Note: Resellers are created when users sign up'}
+              {editReseller ? 'Update reseller details' : 'Select a user account to assign as a reseller'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {!editReseller && (
+              <div className="space-y-2">
+                <Label>Select User <span className="text-destructive">*</span></Label>
+                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a user account..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableUsers.length === 0 ? (
+                      <SelectItem value="_none" disabled>No eligible users found</SelectItem>
+                    ) : (
+                      availableUsers.map((u) => (
+                        <SelectItem key={u.user_id} value={u.user_id}>
+                          {u.full_name || u.user_id}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Company Name</Label>
               <Input
@@ -454,7 +501,7 @@ export default function Resellers() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSubmit} disabled={submitting}>
+            <Button onClick={handleSubmit} disabled={submitting || (!editReseller && !selectedUserId)}>
               {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {editReseller ? 'Update' : 'Create'}
             </Button>
