@@ -802,32 +802,102 @@ export default function AiChat() {
                 <div ref={messagesEndRef} />
               </div>
             ) : (
-              /* Welcome screen */
-              <div className="flex flex-col items-center justify-center h-full py-10 px-4 text-center">
-                <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-4">
+              /* Welcome screen with Build Mode */
+              <div className="flex flex-col items-center justify-center h-full py-6 px-4 text-center overflow-y-auto">
+                <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-3">
                   <span className="text-2xl">🤖</span>
                 </div>
-                <h2 className="text-xl font-bold text-foreground mb-2">VALA AI</h2>
-                <p className="text-muted-foreground mb-6 text-sm leading-relaxed max-w-xs">
-                  Full-Stack Developer + Business Expert.<br />Code, deploy, analyze, audit.
+                <h2 className="text-xl font-bold text-foreground mb-1">VALA AI</h2>
+                <p className="text-muted-foreground mb-4 text-sm leading-relaxed max-w-xs">
+                  Chat, Build Apps, Deploy — sab ek jagah.
                 </p>
-                <div className="grid grid-cols-1 gap-2 w-full max-w-xs">
-                  {[
-                    { emoji: '🔍', text: 'GitHub repos audit karo' },
-                    { emoji: '🚀', text: 'Server status check karo' },
-                    { emoji: '🛡️', text: 'Security scan karo' },
-                    { emoji: '📊', text: 'System health report do' },
-                  ].map(({ emoji, text }) => (
-                    <button
-                      key={text}
-                      onClick={() => handleSend(`${emoji} ${text}`)}
-                      className="flex items-center gap-2 text-left p-3 rounded-lg border border-border/50 bg-card/40 hover:bg-card hover:border-primary/30 transition-all text-xs text-muted-foreground hover:text-foreground"
+
+                {/* Build Mode Toggle */}
+                {!buildMode ? (
+                  <div className="w-full max-w-xs space-y-2">
+                    <Button 
+                      onClick={() => setBuildMode(true)} 
+                      className="w-full gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                      size="lg"
                     >
-                      <span>{emoji}</span>
-                      <span>{text}</span>
-                    </button>
-                  ))}
-                </div>
+                      <Rocket className="h-4 w-4" />
+                      Build New App
+                    </Button>
+                    <div className="grid grid-cols-1 gap-1.5">
+                      {[
+                        { emoji: '🔍', text: 'GitHub repos audit karo' },
+                        { emoji: '🚀', text: 'Server status check karo' },
+                        { emoji: '🛡️', text: 'Security scan karo' },
+                        { emoji: '📊', text: 'System health report do' },
+                      ].map(({ emoji, text }) => (
+                        <button
+                          key={text}
+                          onClick={() => handleSend(`${emoji} ${text}`)}
+                          className="flex items-center gap-2 text-left p-2.5 rounded-lg border border-border/50 bg-card/40 hover:bg-card hover:border-primary/30 transition-all text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          <span>{emoji}</span>
+                          <span>{text}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  /* Build Mode Form */
+                  <div className="w-full max-w-xs space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Badge variant="outline" className="gap-1 text-primary border-primary/30">
+                        <Rocket className="h-3 w-3" /> Build Mode
+                      </Badge>
+                      <Button variant="ghost" size="sm" className="text-xs h-6" onClick={() => setBuildMode(false)}>
+                        ← Back
+                      </Button>
+                    </div>
+                    <Input
+                      placeholder="App name (e.g. Restaurant POS)"
+                      value={buildAppName}
+                      onChange={e => setBuildAppName(e.target.value)}
+                      className="text-sm"
+                      disabled={buildRunning}
+                    />
+                    <textarea
+                      placeholder="Describe your app... (e.g. A restaurant management system with menu, orders, billing, and admin dashboard)"
+                      value={buildPrompt}
+                      onChange={e => setBuildPrompt(e.target.value)}
+                      className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+                      disabled={buildRunning}
+                    />
+                    <Button 
+                      onClick={runBuildPipeline} 
+                      disabled={buildRunning || !buildAppName.trim() || !buildPrompt.trim()}
+                      className="w-full gap-2"
+                    >
+                      {buildRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
+                      {buildRunning ? 'Building...' : 'Start Build Pipeline'}
+                    </Button>
+
+                    {/* Pipeline Steps Visual */}
+                    {(buildRunning || buildSteps.some(s => s.status !== 'idle')) && (
+                      <div className="space-y-1 text-left">
+                        {buildSteps.map((step) => (
+                          <div key={step.id} className={cn(
+                            "flex items-center gap-2 px-2 py-1 rounded text-xs transition-all",
+                            step.status === 'running' && "bg-primary/10 text-primary",
+                            step.status === 'done' && "text-green-600",
+                            step.status === 'error' && "text-destructive",
+                            step.status === 'idle' && "text-muted-foreground/50"
+                          )}>
+                            {step.status === 'running' ? <Loader2 className="h-3 w-3 animate-spin" /> :
+                             step.status === 'done' ? <CheckCircle2 className="h-3 w-3" /> :
+                             step.status === 'error' ? <span className="text-destructive">✕</span> :
+                             <Circle className="h-3 w-3" />}
+                            <span className="flex-1">{step.label}</span>
+                            {step.result && <span className="text-[10px] opacity-70 truncate max-w-[100px]">{step.result}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
