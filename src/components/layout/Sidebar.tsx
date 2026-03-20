@@ -16,7 +16,10 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
+  Users,
   Store,
+  Bot,
+} from 'lucide-react';
   Bot,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
