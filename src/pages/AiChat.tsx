@@ -114,6 +114,7 @@ export default function AiChat() {
   const aiTokensRef = useRef<number>(0);
   const _autoRetryRef = useRef<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const userAbortedRef = useRef<boolean>(false);
 
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
   const [showSearchPanel, setShowSearchPanel] = useState(false);
@@ -243,9 +244,11 @@ export default function AiChat() {
 
     const maxRetries = 2;
     let lastError: Error | null = null;
+    userAbortedRef.current = false;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      const controller = new AbortController();
+      abortControllerRef.current = new AbortController();
+      const controller = abortControllerRef.current;
       const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 min timeout
 
       try {
@@ -283,6 +286,7 @@ export default function AiChat() {
           }));
           const toolsUsed: string[] = data?.tools_used || [];
           onDelta(text, toolResults.length > 0 ? toolResults : undefined, toolsUsed.length > 0 ? toolsUsed : undefined);
+          abortControllerRef.current = null;
           onDone();
           return;
         }
@@ -304,7 +308,7 @@ export default function AiChat() {
               if (line.endsWith('\r')) line = line.slice(0, -1);
               if (line.startsWith(':') || !line.startsWith('data: ')) continue;
               const jsonStr = line.slice(6).trim();
-              if (jsonStr === '[DONE]') { onDone(); return; }
+              if (jsonStr === '[DONE]') { abortControllerRef.current = null; onDone(); return; }
               try {
                 const parsed = JSON.parse(jsonStr);
                 const content = parsed.choices?.[0]?.delta?.content;
@@ -313,13 +317,15 @@ export default function AiChat() {
             }
           }
         } catch (e) { console.error('Stream error:', e); }
+        abortControllerRef.current = null;
         onDone();
         return; // success — exit retry loop
 
       } catch (e: any) {
         clearTimeout(timeoutId);
         lastError = e;
-        const isRetryable = e.name === 'AbortError' || e.message === 'Failed to fetch' || e.message?.includes('network');
+        // Don't retry if user manually aborted (flag set by handleStopGeneration)
+        const isRetryable = !userAbortedRef.current && (e.name === 'AbortError' || e.message === 'Failed to fetch' || e.message?.includes('network'));
         if (!isRetryable || attempt >= maxRetries) {
           throw e;
         }
@@ -499,6 +505,7 @@ export default function AiChat() {
   }, [activeSessionId]);
 
   const handleStopGeneration = useCallback(() => {
+    userAbortedRef.current = true;
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
