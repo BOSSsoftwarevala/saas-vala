@@ -8,6 +8,9 @@ import { ChatSearch } from '@/components/ai-chat/ChatSearch';
 import { KeyboardShortcuts, useKeyboardShortcuts } from '@/components/ai-chat/KeyboardShortcuts';
 import { MemoryPanel } from '@/components/ai-chat/MemoryPanel';
 import { ModelSelector } from '@/components/ai-chat/ModelSelector';
+import { SystemPromptEditor } from '@/components/ai-chat/SystemPromptEditor';
+import { ChatControlPanel } from '@/components/ai-chat/ChatControlPanel';
+import { TokenUsageDisplay } from '@/components/ai-chat/TokenUsageDisplay';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -31,6 +34,8 @@ import {
   Search,
   PanelLeftClose,
   PanelLeft,
+  Square,
+  Settings2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -108,14 +113,25 @@ export default function AiChat() {
   const aiStartTimeRef = useRef<number | null>(null);
   const aiTokensRef = useRef<number>(0);
   const _autoRetryRef = useRef<number | null>(null);
-  const _abortControllerRef = useRef<AbortController | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
   const [showSearchPanel, setShowSearchPanel] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showMemoryPanel, setShowMemoryPanel] = useState(false);
+  const [showSystemPrompt, setShowSystemPrompt] = useState(false);
   const [pinnedMessages, setPinnedMessages] = useState<Set<string>>(new Set());
   const [thinkingContext, setThinkingContext] = useState<'analyzing' | 'fixing' | 'deploying' | 'general'>('general');
+
+  const [systemPrompt, setSystemPrompt] = useState<string>(() => {
+    return localStorage.getItem('saas-ai-system-prompt') || 'You are VALA AI, an expert full-stack developer and business consultant for SaaSVala. You help with code generation, deployment, security audits, and business automation. Always respond in a professional yet friendly manner, mixing English with Hindi when appropriate.';
+  });
+  const [temperature, setTemperature] = useState<number>(() => {
+    return parseFloat(localStorage.getItem('saas-ai-temperature') || '0.7');
+  });
+  const [maxTokens, setMaxTokens] = useState<number>(() => {
+    return parseInt(localStorage.getItem('saas-ai-max-tokens') || '4096');
+  });
 
   const [selectedModel, setSelectedModel] = useState<string>(() => {
     return localStorage.getItem('saas-ai-model') || 'google/gemini-3-flash-preview';
@@ -131,7 +147,9 @@ export default function AiChat() {
   const activeSession = sessions.find(s => s.id === activeSessionId);
 
   useEffect(() => { localStorage.setItem('saas-ai-model', selectedModel); }, [selectedModel]);
-  useEffect(() => { localStorage.setItem('saas-ai-sessions', JSON.stringify(sessions)); }, [sessions]);
+  useEffect(() => { localStorage.setItem('saas-ai-system-prompt', systemPrompt); }, [systemPrompt]);
+  useEffect(() => { localStorage.setItem('saas-ai-temperature', temperature.toString()); }, [temperature]);
+  useEffect(() => { localStorage.setItem('saas-ai-max-tokens', maxTokens.toString()); }, [maxTokens]);
   useEffect(() => { if (activeSessionId) localStorage.setItem('saas-ai-active-session', activeSessionId); }, [activeSessionId]);
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [activeSession?.messages]);
   useEffect(() => { if (isMobile) setSessionListOpen(false); }, [isMobile]);
@@ -240,7 +258,7 @@ export default function AiChat() {
         const resp = await fetch(CHAT_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-          body: JSON.stringify({ messages: formattedMessages, stream: false, model: selectedModel }),
+          body: JSON.stringify({ messages: formattedMessages, stream: false, model: selectedModel, system_prompt: systemPrompt, temperature, max_tokens: maxTokens }),
           signal: controller.signal,
         });
 
@@ -309,7 +327,7 @@ export default function AiChat() {
       }
     }
     if (lastError) throw lastError;
-  }, [selectedModel]);
+  }, [selectedModel, systemPrompt, temperature, maxTokens]);
 
   const handleSend = async (content: string, files?: File[]) => {
     if ((!content.trim() && (!files || files.length === 0)) || isLoading) return;
@@ -480,6 +498,32 @@ export default function AiChat() {
     }));
   }, [activeSessionId]);
 
+  const handleStopGeneration = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    if (aiTimerRef.current) { window.clearInterval(aiTimerRef.current); aiTimerRef.current = null; }
+    setIsLoading(false);
+    setGlobalWorking(false);
+    setAiStatus({ stage: 'idle' });
+    toast.info('Generation stopped');
+  }, []);
+
+  const handleRetry = useCallback((messageId: string) => {
+    if (!activeSessionId || isLoading) return;
+    const session = sessions.find(s => s.id === activeSessionId);
+    if (!session) return;
+    // Find the last user message before this assistant message
+    const msgIndex = session.messages.findIndex(m => m.id === messageId);
+    if (msgIndex <= 0) return;
+    const lastUserMsg = session.messages[msgIndex - 1];
+    if (lastUserMsg.role !== 'user') return;
+    // Remove the assistant message and resend
+    setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, messages: s.messages.filter(m => m.id !== messageId) } : s));
+    setTimeout(() => handleSend(lastUserMsg.content), 100);
+  }, [activeSessionId, sessions, isLoading]);
+
   const handleExport = () => {
     if (!activeSession) return;
     const content = activeSession.messages.map(m => `${m.role === 'user' ? 'You' : 'VALA AI'}: ${m.content}`).join('\n\n');
@@ -605,25 +649,31 @@ export default function AiChat() {
           <div className="flex-1 overflow-y-auto min-h-0">
             {activeSession && activeSession.messages.length > 0 ? (
               <div className="px-3 py-3 space-y-1 pb-4">
-                {activeSession.messages.map((message, index) => (
-                  <div key={message.id} id={`message-${message.id}`}>
-                    <ChatMessage
-                      message={message}
-                      index={index}
-                      isPinned={pinnedMessages.has(message.id)}
-                      onPin={handlePinMessage}
-                      onUnpin={handleUnpinMessage}
-                      onApproveAction={(messageId, actionId) => {
-                        handleSend(`✅ APPROVED — Action ID: ${actionId}. Execute karo.`);
-                        toast.success('Action approved!');
-                      }}
-                      onDenyAction={(messageId, actionId) => {
-                        handleSend(`❌ CANCELLED — Action ID: ${actionId}.`);
-                        toast.info('Action cancelled.');
-                      }}
-                    />
-                  </div>
-                ))}
+                {activeSession.messages.map((message, index) => {
+                  const lastAssistantIdx = [...activeSession.messages].reverse().findIndex(m => m.role === 'assistant');
+                  const isLastAssistant = message.role === 'assistant' && index === activeSession.messages.length - 1 - lastAssistantIdx;
+                  return (
+                    <div key={message.id} id={`message-${message.id}`}>
+                      <ChatMessage
+                        message={message}
+                        index={index}
+                        isPinned={pinnedMessages.has(message.id)}
+                        onPin={handlePinMessage}
+                        onUnpin={handleUnpinMessage}
+                        onRetry={handleRetry}
+                        isLastAssistant={isLastAssistant && !isLoading}
+                        onApproveAction={(messageId, actionId) => {
+                          handleSend(`✅ APPROVED — Action ID: ${actionId}. Execute karo.`);
+                          toast.success('Action approved!');
+                        }}
+                        onDenyAction={(messageId, actionId) => {
+                          handleSend(`❌ CANCELLED — Action ID: ${actionId}.`);
+                          toast.info('Action cancelled.');
+                        }}
+                      />
+                    </div>
+                  );
+                })}
                 <AiStatusPanel 
                   status={aiStatus}
                   onDismissError={() => setAiStatus({ stage: 'idle' })}
@@ -661,15 +711,39 @@ export default function AiChat() {
             )}
           </div>
 
-          {/* Model selector + input */}
+          {/* Model selector + controls + input */}
           <div className="shrink-0 border-t border-border/50 bg-background/95 backdrop-blur-md">
-            <div className="px-2 pt-1.5 flex items-center gap-2">
+            <div className="px-2 pt-1.5 flex items-center gap-2 flex-wrap">
               <ModelSelector selectedModel={selectedModel} onModelChange={setSelectedModel} />
+              <ChatControlPanel 
+                temperature={temperature} 
+                maxTokens={maxTokens} 
+                onTemperatureChange={setTemperature} 
+                onMaxTokensChange={setMaxTokens} 
+              />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={() => setShowSystemPrompt(true)} className="h-7 w-7 text-muted-foreground hover:text-primary">
+                    <Settings2 className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">System Prompt</TooltipContent>
+              </Tooltip>
               {isLoading && (
-                <span className="text-[10px] text-muted-foreground">
-                  {aiStatus.elapsedMs ? `${(aiStatus.elapsedMs / 1000).toFixed(1)}s` : '0s'} · {aiStatus.tokens ?? 0} tokens
-                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" onClick={handleStopGeneration} className="h-7 w-7 text-destructive hover:bg-destructive/10">
+                      <Square className="h-3.5 w-3.5 fill-current" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">Stop generation</TooltipContent>
+                </Tooltip>
               )}
+              <TokenUsageDisplay
+                tokens={aiStatus.tokens ?? 0}
+                elapsedMs={aiStatus.elapsedMs ?? 0}
+                isLoading={isLoading}
+              />
             </div>
             <ChatInput onSend={handleSend} isLoading={isLoading} onVoiceMessage={handleVoiceMessage} />
           </div>
@@ -775,6 +849,12 @@ export default function AiChat() {
             <MemoryPanel onClose={() => setShowMemoryPanel(false)} />
           </SheetContent>
         </Sheet>
+        <SystemPromptEditor
+          isOpen={showSystemPrompt}
+          onClose={() => setShowSystemPrompt(false)}
+          activePrompt={systemPrompt}
+          onSelectPrompt={setSystemPrompt}
+        />
       </div>
     </TooltipProvider>
   );

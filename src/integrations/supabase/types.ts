@@ -461,6 +461,48 @@ export type Database = {
           },
         ]
       }
+      ai_usage_daily: {
+        Row: {
+          created_at: string | null
+          date: string
+          id: string
+          input_tokens: number | null
+          model: string
+          output_tokens: number | null
+          request_count: number | null
+          tool_calls: number | null
+          total_cost: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          date?: string
+          id?: string
+          input_tokens?: number | null
+          model: string
+          output_tokens?: number | null
+          request_count?: number | null
+          tool_calls?: number | null
+          total_cost?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          id?: string
+          input_tokens?: number | null
+          model?: string
+          output_tokens?: number | null
+          request_count?: number | null
+          tool_calls?: number | null
+          total_cost?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       apk_build_queue: {
         Row: {
           apk_file_path: string | null
@@ -3765,6 +3807,39 @@ export type Database = {
         }
         Relationships: []
       }
+      system_prompts: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_default: boolean | null
+          is_global: boolean | null
+          name: string
+          prompt: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          is_global?: boolean | null
+          name: string
+          prompt: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_default?: boolean | null
+          is_global?: boolean | null
+          name?: string
+          prompt?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       tenants: {
         Row: {
           created_at: string | null
@@ -3807,6 +3882,51 @@ export type Database = {
           slug?: string
           status?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      tool_execution_logs: {
+        Row: {
+          cost: number | null
+          created_at: string | null
+          error_message: string | null
+          execution_time_ms: number | null
+          id: string
+          session_id: string | null
+          status: string
+          tokens_used: number | null
+          tool_input: Json | null
+          tool_name: string
+          tool_output: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          cost?: number | null
+          created_at?: string | null
+          error_message?: string | null
+          execution_time_ms?: number | null
+          id?: string
+          session_id?: string | null
+          status?: string
+          tokens_used?: number | null
+          tool_input?: Json | null
+          tool_name: string
+          tool_output?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          cost?: number | null
+          created_at?: string | null
+          error_message?: string | null
+          execution_time_ms?: number | null
+          id?: string
+          session_id?: string | null
+          status?: string
+          tokens_used?: number | null
+          tool_input?: Json | null
+          tool_name?: string
+          tool_output?: Json | null
+          user_id?: string | null
         }
         Relationships: []
       }

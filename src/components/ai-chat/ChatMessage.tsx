@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { User, Sparkles, Copy, Check, FileCode, FileArchive, File, Image, Pin, Volume2, VolumeX } from 'lucide-react';
+import { User, Sparkles, Copy, Check, FileCode, FileArchive, File, Image, Pin, Volume2, VolumeX, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
@@ -39,6 +39,8 @@ interface ChatMessageProps {
   onUnpin?: (messageId: string) => void;
   onApproveAction?: (messageId: string, actionId: string) => void;
   onDenyAction?: (messageId: string, actionId: string) => void;
+  onRetry?: (messageId: string) => void;
+  isLastAssistant?: boolean;
 }
 
 const getFileIcon = (type: FileAttachment['type']) => {
@@ -66,7 +68,7 @@ function stripMarkdown(text: string): string {
     .slice(0, 500); // max 500 chars for TTS
 }
 
-export function ChatMessage({ message, index = 0, isPinned, onApproveAction, onDenyAction }: ChatMessageProps) {
+export function ChatMessage({ message, index = 0, isPinned, onApproveAction, onDenyAction, onRetry, isLastAssistant }: ChatMessageProps) {
   const [copied, setCopied] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [audioObj, setAudioObj] = useState<HTMLAudioElement | null>(null);
@@ -308,6 +310,19 @@ export function ChatMessage({ message, index = 0, isPinned, onApproveAction, onD
             >
               {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
             </Button>
+
+            {/* Retry button - only for last assistant message */}
+            {!isUser && isLastAssistant && onRetry && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onRetry(message.id)}
+                className="h-6 w-6 p-0 rounded-full text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100 transition-all"
+                title="Regenerate response"
+              >
+                <RotateCcw className="h-3 w-3" />
+              </Button>
+            )}
           </div>
 
           {/* File Attachments */}
