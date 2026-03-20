@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export interface MarketplaceProduct {
   id: string;
@@ -50,7 +51,14 @@ const defaultFeatures = [
 
 const defaultTechStack = ['React', 'Node.js', 'PostgreSQL'];
 
-// Category row mapping
+const PRODUCT_FIELDS = 'id, name, slug, description, short_description, price, status, features, thumbnail_url, git_repo_url, marketplace_visible, apk_url, demo_url, demo_login, demo_password, demo_enabled, featured, trending, business_type, deploy_status, discount_percent, rating, tags, apk_enabled, license_enabled';
+const PAGE_SIZE = 100;
+const MAX_RETRIES = 3;
+
+// In-memory cache
+const productCache: { data: MarketplaceProduct[]; ts: number } = { data: [], ts: 0 };
+const CACHE_TTL = 60_000; // 1 minute
+
 export const CATEGORY_ROW_MAP: Record<string, string[]> = {
   upcoming: ['upcoming', 'coming_soon', 'pipeline'],
   ondemand: ['on_demand', 'on demand', 'ondemand', 'saas', 'cloud'],
@@ -66,7 +74,6 @@ function formatProductName(name: string): string {
 function getProductPriorityScore(product: MarketplaceProduct): number {
   const repoUrl = (product.gitRepoUrl || '').toLowerCase();
   const demoUrl = (product.demoUrl || '').toLowerCase();
-
   const hasLiveDemo = Boolean(demoUrl && demoUrl.startsWith('http') && !demoUrl.includes('github.com'));
   const hasRealRepo = repoUrl.includes('github.com/saasvala/') || repoUrl.includes('github.com/softwarevala/');
   const hasAnyRepo = Boolean(repoUrl);
@@ -100,10 +107,7 @@ function matchesCategory(product: MarketplaceProduct, categories: string[]) {
     product.subtitle || '',
     product.gitRepoUrl || '',
     (product.tags || []).join(' '),
-  ]
-    .join(' ')
-    .toLowerCase();
-
+  ].join(' ').toLowerCase();
   return terms.some(term => haystack.includes(term));
 }
 
@@ -148,34 +152,89 @@ export function mapDbProduct(product: any, index: number): MarketplaceProduct {
   };
 }
 
+/** Fetch a page with retry logic */
+async function fetchPageWithRetry(from: number, to: number, attempt = 1): Promise<any[]> {
+  const { data, error } = await supabase
+    .from('products')
+    .select(PRODUCT_FIELDS)
+    .eq('marketplace_visible', true)
+    .order('created_at', { ascending: false })
+    .range(from, to);
+
+  if (error) {
+    if (attempt < MAX_RETRIES) {
+      await new Promise(r => setTimeout(r, attempt * 500));
+      return fetchPageWithRetry(from, to, attempt + 1);
+    }
+    throw error;
+  }
+  return data || [];
+}
+
+/** Fetch all products with pagination (bypasses 1000-row limit) */
+async function fetchAllProducts(): Promise<MarketplaceProduct[]> {
+  // Check cache
+  if (productCache.data.length > 0 && Date.now() - productCache.ts < CACHE_TTL) {
+    return productCache.data;
+  }
+
+  const allData: any[] = [];
+  let page = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const from = page * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+    const batch = await fetchPageWithRetry(from, to);
+    allData.push(...batch);
+    hasMore = batch.length === PAGE_SIZE;
+    page++;
+  }
+
+  const mapped = allData.map((p, i) => mapDbProduct(p, i));
+  const sorted = prioritizeProducts(mapped);
+
+  // Update cache
+  productCache.data = sorted;
+  productCache.ts = Date.now();
+
+  return sorted;
+}
+
 export function useMarketplaceProducts() {
-  const [products, setProducts] = useState<MarketplaceProduct[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<MarketplaceProduct[]>(productCache.data);
+  const [loading, setLoading] = useState(productCache.data.length === 0);
+  const fetchedRef = useRef(false);
 
   useEffect(() => {
-    const fetchProducts = async () => {
-      setLoading(true);
-  const { data, error } = await supabase
-        .from('products')
-        .select('id, name, slug, description, short_description, price, status, features, thumbnail_url, git_repo_url, marketplace_visible, apk_url, demo_url, demo_login, demo_password, demo_enabled, featured, trending, business_type, deploy_status, discount_percent, rating, tags, apk_enabled, license_enabled')
-        .eq('marketplace_visible', true)
-        .order('created_at', { ascending: false })
-        .limit(500);
+    if (fetchedRef.current && productCache.data.length > 0) return;
+    fetchedRef.current = true;
 
-      if (error) {
-        console.error('Failed to fetch marketplace products:', error);
+    const load = async () => {
+      try {
+        const result = await fetchAllProducts();
+        setProducts(result);
+      } catch (err) {
+        console.error('Failed to fetch marketplace products:', err);
+        toast.error('Failed to load products. Please refresh.');
         setProducts([]);
-      } else {
-        const mapped = (data || []).map((p, i) => mapDbProduct(p, i));
-        setProducts(prioritizeProducts(mapped));
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
-    fetchProducts();
+    // If cache is warm, use it immediately, then refresh in background
+    if (productCache.data.length > 0) {
+      setProducts(productCache.data);
+      setLoading(false);
+      // Stale-while-revalidate
+      productCache.ts = 0; // Force refresh
+      load();
+    } else {
+      load();
+    }
   }, []);
 
-  // Split into category rows for the "catalog" section
   const dbRow1 = products.slice(0, 30);
   const remaining = products.slice(30);
   const allRows = [dbRow1];
@@ -185,12 +244,11 @@ export function useMarketplaceProducts() {
     }
   }
 
-  // Category-specific row fetchers
-  const getByCategory = (cats: string[]) => {
+  const getByCategory = useCallback((cats: string[]) => {
     const matched = products.filter(p => matchesCategory(p, cats));
     const fallbackReal = products.filter(isSaasvalaRepo);
     return prioritizeProducts(matched.length > 0 ? matched : fallbackReal);
-  };
+  }, [products]);
 
   return {
     products,
@@ -201,37 +259,51 @@ export function useMarketplaceProducts() {
   };
 }
 
-// Separate lightweight hook that fetches by category from DB
+/** Lightweight hook — fetches only one category from DB with server-side filter */
 export function useProductsByCategory(categories: string[]) {
   const [products, setProducts] = useState<MarketplaceProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  const cacheKey = categories.join(',');
 
   useEffect(() => {
+    let cancelled = false;
     const fetchProducts = async () => {
       setLoading(true);
-      // Fetch all marketplace visible products and filter client-side by category
-      const { data, error } = await supabase
-        .from('products')
-        .select('id, name, slug, description, short_description, price, status, features, thumbnail_url, git_repo_url, marketplace_visible, apk_url, demo_url, demo_login, demo_password, demo_enabled, featured, trending, business_type, deploy_status, discount_percent, rating, tags, apk_enabled, license_enabled')
-        .eq('marketplace_visible', true)
-        .order('created_at', { ascending: false })
-        .limit(500);
+      try {
+        // Use ilike filters for server-side category matching
+        let query = supabase
+          .from('products')
+          .select(PRODUCT_FIELDS)
+          .eq('marketplace_visible', true)
+          .order('created_at', { ascending: false });
 
-      if (error) {
-        setProducts([]);
-      } else {
+        // Server-side filter by business_type if single category
+        if (categories.length === 1) {
+          query = query.ilike('business_type', `%${categories[0]}%`);
+        }
+
+        const { data, error } = await query.limit(200);
+
+        if (cancelled) return;
+
+        if (error) throw error;
+
         const mapped = (data || []).map((p, i) => mapDbProduct(p, i));
-        // Filter by category keywords OR return all if no match
+        // Client-side refinement for multi-keyword
         const matched = mapped.filter(p => matchesCategory(p, categories));
         const fallbackReal = mapped.filter(isSaasvalaRepo);
-        const filtered = prioritizeProducts(matched.length > 0 ? matched : fallbackReal);
-        setProducts(filtered);
+        setProducts(prioritizeProducts(matched.length > 0 ? matched : fallbackReal));
+      } catch (err) {
+        console.error(`Failed to fetch ${cacheKey} products:`, err);
+        if (!cancelled) setProducts([]);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setLoading(false);
     };
 
     fetchProducts();
-  }, [categories.join(',')]);
+    return () => { cancelled = true; };
+  }, [cacheKey]);
 
   return { products, loading };
 }
