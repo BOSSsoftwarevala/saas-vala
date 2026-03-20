@@ -373,6 +373,13 @@ export default function AiChat() {
     setActiveSessionId(newSession.id);
   };
 
+  const openBuilderMode = () => {
+    const newSession: ChatSession = { id: crypto.randomUUID(), title: '🚀 Builder', createdAt: new Date(), messages: [] };
+    setSessions(prev => [newSession, ...prev]);
+    setActiveSessionId(newSession.id);
+    setBuildMode(true);
+  };
+
   const deleteSession = (id: string) => {
     setSessions(prev => prev.filter(s => s.id !== id));
     if (activeSessionId === id) {
