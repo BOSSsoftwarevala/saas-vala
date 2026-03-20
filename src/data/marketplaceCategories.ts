@@ -19,6 +19,8 @@ export interface MarketplaceCategory {
  * Rows 6–40 below are rendered dynamically via MarketplaceCategoryRow.
  */
 export const MARKETPLACE_CATEGORIES: MarketplaceCategory[] = [
+  // 5 — Education
+  { id: 'education', icon: '🎓', title: 'Education & EdTech', subtitle: 'School, Coaching, LMS & Training solutions.', badge: 'EDUCATION', badgeVariant: 'trending', keywords: ['education', 'school', 'college', 'coaching', 'university', 'training', 'academy', 'tutor', 'lms'] },
   // 6
   { id: 'healthcare', icon: '🏥', title: 'Healthcare & Medical', subtitle: 'Hospital, Clinic, Pharmacy & Lab solutions.', badge: 'ESSENTIAL', badgeVariant: 'live', keywords: ['healthcare', 'hospital', 'clinic', 'medical'] },
   // 7
