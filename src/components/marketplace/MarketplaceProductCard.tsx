@@ -57,10 +57,11 @@ export const MarketplaceProductCard = React.memo<MarketplaceProductCardProps>(({
     : ['Dashboard', 'Reports', 'Analytics', 'API'];
 
   const getDemoUrl = useCallback((): string | null => {
-    const d = (product as any).demoUrl || (product as any).demo_url;
-    if (d && d.startsWith('http') && !d.includes('github.com')) return d;
+    // Priority: GitHub repo URL first (user requirement), then demo_url fallback
     const g = (product as any).gitRepoUrl || (product as any).git_repo_url;
     if (g && g.startsWith('http')) return g;
+    const d = (product as any).demoUrl || (product as any).demo_url;
+    if (d && d.startsWith('http')) return d;
     return null;
   }, [product]);
 
