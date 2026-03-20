@@ -58,7 +58,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { action, app_name, repo_url, project_id, repos, domain_suffix } = body;
+    const { action, app_name, repo_url, project_id, repos, domain_suffix, subdomain, domain, target_ip } = body;
 
     const VERCEL_TOKEN = Deno.env.get("VERCEL_TOKEN");
     if (!VERCEL_TOKEN) {
@@ -67,6 +67,10 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const sb = createClient(supabaseUrl, supabaseKey);
 
     const headers = getHeaders(VERCEL_TOKEN);
 
