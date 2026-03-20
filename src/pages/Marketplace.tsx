@@ -3,6 +3,7 @@ import { MarketplaceHeader } from '@/components/marketplace/MarketplaceHeader';
 import { LazySection } from '@/components/marketplace/LazySection';
 import { MarketplaceCategoryRow } from '@/components/marketplace/MarketplaceCategoryRow';
 import { EducationSection } from '@/components/marketplace/EducationSection';
+import { AllProductsGrid } from '@/components/marketplace/AllProductsGrid';
 import { MARKETPLACE_CATEGORIES } from '@/data/marketplaceCategories';
 import { useMarketplaceProducts } from '@/hooks/useMarketplaceProducts';
 import { toast } from 'sonner';
@@ -114,7 +115,12 @@ export default function Marketplace() {
           </LazySection>
         ))}
 
-        {/* Simple Pricing */}
+        {/* All Products — Infinite Scroll Grid */}
+        <LazySection height={400}>
+          <AllProductsGrid onBuyNow={handleBuyNow} />
+        </LazySection>
+
+
         <section id="pricing" className="py-12 px-4 md:px-8 border-t border-border">
           <div className="max-w-3xl mx-auto text-center">
             <h2 className="text-2xl md:text-3xl font-black text-foreground mb-3">💰 Simple Pricing</h2>
