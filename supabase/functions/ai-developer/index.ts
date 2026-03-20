@@ -4462,6 +4462,67 @@ POWERED BY SOFTWAREVALA™ | VALA AI SOVEREIGN FACTORY v10.0 — FULL AUTONOMOUS
     }
     // ─── END MEMORY AUTO-SAVE ─────────────────────────────────────────────────
 
+    // ─── USAGE TRACKING ─────────────────────────────────────────────────────
+    try {
+      const authHeader = req.headers.get('Authorization');
+      if (authHeader) {
+        const token = authHeader.replace('Bearer ', '');
+        const { data: { user } } = await supabase.auth.getUser(token);
+        if (user) {
+          const inputTokens = finalUsage?.prompt_tokens || Math.floor(JSON.stringify(messages).length / 4);
+          const outputTokens = finalUsage?.completion_tokens || Math.floor((finalContent?.length || 0) / 4);
+          const estimatedCost = (inputTokens * 0.000005) + (outputTokens * 0.000015);
+
+          // Log tool executions
+          for (const tr of toolResults) {
+            await supabase.from('tool_execution_logs').insert({
+              user_id: user.id,
+              tool_name: tr.name,
+              tool_output: typeof tr.result === 'string' ? { text: tr.result } : tr.result,
+              status: 'completed',
+              tokens_used: outputTokens,
+              cost: estimatedCost / Math.max(toolResults.length, 1),
+            });
+          }
+
+          // Upsert daily usage
+          const today = new Date().toISOString().split('T')[0];
+          const { data: existing } = await supabase
+            .from('ai_usage_daily')
+            .select('id, request_count, input_tokens, output_tokens, total_cost, tool_calls')
+            .eq('user_id', user.id)
+            .eq('date', today)
+            .eq('model', finalModelUsed || AI_MODEL)
+            .maybeSingle();
+
+          if (existing) {
+            await supabase.from('ai_usage_daily').update({
+              request_count: (existing.request_count || 0) + 1,
+              input_tokens: (existing.input_tokens || 0) + inputTokens,
+              output_tokens: (existing.output_tokens || 0) + outputTokens,
+              total_cost: parseFloat(String(existing.total_cost || 0)) + estimatedCost,
+              tool_calls: (existing.tool_calls || 0) + toolResults.length,
+              updated_at: new Date().toISOString(),
+            }).eq('id', existing.id);
+          } else {
+            await supabase.from('ai_usage_daily').insert({
+              user_id: user.id,
+              date: today,
+              model: finalModelUsed || AI_MODEL,
+              request_count: 1,
+              input_tokens: inputTokens,
+              output_tokens: outputTokens,
+              total_cost: estimatedCost,
+              tool_calls: toolResults.length,
+            });
+          }
+        }
+      }
+    } catch (trackErr) {
+      console.warn('[USAGE] Tracking error (non-fatal):', trackErr);
+    }
+    // ─── END USAGE TRACKING ──────────────────────────────────────────────────
+
     return new Response(
       JSON.stringify({ 
         response: finalContent,
