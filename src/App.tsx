@@ -30,8 +30,7 @@ const Wallet = React.lazy(() => import("./pages/Wallet"));
 const SeoLeads = React.lazy(() => import("./pages/SeoLeads"));
 const Resellers = React.lazy(() => import("./pages/Resellers"));
 const Settings = React.lazy(() => import("./pages/Settings"));
-const AuditLogs = React.lazy(() => import("./pages/AuditLogs"));
-const SystemHealth = React.lazy(() => import("./pages/SystemHealth"));
+// Audit Logs & System Health merged into Dashboard
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 const ResellerDashboard = React.lazy(() => import("./pages/ResellerDashboard"));
 const Automation = React.lazy(() => import("./pages/Automation"));
@@ -150,8 +149,8 @@ function AppRoutes() {
         {/* Admin routes */}
         <Route path="/resellers" element={<ProtectedRoute><AdminRoute><Resellers /></AdminRoute></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><AdminRoute><Settings /></AdminRoute></ProtectedRoute>} />
-        <Route path="/audit-logs" element={<ProtectedRoute><AdminRoute><AuditLogs /></AdminRoute></ProtectedRoute>} />
-        <Route path="/system-health" element={<ProtectedRoute><AdminRoute><SystemHealth /></AdminRoute></ProtectedRoute>} />
+        <Route path="/audit-logs" element={<ProtectedRoute><Navigate to="/dashboard" replace /></ProtectedRoute>} />
+        <Route path="/system-health" element={<ProtectedRoute><Navigate to="/dashboard" replace /></ProtectedRoute>} />
         <Route path="/automation" element={<ProtectedRoute><AdminRoute><Automation /></AdminRoute></ProtectedRoute>} />
         <Route path="/apk-pipeline" element={<ProtectedRoute><Navigate to="/ai-chat" replace /></ProtectedRoute>} />
         <Route path="/admin/add-product" element={<ProtectedRoute><AdminRoute><AddProduct /></AdminRoute></ProtectedRoute>} />
