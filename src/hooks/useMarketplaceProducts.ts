@@ -222,13 +222,9 @@ export function useProductsByCategory(categories: string[]) {
       } else {
         const mapped = (data || []).map((p, i) => mapDbProduct(p, i));
         // Filter by category keywords OR return all if no match
-        const filtered = prioritizeProducts(
-          mapped.filter(p => {
-            const bt = (p.businessType || '').toLowerCase();
-            const cat = (p.category || '').toLowerCase();
-            return categories.some(c => bt.includes(c.toLowerCase()) || cat.includes(c.toLowerCase()));
-          })
-        );
+        const matched = mapped.filter(p => matchesCategory(p, categories));
+        const fallbackReal = mapped.filter(isSaasvalaRepo);
+        const filtered = prioritizeProducts(matched.length > 0 ? matched : fallbackReal);
         setProducts(filtered);
       }
       setLoading(false);
