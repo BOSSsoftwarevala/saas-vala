@@ -3794,27 +3794,47 @@ serve(async (req) => {
     if (isAuditRequest) {
       try {
         // Fetch real data from DB
-        const [modelsRes, productsRes, serversRes, catalogRes] = await Promise.all([
+        const [modelsRes, productsRes, serversRes, catalogRes, errorsRes, deploymentsRes] = await Promise.all([
           supabase.from('ai_models').select('name, provider, is_active, is_default').limit(20),
           supabase.from('products').select('id, status').limit(100),
           supabase.from('servers').select('id, status, health_status').limit(50),
           supabase.from('source_code_catalog').select('id, status').limit(100),
+          supabase.from('error_logs').select('id, resolved, severity').eq('resolved', false).limit(50),
+          supabase.from('deployments').select('id, status').order('created_at', { ascending: false }).limit(20),
         ]);
 
         const activeModels = (modelsRes.data || []).filter((m: any) => m.is_active);
         const activeProducts = (productsRes.data || []).filter((p: any) => p.status === 'active');
         const liveServers = (serversRes.data || []).filter((s: any) => s.status === 'live');
         const catalogItems = catalogRes.data?.length || 0;
+        const unresolvedErrors = errorsRes.data?.length || 0;
+        const criticalErrors = (errorsRes.data || []).filter((e: any) => e.severity === 'critical').length;
+        const recentDeploys = deploymentsRes.data || [];
+        const failedDeploys = recentDeploys.filter((d: any) => d.status === 'failed').length;
+        const successDeploys = recentDeploys.filter((d: any) => d.status === 'success').length;
 
         const hasOpenAI = !!Deno.env.get('OPENAI_API_KEY');
         const hasSaasValaToken = !!Deno.env.get('SAASVALA_GITHUB_TOKEN');
         const hasSoftwareValaToken = !!Deno.env.get('SOFTWAREVALA_GITHUB_TOKEN');
         const hasElevenLabs = !!Deno.env.get('ELEVENLABS_API_KEY');
 
+        // Calculate REAL scores based on actual data
+        const stabilityScore = hasOpenAI ? (unresolvedErrors > 10 ? 5 : unresolvedErrors > 3 ? 7 : 9) : 4;
+        const securityScore = hasSaasValaToken && hasSoftwareValaToken ? 8 : 5;
+        const errorHandlingScore = criticalErrors > 5 ? 4 : criticalErrors > 0 ? 6 : 8;
+        const performanceScore = liveServers.length > 0 ? (failedDeploys > 5 ? 5 : 8) : 3;
+        const productionScore = activeProducts.length > 0 && liveServers.length > 0 ? (failedDeploys > 3 ? 6 : 8) : 4;
+
+        const overallStatus = criticalErrors > 0 || liveServers.length === 0 
+          ? '🟡 DEGRADED — Issues detected' 
+          : unresolvedErrors > 5 
+            ? '🟡 OPERATIONAL WITH WARNINGS' 
+            : '🟢 OPERATIONAL';
+
         const auditReport = `# 🔍 VALA AI — System Audit Report
 **Generated:** ${new Date().toISOString()}
 
-## 🟢 System Status: OPERATIONAL
+## ${overallStatus}
 
 ---
 
@@ -3849,13 +3869,11 @@ serve(async (req) => {
 
 | Module | Score | Notes |
 |--------|-------|-------|
-| **Stability** | 9/10 | Dual provider fallback active |
-| **Security** | 9/10 | RLS on all tables, service role server-side only |
-| **Error Handling** | 8/10 | 401/402/429/500 errors handled with fallback |
-| **Performance** | 8/10 | Edge functions, streaming support |
-| **Logging** | 9/10 | Full audit logs, debug logs, activity logs |
-| **Scalability** | 9/10 | Edge runtime, auto-scaling |
-| **Production Readiness** | 9/10 | Dual AI, GitHub connected, DB online |
+| **Stability** | ${stabilityScore}/10 | ${unresolvedErrors} unresolved errors |
+| **Security** | ${securityScore}/10 | GitHub tokens: ${hasSaasValaToken && hasSoftwareValaToken ? 'Both valid' : 'CHECK TOKENS'} |
+| **Error Handling** | ${errorHandlingScore}/10 | ${criticalErrors} critical, ${unresolvedErrors} total unresolved |
+| **Performance** | ${performanceScore}/10 | ${liveServers.length} live servers, ${failedDeploys} failed deploys |
+| **Production Readiness** | ${productionScore}/10 | ${activeProducts.length} products, ${successDeploys}/${recentDeploys.length} deploys OK |
 
 ---
 
@@ -3864,18 +3882,26 @@ ${activeModels.map((m: any) => `- **${m.name}** (${m.provider}) ${m.is_default ?
 
 ---
 
-## 🔒 Security Status
-- ✅ Row Level Security: Enforced on all 60+ tables
-- ✅ API Keys: Stored as Edge Function secrets (never in client code)
-- ✅ Authentication: Supabase Auth + Role-based access
-- ✅ Audit Logs: Every action logged with timestamp + user
+## 🔒 Security & Infra Status
+- ${hasOpenAI ? '✅' : '❌'} OpenAI API Key: ${hasOpenAI ? 'Configured' : 'MISSING'}
+- ${hasSaasValaToken ? '✅' : '❌'} GitHub SaaSVala Token: ${hasSaasValaToken ? 'Valid' : 'MISSING'}
+- ${hasSoftwareValaToken ? '✅' : '❌'} GitHub SoftwareVala Token: ${hasSoftwareValaToken ? 'Valid' : 'MISSING'}
+- ${hasElevenLabs ? '✅' : '⚠️'} ElevenLabs TTS: ${hasElevenLabs ? 'Active' : 'Not configured'}
+- ${liveServers.length > 0 ? '✅' : '❌'} Live Servers: ${liveServers.length} online
+- ${unresolvedErrors === 0 ? '✅' : '⚠️'} Unresolved Errors: ${unresolvedErrors}
+- ${criticalErrors === 0 ? '✅' : '🔴'} Critical Errors: ${criticalErrors}
 
 ---
 
-## 📋 Conclusion
-**System FULLY OPERATIONAL.** Sabhi critical components active hain. OpenAI + Lovable AI dono configured hain. GitHub dono accounts connected hain. Database RLS secured hai.
+## 📋 Real Assessment
+${criticalErrors > 0 ? `🔴 **${criticalErrors} CRITICAL ERRORS** need immediate attention.` : ''}
+${unresolvedErrors > 5 ? `⚠️ **${unresolvedErrors} unresolved errors** — review error_logs table.` : ''}
+${liveServers.length === 0 ? '❌ **No live servers** — all servers are down or stopped.' : `✅ ${liveServers.length} servers online.`}
+${failedDeploys > 3 ? `⚠️ ${failedDeploys}/${recentDeploys.length} recent deployments failed.` : ''}
+${activeProducts.length === 0 ? '⚠️ **0 active products** — add/activate products.' : `✅ ${activeProducts.length} active products.`}
+${criticalErrors === 0 && unresolvedErrors <= 5 && liveServers.length > 0 ? '**System healthy.** No critical issues detected.' : '**Action required** — fix issues listed above.'}
 
-${activeProducts.length === 0 ? '\n⚠️ **Note:** Active products 0 hain — Products page se products add/activate karo.' : ''}`;
+⚠️ *This report uses LIVE database data. Scores are calculated, not hardcoded.*`;
 
         return new Response(
           JSON.stringify({ response: auditReport, model: 'system-audit', provider: 'direct', tools_used: ['database_query'], tool_results: [] }),
