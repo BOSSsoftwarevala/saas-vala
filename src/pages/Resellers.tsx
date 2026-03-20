@@ -170,6 +170,14 @@ export default function Resellers() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              className="gap-2 border-border"
+              onClick={() => window.location.assign('/reseller-dashboard')}
+            >
+              <Users className="h-4 w-4" />
+              Reseller Dashboard
+            </Button>
             <Button variant="outline" className="gap-2 border-border">
               <Download className="h-4 w-4" />
               Export
@@ -270,108 +278,110 @@ export default function Resellers() {
             </div>
           ) : (
             <>
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-border hover:bg-muted/50">
-                    <TableHead className="text-muted-foreground">Company</TableHead>
-                    <TableHead className="text-muted-foreground">Commission</TableHead>
-                    <TableHead className="text-muted-foreground">Credit Limit</TableHead>
-                    <TableHead className="text-muted-foreground">Total Sales</TableHead>
-                    <TableHead className="text-muted-foreground">Status</TableHead>
-                    <TableHead className="text-muted-foreground">Verified</TableHead>
-                    <TableHead className="text-muted-foreground">Created</TableHead>
-                     <TableHead className="text-muted-foreground">Quick Actions</TableHead>
-                    <TableHead className="text-muted-foreground text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredResellers.map((reseller) => (
-                    <TableRow key={reseller.id} className="border-border hover:bg-muted/30">
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                           <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                             <Users className="h-5 w-5 text-primary" />
-                           </div>
-                           <div>
-                             <span className="font-medium text-foreground block">{reseller.company_name || reseller.profile?.full_name || 'Unnamed'}</span>
-                             {reseller.profile?.full_name && reseller.company_name !== reseller.profile.full_name && (
-                               <span className="text-xs text-muted-foreground">{reseller.profile.full_name}</span>
-                             )}
-                           </div>
-                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Percent className="h-3 w-3 text-primary" />
-                          <span className="font-semibold text-primary">{reseller.commission_percent}%</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <DollarSign className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-foreground">₹{reseller.credit_limit.toLocaleString()}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-semibold text-success">₹{reseller.total_sales.toLocaleString()}</span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            reseller.is_active
-                              ? 'bg-success/20 text-success border-success/30'
-                              : 'bg-destructive/20 text-destructive border-destructive/30'
-                          )}
-                        >
-                          {reseller.is_active ? 'Active' : 'Suspended'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {reseller.is_verified ? (
-                          <Badge variant="outline" className="bg-cyan/20 text-cyan border-cyan/30">
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Verified
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-muted-foreground">{new Date(reseller.created_at).toLocaleDateString()}</span>
-                      </TableCell>
-                       <TableCell>
-                         <ResellerQuickActions reseller={reseller} onAction={() => fetchResellers()} />
-                       </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="bg-popover border-border">
-                            <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => openEditDialog(reseller)}>
-                              <Edit className="h-4 w-4" /> Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="gap-2 cursor-pointer text-destructive" onClick={() => setDeleteId(reseller.id)}>
-                              <Trash2 className="h-4 w-4" /> Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table className="min-w-[1120px]">
+                  <TableHeader>
+                    <TableRow className="border-border hover:bg-muted/50">
+                      <TableHead className="text-muted-foreground">Company</TableHead>
+                      <TableHead className="text-muted-foreground">Commission</TableHead>
+                      <TableHead className="text-muted-foreground">Credit Limit</TableHead>
+                      <TableHead className="text-muted-foreground">Total Sales</TableHead>
+                      <TableHead className="text-muted-foreground">Status</TableHead>
+                      <TableHead className="text-muted-foreground">Verified</TableHead>
+                      <TableHead className="text-muted-foreground">Created</TableHead>
+                      <TableHead className="text-muted-foreground">Quick Actions</TableHead>
+                      <TableHead className="text-muted-foreground text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-                 <PaginationControls
-                   currentPage={currentPage}
-                   totalPages={totalPages}
-                   totalItems={total}
-                   itemsPerPage={ITEMS_PER_PAGE}
-                   onPageChange={handlePageChange}
-                 />
-               </>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredResellers.map((reseller) => (
+                      <TableRow key={reseller.id} className="border-border hover:bg-muted/30">
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                              <Users className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                              <span className="font-medium text-foreground block">{reseller.company_name || reseller.profile?.full_name || 'Unnamed'}</span>
+                              {reseller.profile?.full_name && reseller.company_name !== reseller.profile.full_name && (
+                                <span className="text-xs text-muted-foreground">{reseller.profile.full_name}</span>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Percent className="h-3 w-3 text-primary" />
+                            <span className="font-semibold text-primary">{reseller.commission_percent}%</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <DollarSign className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-foreground">₹{reseller.credit_limit.toLocaleString()}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-semibold text-success">₹{reseller.total_sales.toLocaleString()}</span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              reseller.is_active
+                                ? 'bg-success/20 text-success border-success/30'
+                                : 'bg-destructive/20 text-destructive border-destructive/30'
+                            )}
+                          >
+                            {reseller.is_active ? 'Active' : 'Suspended'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {reseller.is_verified ? (
+                            <Badge variant="outline" className="bg-cyan/20 text-cyan border-cyan/30">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Verified
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-muted-foreground">{new Date(reseller.created_at).toLocaleDateString()}</span>
+                        </TableCell>
+                        <TableCell>
+                          <ResellerQuickActions reseller={reseller} onAction={() => fetchResellers()} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-popover border-border">
+                              <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => openEditDialog(reseller)}>
+                                <Edit className="h-4 w-4" /> Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="gap-2 cursor-pointer text-destructive" onClick={() => setDeleteId(reseller.id)}>
+                                <Trash2 className="h-4 w-4" /> Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <PaginationControls
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={total}
+                itemsPerPage={ITEMS_PER_PAGE}
+                onPageChange={handlePageChange}
+              />
+            </>
              )}
            </div>
  
