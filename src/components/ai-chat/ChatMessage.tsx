@@ -39,6 +39,8 @@ interface ChatMessageProps {
   onUnpin?: (messageId: string) => void;
   onApproveAction?: (messageId: string, actionId: string) => void;
   onDenyAction?: (messageId: string, actionId: string) => void;
+  onRetry?: (messageId: string) => void;
+  isLastAssistant?: boolean;
 }
 
 const getFileIcon = (type: FileAttachment['type']) => {
