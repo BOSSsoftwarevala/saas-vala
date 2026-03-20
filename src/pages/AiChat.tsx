@@ -327,7 +327,7 @@ export default function AiChat() {
       }
     }
     if (lastError) throw lastError;
-  }, [selectedModel]);
+  }, [selectedModel, systemPrompt, temperature, maxTokens]);
 
   const handleSend = async (content: string, files?: File[]) => {
     if ((!content.trim() && (!files || files.length === 0)) || isLoading) return;
