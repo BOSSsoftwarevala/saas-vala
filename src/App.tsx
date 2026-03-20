@@ -23,7 +23,7 @@ const EducationCategory = React.lazy(() => import("./pages/EducationCategory"));
 const Keys = React.lazy(() => import("./pages/Keys"));
 const Servers = React.lazy(() => import("./pages/Servers"));
 const AiChat = React.lazy(() => import("./pages/AiChat"));
-const ValaBuilder = React.lazy(() => import("./pages/ValaBuilder"));
+// ValaBuilder merged into AiChat
 const SaasAiDashboard = React.lazy(() => import("./pages/SaasAiDashboard"));
 const AiApis = React.lazy(() => import("./pages/AiApis"));
 const Wallet = React.lazy(() => import("./pages/Wallet"));
