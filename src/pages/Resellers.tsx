@@ -170,6 +170,14 @@ export default function Resellers() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              className="gap-2 border-border"
+              onClick={() => window.location.assign('/reseller-dashboard')}
+            >
+              <Users className="h-4 w-4" />
+              Reseller Dashboard
+            </Button>
             <Button variant="outline" className="gap-2 border-border">
               <Download className="h-4 w-4" />
               Export
