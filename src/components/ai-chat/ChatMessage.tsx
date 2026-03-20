@@ -68,7 +68,7 @@ function stripMarkdown(text: string): string {
     .slice(0, 500); // max 500 chars for TTS
 }
 
-export function ChatMessage({ message, index = 0, isPinned, onApproveAction, onDenyAction }: ChatMessageProps) {
+export function ChatMessage({ message, index = 0, isPinned, onApproveAction, onDenyAction, onRetry, isLastAssistant }: ChatMessageProps) {
   const [copied, setCopied] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [audioObj, setAudioObj] = useState<HTMLAudioElement | null>(null);
