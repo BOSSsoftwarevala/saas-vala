@@ -30,8 +30,7 @@ const Wallet = React.lazy(() => import("./pages/Wallet"));
 const SeoLeads = React.lazy(() => import("./pages/SeoLeads"));
 const Resellers = React.lazy(() => import("./pages/Resellers"));
 const Settings = React.lazy(() => import("./pages/Settings"));
-const AuditLogs = React.lazy(() => import("./pages/AuditLogs"));
-const SystemHealth = React.lazy(() => import("./pages/SystemHealth"));
+// Audit Logs & System Health merged into Dashboard
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 const ResellerDashboard = React.lazy(() => import("./pages/ResellerDashboard"));
 const Automation = React.lazy(() => import("./pages/Automation"));
