@@ -2,7 +2,6 @@ import { SectionHeader } from './SectionHeader';
 import { SectionSlider } from './SectionSlider';
 import { MarketplaceProductCard, ComingSoonCard } from './MarketplaceProductCard';
 import { useProductsByCategory } from '@/hooks/useMarketplaceProducts';
-import { fillToTarget } from '@/data/marketplaceProductGenerator';
 import type { MarketplaceCategory } from '@/data/marketplaceCategories';
 
 interface Props {
@@ -13,9 +12,7 @@ interface Props {
 export function MarketplaceCategoryRow({ category, onBuyNow }: Props) {
   const { products, loading } = useProductsByCategory(category.keywords);
 
-  const displayProducts = fillToTarget(products as any, category.id, category.title, 50);
-
-  if (!loading && displayProducts.length === 0) {
+  if (!loading && products.length === 0) {
     return (
       <section className="py-4">
         <SectionHeader
@@ -41,10 +38,10 @@ export function MarketplaceCategoryRow({ category, onBuyNow }: Props) {
         subtitle={category.subtitle}
         badge={category.badge}
         badgeVariant={category.badgeVariant}
-        totalCount={displayProducts.length}
+        totalCount={products.length}
       />
       <SectionSlider>
-        {displayProducts.map((product, i) => (
+        {products.map((product, i) => (
           <MarketplaceProductCard
             key={product.id}
             product={product as any}
