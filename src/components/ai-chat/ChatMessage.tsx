@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { User, Sparkles, Copy, Check, FileCode, FileArchive, File, Image, Pin, Volume2, VolumeX } from 'lucide-react';
+import { User, Sparkles, Copy, Check, FileCode, FileArchive, File, Image, Pin, Volume2, VolumeX, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
