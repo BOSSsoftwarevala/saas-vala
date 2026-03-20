@@ -20,8 +20,6 @@ import {
   Store,
   Bot,
 } from 'lucide-react';
-  Bot,
-} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import saasValaLogo from '@/assets/saas-vala-logo.jpg';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
