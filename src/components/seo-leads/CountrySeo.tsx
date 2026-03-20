@@ -76,36 +76,12 @@ export function CountrySeo() {
     setTesting(true);
     setTestResults(null);
     
-    // Simulate SEO test for India
-    await new Promise(r => setTimeout(r, 2500));
+    // Real SEO test would need Google Search Console API
+    // For now, show that no live data is available
+    await new Promise(r => setTimeout(r, 1500));
     
-    const countryData = countryConfigs.find(c => c.code === testCountry);
-    
-    // Mock results based on country
-    const mockResults = {
-      IN: { position: 3, impressions: 1250, clicks: 89, ctr: '7.1%' },
-      US: { position: 8, impressions: 450, clicks: 23, ctr: '5.1%' },
-      UK: { position: 12, impressions: 180, clicks: 9, ctr: '5.0%' },
-      AE: { position: 5, impressions: 320, clicks: 28, ctr: '8.7%' },
-      CA: { position: 15, impressions: 95, clicks: 4, ctr: '4.2%' },
-      AU: { position: 18, impressions: 65, clicks: 2, ctr: '3.1%' },
-    };
-    
-    const result = mockResults[testCountry as keyof typeof mockResults] || mockResults.IN;
-    
-    setTestResults({
-      ...result,
-      competitors: [
-        { name: 'competitor1.com', position: 1 },
-        { name: 'competitor2.in', position: 2 },
-        { name: 'yourdomain.com', position: result.position },
-        { name: 'competitor3.co', position: result.position + 1 },
-        { name: 'competitor4.net', position: result.position + 2 },
-      ]
-    });
-    
+    toast.info('Live SEO testing requires Google Search Console API integration. Contact admin to enable.');
     setTesting(false);
-    toast.success(`SEO test completed for ${countryData?.name || 'India'}!`);
   };
 
   const applyCountrySettings = () => {
