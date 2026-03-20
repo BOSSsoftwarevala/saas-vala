@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { toast } from 'sonner';
 import {
   Table,
   TableBody,
@@ -64,7 +66,7 @@ import { Switch } from '@/components/ui/switch';
 const ITEMS_PER_PAGE = 25;
 
 export default function Resellers() {
-   const { resellers, loading, total, fetchResellers, updateReseller, deleteReseller } = useResellers();
+  const { resellers, loading, total, fetchResellers, createReseller, updateReseller, deleteReseller } = useResellers();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -72,15 +74,30 @@ export default function Resellers() {
   const [editReseller, setEditReseller] = useState<Reseller | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  // Filter state
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'suspended'>('all');
+  const [filterVerified, setFilterVerified] = useState<'all' | 'verified' | 'unverified'>('all');
+  const [filterMinCommission, setFilterMinCommission] = useState('');
+  const [filterMaxCommission, setFilterMaxCommission] = useState('');
 
   // Form state
   const [formData, setFormData] = useState({
+    user_id: '',
     company_name: '',
     commission_percent: 10,
     credit_limit: 0,
     is_active: true,
     is_verified: false,
   });
+
+  useEffect(() => {
+    fetchResellers();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filteredResellers = resellers.filter((reseller) => {
     const name = (reseller.company_name || '').toLowerCase();
@@ -90,13 +107,22 @@ export default function Resellers() {
     if (activeTab === 'active') return reseller.is_active;
     if (activeTab === 'suspended') return !reseller.is_active;
     if (activeTab === 'verified') return reseller.is_verified;
+
+    // Advanced filters from filter popover
+    if (filterStatus === 'active' && !reseller.is_active) return false;
+    if (filterStatus === 'suspended' && reseller.is_active) return false;
+    if (filterVerified === 'verified' && !reseller.is_verified) return false;
+    if (filterVerified === 'unverified' && reseller.is_verified) return false;
+    if (filterMinCommission !== '' && reseller.commission_percent < Number(filterMinCommission)) return false;
+    if (filterMaxCommission !== '' && reseller.commission_percent > Number(filterMaxCommission)) return false;
+
     return true;
   });
 
   const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
 
   const stats = {
-    total: resellers.length,
+    total,
     active: resellers.filter(r => r.is_active).length,
     suspended: resellers.filter(r => !r.is_active).length,
     verified: resellers.filter(r => r.is_verified).length,
@@ -115,7 +141,9 @@ export default function Resellers() {
 
   const openCreateDialog = () => {
     setEditReseller(null);
+    setFormErrors({});
     setFormData({
+      user_id: '',
       company_name: '',
       commission_percent: 10,
       credit_limit: 0,
@@ -127,7 +155,9 @@ export default function Resellers() {
 
   const openEditDialog = (reseller: Reseller) => {
     setEditReseller(reseller);
+    setFormErrors({});
     setFormData({
+      user_id: reseller.user_id,
       company_name: reseller.company_name || '',
       commission_percent: reseller.commission_percent,
       credit_limit: reseller.credit_limit,
@@ -137,14 +167,38 @@ export default function Resellers() {
     setDialogOpen(true);
   };
 
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+    if (!formData.company_name.trim()) {
+      errors.company_name = 'Company name is required';
+    }
+    if (formData.commission_percent < 0 || formData.commission_percent > 100) {
+      errors.commission_percent = 'Commission must be between 0 and 100';
+    }
+    if (formData.credit_limit < 0) {
+      errors.credit_limit = 'Credit limit cannot be negative';
+    }
+    if (!editReseller && !formData.user_id.trim()) {
+      errors.user_id = 'User ID is required to create a reseller';
+    }
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSubmit = async () => {
+    if (!validateForm()) return;
     setSubmitting(true);
     try {
       if (editReseller) {
         await updateReseller(editReseller.id, formData);
+      } else {
+        await createReseller(formData);
       }
-      // Note: Creating new reseller requires user_id from an existing user
       setDialogOpen(false);
+      setFormErrors({});
+    } catch (err) {
+      // Toast is already shown by the hook; show inline error too
+      setFormErrors({ submit: 'Operation failed. Please try again.' });
     } finally {
       setSubmitting(false);
     }
@@ -152,8 +206,52 @@ export default function Resellers() {
 
   const handleDelete = async () => {
     if (!deleteId) return;
-    await deleteReseller(deleteId);
-    setDeleteId(null);
+    try {
+      await deleteReseller(deleteId);
+    } catch {
+      // Toast already shown by hook
+    } finally {
+      setDeleteId(null);
+    }
+  };
+
+  const handleExport = async () => {
+    setExportLoading(true);
+    try {
+      const headers = ['Company Name', 'Commission (%)', 'Credit Limit', 'Total Sales', 'Status', 'Verified', 'Created'];
+      const rows = filteredResellers.map((r) => [
+        r.company_name || r.profile?.full_name || 'Unnamed',
+        r.commission_percent,
+        r.credit_limit,
+        r.total_sales,
+        r.is_active ? 'Active' : 'Suspended',
+        r.is_verified ? 'Verified' : 'Unverified',
+        new Date(r.created_at).toLocaleDateString(),
+      ]);
+      const csvContent = [headers, ...rows]
+        .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        .join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `resellers-${new Date().toISOString().slice(0, 10)}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success('Resellers exported successfully');
+    } catch {
+      toast.error('Failed to export resellers');
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const resetFilters = () => {
+    setFilterStatus('all');
+    setFilterVerified('all');
+    setFilterMinCommission('');
+    setFilterMaxCommission('');
+    setFilterOpen(false);
   };
 
   return (
@@ -178,8 +276,8 @@ export default function Resellers() {
               <Users className="h-4 w-4" />
               Reseller Dashboard
             </Button>
-            <Button variant="outline" className="gap-2 border-border">
-              <Download className="h-4 w-4" />
+            <Button variant="outline" className="gap-2 border-border" onClick={handleExport} disabled={exportLoading}>
+              {exportLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               Export
             </Button>
             <Button onClick={openCreateDialog} className="bg-orange-gradient hover:opacity-90 text-white gap-2">
@@ -251,9 +349,76 @@ export default function Resellers() {
                   className="pl-10 bg-muted/50 border-border"
                 />
               </div>
-              <Button variant="outline" size="icon" className="border-border">
-                <Filter className="h-4 w-4" />
-              </Button>
+              <Popover open={filterOpen} onOpenChange={setFilterOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="icon" className="border-border">
+                    <Filter className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-72 p-4 space-y-4" align="end">
+                  <p className="font-semibold text-sm text-foreground">Advanced Filters</p>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Status</Label>
+                    <div className="flex gap-2">
+                      {(['all', 'active', 'suspended'] as const).map((s) => (
+                        <Button
+                          key={s}
+                          size="sm"
+                          variant={filterStatus === s ? 'default' : 'outline'}
+                          className="capitalize text-xs"
+                          onClick={() => setFilterStatus(s)}
+                        >
+                          {s}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Verification</Label>
+                    <div className="flex gap-2">
+                      {(['all', 'verified', 'unverified'] as const).map((v) => (
+                        <Button
+                          key={v}
+                          size="sm"
+                          variant={filterVerified === v ? 'default' : 'outline'}
+                          className="capitalize text-xs"
+                          onClick={() => setFilterVerified(v)}
+                        >
+                          {v}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Commission Range (%)</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        placeholder="Min"
+                        value={filterMinCommission}
+                        onChange={(e) => setFilterMinCommission(e.target.value)}
+                        className="h-8 text-xs"
+                        min="0"
+                        max="100"
+                      />
+                      <span className="text-muted-foreground text-xs">–</span>
+                      <Input
+                        type="number"
+                        placeholder="Max"
+                        value={filterMaxCommission}
+                        onChange={(e) => setFilterMaxCommission(e.target.value)}
+                        className="h-8 text-xs"
+                        min="0"
+                        max="100"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button variant="ghost" size="sm" onClick={resetFilters}>Reset</Button>
+                    <Button size="sm" onClick={() => setFilterOpen(false)}>Apply</Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
         </div>
@@ -393,22 +558,36 @@ export default function Resellers() {
       </div>
 
       {/* Edit Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setFormErrors({}); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{editReseller ? 'Edit Reseller' : 'Add Reseller'}</DialogTitle>
             <DialogDescription>
-              {editReseller ? 'Update reseller details' : 'Note: Resellers are created when users sign up'}
+              {editReseller ? 'Update reseller details' : 'Provide the user ID of an existing user to create a reseller account'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {!editReseller && (
+              <div className="space-y-2">
+                <Label>User ID <span className="text-destructive">*</span></Label>
+                <Input
+                  placeholder="UUID of existing user"
+                  value={formData.user_id}
+                  onChange={(e) => setFormData({ ...formData, user_id: e.target.value })}
+                  className={formErrors.user_id ? 'border-destructive' : ''}
+                />
+                {formErrors.user_id && <p className="text-xs text-destructive">{formErrors.user_id}</p>}
+              </div>
+            )}
             <div className="space-y-2">
-              <Label>Company Name</Label>
+              <Label>Company Name <span className="text-destructive">*</span></Label>
               <Input
                 placeholder="Acme Corp"
                 value={formData.company_name}
                 onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
+                className={formErrors.company_name ? 'border-destructive' : ''}
               />
+              {formErrors.company_name && <p className="text-xs text-destructive">{formErrors.company_name}</p>}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -419,7 +598,9 @@ export default function Resellers() {
                   max="100"
                   value={formData.commission_percent}
                   onChange={(e) => setFormData({ ...formData, commission_percent: Number(e.target.value) })}
+                  className={formErrors.commission_percent ? 'border-destructive' : ''}
                 />
+                {formErrors.commission_percent && <p className="text-xs text-destructive">{formErrors.commission_percent}</p>}
               </div>
               <div className="space-y-2">
                 <Label>Credit Limit (₹)</Label>
@@ -428,7 +609,9 @@ export default function Resellers() {
                   min="0"
                   value={formData.credit_limit}
                   onChange={(e) => setFormData({ ...formData, credit_limit: Number(e.target.value) })}
+                  className={formErrors.credit_limit ? 'border-destructive' : ''}
                 />
+                {formErrors.credit_limit && <p className="text-xs text-destructive">{formErrors.credit_limit}</p>}
               </div>
             </div>
             <div className="flex items-center justify-between">
@@ -451,6 +634,9 @@ export default function Resellers() {
                 onCheckedChange={(checked) => setFormData({ ...formData, is_verified: checked })}
               />
             </div>
+            {formErrors.submit && (
+              <p className="text-xs text-destructive">{formErrors.submit}</p>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
