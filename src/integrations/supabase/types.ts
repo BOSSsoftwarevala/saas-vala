@@ -1411,6 +1411,72 @@ export type Database = {
         }
         Relationships: []
       }
+      festival_offers: {
+        Row: {
+          auto_generated: boolean | null
+          badge_color: string | null
+          badge_text: string | null
+          banner_image_url: string | null
+          country_code: string
+          coupon_code: string | null
+          created_at: string | null
+          description: string | null
+          discount_percent: number | null
+          end_date: string
+          festival_name: string
+          festival_size: string
+          id: string
+          is_active: boolean | null
+          offer_text: string
+          sort_order: number | null
+          start_date: string
+          state_region: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          auto_generated?: boolean | null
+          badge_color?: string | null
+          badge_text?: string | null
+          banner_image_url?: string | null
+          country_code?: string
+          coupon_code?: string | null
+          created_at?: string | null
+          description?: string | null
+          discount_percent?: number | null
+          end_date: string
+          festival_name: string
+          festival_size?: string
+          id?: string
+          is_active?: boolean | null
+          offer_text: string
+          sort_order?: number | null
+          start_date: string
+          state_region?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          auto_generated?: boolean | null
+          badge_color?: string | null
+          badge_text?: string | null
+          banner_image_url?: string | null
+          country_code?: string
+          coupon_code?: string | null
+          created_at?: string | null
+          description?: string | null
+          discount_percent?: number | null
+          end_date?: string
+          festival_name?: string
+          festival_size?: string
+          id?: string
+          is_active?: boolean | null
+          offer_text?: string
+          sort_order?: number | null
+          start_date?: string
+          state_region?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       git_connections: {
         Row: {
           auto_deploy: boolean | null

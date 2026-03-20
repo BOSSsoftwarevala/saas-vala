@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   User,
   Globe,
   ChevronDown,
   LogIn,
-  Settings,
   Users,
+  Search,
+  RefreshCw,
+  X,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -14,10 +17,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
 import saasValaLogo from '@/assets/saas-vala-logo.jpg';
+
+const currencies = [
+  { code: 'USD', symbol: '$', flag: '🇺🇸', name: 'US Dollar' },
+  { code: 'INR', symbol: '₹', flag: '🇮🇳', name: 'Indian Rupee' },
+  { code: 'EUR', symbol: '€', flag: '🇪🇺', name: 'Euro' },
+  { code: 'GBP', symbol: '£', flag: '🇬🇧', name: 'British Pound' },
+  { code: 'AED', symbol: 'د.إ', flag: '🇦🇪', name: 'UAE Dirham' },
+  { code: 'SAR', symbol: '﷼', flag: '🇸🇦', name: 'Saudi Riyal' },
+];
 
 const languages = [
   { code: 'en', name: 'English', flag: '🇺🇸' },
@@ -27,110 +38,33 @@ const languages = [
   { code: 'zh', name: '中文', flag: '🇨🇳' },
 ];
 
-interface HeaderMenuItem {
-  id: string;
-  label: string;
-  target_id: string | null;
-  link_url: string | null;
-  sort_order: number;
-}
-
-const fallbackLinks: HeaderMenuItem[] = [
-  { id: 'f1', label: 'Marketplace', target_id: 'marketplace-top', link_url: '#marketplace-top', sort_order: 1 },
-  { id: 'f2', label: 'Pricing', target_id: 'pricing', link_url: '#pricing', sort_order: 2 },
-  { id: 'f3', label: 'Demo', target_id: 'demo', link_url: '#demo', sort_order: 3 },
-  { id: 'f4', label: 'Contact', target_id: 'contact', link_url: '#contact', sort_order: 4 },
-];
-
 export function MarketplaceHeader() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { user, isSuperAdmin, isReseller } = useAuth();
-  const [menuLinks, setMenuLinks] = useState<HeaderMenuItem[]>(fallbackLinks);
+  const { user, isReseller } = useAuth();
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCurrency, setSelectedCurrency] = useState(currencies[0]);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const loadMenus = async () => {
-      const { data } = await (supabase as any)
-        .from('marketplace_header_menus')
-        .select('id, label, target_id, link_url, sort_order')
-        .eq('is_active', true)
-        .order('sort_order', { ascending: true });
-
-      if (data && data.length > 0) setMenuLinks(data as HeaderMenuItem[]);
-    };
-
-    loadMenus();
-
-    const channel = supabase
-      .channel('marketplace-header-menu-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'marketplace_header_menus' }, loadMenus)
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  const scrollToSection = (target: string) => {
-    if (location.pathname !== '/') {
-      navigate('/');
-      setTimeout(() => {
-        const el = document.getElementById(target);
-        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 300);
-      return;
+    if (searchOpen && searchInputRef.current) {
+      searchInputRef.current.focus();
     }
+  }, [searchOpen]);
 
-    if (target === 'marketplace-top') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
+  const handleSearch = () => {
+    if (searchQuery.trim()) {
+      // Scroll to products and filter — dispatch custom event
+      window.dispatchEvent(new CustomEvent('marketplace-search', { detail: searchQuery.trim() }));
     }
-
-    const el = document.getElementById(target);
-    el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
-
-  const handleMenuClick = (item: HeaderMenuItem) => {
-    const link = item.link_url || '';
-
-    if (link.startsWith('http')) {
-      window.open(link, '_blank', 'noopener,noreferrer');
-      return;
-    }
-
-    if (link.startsWith('/')) {
-      navigate(link);
-      return;
-    }
-
-    if (link.startsWith('#')) {
-      scrollToSection(link.slice(1));
-      return;
-    }
-
-    if (item.target_id) {
-      scrollToSection(item.target_id);
-      return;
-    }
-
-    scrollToSection('marketplace-top');
-  };
-
-  useEffect(() => {
-    const hash = location.hash.replace('#', '');
-    if (!hash) return;
-
-    setTimeout(() => {
-      const el = document.getElementById(hash);
-      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 500);
-  }, [location.hash]);
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-16 border-b bg-background/90 backdrop-blur-xl border-border">
-      <div className="h-full px-4 md:px-8 flex items-center justify-between">
+      <div className="h-full px-4 md:px-8 flex items-center justify-between gap-2">
+        {/* Logo */}
         <div
-          className="flex items-center gap-3 cursor-pointer"
+          className="flex items-center gap-3 cursor-pointer shrink-0"
           onClick={() => {
             navigate('/');
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -146,24 +80,83 @@ export function MarketplaceHeader() {
           </span>
         </div>
 
-        <nav className="hidden md:flex items-center gap-6">
-          {menuLinks.map((link) => (
-            <button
-              key={link.id}
-              onClick={() => handleMenuClick(link)}
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {link.label}
-            </button>
-          ))}
-        </nav>
+        {/* Center — Search Bar (expandable) */}
+        <div className="flex-1 max-w-md mx-2 hidden md:flex">
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              ref={searchInputRef}
+              placeholder="Search 2000+ software products..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              className="pl-9 pr-3 h-9 text-sm bg-muted/50 border-border/50 focus:bg-background"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => { setSearchQuery(''); window.dispatchEvent(new CustomEvent('marketplace-search', { detail: '' })); }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
 
-        <div className="flex items-center gap-2">
+        {/* Right Actions */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Mobile search toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden h-9 w-9"
+            onClick={() => setSearchOpen(!searchOpen)}
+          >
+            <Search className="h-4 w-4" />
+          </Button>
+
+          {/* Renew / Recharge */}
+          {user && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 text-xs border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+              onClick={() => navigate('/wallet')}
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Renew</span>
+            </Button>
+          )}
+
+          {/* Currency Selector */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-1 px-2 text-xs">
+                <span>{selectedCurrency.flag}</span>
+                <span className="hidden sm:inline font-medium">{selectedCurrency.code}</span>
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[160px]">
+              {currencies.map((c) => (
+                <DropdownMenuItem
+                  key={c.code}
+                  className="gap-2 text-sm"
+                  onClick={() => setSelectedCurrency(c)}
+                >
+                  <span>{c.flag}</span>
+                  <span>{c.symbol} {c.code}</span>
+                  {c.code === selectedCurrency.code && <span className="ml-auto text-primary">✓</span>}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Language Selector */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="gap-1 px-2">
                 <Globe className="h-4 w-4" />
-                <span className="hidden sm:inline text-xs">🇺🇸</span>
                 <ChevronDown className="h-3 w-3" />
               </Button>
             </DropdownMenuTrigger>
@@ -177,32 +170,20 @@ export function MarketplaceHeader() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {isSuperAdmin && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => navigate('/admin/marketplace')}
-            >
-              <Settings className="h-4 w-4" />
-              <span className="hidden sm:inline">Manage</span>
-            </Button>
-          )}
-
-          {/* Apply for Reseller - show to everyone except existing resellers */}
+          {/* Apply for Reseller */}
           {!isReseller && (
             <Button
               variant="outline"
               size="sm"
-              className="gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+              className="gap-1.5 border-primary/30 text-primary hover:bg-primary/10 hidden sm:flex"
               onClick={() => navigate(user ? '/auth?apply=reseller' : '/auth?apply=reseller')}
             >
               <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Apply for Reseller</span>
+              <span className="hidden lg:inline">Apply Reseller</span>
             </Button>
           )}
 
-          {/* Reseller Dashboard - show to resellers */}
+          {/* Reseller Panel */}
           {isReseller && (
             <Button
               variant="outline"
@@ -211,12 +192,13 @@ export function MarketplaceHeader() {
               onClick={() => navigate('/reseller-dashboard')}
             >
               <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Reseller Panel</span>
+              <span className="hidden sm:inline">Reseller</span>
             </Button>
           )}
 
+          {/* Auth */}
           {user ? (
-            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
+            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="h-9 w-9">
               <User className="h-4 w-4" />
             </Button>
           ) : (
@@ -232,6 +214,23 @@ export function MarketplaceHeader() {
           )}
         </div>
       </div>
+
+      {/* Mobile search bar */}
+      {searchOpen && (
+        <div className="md:hidden px-4 pb-3 bg-background border-b border-border">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search products..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              className="pl-9 h-9 text-sm"
+              autoFocus
+            />
+          </div>
+        </div>
+      )}
     </header>
   );
 }

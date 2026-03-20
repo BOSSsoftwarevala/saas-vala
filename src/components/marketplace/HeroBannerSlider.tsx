@@ -28,22 +28,35 @@ const fallbackTickers: TickerItem[] = [
   { id: 'ft-2', text: '⚡ 2000+ Software Products' },
 ];
 
+async function getUserCountry(): Promise<{ country: string; region: string }> {
+  try {
+    const res = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(3000) });
+    if (!res.ok) throw new Error('fail');
+    const data = await res.json();
+    return { country: data.country_code || 'ALL', region: data.region || '' };
+  } catch {
+    return { country: 'ALL', region: '' };
+  }
+}
+
 export function HeroBannerSlider({ autoPlayInterval = 4000 }: { autoPlayInterval?: number }) {
   const [slides, setSlides] = useState<HeroSlide[]>(fallbackSlides);
   const [tickerItems, setTickerItems] = useState<TickerItem[]>(fallbackTickers);
   const [current, setCurrent] = useState(0);
   const [paused, setPaused] = useState(false);
 
-  // Fetch banners from DB
   useEffect(() => {
     const fetchData = async () => {
-      const [bannersRes, tickersRes] = await Promise.all([
+      // Fetch banners, tickers, and festival offers in parallel
+      const [bannersRes, tickersRes, festivalRes, location] = await Promise.all([
         supabase.from('marketplace_banners').select('*').eq('is_active', true).order('sort_order'),
         supabase.from('marketplace_tickers').select('*').eq('is_active', true).order('sort_order'),
+        (supabase as any).from('festival_offers').select('*').eq('is_active', true),
+        getUserCountry(),
       ]);
 
+      // Process banners
       if (bannersRes.data && bannersRes.data.length > 0) {
-        // Filter by date if set
         const now = new Date();
         const valid = bannersRes.data.filter((b: any) => {
           if (b.start_date && new Date(b.start_date) > now) return false;
@@ -64,9 +77,53 @@ export function HeroBannerSlider({ autoPlayInterval = 4000 }: { autoPlayInterval
         }
       }
 
+      // Process tickers — merge with festival offers
+      const baseTickers: TickerItem[] = [];
       if (tickersRes.data && tickersRes.data.length > 0) {
-        setTickerItems(tickersRes.data.map((t: any) => ({ id: t.id, text: t.text })));
+        tickersRes.data.forEach((t: any) => baseTickers.push({ id: t.id, text: t.text }));
       }
+
+      // Process festival offers — filter by location & date
+      if (festivalRes.data && festivalRes.data.length > 0) {
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
+        
+        const activeOffers = (festivalRes.data as any[]).filter((f) => {
+          // Date check
+          if (f.start_date > todayStr || f.end_date < todayStr) return false;
+          // Location check
+          if (f.country_code === 'ALL') return true;
+          if (f.country_code !== location.country) return false;
+          // State/region check if specified
+          if (f.state_region && !location.region.toLowerCase().includes(f.state_region.toLowerCase())) return false;
+          return true;
+        });
+
+        // Add festival offers to ticker
+        activeOffers.forEach((f) => {
+          baseTickers.push({ id: `fest-${f.id}`, text: f.offer_text });
+        });
+
+        // Add festival banners to slides
+        const festivalSlides: HeroSlide[] = activeOffers
+          .filter((f) => f.banner_image_url)
+          .map((f) => ({
+            id: `fest-slide-${f.id}`,
+            image: f.banner_image_url,
+            title: f.festival_name,
+            subtitle: f.description || '',
+            badge: f.badge_text || undefined,
+            badgeColor: f.badge_color || 'from-amber-500 to-orange-500',
+            offerText: f.offer_text || undefined,
+            couponCode: f.coupon_code || undefined,
+          }));
+        
+        if (festivalSlides.length > 0) {
+          setSlides(prev => [...festivalSlides, ...prev]);
+        }
+      }
+
+      if (baseTickers.length > 0) setTickerItems(baseTickers);
     };
     fetchData();
   }, []);
