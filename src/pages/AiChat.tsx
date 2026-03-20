@@ -136,7 +136,7 @@ export default function AiChat() {
   const [showMemoryPanel, setShowMemoryPanel] = useState(false);
   const [showSystemPrompt, setShowSystemPrompt] = useState(false);
   const [pinnedMessages, setPinnedMessages] = useState<Set<string>>(new Set());
-  const [thinkingContext, setThinkingContext] = useState<'analyzing' | 'fixing' | 'deploying' | 'general'>('general');
+  const [_thinkingContext, setThinkingContext] = useState<'analyzing' | 'fixing' | 'deploying' | 'general'>('general');
 
   // Build Mode State
   const [buildMode, setBuildMode] = useState(false);
