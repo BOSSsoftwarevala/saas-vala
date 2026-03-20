@@ -4242,8 +4242,8 @@ POWERED BY SOFTWAREVALA™ | VALA AI SOVEREIGN FACTORY v10.0 — FULL AUTONOMOUS
         const body: any = {
           model: AI_MODEL,
           messages: msgs,
-          max_tokens: 8192,
-          temperature: 0.3,
+          max_tokens: max_tokens || 8192,
+          temperature: temperature ?? 0.3,
           stream: doStream,
         };
         if (withTools) {
