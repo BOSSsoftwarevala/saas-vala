@@ -310,6 +310,19 @@ export function ChatMessage({ message, index = 0, isPinned, onApproveAction, onD
             >
               {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
             </Button>
+
+            {/* Retry button - only for last assistant message */}
+            {!isUser && isLastAssistant && onRetry && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onRetry(message.id)}
+                className="h-6 w-6 p-0 rounded-full text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100 transition-all"
+                title="Regenerate response"
+              >
+                <RotateCcw className="h-3 w-3" />
+              </Button>
+            )}
           </div>
 
           {/* File Attachments */}
