@@ -28,12 +28,15 @@ interface Product {
   status: 'upcoming' | 'live' | 'bestseller' | 'draft'; price: number;
 }
 
-const bankDetails = {
-  accountName: 'SOFTWARE VALA', bankName: 'INDIAN BANK',
-  accountNumber: '8045924772', ifsc: 'IDIB000K196',
-  branchName: 'KANKAR BAGH', upiId: 'softwarevala@indianbank',
+// FIXED: Bank details moved to secure backend config
+// DO NOT hardcode sensitive payment info in frontend code
+const getBankDetails = async () => {
+  const { data } = await supabase
+    .from('payment_config')
+    .select('*')
+    .single();
+  return data;
 };
-
 
 type BuyPayMethod = 'wallet' | 'upi' | 'bank' | 'crypto';
 
@@ -47,12 +50,18 @@ export default function Marketplace() {
   const [buyPayMethod, setBuyPayMethod] = useState<BuyPayMethod>('wallet');
   const [manualTxnRef, setManualTxnRef] = useState('');
   const [_manualSubmitted, setManualSubmitted] = useState(false);
+  const [bankDetails, setBankDetails] = useState<any>(null);
   const paymentLockRef = useRef(false);
   const { purchaseApk, processing } = useApkPurchase();
   const { checkUserStatus } = useFraudDetection();
   const { user } = useAuth();
   
   useMarketplaceProducts();
+
+  // Load bank details securely on mount
+  React.useEffect(() => {
+    getBankDetails().then(data => setBankDetails(data));
+  }, []);
 
   const handleBuyNow = async (product: Product) => {
     if (!user) { toast.error('Please sign in to purchase'); return; }
@@ -98,6 +107,8 @@ export default function Marketplace() {
   const handleCopy = (text: string, label: string) => {
     navigator.clipboard.writeText(text); toast.success(`${label} copied!`);
   };
+
+  if (!bankDetails) return <div>Loading...</div>;
 
   return (
     <div className="min-h-screen overflow-x-hidden" style={{ background: '#0B1020' }}>
@@ -193,7 +204,7 @@ export default function Marketplace() {
                 <button className="w-full flex items-center justify-center gap-1 text-xs text-muted-foreground py-1" onClick={() => setShowMorePayment(!showMorePayment)}>
                   {showMorePayment ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />} More Options
                 </button>
-                {showMorePayment && (
+                {showMorePayment && bankDetails && (
                   <div className="space-y-2">
                     <div className={cn('rounded-xl border cursor-pointer', buyPayMethod === 'upi' ? 'border-primary bg-primary/5' : 'border-border')} onClick={() => setBuyPayMethod('upi')}>
                       <div className="flex items-center gap-3 p-3"><Wallet className="h-4 w-4" /><div><p className="font-medium text-sm">UPI</p><p className="text-xs text-muted-foreground">GPay, PhonePe, Paytm</p></div></div>
