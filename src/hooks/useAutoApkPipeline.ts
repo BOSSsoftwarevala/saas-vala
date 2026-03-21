@@ -65,6 +65,15 @@ export function useAutoApkPipeline() {
     return result;
   }, [invoke]);
 
+  const autoMarketplaceWorkflow = useCallback(async (limit = 20) => {
+    toast.info('🤖 Running auto marketplace workflow...');
+    const result = await invoke('auto_marketplace_workflow', { limit });
+    if (result?.success) {
+      toast.success(result.message);
+    }
+    return result;
+  }, [invoke]);
+
   const checkUpdates = useCallback(async () => {
     const result = await invoke('check_updates');
     if (result?.success) {
