@@ -159,7 +159,7 @@ Deno.serve(async (req) => {
       // FUNCTION 2: Trigger APK build via VPS factory
       // ═══════════════════════════════════════════
       case "trigger_apk_build": {
-        const { catalog_id, slug, repo_url } = data || {};
+        const { catalog_id, slug, repo_url, product_id } = data || {};
         if (!slug) return respond({ error: "slug required" }, 400);
 
         const githubToken = Deno.env.get("SAASVALA_GITHUB_TOKEN");
@@ -169,63 +169,107 @@ Deno.serve(async (req) => {
           slug,
           repo_url: repoFullUrl,
           status: "queued",
-          build_type: "capacitor-android",
+          build_type: "github-actions",
         };
 
-        // Try GitHub Actions dispatch for APK build
-        if (githubToken) {
-          try {
-            // Check if repo exists first
-            const repoCheck = await fetch(
-              `https://api.github.com/repos/saasvala/${slug}`,
-              {
-                headers: {
-                  Authorization: `Bearer ${githubToken}`,
-                  "User-Agent": "SaaSVala-APK-Pipeline",
-                },
-              }
-            );
-
-            if (repoCheck.ok) {
-              const repoData = await repoCheck.json();
-
-              // Upsert to apk_build_queue
-              await admin.from("apk_build_queue").upsert(
-                {
-                  repo_name: repoData.name || slug,
-                  repo_url: repoData.html_url || repoFullUrl,
-                  slug,
-                  build_status: "pending",
-                  product_id: data?.product_id || null,
-                  target_industry: detectIndustry(slug, repoData.description || ""),
-                },
-                { onConflict: "slug" }
-              );
-
-              buildResult.status = "queued";
-              buildResult.message = `✅ ${slug} queued for APK build. Repo verified (${repoData.language || "Unknown"}).`;
-              buildResult.repo_verified = true;
-              buildResult.language = repoData.language;
-              buildResult.size = repoData.size;
-            } else {
-              const errText = await repoCheck.text();
-              buildResult.status = "repo_not_found";
-              buildResult.message = `❌ Repo saasvala/${slug} not found (${repoCheck.status})`;
-            }
-          } catch (e) {
-            buildResult.status = "error";
-            buildResult.message = `GitHub API error: ${e.message}`;
-          }
-        } else {
+        if (!githubToken) {
           buildResult.status = "no_token";
           buildResult.message = "GitHub token not configured";
+          return respond({ success: false, build: buildResult });
         }
 
-        // Update catalog with build status
+        try {
+          // Verify repo exists
+          const repoCheck = await fetch(
+            `https://api.github.com/repos/saasvala/${slug}`,
+            {
+              headers: {
+                Authorization: `Bearer ${githubToken}`,
+                "User-Agent": "SaaSVala-APK-Pipeline",
+              },
+            }
+          );
+
+          if (!repoCheck.ok) {
+            await repoCheck.text();
+            buildResult.status = "repo_not_found";
+            buildResult.message = `Repo saasvala/${slug} not found (${repoCheck.status})`;
+            return respond({ success: false, build: buildResult });
+          }
+
+          const repoData = await repoCheck.json();
+
+          // Trigger GitHub Actions workflow dispatch via apk-factory repo
+          const dispatchRes = await fetch(
+            "https://api.github.com/repos/saasvala/apk-factory/actions/workflows/build-apk.yml/dispatches",
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${githubToken}`,
+                "User-Agent": "SaaSVala-APK-Pipeline",
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                ref: "main",
+                inputs: {
+                  repo_url: repoData.html_url || repoFullUrl,
+                  app_slug: slug,
+                  package_name: `com.saasvala.${slug.replace(/-/g, "_")}`,
+                  product_id: product_id || "",
+                  supabase_url: supabaseUrl,
+                },
+              }),
+            }
+          );
+
+          if (dispatchRes.ok || dispatchRes.status === 204) {
+            // Upsert to build queue
+            await admin.from("apk_build_queue").upsert(
+              {
+                repo_name: repoData.name || slug,
+                repo_url: repoData.html_url || repoFullUrl,
+                slug,
+                build_status: "building",
+                product_id: product_id || null,
+                target_industry: detectIndustry(slug, repoData.description || ""),
+                build_started_at: new Date().toISOString(),
+              },
+              { onConflict: "slug" }
+            );
+
+            buildResult.status = "building";
+            buildResult.message = `APK build triggered via GitHub Actions for ${slug} (${repoData.language || "Unknown"})`;
+            buildResult.repo_verified = true;
+            buildResult.language = repoData.language;
+          } else {
+            const errText = await dispatchRes.text();
+            // Fallback: queue without Actions
+            await admin.from("apk_build_queue").upsert(
+              {
+                repo_name: repoData.name || slug,
+                repo_url: repoData.html_url || repoFullUrl,
+                slug,
+                build_status: "pending",
+                product_id: product_id || null,
+                target_industry: detectIndustry(slug, repoData.description || ""),
+              },
+              { onConflict: "slug" }
+            );
+
+            buildResult.status = "queued";
+            buildResult.message = `Repo verified, queued for build (Actions dispatch: ${dispatchRes.status})`;
+            buildResult.repo_verified = true;
+          }
+        } catch (e) {
+          buildResult.status = "error";
+          buildResult.message = `Error: ${e.message}`;
+        }
+
+        // Update catalog
         if (catalog_id) {
           await admin
             .from("source_code_catalog")
-            .update({ status: buildResult.status === "queued" ? "pending_build" : buildResult.status })
+            .update({ status: buildResult.status === "building" ? "building" : "pending_build" })
             .eq("id", catalog_id);
         }
 
