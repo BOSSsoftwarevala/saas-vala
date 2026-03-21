@@ -32,36 +32,17 @@ const ServersSkeleton = () => (
 
 export default function Servers() {
   return (
-    <>
-      {/* SEO & Meta Tags */}
-      <Helmet>
-        <title>Server Manager - SaaS Vala</title>
-        <meta name="description" content="One-click deploy • Auto subdomain • Zero configuration" />
-        <meta name="robots" content="index, follow" />
-        <meta property="og:title" content="Server Manager - SaaS Vala" />
-        <meta property="og:description" content="Deploy servers with zero configuration" />
-      </Helmet>
-
-      <ErrorBoundary fallback={<div className="p-6 text-red-500">Failed to load servers page</div>}>
-        <DashboardLayout>
-          <div className="space-y-6">
-            {/* Header */}
-            <div>
-              <h2 
-                className="font-display text-xl sm:text-2xl font-bold text-foreground"
-                role="heading"
-                aria-level={1}
-                id="servers-title"
-              >
-                Server Manager
-              </h2>
-              <p 
-                className="text-sm text-muted-foreground"
-                aria-describedby="servers-title"
-              >
-                One-click deploy • Auto subdomain • Zero configuration
-              </p>
-            </div>
+      <DashboardLayout>
+        <div className="space-y-6">
+          {/* Header */}
+          <div>
+            <h1 className="font-display text-xl sm:text-2xl font-bold text-foreground">
+              Server Manager
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              One-click deploy • Auto subdomain • Zero configuration
+            </p>
+          </div>
 
             {/* Status Cards - with Suspense */}
             <Suspense fallback={<div className="grid grid-cols-4 gap-4 animate-pulse">{[...Array(4)].map((_, i) => <div key={i} className="h-24 bg-muted rounded" />)}</div>}>
