@@ -36,12 +36,10 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { title: 'Marketplace', icon: Store, href: '/' },
   { title: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
   { title: 'Products', icon: Package, href: '/products' },
   { title: 'Resellers', icon: Users, href: '/resellers', adminOnly: true },
   { title: 'Marketplace Admin', icon: Store, href: '/admin/marketplace', adminOnly: true },
-  { title: 'Marketplace View', icon: Store, href: '/', adminOnly: true },
   { title: 'Keys', icon: Key, href: '/keys' },
   { title: 'Servers', icon: Server, href: '/servers' },
   { title: 'SaaS AI', icon: Cpu, href: '/saas-ai-dashboard' },
