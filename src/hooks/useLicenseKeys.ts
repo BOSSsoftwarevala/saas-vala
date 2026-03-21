@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from './useAuth';
 import { toast } from 'sonner';
 
 export interface LicenseKey {
@@ -17,26 +18,42 @@ export interface LicenseKey {
   activated_at: string | null;
   notes: string | null;
   created_at: string;
+  user_id?: string; // FIXED: Track ownership
 }
 
 export function useLicenseKeys() {
+  const { user } = useAuth();
   const [keys, setKeys] = useState<LicenseKey[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchKeys = async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('license_keys')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      toast.error('Failed to fetch license keys');
-      console.error(error);
-    } else {
-      setKeys((data || []) as LicenseKey[]);
+    if (!user) {
+      setKeys([]);
+      setLoading(false);
+      return;
     }
-    setLoading(false);
+
+    setLoading(true);
+    try {
+      // FIXED: Filter by user_id to only show user's own keys
+      const { data, error } = await supabase
+        .from('license_keys')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        toast.error('Failed to fetch license keys');
+        console.error(error);
+      } else {
+        setKeys((data || []) as LicenseKey[]);
+      }
+    } catch (err) {
+      console.error('Fetch keys error:', err);
+      toast.error('Error fetching keys');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const generateKeyString = (): string => {
@@ -52,61 +69,131 @@ export function useLicenseKeys() {
   };
 
   const createKey = async (key: Partial<LicenseKey>) => {
-    const { data: userData } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error('Must be signed in');
+      throw new Error('User not authenticated');
+    }
+
+    // FIXED: Validate inputs
+    if (!key.product_id) {
+      toast.error('Product ID is required');
+      throw new Error('Product ID required');
+    }
+
     const licenseKey = key.license_key || generateKeyString();
     
-    const { data, error } = await supabase
-      .from('license_keys')
-      .insert({
-        product_id: key.product_id || '',
-        license_key: licenseKey,
-        key_type: key.key_type || 'yearly',
-        status: key.status || 'active',
-        owner_email: key.owner_email,
-        owner_name: key.owner_name,
-        max_devices: key.max_devices || 1,
-        expires_at: key.expires_at,
-        notes: key.notes,
-        created_by: userData.user?.id
-      })
-      .select()
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('license_keys')
+        .insert({
+          product_id: key.product_id,
+          license_key: licenseKey,
+          key_type: key.key_type || 'yearly',
+          status: key.status || 'active',
+          owner_email: key.owner_email || user.email,
+          owner_name: key.owner_name || user.user_metadata?.full_name,
+          max_devices: key.max_devices || 1,
+          activated_devices: key.activated_devices || 0,
+          expires_at: key.expires_at,
+          notes: key.notes,
+          created_by: user.id,
+          user_id: user.id, // FIXED: Always set user_id
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
 
-    if (error) {
-      toast.error('Failed to create license key');
-      throw error;
+      if (error) {
+        toast.error('Failed to create license key');
+        throw error;
+      }
+      
+      toast.success('License key created: ' + licenseKey);
+      await fetchKeys();
+      return data;
+    } catch (err) {
+      console.error('Create key error:', err);
+      throw err;
     }
-    toast.success('License key created: ' + licenseKey);
-    await fetchKeys();
-    return data;
   };
 
   const updateKey = async (id: string, updates: Partial<LicenseKey>) => {
-    const { error } = await supabase
-      .from('license_keys')
-      .update(updates)
-      .eq('id', id);
-
-    if (error) {
-      toast.error('Failed to update license key');
-      throw error;
+    if (!user) {
+      toast.error('Must be signed in');
+      throw new Error('User not authenticated');
     }
-    toast.success('License key updated');
-    await fetchKeys();
+
+    // FIXED: Verify ownership before update
+    const { data: existing } = await supabase
+      .from('license_keys')
+      .select('user_id')
+      .eq('id', id)
+      .single();
+
+    if (existing?.user_id !== user.id) {
+      toast.error('Unauthorized: Cannot update this key');
+      throw new Error('Unauthorized');
+    }
+
+    try {
+      const { error } = await supabase
+        .from('license_keys')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .eq('user_id', user.id); // FIXED: Double-check user_id
+
+      if (error) {
+        toast.error('Failed to update license key');
+        throw error;
+      }
+      
+      toast.success('License key updated');
+      await fetchKeys();
+    } catch (err) {
+      console.error('Update key error:', err);
+      throw err;
+    }
   };
 
   const deleteKey = async (id: string) => {
-    const { error } = await supabase
-      .from('license_keys')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      toast.error('Failed to delete license key');
-      throw error;
+    if (!user) {
+      toast.error('Must be signed in');
+      throw new Error('User not authenticated');
     }
-    toast.success('License key deleted');
-    await fetchKeys();
+
+    // FIXED: Verify ownership before deletion
+    const { data: existing } = await supabase
+      .from('license_keys')
+      .select('user_id')
+      .eq('id', id)
+      .single();
+
+    if (existing?.user_id !== user.id) {
+      toast.error('Unauthorized: Cannot delete this key');
+      throw new Error('Unauthorized');
+    }
+
+    try {
+      const { error } = await supabase
+        .from('license_keys')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id); // FIXED: Double-check user_id
+
+      if (error) {
+        toast.error('Failed to delete license key');
+        throw error;
+      }
+      
+      toast.success('License key deleted');
+      await fetchKeys();
+    } catch (err) {
+      console.error('Delete key error:', err);
+      throw err;
+    }
   };
 
   const suspendKey = async (id: string) => {
@@ -122,8 +209,10 @@ export function useLicenseKeys() {
   };
 
   useEffect(() => {
-    fetchKeys();
-  }, []);
+    if (user) {
+      fetchKeys();
+    }
+  }, [user?.id]);
 
   return {
     keys,
