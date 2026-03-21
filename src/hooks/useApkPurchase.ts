@@ -26,12 +26,13 @@ export function useApkPurchase() {
   const { checkUserStatus, reportViolation } = useFraudDetection();
   const [processing, setProcessing] = useState(false);
 
-  // Generate transaction ID based license key
+  // Generate transaction ID based license key with checksum
   const generateTransactionLicenseKey = (transactionId: string): string => {
     // Use transaction ID as the base for the license key
-    // Format: TXN-{first8chars}-{last4chars}
+    // Format: TXN-{first8chars}-{last4chars}-{checksum}
     const cleanId = transactionId.replace(/-/g, '').toUpperCase();
-    return `TXN-${cleanId.substring(0, 8)}-${cleanId.substring(cleanId.length - 4)}`;
+    const checksum = Array.from(cleanId).reduce((acc, c) => (acc + c.charCodeAt(0)) % 1000, 0);
+    return `TXN-${cleanId.substring(0, 8)}-${cleanId.substring(cleanId.length - 4)}-${checksum.toString().padStart(3, '0')}`;
   };
 
   // Helper: check if an ID looks like a valid UUID
@@ -91,7 +92,9 @@ export function useApkPurchase() {
           reference_type: 'apk_purchase',
           meta: {
             product_id: product.id,
-            product_title: product.title
+            product_title: product.title,
+            user_id: user.id,
+            timestamp: new Date().toISOString()
           }
         })
         .select()
@@ -121,21 +124,25 @@ export function useApkPurchase() {
 
       // Step 6: Create APK download record (only for real DB products)
       if (!isGeneratedProduct) {
-        await supabase.from('apk_downloads').insert({
+        const { error: dlError } = await supabase.from('apk_downloads').insert({
           user_id: user.id,
           product_id: product.id,
           transaction_id: transaction.id,
           license_key: licenseKey,
           is_verified: true,
           verification_attempts: 0,
-          is_blocked: false
+          is_blocked: false,
+          created_at: new Date().toISOString()
         });
+        
+        if (dlError) throw new Error('Failed to create download record');
       }
 
-      // Step 6.5: Save license key to license_keys table (so user can see it on /keys page)
+      // Step 6.5: Save license key to license_keys table
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 30); // 30-day license
-      await supabase.from('license_keys').insert({
+      
+      const { error: licenseError } = await supabase.from('license_keys').insert({
         product_id: isGeneratedProduct ? null : product.id,
         license_key: licenseKey,
         key_type: 'monthly' as const,
@@ -147,13 +154,16 @@ export function useApkPurchase() {
         activated_at: new Date().toISOString(),
         expires_at: expiresAt.toISOString(),
         created_by: user.id,
+        user_id: user.id,
         notes: `Purchased: ${product.title}`,
         meta: { product_title: product.title, transaction_id: transaction.id, product_id: product.id }
       });
+      
+      if (licenseError) throw new Error('Failed to save license key');
 
       // Step 7: Create marketplace order (only for real DB products)
       if (!isGeneratedProduct) {
-        await supabase
+        const { error: orderError } = await supabase
           .from('marketplace_orders')
           .insert({
             buyer_id: user.id,
@@ -164,6 +174,8 @@ export function useApkPurchase() {
             transaction_id: transaction.id,
             completed_at: new Date().toISOString()
           });
+        
+        if (orderError) throw new Error('Failed to create order');
       }
 
       // Step 8: Log activity
@@ -180,7 +192,7 @@ export function useApkPurchase() {
           transaction_id: transaction.id,
           is_generated: isGeneratedProduct
         }
-      });
+      }).catch(() => {}); // Non-critical
 
       // Step 9: Create notification
       await supabase.from('notifications').insert({
@@ -189,7 +201,7 @@ export function useApkPurchase() {
         message: `${product.title} purchased. Your License Key: ${licenseKey}`,
         type: 'success',
         action_url: '/keys'
-      });
+      }).catch(() => {}); // Non-critical
 
       setProcessing(false);
       
@@ -210,7 +222,7 @@ export function useApkPurchase() {
         error_type: 'apk_purchase_error',
         error_message: errorMessage,
         context: { product_id: product.id, product_title: product.title }
-      });
+      }).catch(() => {}); // Non-critical
 
       return { success: false, error: errorMessage };
     }
