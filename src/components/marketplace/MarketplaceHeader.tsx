@@ -48,6 +48,42 @@ export function MarketplaceHeader() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCurrency, setSelectedCurrency] = useState(currencies[0]);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [applyingReseller, setApplyingReseller] = useState(false);
+
+  const handleApplyReseller = async () => {
+    if (!user) {
+      navigate('/auth?apply=reseller');
+      return;
+    }
+    setApplyingReseller(true);
+    try {
+      // Assign reseller role
+      await supabase.from('user_roles').upsert(
+        { user_id: user.id, role: 'reseller' as any },
+        { onConflict: 'user_id,role' }
+      );
+      // Create reseller record
+      await supabase.from('resellers').upsert(
+        { user_id: user.id, is_active: true, is_verified: false, commission_percent: 10, credit_limit: 0 },
+        { onConflict: 'user_id' }
+      );
+      // Log activity for admin alert
+      await supabase.from('activity_logs').insert({
+        entity_type: 'reseller',
+        entity_id: user.id,
+        action: 'reseller_joined',
+        performed_by: user.id,
+        details: { email: user.email, name: user.user_metadata?.full_name || 'Unknown' } as any,
+      });
+      toast.success('🎉 You are now a Reseller! Redirecting to your dashboard...');
+      setTimeout(() => navigate('/reseller-dashboard'), 1000);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to apply as reseller');
+    } finally {
+      setApplyingReseller(false);
+    }
+  };
 
   useEffect(() => {
     if (searchOpen && searchInputRef.current) {
