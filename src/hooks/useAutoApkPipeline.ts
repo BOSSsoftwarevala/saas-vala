@@ -24,10 +24,10 @@ export function useAutoApkPipeline() {
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<PipelineStats | null>(null);
 
-  const invoke = useCallback(async (action: string, data?: any) => {
+  const invoke = useCallback(async (funcName: string, action: string, data?: any) => {
     setLoading(true);
     try {
-      const { data: result, error } = await supabase.functions.invoke('auto-apk-pipeline', {
+      const { data: result, error } = await supabase.functions.invoke(funcName, {
         body: { action, data },
       });
       if (error) throw error;
