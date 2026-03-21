@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
 
         // Create the GitHub Actions workflow
         const workflowContent = generateWorkflowYaml(supabaseUrl, supabaseAnonKey);
-        const encodedContent = btoa(workflowContent);
+        const encodedContent = btoa(unescape(encodeURIComponent(workflowContent)));
 
         // Check if workflow exists
         const workflowCheck = await gh(
