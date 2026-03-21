@@ -484,6 +484,110 @@ export default function Resellers() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Reseller Detail Dialog */}
+      <Dialog open={!!selectedReseller} onOpenChange={() => { setSelectedReseller(null); setResellerDetail(null); }}>
+        <DialogContent className="max-w-3xl max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              {selectedReseller?.company_name || 'Reseller'} — Full Overview
+            </DialogTitle>
+            <DialogDescription>
+              SEO runs, campaigns, wallet & activity for this reseller
+            </DialogDescription>
+          </DialogHeader>
+
+          {detailLoading ? (
+            <div className="flex items-center justify-center p-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : resellerDetail ? (
+            <ScrollArea className="max-h-[65vh] pr-2">
+              <div className="space-y-6">
+                {/* Quick Stats */}
+                <div className="grid grid-cols-3 gap-3">
+                  <Card>
+                    <CardContent className="p-3 text-center">
+                      <Wallet className="h-4 w-4 mx-auto text-primary mb-1" />
+                      <p className="text-lg font-bold text-foreground">${resellerDetail.walletBalance.toFixed(2)}</p>
+                      <p className="text-xs text-muted-foreground">Wallet Balance</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-3 text-center">
+                      <Globe className="h-4 w-4 mx-auto text-blue-500 mb-1" />
+                      <p className="text-lg font-bold text-foreground">{resellerDetail.seoRuns.length}</p>
+                      <p className="text-xs text-muted-foreground">AI SEO Runs</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-3 text-center">
+                      <Megaphone className="h-4 w-4 mx-auto text-orange-500 mb-1" />
+                      <p className="text-lg font-bold text-foreground">{resellerDetail.campaigns.length}</p>
+                      <p className="text-xs text-muted-foreground">Campaigns</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* SEO Runs */}
+                <div>
+                  <h4 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-1.5">
+                    <Zap className="h-4 w-4 text-primary" /> AI SEO Runs
+                  </h4>
+                  {resellerDetail.seoRuns.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No SEO runs yet</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {resellerDetail.seoRuns.map((run: any) => (
+                        <Card key={run.id}>
+                          <CardContent className="p-3 flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-foreground">{run.tool_name}</p>
+                              <p className="text-xs text-muted-foreground">{run.target_url} • {formatDistanceToNow(new Date(run.created_at), { addSuffix: true })}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs">${Number(run.cost).toFixed(2)}</Badge>
+                              <Badge variant="outline" className={cn('text-xs', run.status === 'completed' ? 'bg-green-500/10 text-green-500 border-green-500/30' : '')}>{run.status}</Badge>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Campaigns */}
+                <div>
+                  <h4 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-1.5">
+                    <Megaphone className="h-4 w-4 text-orange-500" /> Lead Campaigns
+                  </h4>
+                  {resellerDetail.campaigns.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No campaigns yet</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {resellerDetail.campaigns.map((camp: any) => (
+                        <Card key={camp.id}>
+                          <CardContent className="p-3 flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-foreground">{camp.name}</p>
+                              <p className="text-xs text-muted-foreground">{camp.campaign_type?.replace(/_/g, ' ')} • Budget: ${Number(camp.budget).toFixed(2)} • {formatDistanceToNow(new Date(camp.created_at), { addSuffix: true })}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant={camp.status === 'active' ? 'default' : 'secondary'} className="text-xs">{camp.status}</Badge>
+                              {camp.ai_strategy && <Badge variant="outline" className="text-xs gap-1 border-primary/30 text-primary">AI</Badge>}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </ScrollArea>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
