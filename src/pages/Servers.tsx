@@ -94,7 +94,5 @@ export default function Servers() {
             </div>
           </div>
         </DashboardLayout>
-      </ErrorBoundary>
-    </>
   );
 }
