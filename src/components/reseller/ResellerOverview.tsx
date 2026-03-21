@@ -5,26 +5,32 @@
  import { Badge } from '@/components/ui/badge';
  import { useAuth } from '@/hooks/useAuth';
  import { useWallet } from '@/hooks/useWallet';
- import {
-   Key,
-   Users,
-   DollarSign,
-   Wallet,
-   Share2,
-   Lock,
-   ArrowRight,
-   AlertCircle,
- } from 'lucide-react';
+import {
+  Key,
+  Users,
+  DollarSign,
+  Wallet,
+  Share2,
+  Lock,
+  ArrowRight,
+  AlertCircle,
+  Search,
+  Megaphone,
+  Store,
+} from 'lucide-react';
  
  const MINIMUM_BALANCE = 50;
  
- const quickModules = [
-   { title: 'Generate Keys', description: 'Create license keys for clients', icon: Key, tab: 'keys', color: 'from-primary to-orange-500' },
-   { title: 'My Clients', description: 'Track client purchases', icon: Users, tab: 'clients', color: 'from-secondary to-cyan-500' },
-   { title: 'Add Balance', description: 'Top up your wallet', icon: Wallet, tab: 'wallet', color: 'from-green-500 to-emerald-500' },
-   { title: 'Refer & Earn', description: 'Earn commission on referrals', icon: Share2, tab: 'referral', color: 'from-purple-500 to-pink-500' },
-   { title: 'Change Password', description: 'Update your security', icon: Lock, tab: 'password', color: 'from-amber-500 to-orange-500' },
- ];
+const quickModules = [
+  { title: 'Generate Keys', description: 'Create license keys for clients', icon: Key, tab: 'keys', color: 'from-primary to-orange-500' },
+  { title: 'My Clients', description: 'Track client purchases', icon: Users, tab: 'clients', color: 'from-secondary to-cyan-500' },
+  { title: 'SEO Tools', description: 'Boost client websites with SEO', icon: Search, tab: 'seo', color: 'from-blue-500 to-cyan-500' },
+  { title: 'Ads & Leads', description: 'Run campaigns & generate leads', icon: Megaphone, tab: 'ads', color: 'from-red-500 to-rose-500' },
+  { title: 'Marketplace', description: 'Browse & share products', icon: Store, tab: 'marketplace', color: 'from-indigo-500 to-violet-500' },
+  { title: 'Add Balance', description: 'Top up your wallet', icon: Wallet, tab: 'wallet', color: 'from-green-500 to-emerald-500' },
+  { title: 'Refer & Earn', description: 'Earn commission on referrals', icon: Share2, tab: 'referral', color: 'from-purple-500 to-pink-500' },
+  { title: 'Change Password', description: 'Update your security', icon: Lock, tab: 'password', color: 'from-amber-500 to-orange-500' },
+];
  
  export function ResellerOverview() {
    const navigate = useNavigate();
