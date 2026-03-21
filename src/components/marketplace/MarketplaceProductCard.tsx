@@ -45,8 +45,12 @@ export const MarketplaceProductCard = React.memo<MarketplaceProductCardProps>(({
   const iconColor = catColors[product.category] || '#f97316';
   const cardRank = rank ?? index + 1;
 
-  // Dynamic fields from DB
+  // FIXED: Validate price before using
   const price = product.price || 5;
+  if (!Number.isFinite(price) || price <= 0) {
+    throw new Error(`Invalid product price for ${product.id}`);
+  }
+  
   const discount = (product as any).discount_percent || 0;
   const rating = (product as any).rating || 4.5;
   const originalPrice = discount > 0 ? Math.round(price / (1 - discount / 100)) : price * 2;
@@ -58,7 +62,6 @@ export const MarketplaceProductCard = React.memo<MarketplaceProductCardProps>(({
     : ['Dashboard', 'Reports', 'Analytics', 'API'];
 
   const getDemoUrl = useCallback((): string | null => {
-    // Priority: GitHub repo URL first (user requirement), then demo_url fallback
     const g = (product as any).gitRepoUrl || (product as any).git_repo_url;
     if (g && g.startsWith('http')) return g;
     const d = (product as any).demoUrl || (product as any).demo_url;
@@ -105,20 +108,29 @@ export const MarketplaceProductCard = React.memo<MarketplaceProductCardProps>(({
     if (!user) { toast.error('Please sign in to download APK'); return; }
     setDownloadChecking(true);
     try {
+      // FIXED: Add user_id filter for security
       const { data: licenseRecord } = await supabase
-        .from('license_keys').select('license_key, status, expires_at, meta')
-        .eq('created_by', user.id).eq('status', 'active').limit(50);
+        .from('license_keys').select('license_key, status, expires_at, meta, user_id')
+        .eq('created_by', user.id)
+        .eq('user_id', user.id)
+        .eq('status', 'active').limit(50);
+      
       const match = licenseRecord?.find((l: any) => {
+        // Verify user ownership
+        if (l.user_id !== user.id) return false;
         const m = l.meta as any;
         return m?.product_id === product.id || m?.product_title === product.title;
       });
+      
       if (!match?.license_key) {
         toast.error('Please purchase first', { action: { label: 'BUY NOW', onClick: () => onBuyNow(product) } });
         setDownloadChecking(false); return;
       }
+      
       if (match.expires_at && new Date(match.expires_at) < new Date()) {
         toast.error('License expired. Please renew.'); setDownloadChecking(false); return;
       }
+      
       const isUuid = /^[0-9a-f]{8}-/.test(product.id);
       if (isUuid) {
         const { data, error } = await supabase.functions.invoke('download-apk', {
@@ -126,6 +138,7 @@ export const MarketplaceProductCard = React.memo<MarketplaceProductCardProps>(({
         });
         if (!error && data?.success) { window.open(data.download_url, '_blank'); setDownloadChecking(false); return; }
       }
+      
       toast.success(`✅ License Key: ${match.license_key}`, {
         duration: 10000,
         action: { label: 'Copy', onClick: () => navigator.clipboard.writeText(match.license_key) },
