@@ -23,14 +23,12 @@ const EducationCategory = React.lazy(() => import("./pages/EducationCategory"));
 const Keys = React.lazy(() => import("./pages/Keys"));
 const Servers = React.lazy(() => import("./pages/Servers"));
 const AiChat = React.lazy(() => import("./pages/AiChat"));
-// ValaBuilder merged into AiChat
 const SaasAiDashboard = React.lazy(() => import("./pages/SaasAiDashboard"));
 const AiApis = React.lazy(() => import("./pages/AiApis"));
 const Wallet = React.lazy(() => import("./pages/Wallet"));
 const SeoLeads = React.lazy(() => import("./pages/SeoLeads"));
 const Resellers = React.lazy(() => import("./pages/Resellers"));
 const Settings = React.lazy(() => import("./pages/Settings"));
-// Audit Logs & System Health merged into Dashboard
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 const ResellerDashboard = React.lazy(() => import("./pages/ResellerDashboard"));
 const Automation = React.lazy(() => import("./pages/Automation"));
@@ -66,7 +64,20 @@ const Cart = React.lazy(() => import("./pages/Cart"));
 const OfflineAppTemplate = React.lazy(() => import("./pages/OfflineAppTemplate"));
 const MarketplaceAdmin = React.lazy(() => import("./pages/MarketplaceAdmin"));
 
-const queryClient = new QueryClient();
+// FIXED: Configure React Query with sensible defaults
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      gcTime: 1000 * 60 * 10, // 10 minutes (was cacheTime)
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+    mutations: {
+      retry: 0,
+    },
+  },
+});
 
 function PageLoader() {
   return (
@@ -76,17 +87,27 @@ function PageLoader() {
   );
 }
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+interface RouteGuardProps {
+  children: React.ReactNode;
+}
+
+function ProtectedRoute({ children }: RouteGuardProps) {
   const { user, loading } = useAuth();
   if (loading) return <PageLoader />;
-  if (!user) return <Navigate to="/auth" replace />;
+  if (!user) {
+    // FIXED: Store redirect path for post-login redirect
+    sessionStorage.setItem('redirectTo', window.location.pathname);
+    return <Navigate to="/auth" replace />;
+  }
   return <>{children}</>;
 }
 
-function AdminRoute({ children }: { children: React.ReactNode }) {
+function AdminRoute({ children }: RouteGuardProps) {
   const { isSuperAdmin, loading } = useAuth();
   if (loading) return <PageLoader />;
-  if (!isSuperAdmin) return <Navigate to="/" replace />;
+  if (!isSuperAdmin) {
+    return <Navigate to="/" replace />;
+  }
   return <>{children}</>;
 }
 
@@ -94,13 +115,15 @@ function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
+        {/* Public routes - no auth required */}
         <Route path="/auth" element={<Auth />} />
         <Route path="/" element={<Marketplace />} />
         <Route path="/marketplace" element={<Marketplace />} />
-
-        {/* Public lazy routes */}
-        <Route path="/edu-pwa" element={<EduPwa />} />
         <Route path="/install" element={<Install />} />
+        <Route path="/offline-app" element={<OfflineAppTemplate />} />
+
+        {/* Public PWA routes */}
+        <Route path="/edu-pwa" element={<EduPwa />} />
         <Route path="/health-pwa" element={<HealthPwa />} />
         <Route path="/realestate-pwa" element={<RealEstatePwa />} />
         <Route path="/ecom-pwa" element={<EcomPwa />} />
@@ -127,9 +150,12 @@ function AppRoutes() {
         <Route path="/cloud-devops-pwa" element={<CloudDevopsPwa />} />
         <Route path="/analytics-pwa" element={<AnalyticsPwa />} />
         <Route path="/cart" element={<Cart />} />
-        <Route path="/offline-app" element={<OfflineAppTemplate />} />
 
-        {/* Protected routes */}
+        {/* Legacy redirects */}
+        <Route path="/vala-builder" element={<Navigate to="/ai-chat" replace />} />
+        <Route path="/apk-pipeline" element={<Navigate to="/ai-chat" replace />} />
+
+        {/* Protected user routes - auth required */}
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
         <Route path="/keys" element={<ProtectedRoute><Keys /></ProtectedRoute>} />
@@ -138,7 +164,6 @@ function AppRoutes() {
         <Route path="/transport-role-detail" element={<ProtectedRoute><TransportRoleDetail /></ProtectedRoute>} />
         <Route path="/manufacturing-role-detail" element={<ProtectedRoute><ManufacturingRoleDetail /></ProtectedRoute>} />
         <Route path="/education" element={<ProtectedRoute><EducationCategory /></ProtectedRoute>} />
-        <Route path="/vala-builder" element={<Navigate to="/ai-chat" replace />} />
         <Route path="/ai-chat" element={<ProtectedRoute><AiChat /></ProtectedRoute>} />
         <Route path="/saas-ai-dashboard" element={<ProtectedRoute><SaasAiDashboard /></ProtectedRoute>} />
         <Route path="/ai-apis" element={<ProtectedRoute><AiApis /></ProtectedRoute>} />
@@ -146,14 +171,59 @@ function AppRoutes() {
         <Route path="/seo-leads" element={<ProtectedRoute><SeoLeads /></ProtectedRoute>} />
         <Route path="/reseller-dashboard" element={<ProtectedRoute><ResellerDashboard /></ProtectedRoute>} />
 
-        {/* Admin routes */}
-        <Route path="/resellers" element={<ProtectedRoute><AdminRoute><Resellers /></AdminRoute></ProtectedRoute>} />
-        <Route path="/settings" element={<ProtectedRoute><AdminRoute><Settings /></AdminRoute></ProtectedRoute>} />
-        <Route path="/automation" element={<ProtectedRoute><AdminRoute><Automation /></AdminRoute></ProtectedRoute>} />
-        <Route path="/apk-pipeline" element={<ProtectedRoute><Navigate to="/ai-chat" replace /></ProtectedRoute>} />
-        <Route path="/admin/add-product" element={<ProtectedRoute><AdminRoute><AddProduct /></AdminRoute></ProtectedRoute>} />
-        <Route path="/admin/marketplace" element={<ProtectedRoute><AdminRoute><MarketplaceAdmin /></AdminRoute></ProtectedRoute>} />
+        {/* Admin routes - auth + super admin required */}
+        <Route 
+          path="/resellers" 
+          element={
+            <ProtectedRoute>
+              <AdminRoute>
+                <Resellers />
+              </AdminRoute>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/settings" 
+          element={
+            <ProtectedRoute>
+              <AdminRoute>
+                <Settings />
+              </AdminRoute>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/automation" 
+          element={
+            <ProtectedRoute>
+              <AdminRoute>
+                <Automation />
+              </AdminRoute>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/admin/add-product" 
+          element={
+            <ProtectedRoute>
+              <AdminRoute>
+                <AddProduct />
+              </AdminRoute>
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/admin/marketplace" 
+          element={
+            <ProtectedRoute>
+              <AdminRoute>
+                <MarketplaceAdmin />
+              </AdminRoute>
+            </ProtectedRoute>
+          } 
+        />
 
+        {/* 404 - must be last */}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
