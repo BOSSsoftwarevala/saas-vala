@@ -52,7 +52,7 @@ export function Sidebar() {
   const location = useLocation();
   const { isSuperAdmin, signOut } = useAuth();
 
-  const blockedNavPaths = new Set(['/marketplace', '/audit-logs', '/system-health', '/apk-pipeline', '/vala-builder']);
+  const blockedNavPaths = new Set(['/marketplace', '/audit-logs', '/system-health', '/apk-pipeline']);
 
   const filteredNavItems = navItems.filter(
     (item) => (!item.adminOnly || isSuperAdmin) && !blockedNavPaths.has(item.href)
