@@ -1,0 +1,1 @@
+UPDATE public.servers SET created_by = '744e0d85-dd5d-4fbe-bbf3-4fd5cbcf5f1b' WHERE created_by IS NULL;

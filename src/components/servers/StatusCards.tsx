@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react';
 import { Server, Rocket, AlertCircle, Globe, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 interface StatusCardProps {
   icon: typeof Server;
@@ -26,12 +28,30 @@ function StatusCard({ icon: Icon, label, value, color, bgColor }: StatusCardProp
 }
 
 export function StatusCards() {
+  const [counts, setCounts] = useState({ total: 0, live: 0, failed: 0, subdomains: 0, domains: 0 });
+
+  useEffect(() => {
+    const fetchCounts = async () => {
+      const { data } = await supabase.from('servers').select('id, status, subdomain, custom_domain');
+      if (data) {
+        setCounts({
+          total: data.length,
+          live: data.filter(s => s.status === 'live').length,
+          failed: data.filter(s => s.status === 'failed').length,
+          subdomains: data.filter(s => s.subdomain).length,
+          domains: data.filter(s => s.custom_domain).length,
+        });
+      }
+    };
+    fetchCounts();
+  }, []);
+
   const stats = [
-    { icon: Server, label: 'Total Projects', value: 3, color: 'text-primary', bgColor: 'bg-primary/20' },
-    { icon: Rocket, label: 'Live Deployments', value: 2, color: 'text-success', bgColor: 'bg-success/20' },
-    { icon: AlertCircle, label: 'Failed Deployments', value: 1, color: 'text-destructive', bgColor: 'bg-destructive/20' },
-    { icon: Globe, label: 'Active Subdomains', value: 3, color: 'text-cyan', bgColor: 'bg-cyan/20' },
-    { icon: Shield, label: 'Custom Domains', value: 1, color: 'text-warning', bgColor: 'bg-warning/20' },
+    { icon: Server, label: 'Total Projects', value: counts.total, color: 'text-primary', bgColor: 'bg-primary/20' },
+    { icon: Rocket, label: 'Live Servers', value: counts.live, color: 'text-success', bgColor: 'bg-success/20' },
+    { icon: AlertCircle, label: 'Failed', value: counts.failed, color: 'text-destructive', bgColor: 'bg-destructive/20' },
+    { icon: Globe, label: 'Subdomains', value: counts.subdomains, color: 'text-cyan', bgColor: 'bg-cyan/20' },
+    { icon: Shield, label: 'Custom Domains', value: counts.domains, color: 'text-warning', bgColor: 'bg-warning/20' },
   ];
 
   return (
