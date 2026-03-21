@@ -19,7 +19,6 @@ interface Product {
   slug: string;
   description: string | null;
   price: number | null;
-  category: string | null;
   status: string | null;
   demo_url: string | null;
   thumbnail_url: string | null;
