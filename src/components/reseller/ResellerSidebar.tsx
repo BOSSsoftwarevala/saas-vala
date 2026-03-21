@@ -2,17 +2,20 @@
  import { NavLink, useLocation } from 'react-router-dom';
  import { cn } from '@/lib/utils';
  import { useAuth } from '@/hooks/useAuth';
- import {
-   LayoutDashboard,
-   Key,
-   Users,
-   Wallet,
-   Share2,
-   Lock,
-   ChevronLeft,
-   ChevronRight,
-   LogOut,
- } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Key,
+  Users,
+  Wallet,
+  Share2,
+  Lock,
+  ChevronLeft,
+  ChevronRight,
+  LogOut,
+  Search,
+  Megaphone,
+  Store,
+} from 'lucide-react';
  import { Button } from '@/components/ui/button';
  import saasValaLogo from '@/assets/saas-vala-logo.jpg';
  import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
