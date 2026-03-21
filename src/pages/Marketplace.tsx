@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { MarketplaceHeader } from '@/components/marketplace/MarketplaceHeader';
 import { LazySection } from '@/components/marketplace/LazySection';
 import { MarketplaceCategoryRow } from '@/components/marketplace/MarketplaceCategoryRow';
