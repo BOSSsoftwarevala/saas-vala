@@ -60,7 +60,7 @@ export function AddBalancePanel() {
     toast.success(`${label} copied!`);
   };
 
-  const getPaymentDetails = () => {
+  const getPaymentDetails = (): Record<string, string> => {
     switch (selectedMethod) {
       case 'wise': return wiseDetails;
       case 'bank': return bankDetails;

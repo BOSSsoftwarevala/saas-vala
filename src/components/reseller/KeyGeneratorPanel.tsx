@@ -10,13 +10,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
   Key,
-  AlertCircle,
   Wallet,
   Copy,
   CheckCircle2,
   Loader2,
   Lock,
-  Receipt,
   Search,
 } from 'lucide-react';
 
