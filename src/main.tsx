@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import { AppErrorBoundary } from "@/components/global/AppErrorBoundary";
 
 const isPreviewHost = /lovable(app|project)\.com$/i.test(window.location.hostname);
 
@@ -20,4 +21,8 @@ if (isPreviewHost && "serviceWorker" in navigator) {
   }
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(
+  <AppErrorBoundary>
+    <App />
+  </AppErrorBoundary>
+);
