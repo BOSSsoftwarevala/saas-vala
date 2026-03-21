@@ -43,7 +43,7 @@ export function ResellerMarketplacePanel() {
       .order('name')
       .limit(100);
 
-    setProducts((data as Product[]) || []);
+    setProducts((data as unknown as Product[]) || []);
     setLoading(false);
   };
 
