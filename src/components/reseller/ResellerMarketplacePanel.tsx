@@ -130,11 +130,6 @@ export function ResellerMarketplacePanel() {
                   <h3 className="font-semibold text-foreground text-sm mb-1 line-clamp-1">
                     {product.name}
                   </h3>
-                  {product.category && (
-                    <Badge variant="secondary" className="text-[10px] mb-2">
-                      {product.category}
-                    </Badge>
-                  )}
                   <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
                     {product.description || 'Professional software solution'}
                   </p>

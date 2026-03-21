@@ -26,14 +26,17 @@ import {
    href: string;
  }
  
- const resellerNavItems: NavItem[] = [
-   { title: 'Dashboard', icon: LayoutDashboard, href: '/reseller-dashboard' },
-   { title: 'Generate Keys', icon: Key, href: '/reseller-dashboard?tab=keys' },
-   { title: 'My Clients', icon: Users, href: '/reseller-dashboard?tab=clients' },
-   { title: 'Add Balance', icon: Wallet, href: '/reseller-dashboard?tab=wallet' },
-   { title: 'Refer & Earn', icon: Share2, href: '/reseller-dashboard?tab=referral' },
-   { title: 'Change Password', icon: Lock, href: '/reseller-dashboard?tab=password' },
- ];
+const resellerNavItems: NavItem[] = [
+  { title: 'Dashboard', icon: LayoutDashboard, href: '/reseller-dashboard' },
+  { title: 'Generate Keys', icon: Key, href: '/reseller-dashboard?tab=keys' },
+  { title: 'My Clients', icon: Users, href: '/reseller-dashboard?tab=clients' },
+  { title: 'SEO Tools', icon: Search, href: '/reseller-dashboard?tab=seo' },
+  { title: 'Ads & Leads', icon: Megaphone, href: '/reseller-dashboard?tab=ads' },
+  { title: 'Marketplace', icon: Store, href: '/reseller-dashboard?tab=marketplace' },
+  { title: 'Add Balance', icon: Wallet, href: '/reseller-dashboard?tab=wallet' },
+  { title: 'Refer & Earn', icon: Share2, href: '/reseller-dashboard?tab=referral' },
+  { title: 'Change Password', icon: Lock, href: '/reseller-dashboard?tab=password' },
+];
  
  export function ResellerSidebar() {
    const [collapsed, setCollapsed] = useState(false);

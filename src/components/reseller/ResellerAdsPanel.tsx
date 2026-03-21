@@ -9,7 +9,7 @@ import { useWallet } from '@/hooks/useWallet';
 import { useNavigate } from 'react-router-dom';
 import {
   Megaphone,
-  Target,
+  
   Users,
   TrendingUp,
   Wallet,
