@@ -13,12 +13,9 @@ import { ChatControlPanel } from '@/components/ai-chat/ChatControlPanel';
 import { TokenUsageDisplay } from '@/components/ai-chat/TokenUsageDisplay';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
-import { useAutoApkPipeline } from '@/hooks/useAutoApkPipeline';
 import {
   addGlobalActivity,
   updateGlobalActivity,
@@ -39,19 +36,6 @@ import {
   PanelLeft,
   Square,
   Settings2,
-  Rocket,
-  Code,
-  Database,
-  Server,
-  Bug,
-  Wrench,
-  Package,
-  Store,
-  Sparkles,
-  Loader2,
-  CheckCircle2,
-  Circle,
-  
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -128,10 +112,8 @@ export default function AiChat() {
   const aiTimerRef = useRef<number | null>(null);
   const aiStartTimeRef = useRef<number | null>(null);
   const aiTokensRef = useRef<number>(0);
-  const _autoRetryRef = useRef<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // ── PERSIST SESSIONS TO LOCALSTORAGE ──
   useEffect(() => {
     localStorage.setItem('saas-ai-sessions', JSON.stringify(sessions));
   }, [sessions]);
@@ -144,162 +126,9 @@ export default function AiChat() {
   const [pinnedMessages, setPinnedMessages] = useState<Set<string>>(new Set());
   const [_thinkingContext, setThinkingContext] = useState<'analyzing' | 'fixing' | 'deploying' | 'general'>('general');
 
-  // Build Mode State
-  const [buildMode, setBuildMode] = useState(false);
-  const [buildAppName, setBuildAppName] = useState('');
-  const [buildPrompt, setBuildPrompt] = useState('');
-  const [buildRunning, setBuildRunning] = useState(false);
-
-  type BuildStepStatus = 'idle' | 'running' | 'done' | 'error';
-  interface BuildStep { id: string; label: string; icon: React.ReactNode; status: BuildStepStatus; result?: string; }
-  const INITIAL_BUILD_STEPS: BuildStep[] = [
-    { id: 'plan', label: 'AI Planner', icon: <Sparkles className="h-3.5 w-3.5" />, status: 'idle' },
-    { id: 'ui', label: 'UI Builder', icon: <Code className="h-3.5 w-3.5" />, status: 'idle' },
-    { id: 'code', label: 'Code Gen', icon: <Package className="h-3.5 w-3.5" />, status: 'idle' },
-    { id: 'db', label: 'Database', icon: <Database className="h-3.5 w-3.5" />, status: 'idle' },
-    { id: 'api', label: 'API Gen', icon: <Server className="h-3.5 w-3.5" />, status: 'idle' },
-    { id: 'debug', label: 'Debug', icon: <Bug className="h-3.5 w-3.5" />, status: 'idle' },
-    { id: 'fix', label: 'Auto Fix', icon: <Wrench className="h-3.5 w-3.5" />, status: 'idle' },
-    { id: 'build', label: 'Build', icon: <Package className="h-3.5 w-3.5" />, status: 'idle' },
-    { id: 'deploy', label: 'Deploy', icon: <Rocket className="h-3.5 w-3.5" />, status: 'idle' },
-    { id: 'publish', label: 'Marketplace', icon: <Store className="h-3.5 w-3.5" />, status: 'idle' },
-  ];
-  const [buildSteps, setBuildSteps] = useState<BuildStep[]>(INITIAL_BUILD_STEPS);
-
-  const {
-    loading: apkPipelineLoading,
-    stats: apkPipelineStats,
-    scanAndRegister,
-    bulkBuild,
-    runFullPipeline,
-    getStats: getApkPipelineStats,
-  } = useAutoApkPipeline();
-
-  useEffect(() => {
-    getApkPipelineStats();
-  }, [getApkPipelineStats]);
-
   const [selectedModel, setSelectedModel] = useState<string>(() => {
     return localStorage.getItem('saas-ai-model') || 'google/gemini-3-flash-preview';
   });
-
-  const updateBuildStep = (id: string, status: BuildStepStatus, result?: string) => {
-    setBuildSteps(prev => prev.map(s => s.id === id ? { ...s, status, result } : s));
-  };
-
-  const runBuildPipeline = useCallback(async () => {
-    if (!buildAppName.trim() || !buildPrompt.trim()) { toast.error('App name aur description dono daalo'); return; }
-    setBuildRunning(true);
-    setBuildSteps(INITIAL_BUILD_STEPS);
-    const slug = buildAppName.toLowerCase().replace(/\s+/g, '-');
-    let runningStep: string | null = null;
-
-    // Insert build progress as chat messages
-    const buildSessionId = activeSessionId || (() => {
-      const ns: ChatSession = { id: crypto.randomUUID(), title: `🚀 Build: ${buildAppName}`, createdAt: new Date(), messages: [] };
-      setSessions(prev => [ns, ...prev]);
-      setActiveSessionId(ns.id);
-      return ns.id;
-    })();
-
-    const addBuildMsg = (content: string) => {
-      setSessions(prev => prev.map(s => s.id === buildSessionId ? {
-        ...s, messages: [...s.messages, { id: crypto.randomUUID(), role: 'assistant' as const, content, timestamp: new Date() }]
-      } : s));
-    };
-
-    addBuildMsg(`🚀 **Building "${buildAppName}"...**\n\nPipeline started. Sit back!`);
-
-    try {
-      // Step 1: AI Planning + Code Gen
-      runningStep = 'plan';
-      updateBuildStep('plan', 'running');
-      const { data: aiResult, error: aiError } = await supabase.functions.invoke('ai-developer', {
-        body: {
-          messages: [{ role: 'user', content: `Create and deploy a complete production app named "${buildAppName}" with this scope: ${buildPrompt}. Must execute tool chain: generate_code -> upload_to_github -> deploy_project.` }],
-          stream: false,
-          model: selectedModel,
-        }
-      });
-      if (aiError) throw aiError;
-
-      const toolsUsed: string[] = aiResult?.tools_used || [];
-      const toolResults: any[] = aiResult?.tool_results || [];
-      const hasCodeGeneration = toolsUsed.includes('generate_code') || toolResults.some((t: any) => t?.name === 'generate_code' && t?.result?.success !== false);
-
-      if (!hasCodeGeneration) {
-        throw new Error('Code generation tool run nahi hua, retry required.');
-      }
-
-      updateBuildStep('plan', 'done', 'Requirements analyzed');
-      runningStep = null;
-
-      for (const stepId of ['ui', 'code', 'db', 'api']) {
-        runningStep = stepId;
-        updateBuildStep(stepId, 'running');
-        updateBuildStep(stepId, 'done', toolsUsed.length ? `${toolsUsed.length} tools` : 'completed');
-        runningStep = null;
-      }
-
-      runningStep = 'debug';
-      updateBuildStep('debug', 'running');
-      updateBuildStep('debug', 'done', 'Tool chain validated');
-      runningStep = null;
-
-      runningStep = 'fix';
-      updateBuildStep('fix', 'running');
-      updateBuildStep('fix', 'done', 'Auto checks done');
-      runningStep = null;
-
-      runningStep = 'build';
-      updateBuildStep('build', 'running');
-      const { data: buildData, error: buildError } = await supabase.functions.invoke('auto-apk-pipeline', {
-        body: { action: 'trigger_apk_build', data: { slug } }
-      });
-      if (buildError) throw buildError;
-      const buildStatus = buildData?.build?.status || 'queued';
-      updateBuildStep('build', 'done', buildStatus);
-      runningStep = null;
-
-      runningStep = 'deploy';
-      updateBuildStep('deploy', 'running');
-      const deploymentTool = toolResults.find((t: any) => t?.name === 'deploy_project' || t?.name === 'factory_deploy');
-      const liveUrl = deploymentTool?.result?.url || deploymentTool?.result?.deployed_url || deploymentTool?.result?.deployment?.url || null;
-      const repoUrl = `https://github.com/saasvala/${slug}`;
-      if (liveUrl) {
-        setPreviewUrl(liveUrl);
-        setPreviewInput(liveUrl);
-        updateBuildStep('deploy', 'done', liveUrl);
-      } else {
-        updateBuildStep('deploy', 'done', 'deployment queued');
-      }
-      runningStep = null;
-
-      runningStep = 'publish';
-      updateBuildStep('publish', 'running');
-      const { data: publishData, error: publishError } = await supabase.functions.invoke('auto-apk-pipeline', {
-        body: { action: 'auto_marketplace_workflow', data: { limit: 10 } }
-      });
-      if (publishError) {
-        updateBuildStep('publish', 'error', 'workflow failed');
-      } else {
-        updateBuildStep('publish', 'done', `${publishData?.attached || 0} attached`);
-      }
-      runningStep = null;
-
-      await getApkPipelineStats();
-
-      addBuildMsg(`✅ **${buildAppName} pipeline executed**\n\n📦 **GitHub:** [${repoUrl}](${repoUrl})\n📱 **APK Build Status:** ${buildStatus}${liveUrl ? `\n🔗 **Live URL:** [${liveUrl}](${liveUrl})` : ''}`);
-      toast.success('Builder + APK pipeline sync complete');
-      setBuildMode(false);
-    } catch (err: any) {
-      if (runningStep) updateBuildStep(runningStep, 'error', err.message);
-      addBuildMsg(`❌ **Build failed:** ${err.message}`);
-      toast.error(err.message);
-    } finally {
-      setBuildRunning(false);
-    }
-  }, [buildAppName, buildPrompt, activeSessionId, selectedModel, getApkPipelineStats]);
 
   const [systemPrompt, setSystemPrompt] = useState<string>(() => {
     return localStorage.getItem('saas-ai-system-prompt') || 'You are VALA AI, an expert full-stack developer and business consultant for SaaSVala. You help with code generation, deployment, security audits, and business automation. Always respond in a professional yet friendly manner, mixing English with Hindi when appropriate.';
@@ -311,7 +140,6 @@ export default function AiChat() {
     return parseInt(localStorage.getItem('saas-ai-max-tokens') || '4096');
   });
 
-  // Auto-select first session
   useEffect(() => {
     if (!activeSessionId && sessions.length > 0) {
       setActiveSessionId(sessions[0].id);
@@ -328,7 +156,7 @@ export default function AiChat() {
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [activeSession?.messages]);
   useEffect(() => { if (isMobile) setSessionListOpen(false); }, [isMobile]);
 
-  // Auto-load latest deployed project URL in preview (with health check)
+  // Auto-load latest deployed project URL in preview
   useEffect(() => {
     if (previewUrl) return;
     const loadLatestDeployment = async () => {
@@ -341,7 +169,6 @@ export default function AiChat() {
           .order('created_at', { ascending: false })
           .limit(3);
         if (data && data.length > 0) {
-          // Try each URL to find one that's actually alive
           for (const row of data) {
             try {
               await fetch(row.deployed_url, { method: 'HEAD', mode: 'no-cors' });
@@ -376,13 +203,6 @@ export default function AiChat() {
     const newSession: ChatSession = { id: crypto.randomUUID(), title: 'New Chat', createdAt: new Date(), messages: [] };
     setSessions(prev => [newSession, ...prev]);
     setActiveSessionId(newSession.id);
-  };
-
-  const openBuilderMode = () => {
-    const newSession: ChatSession = { id: crypto.randomUUID(), title: '🚀 Builder', createdAt: new Date(), messages: [] };
-    setSessions(prev => [newSession, ...prev]);
-    setActiveSessionId(newSession.id);
-    setBuildMode(true);
   };
 
   const deleteSession = (id: string) => {
@@ -428,13 +248,13 @@ export default function AiChat() {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       const controller = new AbortController();
       abortControllerRef.current = controller;
-      const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 min timeout
+      const timeoutId = setTimeout(() => controller.abort(), 180000);
 
       try {
         if (attempt > 0) {
           console.log(`[AI Chat] Retry attempt ${attempt}/${maxRetries}`);
           setAiStatus(prev => ({ ...prev, stage: 'sending', retryCount: attempt }));
-          await new Promise(r => setTimeout(r, 2000 * attempt)); // backoff
+          await new Promise(r => setTimeout(r, 2000 * attempt));
         }
 
         const resp = await fetch(CHAT_URL, {
@@ -496,7 +316,7 @@ export default function AiChat() {
           }
         } catch (e) { console.error('Stream error:', e); }
         onDone();
-        return; // success — exit retry loop
+        return;
 
       } catch (e: any) {
         clearTimeout(timeoutId);
@@ -562,7 +382,6 @@ export default function AiChat() {
       timestamp: new Date(), files: fileAttachments.length > 0 ? fileAttachments : undefined
     };
 
-    // Update title if first message
     setSessions(prev => prev.map(s => {
       if (s.id === sessionId) {
         const updatedMessages = [...s.messages, userMessage];
@@ -579,7 +398,6 @@ export default function AiChat() {
 
     aiStartTimeRef.current = Date.now();
     aiTokensRef.current = 0;
-    aiStartTimeRef.current = Date.now();
     aiTimerRef.current = window.setInterval(() => {
       setAiStatus(prev => ({ ...prev, elapsedMs: Date.now() - (aiStartTimeRef.current || Date.now()) }));
     }, 500);
@@ -696,12 +514,10 @@ export default function AiChat() {
     if (!activeSessionId || isLoading) return;
     const session = sessions.find(s => s.id === activeSessionId);
     if (!session) return;
-    // Find the last user message before this assistant message
     const msgIndex = session.messages.findIndex(m => m.id === messageId);
     if (msgIndex <= 0) return;
     const lastUserMsg = session.messages[msgIndex - 1];
     if (lastUserMsg.role !== 'user') return;
-    // Remove the assistant message and resend
     setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, messages: s.messages.filter(m => m.id !== messageId) } : s));
     setTimeout(() => handleSend(lastUserMsg.content), 100);
   }, [activeSessionId, sessions, isLoading]);
@@ -750,7 +566,6 @@ export default function AiChat() {
           {/* Chat Header */}
           <div className="h-12 flex items-center justify-between px-3 border-b border-border bg-muted/30 shrink-0">
             <div className="flex items-center gap-2">
-              {/* Session list toggle */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="icon" onClick={() => setSessionListOpen(!sessionListOpen)} className="h-7 w-7 text-muted-foreground hover:text-foreground">
@@ -763,14 +578,6 @@ export default function AiChat() {
               {isLoading && <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />}
             </div>
             <div className="flex items-center gap-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" onClick={openBuilderMode} className="h-7 w-7 text-muted-foreground hover:text-primary">
-                    <Rocket className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">Builder + APK Pipeline</TooltipContent>
-              </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="icon" onClick={() => setShowSearchPanel(true)} className="h-7 w-7 text-muted-foreground hover:text-foreground">
@@ -798,7 +605,7 @@ export default function AiChat() {
             </div>
           </div>
 
-          {/* Session List (collapsible) */}
+          {/* Session List */}
           {sessionListOpen && (
             <div className="border-b border-border bg-muted/10 shrink-0 max-h-48 overflow-y-auto">
               {sessions.length === 0 ? (
@@ -835,7 +642,7 @@ export default function AiChat() {
             </div>
           )}
 
-          {/* Messages — scrollable */}
+          {/* Messages */}
           <div className="flex-1 overflow-y-auto min-h-0">
             {activeSession && activeSession.messages.length > 0 ? (
               <div className="px-3 py-3 space-y-1 pb-4">
@@ -871,144 +678,32 @@ export default function AiChat() {
                 <div ref={messagesEndRef} />
               </div>
             ) : (
-              /* Welcome screen with Build Mode */
-              <div className="flex flex-col items-center justify-center h-full py-6 px-4 text-center overflow-y-auto">
+              /* Welcome screen — chat only */
+              <div className="flex flex-col items-center justify-center h-full py-6 px-4 text-center">
                 <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mb-3">
                   <span className="text-2xl">🤖</span>
                 </div>
                 <h2 className="text-xl font-bold text-foreground mb-1">VALA AI</h2>
                 <p className="text-muted-foreground mb-4 text-sm leading-relaxed max-w-xs">
-                  Chat, Build Apps, Deploy — sab ek jagah.
+                  Ask anything — code, deploy, audit, automate.
                 </p>
-
-                {/* Build Mode Toggle */}
-                {!buildMode ? (
-                  <div className="w-full max-w-xs space-y-2">
-                    <Button 
-                      onClick={() => setBuildMode(true)} 
-                      className="w-full gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
-                      size="lg"
+                <div className="w-full max-w-xs grid grid-cols-1 gap-1.5">
+                  {[
+                    { emoji: '🔍', text: 'GitHub repos audit karo' },
+                    { emoji: '🚀', text: 'Server status check karo' },
+                    { emoji: '🛡️', text: 'Security scan karo' },
+                    { emoji: '📊', text: 'System health report do' },
+                  ].map(({ emoji, text }) => (
+                    <button
+                      key={text}
+                      onClick={() => handleSend(`${emoji} ${text}`)}
+                      className="flex items-center gap-2 text-left p-2.5 rounded-lg border border-border/50 bg-card/40 hover:bg-card hover:border-primary/30 transition-all text-xs text-muted-foreground hover:text-foreground"
                     >
-                      <Rocket className="h-4 w-4" />
-                      Build New App
-                    </Button>
-                    <div className="grid grid-cols-1 gap-1.5">
-                      {[
-                        { emoji: '🔍', text: 'GitHub repos audit karo' },
-                        { emoji: '🚀', text: 'Server status check karo' },
-                        { emoji: '🛡️', text: 'Security scan karo' },
-                        { emoji: '📊', text: 'System health report do' },
-                      ].map(({ emoji, text }) => (
-                        <button
-                          key={text}
-                          onClick={() => handleSend(`${emoji} ${text}`)}
-                          className="flex items-center gap-2 text-left p-2.5 rounded-lg border border-border/50 bg-card/40 hover:bg-card hover:border-primary/30 transition-all text-xs text-muted-foreground hover:text-foreground"
-                        >
-                          <span>{emoji}</span>
-                          <span>{text}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  /* Build Mode Form */
-                  <div className="w-full max-w-xs space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Badge variant="outline" className="gap-1 text-primary border-primary/30">
-                        <Rocket className="h-3 w-3" /> Build Mode
-                      </Badge>
-                      <Button variant="ghost" size="sm" className="text-xs h-6" onClick={() => setBuildMode(false)}>
-                        ← Back
-                      </Button>
-                    </div>
-                    <Input
-                      placeholder="App name (e.g. Restaurant POS)"
-                      value={buildAppName}
-                      onChange={e => setBuildAppName(e.target.value)}
-                      className="text-sm"
-                      disabled={buildRunning}
-                    />
-                    <textarea
-                      placeholder="Describe your app... (e.g. A restaurant management system with menu, orders, billing, and admin dashboard)"
-                      value={buildPrompt}
-                      onChange={e => setBuildPrompt(e.target.value)}
-                      className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
-                      disabled={buildRunning}
-                    />
-                    <Button 
-                      onClick={runBuildPipeline} 
-                      disabled={buildRunning || !buildAppName.trim() || !buildPrompt.trim()}
-                      className="w-full gap-2"
-                    >
-                      {buildRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
-                      {buildRunning ? 'Building...' : 'Start Build Pipeline'}
-                    </Button>
-
-                    <div className="rounded-lg border border-border/50 bg-muted/20 p-2 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-[11px] font-semibold text-foreground">Builder + APK Pipeline</p>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 px-2 text-[10px]"
-                          onClick={getApkPipelineStats}
-                          disabled={apkPipelineLoading}
-                        >
-                          <RefreshCw className={`h-3 w-3 ${apkPipelineLoading ? 'animate-spin' : ''}`} />
-                        </Button>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-1 text-[10px]">
-                        <div className="rounded border border-border/60 bg-background/60 px-1.5 py-1">
-                          <p className="text-muted-foreground">Total</p>
-                          <p className="font-semibold">{apkPipelineStats?.catalog.total || 0}</p>
-                        </div>
-                        <div className="rounded border border-border/60 bg-background/60 px-1.5 py-1">
-                          <p className="text-muted-foreground">Pending</p>
-                          <p className="font-semibold">{apkPipelineStats?.catalog.pending_build || 0}</p>
-                        </div>
-                        <div className="rounded border border-border/60 bg-background/60 px-1.5 py-1">
-                          <p className="text-muted-foreground">Queue</p>
-                          <p className="font-semibold">{apkPipelineStats?.queue.queued || 0}</p>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-1">
-                        <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={scanAndRegister} disabled={apkPipelineLoading}>
-                          Scan Repos
-                        </Button>
-                        <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => bulkBuild(20)} disabled={apkPipelineLoading}>
-                          Queue Builds
-                        </Button>
-                        <Button size="sm" className="col-span-2 h-7 text-[10px]" onClick={runFullPipeline} disabled={apkPipelineLoading}>
-                          Run Full APK Workflow
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Pipeline Steps Visual */}
-                    {(buildRunning || buildSteps.some(s => s.status !== 'idle')) && (
-                      <div className="space-y-1 text-left">
-                        {buildSteps.map((step) => (
-                          <div key={step.id} className={cn(
-                            "flex items-center gap-2 px-2 py-1 rounded text-xs transition-all",
-                            step.status === 'running' && "bg-primary/10 text-primary",
-                            step.status === 'done' && "text-green-600",
-                            step.status === 'error' && "text-destructive",
-                            step.status === 'idle' && "text-muted-foreground/50"
-                          )}>
-                            {step.status === 'running' ? <Loader2 className="h-3 w-3 animate-spin" /> :
-                             step.status === 'done' ? <CheckCircle2 className="h-3 w-3" /> :
-                             step.status === 'error' ? <span className="text-destructive">✕</span> :
-                             <Circle className="h-3 w-3" />}
-                            <span className="flex-1">{step.label}</span>
-                            {step.result && <span className="text-[10px] opacity-70 truncate max-w-[100px]">{step.result}</span>}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                      <span>{emoji}</span>
+                      <span>{text}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -1051,10 +746,9 @@ export default function AiChat() {
           </div>
         </div>
 
-        {/* ── RIGHT PANEL: Project / Browser Preview ── */}
+        {/* ── RIGHT PANEL: Preview ── */}
         {!isMobile && (
           <div className="flex-1 flex flex-col min-w-0 bg-muted/5">
-            {/* Preview header / URL bar */}
             <div className="h-12 flex items-center gap-2 px-3 border-b border-border bg-muted/30 shrink-0">
               <Globe className="h-4 w-4 text-muted-foreground shrink-0" />
               <div className="flex-1 flex items-center gap-1 bg-background border border-border rounded-md px-2 h-7">
@@ -1063,7 +757,7 @@ export default function AiChat() {
                   value={previewInput}
                   onChange={e => setPreviewInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handlePreviewNavigate()}
-                  placeholder="Enter project URL to preview... (e.g. yoursite.com)"
+                  placeholder="Enter project URL to preview..."
                   className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none"
                 />
               </div>
@@ -1094,8 +788,6 @@ export default function AiChat() {
                 </Tooltip>
               )}
             </div>
-
-            {/* Preview area */}
             <div className="flex-1 overflow-hidden relative">
               {previewUrl ? (
                 <iframe
@@ -1106,25 +798,14 @@ export default function AiChat() {
                   sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
                 />
               ) : (
-                /* Empty state */
                 <div className="flex flex-col items-center justify-center h-full text-center px-8">
                   <div className="w-20 h-20 rounded-3xl bg-muted/50 border border-border flex items-center justify-center mb-6">
                     <Globe className="h-8 w-8 text-muted-foreground/40" />
                   </div>
                   <h3 className="text-lg font-semibold text-foreground mb-2">Project Preview</h3>
                   <p className="text-muted-foreground text-sm max-w-sm mb-6">
-                    Upar URL bar mein apne deployed project ka link daalo aur preview dekho. Ya VALA AI se koi project deploy karo.
+                    URL bar mein apne deployed project ka link daalo aur preview dekho.
                   </p>
-                  <div className="grid grid-cols-1 gap-3 w-full max-w-xs">
-                    <div className="p-4 rounded-xl border border-border/50 bg-card/40 text-left">
-                      <p className="text-xs font-semibold text-foreground mb-1">🚀 Quick Actions</p>
-                      <p className="text-xs text-muted-foreground">VALA AI se poocho: <span className="text-primary font-mono">"Server status check karo"</span></p>
-                    </div>
-                    <div className="p-4 rounded-xl border border-border/50 bg-card/40 text-left">
-                      <p className="text-xs font-semibold text-foreground mb-1">🔗 Preview Karo</p>
-                      <p className="text-xs text-muted-foreground">Koi bhi URL upar bar mein daalo aur Enter dabao</p>
-                    </div>
-                  </div>
                 </div>
               )}
             </div>

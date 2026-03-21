@@ -37,7 +37,8 @@ const navItems: NavItem[] = [
   { title: 'Keys', icon: Key, href: '/keys' },
   { title: 'Servers', icon: Server, href: '/servers' },
   { title: 'SaaS AI', icon: Cpu, href: '/saas-ai-dashboard' },
-  { title: 'Builder + APK Pipeline', icon: Rocket, href: '/ai-chat' },
+  { title: 'AI Chat', icon: Bot, href: '/ai-chat' },
+  { title: 'VALA Builder', icon: Rocket, href: '/vala-builder' },
   { title: 'AI APIs', icon: Bot, href: '/ai-apis', adminOnly: true },
   { title: 'Auto-Pilot', icon: Bot, href: '/automation', adminOnly: true },
   { title: 'Wallet', icon: Wallet, href: '/wallet' },
@@ -52,7 +53,7 @@ export function Sidebar() {
   const location = useLocation();
   const { isSuperAdmin, signOut } = useAuth();
 
-  const blockedNavPaths = new Set(['/marketplace', '/audit-logs', '/system-health', '/apk-pipeline', '/vala-builder']);
+  const blockedNavPaths = new Set(['/marketplace', '/audit-logs', '/system-health', '/apk-pipeline']);
 
   const filteredNavItems = navItems.filter(
     (item) => (!item.adminOnly || isSuperAdmin) && !blockedNavPaths.has(item.href)
