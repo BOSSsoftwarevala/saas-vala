@@ -105,15 +105,6 @@ export function ResellerSeoPanel() {
 
       if (runErr) throw runErr;
 
-      // Log transaction
-      await supabase.from('transactions').insert({
-        user_id: user.id,
-        type: 'debit',
-        amount: cost,
-        description: `SEO Tool: ${toolName} - ${targetUrl.trim()}`,
-        status: 'completed',
-      });
-
       toast.success(`✅ ${toolName} completed! $${cost} deducted from wallet.`);
       await fetchSeoRuns();
     } catch (err) {

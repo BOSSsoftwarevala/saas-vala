@@ -108,15 +108,6 @@ export function ResellerAdsPanel() {
 
       if (campErr) throw campErr;
 
-      // Log transaction
-      await supabase.from('transactions').insert({
-        user_id: user.id,
-        type: 'debit',
-        amount: newCampaign.budget,
-        description: `Campaign: ${newCampaign.name.trim()}`,
-        status: 'completed',
-      });
-
       toast.success(`🚀 Campaign "${newCampaign.name}" launched! $${newCampaign.budget} reserved.`);
       setShowCreate(false);
       setNewCampaign({ name: '', type: 'google_ads', budget: 25, targetAudience: '', description: '' });
