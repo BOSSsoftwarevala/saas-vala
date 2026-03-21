@@ -484,7 +484,7 @@ REPO_URL=\${1:?"Usage: ./build-apk.sh <repo_url> <app_slug> <package_name>"}
 APP_SLUG=\${2:?"App slug required"}
 PACKAGE_NAME=\${3:-"com.saasvala.\${APP_SLUG//-/_}"}
 
-echo "🔧 Building APK for: $APP_SLUG"
+echo "Building APK for: $APP_SLUG"
 echo "   Repo: $REPO_URL"
 echo "   Package: $PACKAGE_NAME"
 
@@ -507,7 +507,7 @@ cd android
 chmod +x gradlew
 ./gradlew assembleDebug --no-daemon
 
-echo "✅ APK built for $APP_SLUG"
+echo "APK built for $APP_SLUG"
 find . -name "*.apk" -type f
 `;
 }
