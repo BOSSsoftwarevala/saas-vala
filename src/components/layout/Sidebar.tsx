@@ -60,17 +60,7 @@ export function Sidebar() {
   const location = useLocation();
   const { isSuperAdmin, signOut } = useAuth();
 
-  const resolvedNavItems = navItems.map((item) => {
-    if (item.title === 'Marketplace') {
-      return {
-        ...item,
-        href: isSuperAdmin ? '/admin/marketplace' : '/',
-      };
-    }
-    return item;
-  });
-
-  const filteredNavItems = resolvedNavItems.filter(
+  const filteredNavItems = navItems.filter(
     (item) => !item.adminOnly || isSuperAdmin
   );
 
