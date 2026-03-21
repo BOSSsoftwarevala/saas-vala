@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,10 +6,11 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useWallet } from '@/hooks/useWallet';
+import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Megaphone,
-  
   Users,
   TrendingUp,
   Wallet,
@@ -30,18 +31,23 @@ const MIN_CAMPAIGN_COST = 25;
 interface Campaign {
   id: string;
   name: string;
-  type: string;
+  campaign_type: string;
   budget: number;
-  status: 'active' | 'paused' | 'draft';
-  leads: number;
+  status: string;
+  leads_count: number;
   impressions: number;
+  spent: number;
+  created_at: string;
 }
 
 export function ResellerAdsPanel() {
   const { wallet } = useWallet();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [newCampaign, setNewCampaign] = useState({
     name: '',
     type: 'google_ads',
@@ -52,7 +58,21 @@ export function ResellerAdsPanel() {
 
   const balance = wallet?.balance || 0;
 
-  const handleCreateCampaign = () => {
+  useEffect(() => {
+    fetchCampaigns();
+  }, []);
+
+  const fetchCampaigns = async () => {
+    const { data } = await supabase
+      .from('reseller_campaigns')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50);
+    setCampaigns((data as unknown as Campaign[]) || []);
+    setLoading(false);
+  };
+
+  const handleCreateCampaign = async () => {
     if (balance < newCampaign.budget) {
       toast.error(`Insufficient balance! You need $${newCampaign.budget}. Add balance first.`);
       return;
@@ -61,25 +81,63 @@ export function ResellerAdsPanel() {
       toast.error('Please enter a campaign name');
       return;
     }
+    if (!user) return;
 
-    const campaign: Campaign = {
-      id: Date.now().toString(),
-      name: newCampaign.name,
-      type: newCampaign.type,
-      budget: newCampaign.budget,
-      status: 'active',
-      leads: 0,
-      impressions: 0,
-    };
+    setCreating(true);
+    try {
+      // Deduct from wallet
+      const { error: walletErr } = await supabase
+        .from('wallets')
+        .update({ balance: balance - newCampaign.budget })
+        .eq('user_id', user.id);
 
-    setCampaigns((prev) => [campaign, ...prev]);
-    setShowCreate(false);
-    setNewCampaign({ name: '', type: 'google_ads', budget: 25, targetAudience: '', description: '' });
-    toast.success(`Campaign "${campaign.name}" created! $${campaign.budget} reserved from wallet.`);
+      if (walletErr) throw walletErr;
+
+      // Create campaign
+      const { error: campErr } = await supabase
+        .from('reseller_campaigns')
+        .insert({
+          user_id: user.id,
+          name: newCampaign.name.trim(),
+          campaign_type: newCampaign.type,
+          budget: newCampaign.budget,
+          target_audience: newCampaign.targetAudience || null,
+          description: newCampaign.description || null,
+          status: 'active',
+        });
+
+      if (campErr) throw campErr;
+
+      // Log transaction
+      await supabase.from('transactions').insert({
+        user_id: user.id,
+        type: 'debit',
+        amount: newCampaign.budget,
+        description: `Campaign: ${newCampaign.name.trim()}`,
+        status: 'completed',
+      });
+
+      toast.success(`🚀 Campaign "${newCampaign.name}" launched! $${newCampaign.budget} reserved.`);
+      setShowCreate(false);
+      setNewCampaign({ name: '', type: 'google_ads', budget: 25, targetAudience: '', description: '' });
+      await fetchCampaigns();
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to create campaign');
+    } finally {
+      setCreating(false);
+    }
   };
 
-  const totalLeads = campaigns.reduce((s, c) => s + c.leads, 0);
-  const totalSpent = campaigns.reduce((s, c) => s + c.budget, 0);
+  const toggleCampaignStatus = async (id: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'active' ? 'paused' : 'active';
+    await supabase.from('reseller_campaigns').update({ status: newStatus }).eq('id', id);
+    toast.success(`Campaign ${newStatus === 'active' ? 'resumed' : 'paused'}`);
+    await fetchCampaigns();
+  };
+
+  const totalLeads = campaigns.reduce((s, c) => s + c.leads_count, 0);
+  const totalSpent = campaigns.reduce((s, c) => s + Number(c.budget), 0);
   const activeCampaigns = campaigns.filter((c) => c.status === 'active').length;
 
   return (
@@ -131,7 +189,7 @@ export function ResellerAdsPanel() {
           { label: 'Active Campaigns', value: activeCampaigns.toString(), icon: Megaphone, color: 'text-blue-500' },
           { label: 'Total Leads', value: totalLeads.toString(), icon: Users, color: 'text-green-500' },
           { label: 'Total Spent', value: `$${totalSpent.toFixed(2)}`, icon: Wallet, color: 'text-orange-500' },
-          { label: 'Conversion Rate', value: '0%', icon: TrendingUp, color: 'text-purple-500' },
+          { label: 'Conversion Rate', value: totalLeads > 0 ? `${((totalLeads / Math.max(1, campaigns.reduce((s, c) => s + c.impressions, 0))) * 100).toFixed(1)}%` : '0%', icon: TrendingUp, color: 'text-purple-500' },
         ].map((stat) => (
           <Card key={stat.label}>
             <CardContent className="p-4">
@@ -151,7 +209,6 @@ export function ResellerAdsPanel() {
           <Card className="border-primary/30">
             <CardContent className="p-6 space-y-4">
               <h3 className="text-lg font-semibold text-foreground">Create New Campaign</h3>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1 block">Campaign Name</label>
@@ -163,13 +220,8 @@ export function ResellerAdsPanel() {
                 </div>
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1 block">Campaign Type</label>
-                  <Select
-                    value={newCampaign.type}
-                    onValueChange={(v) => setNewCampaign((p) => ({ ...p, type: v }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                  <Select value={newCampaign.type} onValueChange={(v) => setNewCampaign((p) => ({ ...p, type: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="google_ads">Google Ads</SelectItem>
                       <SelectItem value="facebook_ads">Facebook Ads</SelectItem>
@@ -197,7 +249,6 @@ export function ResellerAdsPanel() {
                   />
                 </div>
               </div>
-
               <div>
                 <label className="text-sm font-medium text-foreground mb-1 block">Campaign Description</label>
                 <Textarea
@@ -207,14 +258,11 @@ export function ResellerAdsPanel() {
                   rows={3}
                 />
               </div>
-
               <div className="flex gap-3 justify-end">
-                <Button variant="outline" onClick={() => setShowCreate(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleCreateCampaign} disabled={balance < newCampaign.budget} className="gap-1.5">
+                <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
+                <Button onClick={handleCreateCampaign} disabled={balance < newCampaign.budget || creating} className="gap-1.5">
                   <Zap className="h-4 w-4" />
-                  Launch Campaign (${newCampaign.budget})
+                  {creating ? 'Launching...' : `Launch Campaign ($${newCampaign.budget})`}
                 </Button>
               </div>
             </CardContent>
@@ -232,28 +280,17 @@ export function ResellerAdsPanel() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <h4 className="font-medium text-foreground">{campaign.name}</h4>
-                    <Badge
-                      variant={campaign.status === 'active' ? 'default' : 'secondary'}
-                      className="text-xs"
-                    >
+                    <Badge variant={campaign.status === 'active' ? 'default' : 'secondary'} className="text-xs">
                       {campaign.status}
                     </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {campaign.type.replace('_', ' ')} • Budget: ${campaign.budget} • {campaign.leads} leads
+                    {campaign.campaign_type.replace(/_/g, ' ')} • Budget: ${Number(campaign.budget).toFixed(2)} • {campaign.leads_count} leads
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="gap-1">
-                    {campaign.status === 'active' ? (
-                      <>
-                        <Pause className="h-3.5 w-3.5" /> Pause
-                      </>
-                    ) : (
-                      <>
-                        <Play className="h-3.5 w-3.5" /> Resume
-                      </>
-                    )}
+                  <Button variant="outline" size="sm" className="gap-1" onClick={() => toggleCampaignStatus(campaign.id, campaign.status)}>
+                    {campaign.status === 'active' ? <><Pause className="h-3.5 w-3.5" /> Pause</> : <><Play className="h-3.5 w-3.5" /> Resume</>}
                   </Button>
                   <Button variant="outline" size="sm" className="gap-1">
                     <BarChart3 className="h-3.5 w-3.5" /> Report
@@ -268,9 +305,7 @@ export function ResellerAdsPanel() {
           <CardContent className="p-12 text-center">
             <Megaphone className="h-12 w-12 mx-auto text-muted-foreground/40 mb-4" />
             <h3 className="text-lg font-semibold text-foreground mb-2">No Campaigns Yet</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Create your first lead generation campaign to start getting clients
-            </p>
+            <p className="text-sm text-muted-foreground mb-4">Create your first lead generation campaign to start getting clients</p>
             <Button onClick={() => setShowCreate(true)} className="gap-1.5">
               <Megaphone className="h-4 w-4" />
               Create First Campaign
