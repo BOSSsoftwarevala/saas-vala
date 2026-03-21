@@ -2990,6 +2990,7 @@ export type Database = {
       }
       reseller_campaigns: {
         Row: {
+          ai_strategy: string | null
           budget: number
           campaign_type: string
           created_at: string
@@ -3005,6 +3006,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          ai_strategy?: string | null
           budget?: number
           campaign_type?: string
           created_at?: string
@@ -3020,6 +3022,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          ai_strategy?: string | null
           budget?: number
           campaign_type?: string
           created_at?: string
