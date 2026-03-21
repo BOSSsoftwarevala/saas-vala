@@ -6,6 +6,15 @@ import { useProductsByCategory } from '@/hooks/useMarketplaceProducts';
 export function HealthcareTelemedicineSection({ onBuyNow }: { onBuyNow: (p: any) => void }) {
   const { products: dbProducts, loading } = useProductsByCategory(['healthcare', 'telemedicine', 'doctor', 'patient']);
 
+  // FIXED: Validate products before rendering
+  const validProducts = dbProducts.filter(product => {
+    if (!Number.isFinite(product.price) || product.price <= 0) {
+      console.warn('Invalid product price:', product.id);
+      return false;
+    }
+    return true;
+  });
+
   return (
     <section className="py-4">
       <SectionHeader
@@ -14,10 +23,10 @@ export function HealthcareTelemedicineSection({ onBuyNow }: { onBuyNow: (p: any)
         subtitle="Remote healthcare and telemedicine"
         badge="TELEHEALTH"
         badgeVariant="trending"
-        totalCount={dbProducts.length}
+        totalCount={validProducts.length}
       />
       <SectionSlider>
-        {dbProducts.map((product, i) => (
+        {validProducts.map((product, i) => (
           <MarketplaceProductCard
             key={product.id}
             product={product as any}
@@ -26,7 +35,7 @@ export function HealthcareTelemedicineSection({ onBuyNow }: { onBuyNow: (p: any)
             rank={i + 1}
           />
         ))}
-        {!loading && dbProducts.length === 0 && <ComingSoonCard label="Healthcare & Telemedicine" />}
+        {!loading && validProducts.length === 0 && <ComingSoonCard label="Healthcare & Telemedicine" />}
       </SectionSlider>
     </section>
   );
