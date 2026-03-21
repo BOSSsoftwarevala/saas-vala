@@ -146,7 +146,7 @@ export default function ValaBuilder() {
   const [projectsLoading, setProjectsLoading] = useState(false);
   const [templateSearch, setTemplateSearch] = useState('');
   const isMobile = useIsMobile();
-  const { user } = useAuth();
+  useAuth();
 
   const [selectedModel] = useState<string>(() => {
     return localStorage.getItem('saas-ai-model') || 'google/gemini-3-flash-preview';
