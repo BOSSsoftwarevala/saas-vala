@@ -162,67 +162,72 @@ Deno.serve(async (req) => {
         const { catalog_id, slug, repo_url } = data || {};
         if (!slug) return respond({ error: "slug required" }, 400);
 
-        // Get VPS factory agent URL
-        const { data: agentServer } = await admin
-          .from("servers")
-          .select("agent_url, agent_token")
-          .eq("server_type", "vps")
-          .not("agent_url", "is", null)
-          .limit(1)
-          .single();
+        const githubToken = Deno.env.get("SAASVALA_GITHUB_TOKEN");
+        const repoFullUrl = repo_url || `https://github.com/saasvala/${slug}`;
 
         const buildResult: any = {
           slug,
-          repo_url: repo_url || `https://github.com/saasvala/${slug}`,
+          repo_url: repoFullUrl,
           status: "queued",
           build_type: "capacitor-android",
         };
 
-        if (agentServer?.agent_url) {
-          // Trigger build on VPS factory
+        // Try GitHub Actions dispatch for APK build
+        if (githubToken) {
           try {
-            const buildRes = await fetch(`${agentServer.agent_url}/api/build-apk`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                ...(agentServer.agent_token ? { Authorization: `Bearer ${agentServer.agent_token}` } : {}),
-              },
-              body: JSON.stringify({
-                repo_url: buildResult.repo_url,
-                app_name: slug,
-                package_name: `com.saasvala.${slug.replace(/-/g, "_")}`,
-                build_type: "release",
-                include_sqlite: true,
-                license_gate: true,
-              }),
-            });
-            const buildData = await buildRes.json();
-            buildResult.status = buildData.success ? "building" : "failed";
-            buildResult.build_id = buildData.build_id;
-            buildResult.message = buildData.message;
+            // Check if repo exists first
+            const repoCheck = await fetch(
+              `https://api.github.com/repos/saasvala/${slug}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${githubToken}`,
+                  "User-Agent": "SaaSVala-APK-Pipeline",
+                },
+              }
+            );
+
+            if (repoCheck.ok) {
+              const repoData = await repoCheck.json();
+
+              // Upsert to apk_build_queue
+              await admin.from("apk_build_queue").upsert(
+                {
+                  repo_name: repoData.name || slug,
+                  repo_url: repoData.html_url || repoFullUrl,
+                  slug,
+                  build_status: "pending",
+                  product_id: data?.product_id || null,
+                  target_industry: detectIndustry(slug, repoData.description || ""),
+                },
+                { onConflict: "slug" }
+              );
+
+              buildResult.status = "queued";
+              buildResult.message = `✅ ${slug} queued for APK build. Repo verified (${repoData.language || "Unknown"}).`;
+              buildResult.repo_verified = true;
+              buildResult.language = repoData.language;
+              buildResult.size = repoData.size;
+            } else {
+              const errText = await repoCheck.text();
+              buildResult.status = "repo_not_found";
+              buildResult.message = `❌ Repo saasvala/${slug} not found (${repoCheck.status})`;
+            }
           } catch (e) {
-            buildResult.status = "agent_unreachable";
-            buildResult.message = `VPS agent unreachable: ${e.message}`;
+            buildResult.status = "error";
+            buildResult.message = `GitHub API error: ${e.message}`;
           }
         } else {
-          buildResult.status = "no_agent";
-          buildResult.message = "No VPS factory agent configured. APK build queued for manual processing.";
+          buildResult.status = "no_token";
+          buildResult.message = "GitHub token not configured";
         }
 
         // Update catalog with build status
         if (catalog_id) {
           await admin
             .from("source_code_catalog")
-            .update({ status: buildResult.status === "building" ? "building" : "pending_build" })
+            .update({ status: buildResult.status === "queued" ? "pending_build" : buildResult.status })
             .eq("id", catalog_id);
         }
-
-        // Log to bulk_upload_queue
-        await admin.from("bulk_upload_queue").insert({
-          catalog_id: catalog_id || null,
-          upload_type: "apk_build",
-          status: buildResult.status === "building" ? "processing" : "queued",
-        });
 
         return respond({ success: true, build: buildResult });
       }
