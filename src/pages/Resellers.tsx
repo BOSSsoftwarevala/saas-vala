@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,65 +6,44 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Card, CardContent } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
-  Plus,
-  Search,
-  Filter,
-  MoreVertical,
-  Users,
-  Edit,
-  Trash2,
-  Ban,
-  Play,
-  Shield,
-  Loader2,
-  DollarSign,
-  Percent,
-  CheckCircle,
-  Download,
+  Plus, Search, Filter, MoreVertical, Users, Edit, Trash2, Ban, Play,
+  Shield, Loader2, DollarSign, Percent, CheckCircle, Download,
+  Eye, Wallet, BarChart3, Megaphone, ArrowLeft, Globe, Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useResellers, type Reseller } from '@/hooks/useResellers';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { Switch } from '@/components/ui/switch';
- import { ResellerActivityPanel } from '@/components/reseller/ResellerActivityPanel';
- import { ResellerQuickActions } from '@/components/reseller/ResellerQuickActions';
+import { ResellerActivityPanel } from '@/components/reseller/ResellerActivityPanel';
+import { ResellerQuickActions } from '@/components/reseller/ResellerQuickActions';
+import { supabase } from '@/integrations/supabase/client';
+import { formatDistanceToNow } from 'date-fns';
 
 const ITEMS_PER_PAGE = 25;
 
+interface ResellerDetail {
+  seoRuns: any[];
+  campaigns: any[];
+  walletBalance: number;
+}
+
 export default function Resellers() {
-   const { resellers, loading, total, fetchResellers, updateReseller, deleteReseller } = useResellers();
+  const { resellers, loading, total, fetchResellers, updateReseller, deleteReseller } = useResellers();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -72,8 +51,10 @@ export default function Resellers() {
   const [editReseller, setEditReseller] = useState<Reseller | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedReseller, setSelectedReseller] = useState<Reseller | null>(null);
+  const [resellerDetail, setResellerDetail] = useState<ResellerDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
-  // Form state
   const [formData, setFormData] = useState({
     company_name: '',
     commission_percent: 10,
@@ -81,6 +62,27 @@ export default function Resellers() {
     is_active: true,
     is_verified: false,
   });
+
+  const openResellerDetail = async (reseller: Reseller) => {
+    setSelectedReseller(reseller);
+    setDetailLoading(true);
+    try {
+      const [seoRes, campRes, walletRes] = await Promise.all([
+        supabase.from('reseller_seo_runs').select('*').eq('user_id', reseller.user_id).order('created_at', { ascending: false }).limit(20),
+        supabase.from('reseller_campaigns').select('*').eq('user_id', reseller.user_id).order('created_at', { ascending: false }).limit(20),
+        supabase.from('wallets').select('balance').eq('user_id', reseller.user_id).maybeSingle(),
+      ]);
+      setResellerDetail({
+        seoRuns: (seoRes.data as any[]) || [],
+        campaigns: (campRes.data as any[]) || [],
+        walletBalance: (walletRes.data as any)?.balance || 0,
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
 
   const filteredResellers = resellers.filter((reseller) => {
     const name = (reseller.company_name || '').toLowerCase();
@@ -360,6 +362,9 @@ export default function Resellers() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="bg-popover border-border">
+                              <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => openResellerDetail(reseller)}>
+                                <Eye className="h-4 w-4" /> View Details
+                              </DropdownMenuItem>
                               <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => openEditDialog(reseller)}>
                                 <Edit className="h-4 w-4" /> Edit
                               </DropdownMenuItem>
@@ -479,6 +484,110 @@ export default function Resellers() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Reseller Detail Dialog */}
+      <Dialog open={!!selectedReseller} onOpenChange={() => { setSelectedReseller(null); setResellerDetail(null); }}>
+        <DialogContent className="max-w-3xl max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              {selectedReseller?.company_name || 'Reseller'} — Full Overview
+            </DialogTitle>
+            <DialogDescription>
+              SEO runs, campaigns, wallet & activity for this reseller
+            </DialogDescription>
+          </DialogHeader>
+
+          {detailLoading ? (
+            <div className="flex items-center justify-center p-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : resellerDetail ? (
+            <ScrollArea className="max-h-[65vh] pr-2">
+              <div className="space-y-6">
+                {/* Quick Stats */}
+                <div className="grid grid-cols-3 gap-3">
+                  <Card>
+                    <CardContent className="p-3 text-center">
+                      <Wallet className="h-4 w-4 mx-auto text-primary mb-1" />
+                      <p className="text-lg font-bold text-foreground">${resellerDetail.walletBalance.toFixed(2)}</p>
+                      <p className="text-xs text-muted-foreground">Wallet Balance</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-3 text-center">
+                      <Globe className="h-4 w-4 mx-auto text-blue-500 mb-1" />
+                      <p className="text-lg font-bold text-foreground">{resellerDetail.seoRuns.length}</p>
+                      <p className="text-xs text-muted-foreground">AI SEO Runs</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-3 text-center">
+                      <Megaphone className="h-4 w-4 mx-auto text-orange-500 mb-1" />
+                      <p className="text-lg font-bold text-foreground">{resellerDetail.campaigns.length}</p>
+                      <p className="text-xs text-muted-foreground">Campaigns</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* SEO Runs */}
+                <div>
+                  <h4 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-1.5">
+                    <Zap className="h-4 w-4 text-primary" /> AI SEO Runs
+                  </h4>
+                  {resellerDetail.seoRuns.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No SEO runs yet</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {resellerDetail.seoRuns.map((run: any) => (
+                        <Card key={run.id}>
+                          <CardContent className="p-3 flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-foreground">{run.tool_name}</p>
+                              <p className="text-xs text-muted-foreground">{run.target_url} • {formatDistanceToNow(new Date(run.created_at), { addSuffix: true })}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs">${Number(run.cost).toFixed(2)}</Badge>
+                              <Badge variant="outline" className={cn('text-xs', run.status === 'completed' ? 'bg-green-500/10 text-green-500 border-green-500/30' : '')}>{run.status}</Badge>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Campaigns */}
+                <div>
+                  <h4 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-1.5">
+                    <Megaphone className="h-4 w-4 text-orange-500" /> Lead Campaigns
+                  </h4>
+                  {resellerDetail.campaigns.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No campaigns yet</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {resellerDetail.campaigns.map((camp: any) => (
+                        <Card key={camp.id}>
+                          <CardContent className="p-3 flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-foreground">{camp.name}</p>
+                              <p className="text-xs text-muted-foreground">{camp.campaign_type?.replace(/_/g, ' ')} • Budget: ${Number(camp.budget).toFixed(2)} • {formatDistanceToNow(new Date(camp.created_at), { addSuffix: true })}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant={camp.status === 'active' ? 'default' : 'secondary'} className="text-xs">{camp.status}</Badge>
+                              {camp.ai_strategy && <Badge variant="outline" className="text-xs gap-1 border-primary/30 text-primary">AI</Badge>}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </ScrollArea>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

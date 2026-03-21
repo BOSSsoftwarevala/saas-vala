@@ -5,26 +5,19 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useWallet } from '@/hooks/useWallet';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import {
-  Megaphone,
-  Users,
-  TrendingUp,
-  Wallet,
-  AlertCircle,
-  Zap,
-  Mail,
-  Phone,
-  Globe,
-  BarChart3,
-  Play,
-  Pause,
+  Megaphone, Users, TrendingUp, Wallet, AlertCircle, Zap, Mail,
+  Phone, Globe, BarChart3, Play, Pause, Loader2, Eye, Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
 
 const MIN_CAMPAIGN_COST = 25;
 
@@ -37,30 +30,26 @@ interface Campaign {
   leads_count: number;
   impressions: number;
   spent: number;
+  ai_strategy: string | null;
   created_at: string;
 }
 
 export function ResellerAdsPanel() {
-  const { wallet } = useWallet();
+  const { wallet, fetchWallet: refetchWallet } = useWallet();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [viewStrategy, setViewStrategy] = useState<Campaign | null>(null);
   const [newCampaign, setNewCampaign] = useState({
-    name: '',
-    type: 'google_ads',
-    budget: 25,
-    targetAudience: '',
-    description: '',
+    name: '', type: 'google_ads', budget: 25, targetAudience: '', description: '',
   });
 
   const balance = wallet?.balance || 0;
 
-  useEffect(() => {
-    fetchCampaigns();
-  }, []);
+  useEffect(() => { fetchCampaigns(); }, []);
 
   const fetchCampaigns = async () => {
     const { data } = await supabase
@@ -85,15 +74,26 @@ export function ResellerAdsPanel() {
 
     setCreating(true);
     try {
-      // Deduct from wallet
+      // Step 1: Deduct from wallet
       const { error: walletErr } = await supabase
         .from('wallets')
         .update({ balance: balance - newCampaign.budget })
         .eq('user_id', user.id);
-
       if (walletErr) throw walletErr;
 
-      // Create campaign
+      // Step 2: Get AI strategy
+      const { data: aiResult, error: aiErr } = await supabase.functions.invoke('reseller-ai-tools', {
+        body: {
+          tool_id: newCampaign.type,
+          tool_name: newCampaign.name,
+          target_url: newCampaign.targetAudience || newCampaign.description || newCampaign.name,
+          tool_type: 'lead',
+        },
+      });
+
+      const aiStrategy = aiErr ? null : aiResult?.result || null;
+
+      // Step 3: Create campaign
       const { error: campErr } = await supabase
         .from('reseller_campaigns')
         .insert({
@@ -104,17 +104,20 @@ export function ResellerAdsPanel() {
           target_audience: newCampaign.targetAudience || null,
           description: newCampaign.description || null,
           status: 'active',
+          ai_strategy: aiStrategy,
         });
-
       if (campErr) throw campErr;
 
-      toast.success(`🚀 Campaign "${newCampaign.name}" launched! $${newCampaign.budget} reserved.`);
+      toast.success(`🚀 Campaign launched with AI strategy! $${newCampaign.budget} reserved.`);
       setShowCreate(false);
       setNewCampaign({ name: '', type: 'google_ads', budget: 25, targetAudience: '', description: '' });
       await fetchCampaigns();
-    } catch (err) {
+      refetchWallet();
+    } catch (err: any) {
       console.error(err);
-      toast.error('Failed to create campaign');
+      toast.error(err?.message || 'Failed to create campaign');
+      await supabase.from('wallets').update({ balance }).eq('user_id', user!.id);
+      refetchWallet();
     } finally {
       setCreating(false);
     }
@@ -129,47 +132,34 @@ export function ResellerAdsPanel() {
 
   const totalLeads = campaigns.reduce((s, c) => s + c.leads_count, 0);
   const totalSpent = campaigns.reduce((s, c) => s + Number(c.budget), 0);
-  const activeCampaigns = campaigns.filter((c) => c.status === 'active').length;
+  const activeCampaigns = campaigns.filter(c => c.status === 'active').length;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-display font-bold text-foreground">Ads & Lead Generation</h2>
-          <p className="text-muted-foreground">Run campaigns to generate leads for your software business</p>
+          <h2 className="text-2xl font-display font-bold text-foreground">🤖 AI Ads & Lead Generation</h2>
+          <p className="text-muted-foreground">AI-powered campaigns — strategy generated after payment</p>
         </div>
         <div className="flex items-center gap-3">
           <Badge variant="outline" className="text-sm py-1.5 px-3 gap-1.5 border-primary/30">
-            <Wallet className="h-3.5 w-3.5" />
-            Balance: ${balance.toFixed(2)}
+            <Wallet className="h-3.5 w-3.5" /> Balance: ${balance.toFixed(2)}
           </Badge>
           <Button size="sm" onClick={() => setShowCreate(true)} className="gap-1.5">
-            <Megaphone className="h-3.5 w-3.5" />
-            New Campaign
+            <Megaphone className="h-3.5 w-3.5" /> New Campaign
           </Button>
         </div>
       </div>
 
-      {/* Balance Warning */}
       {balance < MIN_CAMPAIGN_COST && (
         <Card className="border-amber-500/30 bg-amber-500/5">
           <CardContent className="p-4 flex items-center gap-3">
             <AlertCircle className="h-5 w-5 text-amber-500 shrink-0" />
             <div>
-              <p className="text-sm font-medium text-foreground">Add Balance to Start Campaigns</p>
-              <p className="text-xs text-muted-foreground">
-                Minimum ${MIN_CAMPAIGN_COST} required to create a lead generation campaign.
-              </p>
+              <p className="text-sm font-medium text-foreground">Add Balance for AI Campaigns</p>
+              <p className="text-xs text-muted-foreground">Minimum ${MIN_CAMPAIGN_COST} required. AI generates strategy after payment.</p>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="ml-auto shrink-0 border-amber-500/30 text-amber-500 hover:bg-amber-500/10"
-              onClick={() => navigate('/reseller-dashboard?tab=wallet')}
-            >
-              Add Balance
-            </Button>
+            <Button size="sm" variant="outline" className="ml-auto shrink-0 border-amber-500/30 text-amber-500 hover:bg-amber-500/10" onClick={() => navigate('/reseller-dashboard?tab=wallet')}>Add Balance</Button>
           </CardContent>
         </Card>
       )}
@@ -180,7 +170,7 @@ export function ResellerAdsPanel() {
           { label: 'Active Campaigns', value: activeCampaigns.toString(), icon: Megaphone, color: 'text-blue-500' },
           { label: 'Total Leads', value: totalLeads.toString(), icon: Users, color: 'text-green-500' },
           { label: 'Total Spent', value: `$${totalSpent.toFixed(2)}`, icon: Wallet, color: 'text-orange-500' },
-          { label: 'Conversion Rate', value: totalLeads > 0 ? `${((totalLeads / Math.max(1, campaigns.reduce((s, c) => s + c.impressions, 0))) * 100).toFixed(1)}%` : '0%', icon: TrendingUp, color: 'text-purple-500' },
+          { label: 'Conversion', value: totalLeads > 0 ? `${((totalLeads / Math.max(1, campaigns.reduce((s, c) => s + c.impressions, 0))) * 100).toFixed(1)}%` : '0%', icon: TrendingUp, color: 'text-purple-500' },
         ].map((stat) => (
           <Card key={stat.label}>
             <CardContent className="p-4">
@@ -194,24 +184,22 @@ export function ResellerAdsPanel() {
         ))}
       </div>
 
-      {/* Create Campaign Form */}
+      {/* Create Campaign */}
       {showCreate && (
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
           <Card className="border-primary/30">
             <CardContent className="p-6 space-y-4">
-              <h3 className="text-lg font-semibold text-foreground">Create New Campaign</h3>
+              <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" /> Create AI-Powered Campaign
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1 block">Campaign Name</label>
-                  <Input
-                    placeholder="e.g. Restaurant POS Leads India"
-                    value={newCampaign.name}
-                    onChange={(e) => setNewCampaign((p) => ({ ...p, name: e.target.value }))}
-                  />
+                  <Input placeholder="e.g. Restaurant POS Leads India" value={newCampaign.name} onChange={(e) => setNewCampaign(p => ({ ...p, name: e.target.value }))} />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1 block">Campaign Type</label>
-                  <Select value={newCampaign.type} onValueChange={(v) => setNewCampaign((p) => ({ ...p, type: v }))}>
+                  <Select value={newCampaign.type} onValueChange={(v) => setNewCampaign(p => ({ ...p, type: v }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="google_ads">Google Ads</SelectItem>
@@ -224,36 +212,22 @@ export function ResellerAdsPanel() {
                 </div>
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1 block">Budget ($)</label>
-                  <Input
-                    type="number"
-                    min={25}
-                    value={newCampaign.budget}
-                    onChange={(e) => setNewCampaign((p) => ({ ...p, budget: Number(e.target.value) }))}
-                  />
+                  <Input type="number" min={25} value={newCampaign.budget} onChange={(e) => setNewCampaign(p => ({ ...p, budget: Number(e.target.value) }))} />
                 </div>
                 <div>
                   <label className="text-sm font-medium text-foreground mb-1 block">Target Audience</label>
-                  <Input
-                    placeholder="e.g. Small businesses in Mumbai"
-                    value={newCampaign.targetAudience}
-                    onChange={(e) => setNewCampaign((p) => ({ ...p, targetAudience: e.target.value }))}
-                  />
+                  <Input placeholder="e.g. Small businesses in Mumbai" value={newCampaign.targetAudience} onChange={(e) => setNewCampaign(p => ({ ...p, targetAudience: e.target.value }))} />
                 </div>
               </div>
               <div>
                 <label className="text-sm font-medium text-foreground mb-1 block">Campaign Description</label>
-                <Textarea
-                  placeholder="Describe your campaign goals..."
-                  value={newCampaign.description}
-                  onChange={(e) => setNewCampaign((p) => ({ ...p, description: e.target.value }))}
-                  rows={3}
-                />
+                <Textarea placeholder="Describe your campaign goals..." value={newCampaign.description} onChange={(e) => setNewCampaign(p => ({ ...p, description: e.target.value }))} rows={3} />
               </div>
+              <p className="text-xs text-muted-foreground">💡 AI will generate a full strategy, ad copy & targeting recommendations after payment</p>
               <div className="flex gap-3 justify-end">
                 <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
                 <Button onClick={handleCreateCampaign} disabled={balance < newCampaign.budget || creating} className="gap-1.5">
-                  <Zap className="h-4 w-4" />
-                  {creating ? 'Launching...' : `Launch Campaign ($${newCampaign.budget})`}
+                  {creating ? <><Loader2 className="h-4 w-4 animate-spin" /> AI Generating...</> : <><Zap className="h-4 w-4" /> Launch Campaign (${newCampaign.budget})</>}
                 </Button>
               </div>
             </CardContent>
@@ -261,7 +235,7 @@ export function ResellerAdsPanel() {
         </motion.div>
       )}
 
-      {/* Campaign List */}
+      {/* Campaigns List */}
       {campaigns.length > 0 ? (
         <div className="space-y-3">
           <h3 className="text-lg font-semibold text-foreground">Your Campaigns</h3>
@@ -271,20 +245,19 @@ export function ResellerAdsPanel() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <h4 className="font-medium text-foreground">{campaign.name}</h4>
-                    <Badge variant={campaign.status === 'active' ? 'default' : 'secondary'} className="text-xs">
-                      {campaign.status}
-                    </Badge>
+                    <Badge variant={campaign.status === 'active' ? 'default' : 'secondary'} className="text-xs">{campaign.status}</Badge>
+                    {campaign.ai_strategy && <Badge variant="outline" className="text-xs gap-1 border-primary/30 text-primary"><Sparkles className="h-3 w-3" />AI</Badge>}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {campaign.campaign_type.replace(/_/g, ' ')} • Budget: ${Number(campaign.budget).toFixed(2)} • {campaign.leads_count} leads
-                  </p>
+                  <p className="text-xs text-muted-foreground">{campaign.campaign_type.replace(/_/g, ' ')} • Budget: ${Number(campaign.budget).toFixed(2)} • {campaign.leads_count} leads</p>
                 </div>
                 <div className="flex gap-2">
+                  {campaign.ai_strategy && (
+                    <Button variant="outline" size="sm" className="gap-1" onClick={() => setViewStrategy(campaign)}>
+                      <Eye className="h-3.5 w-3.5" /> AI Strategy
+                    </Button>
+                  )}
                   <Button variant="outline" size="sm" className="gap-1" onClick={() => toggleCampaignStatus(campaign.id, campaign.status)}>
                     {campaign.status === 'active' ? <><Pause className="h-3.5 w-3.5" /> Pause</> : <><Play className="h-3.5 w-3.5" /> Resume</>}
-                  </Button>
-                  <Button variant="outline" size="sm" className="gap-1">
-                    <BarChart3 className="h-3.5 w-3.5" /> Report
                   </Button>
                 </div>
               </CardContent>
@@ -296,11 +269,8 @@ export function ResellerAdsPanel() {
           <CardContent className="p-12 text-center">
             <Megaphone className="h-12 w-12 mx-auto text-muted-foreground/40 mb-4" />
             <h3 className="text-lg font-semibold text-foreground mb-2">No Campaigns Yet</h3>
-            <p className="text-sm text-muted-foreground mb-4">Create your first lead generation campaign to start getting clients</p>
-            <Button onClick={() => setShowCreate(true)} className="gap-1.5">
-              <Megaphone className="h-4 w-4" />
-              Create First Campaign
-            </Button>
+            <p className="text-sm text-muted-foreground mb-4">Create your first AI-powered lead generation campaign</p>
+            <Button onClick={() => setShowCreate(true)} className="gap-1.5"><Megaphone className="h-4 w-4" /> Create First Campaign</Button>
           </CardContent>
         </Card>
       )}
@@ -310,15 +280,13 @@ export function ResellerAdsPanel() {
         <h3 className="text-lg font-semibold text-foreground mb-3">Lead Generation Channels</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[
-            { title: 'Email Outreach', desc: 'Send targeted emails to prospects', icon: Mail, cost: '$5/100 emails', color: 'from-blue-500 to-cyan-500' },
-            { title: 'SMS Campaigns', desc: 'Bulk SMS to potential clients', icon: Phone, cost: '$10/500 SMS', color: 'from-green-500 to-emerald-500' },
-            { title: 'Google Ads', desc: 'Run PPC campaigns for leads', icon: Globe, cost: '$25 min budget', color: 'from-red-500 to-orange-500' },
+            { title: 'Email Outreach', desc: 'AI-crafted targeted emails', icon: Mail, cost: '$5/100 emails', color: 'from-blue-500 to-cyan-500' },
+            { title: 'SMS Campaigns', desc: 'AI-optimized bulk SMS', icon: Phone, cost: '$10/500 SMS', color: 'from-green-500 to-emerald-500' },
+            { title: 'Google Ads', desc: 'AI-managed PPC campaigns', icon: Globe, cost: '$25 min budget', color: 'from-red-500 to-orange-500' },
           ].map((ch) => (
             <Card key={ch.title} className="hover:border-primary/20 transition-colors">
               <CardContent className="p-5">
-                <div className={`p-2.5 rounded-xl bg-gradient-to-br ${ch.color} text-white w-fit mb-3`}>
-                  <ch.icon className="h-5 w-5" />
-                </div>
+                <div className={`p-2.5 rounded-xl bg-gradient-to-br ${ch.color} text-white w-fit mb-3`}><ch.icon className="h-5 w-5" /></div>
                 <h4 className="font-semibold text-foreground mb-1">{ch.title}</h4>
                 <p className="text-xs text-muted-foreground mb-2">{ch.desc}</p>
                 <Badge variant="outline" className="text-xs">{ch.cost}</Badge>
@@ -327,6 +295,20 @@ export function ResellerAdsPanel() {
           ))}
         </div>
       </div>
+
+      {/* AI Strategy Viewer */}
+      <Dialog open={!!viewStrategy} onOpenChange={() => setViewStrategy(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /> AI Strategy — {viewStrategy?.name}</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            <div className="prose prose-sm dark:prose-invert max-w-none p-2">
+              <ReactMarkdown>{viewStrategy?.ai_strategy || ''}</ReactMarkdown>
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
