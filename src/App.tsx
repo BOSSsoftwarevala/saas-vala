@@ -152,8 +152,7 @@ function AppRoutes() {
         <Route path="/cart" element={<Cart />} />
 
         {/* Legacy redirects */}
-        <Route path="/vala-builder" element={<Navigate to="/ai-chat" replace />} />
-        <Route path="/apk-pipeline" element={<Navigate to="/ai-chat" replace />} />
+        <Route path="/apk-pipeline" element={<Navigate to="/vala-builder" replace />} />
 
         {/* Protected user routes - auth required */}
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
