@@ -7,10 +7,8 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
-interface ServerSettings {
-  auto_deploy: boolean;
-  status: string;
-}
+
+
 
 export function SimpleSettings() {
   const [server, setServer] = useState<{ id: string; auto_deploy: boolean; status: string } | null>(null);

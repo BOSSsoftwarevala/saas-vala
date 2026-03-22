@@ -52,14 +52,14 @@ export function CustomDomain() {
     setIsAdding(true);
     
     const { data: userData } = await supabase.auth.getUser();
-    const { error } = await supabase.from('domains').insert({
+    const { error } = await supabase.from('domains').insert([{
       domain_name: newDomain.trim(),
       domain_type: 'custom',
       status: 'pending_verification',
       ssl_status: 'pending',
       dns_verified: false,
       created_by: userData.user?.id,
-    });
+    }]);
 
     if (error) {
       toast.error('Failed to add domain: ' + error.message);
