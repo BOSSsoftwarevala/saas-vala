@@ -55,7 +55,7 @@ export function CustomDomain() {
     const { error } = await supabase.from('domains').insert([{
       domain_name: newDomain.trim(),
       domain_type: 'custom',
-      status: 'pending_verification',
+      status: 'pending' as const,
       ssl_status: 'pending',
       dns_verified: false,
       created_by: userData.user?.id,
