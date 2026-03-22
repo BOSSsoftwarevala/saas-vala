@@ -106,7 +106,7 @@ export function CustomDomain() {
   };
 
   const statusConfig: Record<string, { icon: typeof CheckCircle2; color: string; bg: string; border: string; label: string }> = {
-    pending_verification: { icon: Clock, color: 'text-warning', bg: 'bg-warning/20', border: 'border-warning/30', label: 'Pending' },
+    pending: { icon: Clock, color: 'text-warning', bg: 'bg-warning/20', border: 'border-warning/30', label: 'Pending' },
     active: { icon: CheckCircle2, color: 'text-success', bg: 'bg-success/20', border: 'border-success/30', label: 'Live' },
     failed: { icon: AlertCircle, color: 'text-destructive', bg: 'bg-destructive/20', border: 'border-destructive/30', label: 'Failed' },
   };
