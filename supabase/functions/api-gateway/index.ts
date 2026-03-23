@@ -14,6 +14,57 @@ function err(message: string, status = 400) {
   return json({ error: message }, status)
 }
 
+// ===================== INPUT VALIDATION =====================
+function validateAmount(amount: unknown): { valid: boolean; value: number; error?: string } {
+  const v = Number(amount)
+  if (isNaN(v) || v <= 0) return { valid: false, value: 0, error: 'Amount must be a positive number' }
+  if (v > 1_000_000) return { valid: false, value: 0, error: 'Amount exceeds maximum allowed value' }
+  return { valid: true, value: Math.round(v * 100) / 100 }
+}
+
+function validatePagination(page: unknown, limit: unknown): { page: number; limit: number } {
+  const rawPage = page !== undefined && page !== null && page !== '' ? parseInt(String(page), 10) : 1
+  const rawLimit = limit !== undefined && limit !== null && limit !== '' ? parseInt(String(limit), 10) : 25
+  const p = Math.max(1, isNaN(rawPage) ? 1 : rawPage)
+  const l = Math.min(100, Math.max(1, isNaN(rawLimit) ? 25 : rawLimit))
+  return { page: p, limit: l }
+}
+
+function validateUuid(id: unknown): boolean {
+  if (typeof id !== 'string') return false
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+}
+
+// ===================== RATE LIMITING =====================
+// Per-module rate limits: [maxRequests, windowMinutes]
+const RATE_LIMITS: Record<string, [number, number]> = {
+  'wallet':     [30, 1],   // 30 wallet ops/min
+  'keys':       [60, 1],   // 60 key ops/min
+  'products':   [120, 1],  // 120 product reads/min
+  'marketplace':[120, 1],
+  'resellers':  [60, 1],
+  'ai':         [20, 1],   // 20 AI calls/min
+  'default':    [120, 1],
+}
+
+async function checkRateLimit(admin: any, identifier: string, module: string): Promise<boolean> {
+  try {
+    const [maxReq, windowMin] = RATE_LIMITS[module] ?? RATE_LIMITS['default']
+    const { data } = await admin.rpc('check_rate_limit', {
+      p_identifier: identifier,
+      p_endpoint: module,
+      p_max_requests: maxReq,
+      p_window_minutes: windowMin,
+    })
+    return data !== false
+  } catch (e) {
+    // If rate limit check fails, allow the request (fail open)
+    console.error('Rate limit check failed:', e)
+    return true
+  }
+}
+
+// ===================== AUTH =====================
 async function authenticate(req: Request) {
   const authHeader = req.headers.get('Authorization')
   if (!authHeader?.startsWith('Bearer ')) return null
@@ -50,6 +101,11 @@ async function logActivity(admin: any, entityType: string, entityId: string, act
   } catch (e) {
     console.error('Activity log failed:', e)
   }
+}
+
+async function isAdmin(admin: any, userId: string): Promise<boolean> {
+  const { data } = await admin.from('user_roles').select('role').eq('user_id', userId).eq('role', 'super_admin').maybeSingle()
+  return !!data
 }
 
 // ===================== 1. AUTH =====================
@@ -707,11 +763,16 @@ async function handleWallet(method: string, pathParts: string[], body: any, user
     return json({ data })
   }
 
-  // GET /wallet/all (admin)
+  // GET /wallet/all (admin only) — paginated
   if (method === 'GET' && action === 'all') {
-    const { data, error } = await sb.from('wallets').select('*').order('balance', { ascending: false })
+    const adminCheck = await isAdmin(admin, userId)
+    if (!adminCheck) return err('Forbidden', 403)
+    const { page, limit } = validatePagination(body?.page, body?.limit)
+    const { data, error, count } = await admin.from('wallets').select('*', { count: 'exact' })
+      .order('balance', { ascending: false })
+      .range((page - 1) * limit, page * limit - 1)
     if (error) return err(error.message)
-    return json({ data })
+    return json({ data, total: count, page, limit })
   }
 
   // GET /wallet/transactions
@@ -719,52 +780,51 @@ async function handleWallet(method: string, pathParts: string[], body: any, user
     const { data: wallet } = await sb.from('wallets').select('id').eq('user_id', userId).maybeSingle()
     if (!wallet) return json({ data: [], total: 0 })
 
-    const page = Number(body?.page || 1)
-    const limit = Number(body?.limit || 25)
+    const { page, limit } = validatePagination(body?.page, body?.limit)
     const { data, error, count } = await sb.from('transactions').select('*', { count: 'exact' })
       .eq('wallet_id', wallet.id).order('created_at', { ascending: false })
       .range((page - 1) * limit, page * limit - 1)
     if (error) return err(error.message)
-    return json({ data, total: count })
+    return json({ data, total: count, page, limit })
   }
 
-  // POST /wallet/add
+  // POST /wallet/add — uses atomic credit to prevent race conditions
   if (method === 'POST' && action === 'add') {
-    const { data: wallet } = await sb.from('wallets').select('id, balance').eq('user_id', userId).single()
-    if (!wallet) return err('Wallet not found', 404)
+    const amtCheck = validateAmount(body?.amount)
+    if (!amtCheck.valid) return err(amtCheck.error!, 422)
 
-    const newBalance = (wallet.balance || 0) + body.amount
-    const { error: txErr } = await sb.from('transactions').insert({
-      wallet_id: wallet.id, type: 'credit', amount: body.amount,
-      balance_after: newBalance, status: 'completed',
-      description: body.description || 'Credit added', created_by: userId,
-      meta: body.payment_method ? { payment_method: body.payment_method } : null,
+    const { data: result, error } = await admin.rpc('atomic_wallet_credit', {
+      p_user_id: userId,
+      p_amount: amtCheck.value,
+      p_description: body.description || 'Credit added',
+      p_reference_id: body.reference_id || null,
+      p_reference_type: body.reference_type || null,
+      p_payment_method: body.payment_method || null,
     })
-    if (txErr) return err(txErr.message)
+    if (error) return err(error.message)
+    if (!result?.success) return err(result?.error || 'Credit failed', 400)
 
-    await sb.from('wallets').update({ balance: newBalance }).eq('id', wallet.id)
-    await logActivity(admin, 'wallet', wallet.id, 'credit_added', userId, { amount: body.amount })
-    return json({ success: true, balance: newBalance })
+    await logActivity(admin, 'wallet', result.transaction_id || userId, 'credit_added', userId, { amount: amtCheck.value })
+    return json({ success: true, balance: result.balance, transaction_id: result.transaction_id })
   }
 
-  // POST /wallet/withdraw
+  // POST /wallet/withdraw — uses atomic debit to prevent double-spend
   if (method === 'POST' && action === 'withdraw') {
-    const { data: wallet } = await sb.from('wallets').select('id, balance').eq('user_id', userId).single()
-    if (!wallet) return err('Wallet not found', 404)
-    if ((wallet.balance || 0) < body.amount) return err('Insufficient balance')
+    const amtCheck = validateAmount(body?.amount)
+    if (!amtCheck.valid) return err(amtCheck.error!, 422)
 
-    const newBalance = (wallet.balance || 0) - body.amount
-    const { error: txErr } = await sb.from('transactions').insert({
-      wallet_id: wallet.id, type: 'debit', amount: body.amount,
-      balance_after: newBalance, status: 'completed',
-      description: body.description || 'Withdrawal', created_by: userId,
-      reference_id: body.reference_id, reference_type: body.reference_type,
+    const { data: result, error } = await admin.rpc('atomic_wallet_debit', {
+      p_user_id: userId,
+      p_amount: amtCheck.value,
+      p_description: body.description || 'Withdrawal',
+      p_reference_id: body.reference_id || null,
+      p_reference_type: body.reference_type || null,
     })
-    if (txErr) return err(txErr.message)
+    if (error) return err(error.message)
+    if (!result?.success) return err(result?.error || 'Debit failed', 400)
 
-    await sb.from('wallets').update({ balance: newBalance }).eq('id', wallet.id)
-    await logActivity(admin, 'wallet', wallet.id, 'debit', userId, { amount: body.amount })
-    return json({ success: true, balance: newBalance })
+    await logActivity(admin, 'wallet', result.transaction_id || userId, 'debit', userId, { amount: amtCheck.value })
+    return json({ success: true, balance: result.balance, transaction_id: result.transaction_id })
   }
 
   return err('Not found', 404)
@@ -777,8 +837,7 @@ async function handleSeoLeads(method: string, pathParts: string[], body: any, us
 
   // GET /leads
   if (method === 'GET' && segment === 'leads') {
-    const page = Number(body?.page || 1)
-    const limit = Number(body?.limit || 25)
+    const { page, limit } = validatePagination(body?.page, body?.limit)
     const search = body?.search || ''
 
     let query = sb.from('leads').select('*', { count: 'exact' })
@@ -788,7 +847,7 @@ async function handleSeoLeads(method: string, pathParts: string[], body: any, us
     if (search) query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,company.ilike.%${search}%`)
     const { data, error, count } = await query
     if (error) return err(error.message)
-    return json({ data, total: count })
+    return json({ data, total: count, page, limit })
   }
 
   // POST /leads
@@ -820,12 +879,20 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
+  const requestId = crypto.randomUUID()
+  const startTime = Date.now()
+
   try {
     const url = new URL(req.url)
     const fullPath = url.pathname.replace(/^\/api-gateway\/?/, '').replace(/\/$/, '')
     const parts = fullPath.split('/').filter(Boolean)
     const module = parts[0]
     const subParts = parts.slice(1)
+
+    // Reject requests with no module
+    if (!module) {
+      return err('Not found', 404)
+    }
 
     // Parse body for POST/PUT/DELETE, query params for GET
     let body: any = {}
@@ -840,11 +907,27 @@ Deno.serve(async (req) => {
       return await handleAuth(req.method, subParts, body, req)
     }
 
+    // Health check endpoint
+    if (module === 'health') {
+      return json({ status: 'healthy', timestamp: new Date().toISOString(), request_id: requestId })
+    }
+
     // All other endpoints require JWT
     const auth = await authenticate(req)
     if (!auth) return err('Unauthorized', 401)
 
     const { userId, supabase: sb } = auth
+
+    // Rate limiting (use IP as fallback identifier for unauthenticated-but-validated requests)
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+    const rateLimitIdentifier = `user:${userId}`
+    const admin = adminClient()
+
+    const allowed = await checkRateLimit(admin, rateLimitIdentifier, module)
+    if (!allowed) {
+      console.warn(`Rate limit exceeded: user=${userId} module=${module} ip=${clientIp}`)
+      return err('Too many requests. Please slow down.', 429)
+    }
 
     switch (module) {
       case 'products': return await handleProducts(req.method, subParts, body, userId, sb)
@@ -870,10 +953,11 @@ Deno.serve(async (req) => {
       case 'seo':
         return await handleSeoLeads(req.method, [module, ...subParts], body, userId, sb)
       default:
-        return err(`Unknown module: ${module}`, 404)
+        return err(`Unknown endpoint: ${module}`, 404)
     }
   } catch (e) {
-    console.error('API Gateway Error:', e)
+    const elapsed = Date.now() - startTime
+    console.error(`API Gateway Error [${requestId}] +${elapsed}ms:`, e)
     return err('Internal server error', 500)
   }
 })
