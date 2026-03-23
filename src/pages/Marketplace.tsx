@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { MarketplaceHeader } from '@/components/marketplace/MarketplaceHeader';
 import { LazySection } from '@/components/marketplace/LazySection';
 import { MarketplaceCategoryRow } from '@/components/marketplace/MarketplaceCategoryRow';
@@ -46,11 +47,28 @@ export default function Marketplace() {
   const [manualTxnRef, setManualTxnRef] = useState('');
   const [_manualSubmitted, setManualSubmitted] = useState(false);
   const paymentLockRef = useRef(false);
+  const buyParamHandled = useRef(false);
   const { purchaseApk, processing } = useApkPurchase();
   const { checkUserStatus } = useFraudDetection();
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   
-  useMarketplaceProducts();
+  const { products } = useMarketplaceProducts();
+
+  // Handle ?buy=PRODUCT_ID query param coming from cart checkout
+  useEffect(() => {
+    if (buyParamHandled.current) return;
+    const buyId = searchParams.get('buy');
+    if (!buyId || !products.length) return;
+    // Mark as handled immediately (before async work) to prevent duplicate triggers
+    buyParamHandled.current = true;
+    const product = products.find((p) => p.id === buyId);
+    if (product) {
+      setSearchParams((prev) => { prev.delete('buy'); return prev; }, { replace: true });
+      handleBuyNow(product as Product);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products, searchParams]);
 
   const handleBuyNow = async (product: Product) => {
     if (!user) { toast.error('Please sign in to purchase'); return; }
