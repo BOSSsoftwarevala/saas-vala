@@ -63,6 +63,7 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
   const [transactionRef, setTransactionRef] = useState('');
   const [step, setStep] = useState<'form' | 'processing' | 'success' | 'pending'>('form');
   const [retryCount, setRetryCount] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const finalAmount = customAmount ? parseInt(customAmount) || 0 : amount;
   const isManualMethod = payMethod === 'bank' || payMethod === 'wise' || payMethod === 'remit' || payMethod === 'crypto';
@@ -74,6 +75,7 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
     setPayMethod('upi');
     setTransactionRef('');
     setRetryCount(0);
+    setIsSubmitting(false);
     setShowMoreOptions(false);
     onOpenChange(false);
   };
@@ -84,10 +86,13 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
   };
 
   const submitManualPayment = async () => {
-    if (!transactionRef.trim()) {
+    const trimmedRef = transactionRef.trim();
+    if (!trimmedRef) {
       toast.error('Please enter your transaction reference number');
       return;
     }
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     setStep('processing');
     try {
       const { supabase } = await import('@/integrations/supabase/client');
@@ -99,18 +104,41 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
           .eq('user_id', userData.user.id)
           .maybeSingle();
         if (walletData) {
-          await supabase.from('transactions').insert({
+          // Check for duplicate reference ID before inserting
+          const { data: existing } = await supabase
+            .from('transactions')
+            .select('id')
+            .eq('wallet_id', walletData.id)
+            .eq('reference_id', trimmedRef)
+            .maybeSingle();
+          if (existing) {
+            toast.error('This reference ID has already been submitted');
+            setStep('form');
+            setIsSubmitting(false);
+            return;
+          }
+          const { error: insertError } = await supabase.from('transactions').insert({
             wallet_id: walletData.id,
-            type: 'credit',
+            type: 'purchase',
             amount: finalAmount,
             balance_after: null,
             status: 'pending',
             description: `${payMethod.toUpperCase()} Transfer - Awaiting Verification`,
             created_by: userData.user.id,
-            reference_id: transactionRef,
+            reference_id: trimmedRef,
             reference_type: payMethod === 'crypto' ? 'crypto_transfer' : 'bank_transfer',
-            meta: { payment_method: payMethod, transaction_ref: transactionRef },
+            meta: { payment_method: payMethod, transaction_ref: trimmedRef },
           });
+          if (insertError) {
+            if (insertError.code === '23505') {
+              toast.error('This reference ID has already been submitted');
+            } else {
+              throw insertError;
+            }
+            setStep('form');
+            setIsSubmitting(false);
+            return;
+          }
         }
       }
       await new Promise(r => setTimeout(r, 800));
@@ -118,69 +146,109 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
     } catch {
       toast.error('Failed to submit. Please try again.');
       setStep('form');
+      setIsSubmitting(false);
     }
   };
 
   const submitUpiPayment = async () => {
-    if (!transactionRef.trim()) {
+    const trimmedRef = transactionRef.trim();
+    if (!trimmedRef) {
       toast.error('Please enter your UPI transaction ID');
       return;
     }
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     setStep('processing');
 
-    const processPayment = async (attempt: number): Promise<boolean> => {
+    // Check for duplicate reference ID before attempting payment
+    try {
+      const { supabase: sb } = await import('@/integrations/supabase/client');
+      const { data: userData } = await sb.auth.getUser();
+      if (userData.user) {
+        const { data: walletData } = await sb
+          .from('wallets')
+          .select('id')
+          .eq('user_id', userData.user.id)
+          .maybeSingle();
+        if (walletData) {
+          const { data: existing } = await sb
+            .from('transactions')
+            .select('id')
+            .eq('wallet_id', walletData.id)
+            .eq('reference_id', trimmedRef)
+            .maybeSingle();
+          if (existing) {
+            toast.error('This UPI Transaction ID has already been submitted');
+            setStep('form');
+            setIsSubmitting(false);
+            return;
+          }
+        }
+      }
+    } catch {
+      // If pre-check fails, proceed and let DB unique constraint catch duplicates
+    }
+
+    const processPayment = async (attempt: number): Promise<'success' | 'duplicate' | 'failed'> => {
       try {
         const { supabase } = await import('@/integrations/supabase/client');
         const { data: userData } = await supabase.auth.getUser();
-        if (!userData.user) return false;
+        if (!userData.user) return 'failed';
 
         const { data: walletData } = await supabase
           .from('wallets')
-          .select('id, balance')
+          .select('id')
           .eq('user_id', userData.user.id)
           .maybeSingle();
-        if (!walletData) return false;
-
-        const newBalance = (walletData.balance || 0) + finalAmount;
+        if (!walletData) return 'failed';
 
         const { error: txError } = await supabase.from('transactions').insert({
           wallet_id: walletData.id,
-          type: 'credit',
+          type: 'purchase',
           amount: finalAmount,
-          balance_after: newBalance,
+          balance_after: null,
           status: 'pending',
           description: 'UPI Payment - Pending Verification',
           created_by: userData.user.id,
-          reference_id: transactionRef,
+          reference_id: trimmedRef,
           reference_type: 'upi',
-          meta: { payment_method: 'upi', upi_txn_id: transactionRef },
+          meta: { payment_method: 'upi', upi_txn_id: trimmedRef },
         });
 
-        if (txError && attempt < 3) {
-          setRetryCount(attempt);
-          await new Promise(r => setTimeout(r, 1500));
-          return processPayment(attempt + 1);
+        if (txError) {
+          if (txError.code === '23505') return 'duplicate';
+          if (attempt < 3) {
+            setRetryCount(attempt);
+            await new Promise(r => setTimeout(r, 1500));
+            return processPayment(attempt + 1);
+          }
+          return 'failed';
         }
-        return !txError;
+        return 'success';
       } catch {
         if (attempt < 3) {
           setRetryCount(attempt);
           await new Promise(r => setTimeout(r, 1500));
           return processPayment(attempt + 1);
         }
-        return false;
+        return 'failed';
       }
     };
 
-    const success = await processPayment(1);
-    if (success) {
+    const result = await processPayment(1);
+    if (result === 'success') {
       setStep('pending');
       onSuccess?.();
     } else {
-      toast.error('Submission failed. Please try again.');
+      if (result === 'duplicate') {
+        toast.error('This UPI Transaction ID has already been submitted');
+      } else {
+        toast.error('Submission failed. Please try again.');
+      }
       setStep('form');
       setRetryCount(0);
     }
+    setIsSubmitting(false);
   };
 
   return (
@@ -505,7 +573,7 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
               {/* ── SUBMIT BUTTON ── */}
               <Button
                 className="w-full bg-orange-gradient hover:opacity-90 text-white h-12 text-base font-semibold"
-                disabled={finalAmount < 100 || (isManualMethod && !transactionRef.trim()) || (payMethod === 'upi' && !transactionRef.trim())}
+                disabled={isSubmitting || finalAmount < 100 || (isManualMethod && !transactionRef.trim()) || (payMethod === 'upi' && !transactionRef.trim())}
                 onClick={isManualMethod ? submitManualPayment : submitUpiPayment}
               >
                 {payMethod === 'upi'

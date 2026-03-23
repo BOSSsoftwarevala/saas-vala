@@ -14,7 +14,7 @@ export interface Wallet {
 export interface Transaction {
   id: string;
   wallet_id: string;
-  type: 'credit' | 'debit' | 'refund' | 'adjustment';
+  type: 'credit' | 'debit' | 'refund' | 'adjustment' | 'purchase';
   amount: number;
   balance_after: number | null;
   status: 'pending' | 'completed' | 'failed' | 'cancelled';
@@ -110,12 +110,12 @@ export function useWallet() {
   };
 
   const getLastPaymentStatus = (): { status: 'success' | 'failed' | 'pending' | null; amount: number } => {
-    const lastCreditTx = transactions.find(t => t.type === 'credit');
-    if (!lastCreditTx) return { status: null, amount: 0 };
+    const lastTx = transactions.find(t => t.type === 'credit' || t.type === 'purchase');
+    if (!lastTx) return { status: null, amount: 0 };
     return {
-      status: lastCreditTx.status === 'completed' ? 'success' :
-              lastCreditTx.status === 'failed' ? 'failed' : 'pending',
-      amount: lastCreditTx.amount
+      status: lastTx.status === 'completed' ? 'success' :
+              lastTx.status === 'failed' ? 'failed' : 'pending',
+      amount: lastTx.amount
     };
   };
 

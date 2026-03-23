@@ -730,14 +730,24 @@ async function handleWallet(method: string, pathParts: string[], body: any, user
 
   // POST /wallet/add
   if (method === 'POST' && action === 'add') {
+    if (!body.amount || Number(body.amount) <= 0) return err('Invalid amount')
+
     const { data: wallet } = await sb.from('wallets').select('id, balance').eq('user_id', userId).single()
     if (!wallet) return err('Wallet not found', 404)
+
+    // Prevent duplicate credit by checking reference_id if provided
+    if (body.reference_id) {
+      const { data: dup } = await admin.from('transactions')
+        .select('id').eq('wallet_id', wallet.id).eq('reference_id', body.reference_id).maybeSingle()
+      if (dup) return err('Duplicate reference ID')
+    }
 
     const newBalance = (wallet.balance || 0) + body.amount
     const { error: txErr } = await sb.from('transactions').insert({
       wallet_id: wallet.id, type: 'credit', amount: body.amount,
       balance_after: newBalance, status: 'completed',
       description: body.description || 'Credit added', created_by: userId,
+      reference_id: body.reference_id || null,
       meta: body.payment_method ? { payment_method: body.payment_method } : null,
     })
     if (txErr) return err(txErr.message)
@@ -749,21 +759,52 @@ async function handleWallet(method: string, pathParts: string[], body: any, user
 
   // POST /wallet/withdraw
   if (method === 'POST' && action === 'withdraw') {
-    const { data: wallet } = await sb.from('wallets').select('id, balance').eq('user_id', userId).single()
-    if (!wallet) return err('Wallet not found', 404)
-    if ((wallet.balance || 0) < body.amount) return err('Insufficient balance')
+    if (!body.amount || Number(body.amount) <= 0) return err('Invalid amount')
 
-    const newBalance = (wallet.balance || 0) - body.amount
-    const { error: txErr } = await sb.from('transactions').insert({
-      wallet_id: wallet.id, type: 'debit', amount: body.amount,
+    // Validate product price server-side to prevent frontend price manipulation
+    if (body.product_id) {
+      const { data: product } = await admin.from('products')
+        .select('id, price').eq('id', body.product_id).maybeSingle()
+      if (!product) return err('Product not found', 404)
+      if (Number(body.amount) !== Number(product.price)) return err('Amount does not match product price')
+    }
+
+    // Use admin client to check and lock wallet atomically
+    const { data: walletCheck } = await admin.from('wallets')
+      .select('id, balance, is_locked').eq('user_id', userId).single()
+    if (!walletCheck) return err('Wallet not found', 404)
+    if (walletCheck.is_locked) return err('Another transaction is in progress. Please wait a moment and try again.')
+    if ((walletCheck.balance || 0) < body.amount) return err('Insufficient balance')
+
+    // Attempt atomic lock: only succeeds if wallet is still unlocked
+    const { data: lockedWallet } = await admin.from('wallets')
+      .update({ is_locked: true })
+      .eq('id', walletCheck.id)
+      .eq('is_locked', false)
+      .select('id, balance')
+      .maybeSingle()
+    if (!lockedWallet) return err('Transaction conflict detected. Please try again.')
+
+    // Re-verify balance after acquiring lock
+    if ((lockedWallet.balance || 0) < body.amount) {
+      await admin.from('wallets').update({ is_locked: false }).eq('id', lockedWallet.id)
+      return err('Insufficient balance')
+    }
+
+    const newBalance = (lockedWallet.balance || 0) - body.amount
+    const { error: txErr } = await admin.from('transactions').insert({
+      wallet_id: lockedWallet.id, type: 'debit', amount: body.amount,
       balance_after: newBalance, status: 'completed',
       description: body.description || 'Withdrawal', created_by: userId,
       reference_id: body.reference_id, reference_type: body.reference_type,
     })
-    if (txErr) return err(txErr.message)
+    if (txErr) {
+      await admin.from('wallets').update({ is_locked: false }).eq('id', lockedWallet.id)
+      return err(txErr.message)
+    }
 
-    await sb.from('wallets').update({ balance: newBalance }).eq('id', wallet.id)
-    await logActivity(admin, 'wallet', wallet.id, 'debit', userId, { amount: body.amount })
+    await admin.from('wallets').update({ balance: newBalance, is_locked: false }).eq('id', lockedWallet.id)
+    await logActivity(admin, 'wallet', lockedWallet.id, 'debit', userId, { amount: body.amount })
     return json({ success: true, balance: newBalance })
   }
 
