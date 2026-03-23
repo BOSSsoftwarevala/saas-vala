@@ -183,6 +183,32 @@ async function handleResellers(method: string, pathParts: string[], body: any, u
   const admin = adminClient()
   const id = pathParts[0]
 
+  // GET /resellers/me – reseller checks their own status (Phase 4 & 5)
+  if (method === 'GET' && id === 'me') {
+    const { data, error } = await admin.from('resellers').select('*').eq('user_id', userId).maybeSingle()
+    if (error) return err(error.message)
+    return json({ data })
+  }
+
+  // POST /resellers/apply – user applies to become a reseller (Phase 5)
+  if (method === 'POST' && id === 'apply') {
+    // Check if already applied
+    const { data: existing } = await admin.from('resellers').select('id').eq('user_id', userId).maybeSingle()
+    if (existing) return err('You have already applied to become a reseller')
+
+    const { data, error } = await admin.from('resellers').insert({
+      user_id: userId,
+      company_name: body.company_name || null,
+      commission_percent: 10,
+      credit_limit: 0,
+      is_active: false,
+      is_verified: false,
+    }).select().single()
+    if (error) return err(error.message)
+    await logActivity(admin, 'reseller', data.id, 'applied', userId, { company_name: body.company_name })
+    return json({ data }, 201)
+  }
+
   // GET /resellers
   if (method === 'GET' && !id) {
     const page = Number(body?.page || 1)
@@ -224,7 +250,7 @@ async function handleResellers(method: string, pathParts: string[], body: any, u
     return json({ data })
   }
 
-  // POST /resellers
+  // POST /resellers – admin creates a reseller directly
   if (method === 'POST') {
     const { data, error } = await sb.from('resellers').insert({
       user_id: body.user_id,
@@ -316,6 +342,43 @@ async function handleKeys(method: string, pathParts: string[], body: any, userId
 
   // POST /keys/generate
   if (method === 'POST' && action === 'generate') {
+    // PHASE 7: product_id is required
+    if (!body.product_id) return err('product_id is required')
+
+    // PHASE 3: Verify product exists
+    const { data: product, error: productErr } = await admin.from('products')
+      .select('id, price, currency').eq('id', body.product_id).maybeSingle()
+    if (productErr || !product) return err('Invalid product_id')
+
+    const keyCost = Number(product.price) || 0
+
+    // PHASE 3: Check & deduct wallet balance atomically (only when product has a price)
+    if (keyCost > 0) {
+      const { data: wallet, error: walletFetchErr } = await admin
+        .from('wallets').select('id, balance, is_locked').eq('user_id', userId).single()
+      if (walletFetchErr || !wallet) return err('Wallet not found')
+      if (wallet.is_locked) return err('Wallet is locked')
+      if ((wallet.balance || 0) < keyCost) return err('Insufficient wallet balance')
+
+      const newBalance = wallet.balance - keyCost
+      // Optimistic lock: only update if balance hasn't changed since we read it
+      const { data: updated, error: walletUpdateErr } = await admin
+        .from('wallets').update({ balance: newBalance }).eq('id', wallet.id).eq('balance', wallet.balance).select('id').maybeSingle()
+      if (walletUpdateErr) return err('Failed to deduct balance – please retry')
+      if (!updated) return err('Balance changed concurrently – please retry')
+
+      // Record the debit transaction
+      await admin.from('transactions').insert({
+        wallet_id: wallet.id, type: 'debit', amount: keyCost,
+        balance_after: newBalance, status: 'completed',
+        description: `Key generation – product ${body.product_id}`,
+        reference_type: 'key_generation', created_by: userId,
+      })
+
+      await logActivity(admin, 'wallet', wallet.id, 'key_generation_debit', userId, { amount: keyCost, product_id: body.product_id })
+    }
+
+    // PHASE 3 & 7: Generate key using selected product
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
     let key = ''
     for (let j = 0; j < 4; j++) {
@@ -323,8 +386,14 @@ async function handleKeys(method: string, pathParts: string[], body: any, userId
       for (let i = 0; i < 4; i++) key += chars.charAt(Math.floor(Math.random() * chars.length))
     }
     const licenseKey = body.license_key || key
-    const { data, error } = await sb.from('license_keys').insert({
-      product_id: body.product_id || '',
+
+    // PHASE 3: Prevent duplicate keys
+    const { data: existing } = await admin.from('license_keys')
+      .select('id').eq('license_key', licenseKey).maybeSingle()
+    if (existing) return err('Duplicate key – please regenerate')
+
+    const { data, error } = await admin.from('license_keys').insert({
+      product_id: body.product_id,
       license_key: licenseKey,
       key_type: body.key_type || 'yearly',
       status: body.status || 'active',
@@ -336,7 +405,9 @@ async function handleKeys(method: string, pathParts: string[], body: any, userId
       created_by: userId,
     }).select().single()
     if (error) return err(error.message)
-    await logActivity(admin, 'license_key', data.id, 'generated', userId, { key: licenseKey })
+
+    // PHASE 9: Log via server-side admin client
+    await logActivity(admin, 'license_key', data.id, 'generated', userId, { key: licenseKey, product_id: body.product_id, cost: keyCost })
     return json({ data }, 201)
   }
 
@@ -699,6 +770,7 @@ async function handleApk(method: string, pathParts: string[], body: any, userId:
 async function handleWallet(method: string, pathParts: string[], body: any, userId: string, sb: any) {
   const admin = adminClient()
   const action = pathParts[0]
+  const subAction = pathParts[1]
 
   // GET /wallet
   if (method === 'GET' && !action) {
@@ -728,33 +800,141 @@ async function handleWallet(method: string, pathParts: string[], body: any, user
     return json({ data, total: count })
   }
 
-  // POST /wallet/add
+  // GET /wallet/topup – user views their own topup requests
+  if (method === 'GET' && action === 'topup' && !subAction) {
+    const { data, error } = await sb.from('topup_requests').select('*')
+      .eq('user_id', userId).order('created_at', { ascending: false })
+    if (error) return err(error.message)
+    return json({ data })
+  }
+
+  // GET /wallet/topup/all – admin views all topup requests
+  if (method === 'GET' && action === 'topup' && subAction === 'all') {
+    const { data: role } = await admin.from('user_roles').select('role').eq('user_id', userId).eq('role', 'super_admin').maybeSingle()
+    if (!role) return err('Forbidden', 403)
+    const { data, error } = await admin.from('topup_requests').select('*').order('created_at', { ascending: false })
+    if (error) return err(error.message)
+    return json({ data })
+  }
+
+  // POST /wallet/topup – user submits a manual topup request (PENDING, no auto credit)
+  if (method === 'POST' && action === 'topup' && !subAction) {
+    if (!body.amount || Number(body.amount) <= 0) return err('amount must be greater than 0')
+    if (!body.reference_id) return err('reference_id is required')
+    if (!body.method) return err('method is required')
+
+    const { data, error } = await sb.from('topup_requests').insert({
+      user_id: userId,
+      amount: Number(body.amount),
+      method: body.method,
+      reference_id: body.reference_id,
+      status: 'pending',
+    }).select().single()
+    if (error) {
+      if (error.code === '23505') return err('A topup request with this reference ID already exists')
+      return err(error.message)
+    }
+    await logActivity(admin, 'topup_request', data.id, 'submitted', userId, { amount: body.amount, method: body.method })
+    return json({ data }, 201)
+  }
+
+  // POST /wallet/topup/:id/approve – admin verifies and credits wallet
+  if (method === 'POST' && action === 'topup' && pathParts[2] === 'approve') {
+    const topupId = subAction
+    if (!topupId) return err('topup request id required')
+
+    const { data: roleRow } = await admin.from('user_roles').select('role').eq('user_id', userId).eq('role', 'super_admin').maybeSingle()
+    if (!roleRow) return err('Forbidden', 403)
+
+    const { data: topup, error: topupErr } = await admin.from('topup_requests').select('*').eq('id', topupId).single()
+    if (topupErr || !topup) return err('Topup request not found', 404)
+    if (topup.status !== 'pending') return err(`Topup request is already ${topup.status}`)
+
+    // Get wallet for the requesting user
+    const { data: wallet, error: walletErr } = await admin.from('wallets').select('id, balance').eq('user_id', topup.user_id).single()
+    if (walletErr || !wallet) return err('Wallet not found for this user', 404)
+
+    const newBalance = (wallet.balance || 0) + Number(topup.amount)
+
+    // Credit wallet via admin client with optimistic locking to prevent double-credit
+    const { data: credited, error: updateErr } = await admin.from('wallets')
+      .update({ balance: newBalance }).eq('id', wallet.id).eq('balance', wallet.balance).select('id').maybeSingle()
+    if (updateErr) return err(updateErr.message)
+    if (!credited) return err('Wallet balance changed concurrently – please retry')
+
+    // Record transaction
+    await admin.from('transactions').insert({
+      wallet_id: wallet.id, type: 'credit', amount: topup.amount,
+      balance_after: newBalance, status: 'completed',
+      description: `Topup approved – ref: ${topup.reference_id}`,
+      reference_id: topup.reference_id, reference_type: 'topup',
+      created_by: userId,
+    })
+
+    // Mark topup request as approved
+    await admin.from('topup_requests').update({
+      status: 'approved', reviewed_by: userId, reviewed_at: new Date().toISOString(),
+      admin_notes: body.admin_notes || null,
+    }).eq('id', topupId)
+
+    await logActivity(admin, 'topup_request', topupId, 'approved', userId, { amount: topup.amount, wallet_id: wallet.id })
+    return json({ success: true, balance: newBalance })
+  }
+
+  // POST /wallet/topup/:id/reject – admin rejects a topup request
+  if (method === 'POST' && action === 'topup' && pathParts[2] === 'reject') {
+    const topupId = subAction
+    if (!topupId) return err('topup request id required')
+
+    const { data: roleRow } = await admin.from('user_roles').select('role').eq('user_id', userId).eq('role', 'super_admin').maybeSingle()
+    if (!roleRow) return err('Forbidden', 403)
+
+    const { data: topup, error: topupErr } = await admin.from('topup_requests').select('status').eq('id', topupId).single()
+    if (topupErr || !topup) return err('Topup request not found', 404)
+    if (topup.status !== 'pending') return err(`Topup request is already ${topup.status}`)
+
+    await admin.from('topup_requests').update({
+      status: 'rejected', reviewed_by: userId, reviewed_at: new Date().toISOString(),
+      admin_notes: body.admin_notes || null,
+    }).eq('id', topupId)
+
+    await logActivity(admin, 'topup_request', topupId, 'rejected', userId, { reason: body.admin_notes })
+    return json({ success: true })
+  }
+
+  // POST /wallet/add – ADMIN ONLY: direct credit (e.g. manual admin adjustment)
   if (method === 'POST' && action === 'add') {
-    const { data: wallet } = await sb.from('wallets').select('id, balance').eq('user_id', userId).single()
+    // Require admin role for direct wallet credit
+    const { data: roleRow } = await admin.from('user_roles').select('role').eq('user_id', userId).eq('role', 'super_admin').maybeSingle()
+    if (!roleRow) return err('Forbidden: direct wallet credit requires admin role', 403)
+
+    const targetUserId = body.target_user_id || userId
+    const { data: wallet } = await admin.from('wallets').select('id, balance').eq('user_id', targetUserId).single()
     if (!wallet) return err('Wallet not found', 404)
 
-    const newBalance = (wallet.balance || 0) + body.amount
-    const { error: txErr } = await sb.from('transactions').insert({
+    const newBalance = (wallet.balance || 0) + Number(body.amount)
+    const { error: txErr } = await admin.from('transactions').insert({
       wallet_id: wallet.id, type: 'credit', amount: body.amount,
       balance_after: newBalance, status: 'completed',
-      description: body.description || 'Credit added', created_by: userId,
+      description: body.description || 'Admin credit', created_by: userId,
       meta: body.payment_method ? { payment_method: body.payment_method } : null,
     })
     if (txErr) return err(txErr.message)
 
-    await sb.from('wallets').update({ balance: newBalance }).eq('id', wallet.id)
-    await logActivity(admin, 'wallet', wallet.id, 'credit_added', userId, { amount: body.amount })
+    await admin.from('wallets').update({ balance: newBalance }).eq('id', wallet.id)
+    await logActivity(admin, 'wallet', wallet.id, 'admin_credit', userId, { amount: body.amount, target_user: targetUserId })
     return json({ success: true, balance: newBalance })
   }
 
   // POST /wallet/withdraw
   if (method === 'POST' && action === 'withdraw') {
-    const { data: wallet } = await sb.from('wallets').select('id, balance').eq('user_id', userId).single()
+    const { data: wallet } = await admin.from('wallets').select('id, balance, is_locked').eq('user_id', userId).single()
     if (!wallet) return err('Wallet not found', 404)
+    if (wallet.is_locked) return err('Wallet is locked')
     if ((wallet.balance || 0) < body.amount) return err('Insufficient balance')
 
     const newBalance = (wallet.balance || 0) - body.amount
-    const { error: txErr } = await sb.from('transactions').insert({
+    const { error: txErr } = await admin.from('transactions').insert({
       wallet_id: wallet.id, type: 'debit', amount: body.amount,
       balance_after: newBalance, status: 'completed',
       description: body.description || 'Withdrawal', created_by: userId,
@@ -762,7 +942,7 @@ async function handleWallet(method: string, pathParts: string[], body: any, user
     })
     if (txErr) return err(txErr.message)
 
-    await sb.from('wallets').update({ balance: newBalance }).eq('id', wallet.id)
+    await admin.from('wallets').update({ balance: newBalance }).eq('id', wallet.id)
     await logActivity(admin, 'wallet', wallet.id, 'debit', userId, { amount: body.amount })
     return json({ success: true, balance: newBalance })
   }

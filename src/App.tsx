@@ -98,6 +98,32 @@ const AdminRoute = React.forwardRef<unknown, { children: React.ReactNode }>(({ c
 
 AdminRoute.displayName = "AdminRoute";
 
+const ResellerRoute = React.forwardRef<unknown, { children: React.ReactNode }>(({ children }, _ref) => {
+  const { isReseller, loading } = useAuth();
+  const [resellerStatus, setResellerStatus] = React.useState<{ checked: boolean; allowed: boolean }>({ checked: false, allowed: false });
+
+  React.useEffect(() => {
+    if (!isReseller) {
+      setResellerStatus({ checked: true, allowed: false });
+      return;
+    }
+    import('@/lib/api').then(({ resellersApi }) =>
+      resellersApi.me()
+        .then((res) => {
+          const r = res.data;
+          setResellerStatus({ checked: true, allowed: !!r && r.is_verified === true && r.is_active === true });
+        })
+        .catch(() => setResellerStatus({ checked: true, allowed: false }))
+    );
+  }, [isReseller]);
+
+  if (loading || !resellerStatus.checked) return <PageLoader />;
+  if (!resellerStatus.allowed) return <Navigate to="/auth" replace />;
+  return <>{children}</>;
+});
+
+ResellerRoute.displayName = "ResellerRoute";
+
 function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
@@ -152,7 +178,7 @@ function AppRoutes() {
         <Route path="/ai-apis" element={<ProtectedRoute><AiApis /></ProtectedRoute>} />
         <Route path="/wallet" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
         <Route path="/seo-leads" element={<ProtectedRoute><SeoLeads /></ProtectedRoute>} />
-        <Route path="/reseller-dashboard" element={<ProtectedRoute><ResellerDashboard /></ProtectedRoute>} />
+        <Route path="/reseller-dashboard" element={<ProtectedRoute><ResellerRoute><ResellerDashboard /></ResellerRoute></ProtectedRoute>} />
 
         {/* Admin routes */}
         <Route path="/resellers" element={<ProtectedRoute><AdminRoute><Resellers /></AdminRoute></ProtectedRoute>} />

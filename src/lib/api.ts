@@ -59,6 +59,8 @@ export const productsApi = {
 export const resellersApi = {
   list: (params?: { page?: number; limit?: number; search?: string }) =>
     apiCall('GET', 'resellers', params),
+  me: () => apiCall('GET', 'resellers/me'),
+  apply: (data: { company_name?: string }) => apiCall('POST', 'resellers/apply', data),
   create: (data: any) => apiCall('POST', 'resellers', data),
   update: (id: string, data: any) => apiCall('PUT', `resellers/${id}`, data),
   sales: (id: string) => apiCall('GET', `resellers/${id}/sales`),
@@ -140,13 +142,27 @@ export const apkApi = {
 // ===================== WALLET =====================
 export const walletApi = {
   get: () => apiCall('GET', 'wallet'),
-  add: (amount: number, description?: string, paymentMethod?: string) =>
-    apiCall('POST', 'wallet/add', { amount, description, payment_method: paymentMethod }),
+  /** Admin only: direct credit adjustment */
+  add: (amount: number, description?: string, paymentMethod?: string, targetUserId?: string) =>
+    apiCall('POST', 'wallet/add', { amount, description, payment_method: paymentMethod, target_user_id: targetUserId }),
   withdraw: (amount: number, description?: string, referenceId?: string, referenceType?: string) =>
     apiCall('POST', 'wallet/withdraw', { amount, description, reference_id: referenceId, reference_type: referenceType }),
   transactions: (params?: { page?: number; limit?: number }) =>
     apiCall('GET', 'wallet/transactions', params),
   all: () => apiCall('GET', 'wallet/all'),
+  /** Submit a topup request (PENDING – requires admin approval) */
+  topupRequest: (amount: number, method: string, referenceId: string) =>
+    apiCall('POST', 'wallet/topup', { amount, method, reference_id: referenceId }),
+  /** View own topup requests */
+  myTopupRequests: () => apiCall('GET', 'wallet/topup'),
+  /** Admin: view all topup requests */
+  allTopupRequests: () => apiCall('GET', 'wallet/topup/all'),
+  /** Admin: approve a topup request and credit wallet */
+  approveTopup: (id: string, adminNotes?: string) =>
+    apiCall('POST', `wallet/topup/${id}/approve`, { admin_notes: adminNotes }),
+  /** Admin: reject a topup request */
+  rejectTopup: (id: string, adminNotes?: string) =>
+    apiCall('POST', `wallet/topup/${id}/reject`, { admin_notes: adminNotes }),
 };
 
 // ===================== SEO & LEADS =====================
