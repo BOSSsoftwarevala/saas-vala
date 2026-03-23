@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Heart, Star, ExternalLink, Download, KeyRound, CheckCircle2, Lock, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
+import { validateLicenseKeyInDb } from '@/lib/licenseUtils';
 import { cn } from '@/lib/utils';
 
 const PRODUCTS = [
@@ -18,7 +19,6 @@ const PRODUCTS = [
   { id: 'it-pwa-5', name: 'Monday.com Clone', repo: 'https://github.com/saasvala/monday-clone-software', price: 5, old_price: 10, rating: 4.9, description: 'Project management with workflow automation and collaboration.', features: ['Project Management', 'Workflow Automation', 'Collaboration Tools', 'Mobile App', 'Analytics Dashboard'] },
 ];
 
-const VALID_KEYS = ['IT-PWA-2026-001', 'IT-PWA-2026-002', 'IT-PWA-2026-003', 'IT-APK-2026-001'];
 const PFX = 'it-pwa';
 
 export default function ItSoftwarePwa() {
@@ -35,11 +35,13 @@ export default function ItSoftwarePwa() {
     toast.success(next.includes(id) ? 'Added to wishlist' : 'Removed from wishlist');
   };
 
-  const activate = () => {
-    if (VALID_KEYS.includes(keyInput.trim().toUpperCase())) {
+  const activate = async () => {
+    const trimmed = keyInput.trim().toUpperCase();
+    const result = await validateLicenseKeyInDb(trimmed);
+    if (result.valid) {
       setActivated(true); localStorage.setItem(`${PFX}-activated`, 'true'); setShowKey(false); setKeyInput('');
       toast.success('🎉 License activated! All 5 IT & Software demos unlocked.');
-    } else toast.error('Invalid license key.');
+    } else toast.error(result.error || 'Invalid license key.');
   };
 
   const download = () => {

@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
-  ShoppingCart, CreditCard, Wallet, Loader2, ChevronDown, ChevronUp, Copy
+  ShoppingCart, CreditCard, Wallet, Loader2, ChevronDown, ChevronUp, Copy, Key, Download
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -40,6 +40,7 @@ export default function Marketplace() {
   const [showPayment, setShowPayment] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [generatedLicenseKey, setGeneratedLicenseKey] = useState('');
+  const [downloadUrl, setDownloadUrl] = useState('');
   const [showMorePayment, setShowMorePayment] = useState(false);
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const [buyPayMethod, setBuyPayMethod] = useState<BuyPayMethod>('wallet');
@@ -57,7 +58,7 @@ export default function Marketplace() {
     const fraud = await checkUserStatus(user.id, user.email || '');
     if (fraud.isBlocked) { toast.error(fraud.message); return; }
     setSelectedProduct(product); setShowPayment(true); setPaymentSuccess(false);
-    setGeneratedLicenseKey(''); setShowMorePayment(false); setPaymentSubmitting(false);
+    setGeneratedLicenseKey(''); setDownloadUrl(''); setShowMorePayment(false); setPaymentSubmitting(false);
     setBuyPayMethod('wallet'); setManualTxnRef(''); setManualSubmitted(false);
     paymentLockRef.current = false;
   };
@@ -68,6 +69,7 @@ export default function Marketplace() {
     const result = await purchaseApk(selectedProduct);
     if (result.success) {
       setPaymentSuccess(true); setGeneratedLicenseKey(result.licenseKey || '');
+      setDownloadUrl(result.downloadUrl || '');
       toast.success('🎉 Payment successful!');
     } else {
       toast.error(result.error || 'Payment failed'); paymentLockRef.current = false;
@@ -227,7 +229,21 @@ export default function Marketplace() {
                     </div>
                   </div>
                 )}
-                <Button className="w-full" onClick={() => setShowPayment(false)}>Done</Button>
+                <div className="flex flex-col gap-2">
+                  <a href="/keys" className="w-full">
+                    <Button className="w-full gap-2" variant="outline">
+                      <Key className="h-4 w-4" /> View My Licenses
+                    </Button>
+                  </a>
+                  {downloadUrl && (
+                    <a href={downloadUrl} className="w-full">
+                      <Button className="w-full gap-2 bg-green-600 hover:bg-green-700 text-white">
+                        <Download className="h-4 w-4" /> Download APK
+                      </Button>
+                    </a>
+                  )}
+                  <Button variant="ghost" className="w-full" onClick={() => setShowPayment(false)}>Done</Button>
+                </div>
               </div>
             )}
           </DialogContent>

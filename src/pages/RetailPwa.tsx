@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Heart, Star, ExternalLink, Download, KeyRound, CheckCircle2, Lock, ShieldCheck, AlertTriangle, FolderOpen } from 'lucide-react';
 import { toast } from 'sonner';
+import { validateLicenseKeyInDb } from '@/lib/licenseUtils';
 import { cn } from '@/lib/utils';
 
 const PFX = 'retail-pwa';
@@ -20,15 +21,15 @@ const PRODUCTS = [
   { id: 'retail-5', name: 'Loyverse POS Clone', repo: 'https://github.com/saasvala/loyverse-pos-clone-software', price: 5, old_price: 10, rating: 4.9, description: 'Free POS system for small businesses with sales analytics and loyalty.', features: ['POS Billing', 'Inventory Management', 'Barcode Scanner', 'Sales Reports', 'Customer Management', 'Receipt Printing', 'Multi-Store Support'], demoFolder: 'loyverse-pos' },
 ];
 
-const VALID_KEYS = ['RETAIL-APK-2026-001', 'RETAIL-APK-2026-002', 'RETAIL-APK-2026-003', 'RETAIL-PWA-2026-001'];
 
 function getLicense(): { key: string; activation: string; expiry: string } | null {
   try { const r = localStorage.getItem(`${PFX}-license`); return r ? JSON.parse(r) : null; } catch { return null; }
 }
-function saveLicense(key: string) {
+function saveLicense(key: string, dbExpiry?: string) {
   const now = new Date();
-  localStorage.setItem(`${PFX}-license`, JSON.stringify({ key, activation: now.toISOString(), expiry: new Date(now.getTime() + 30 * 86400000).toISOString() }));
-}
+  const expiry = dbExpiry ? new Date(dbExpiry) : new Date(now.getTime() + 30 * 86400000);
+  localStorage.setItem(`${PFX}-license`, JSON.stringify({ key, activation: now.toISOString(), expiry: expiry.toISOString() }));
+  }
 function isLicenseValid(): { valid: boolean; expired: boolean; daysLeft: number } {
   const lic = getLicense();
   if (!lic) return { valid: false, expired: false, daysLeft: 0 };
@@ -56,12 +57,13 @@ export default function RetailPwa() {
 
   const handleBuy = () => { if (licStatus.valid) { toast.success('License active!'); return; } setShowActivation(true); };
 
-  const handleActivate = () => {
+  const handleActivate = async () => {
     const trimmed = keyInput.trim().toUpperCase();
-    if (VALID_KEYS.includes(trimmed)) {
-      saveLicense(trimmed); refreshLicense(); setShowActivation(false); setKeyInput('');
+    const result = await validateLicenseKeyInDb(trimmed);
+    if (result.valid) {
+      saveLicense(trimmed, result.expiresAt); refreshLicense(); setShowActivation(false); setKeyInput('');
       toast.success('🎉 License activated for 30 days! All 5 Retail & POS demos unlocked.');
-    } else { toast.error('Invalid license key.'); }
+    } else { toast.error(result.error || 'Invalid license key.'); }
   };
 
   const handleMasterDownload = () => {

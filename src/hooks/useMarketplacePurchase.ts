@@ -1,6 +1,7 @@
  import { useState } from 'react';
  import { supabase } from '@/integrations/supabase/client';
  import { useAuth } from './useAuth';
+ import { generateSecureLicenseKey } from '@/lib/licenseUtils';
  import { toast } from 'sonner';
  
 interface Product {
@@ -93,27 +94,37 @@ interface Product {
          console.error('Wallet update error:', updateError);
        }
  
-       // Step 5: Generate license key (SV-YEAR-CATEGORY-XXXNNN format)
-        const licenseKey = generateLicenseKey((product as any).category);
+       // Step 5: Generate secure crypto-random license key
+        const licenseKey = generateSecureLicenseKey();
 
-       // Step 5b: Save license key to license_keys table
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 30);
-        await supabase.from('license_keys').insert({
-          product_id: /^[0-9a-f]{8}-/i.test(product.id) ? product.id : null,
-          license_key: licenseKey,
-          key_type: 'monthly' as const,
-          status: 'active' as const,
-          owner_email: user.email || null,
-          owner_name: user.user_metadata?.full_name || null,
-          max_devices: 1,
-          activated_devices: 0,
-          activated_at: new Date().toISOString(),
-          expires_at: expiresAt.toISOString(),
-          created_by: user.id,
-          notes: `Purchased: ${product.title}`,
-          meta: { product_title: product.title, order_id: order.id, product_id: product.id },
-        });
+       // Step 5b: Save license key to license_keys table (guard against duplicate for same order)
+        const { data: existingLicense } = await supabase
+          .from('license_keys')
+          .select('license_key')
+          .filter('meta->>order_id', 'eq', order.id)
+          .maybeSingle();
+
+        const finalLicenseKey = existingLicense ? existingLicense.license_key : licenseKey;
+
+        if (!existingLicense) {
+          const expiresAt = new Date();
+          expiresAt.setDate(expiresAt.getDate() + 30);
+          await supabase.from('license_keys').insert({
+            product_id: /^[0-9a-f]{8}-/i.test(product.id) ? product.id : null,
+            license_key: licenseKey,
+            key_type: 'monthly' as const,
+            status: 'active' as const,
+            owner_email: user.email || null,
+            owner_name: user.user_metadata?.full_name || null,
+            max_devices: 1,
+            activated_devices: 0,
+            activated_at: new Date().toISOString(),
+            expires_at: expiresAt.toISOString(),
+            created_by: user.id,
+            notes: `Purchased: ${product.title}`,
+            meta: { product_title: product.title, order_id: order.id, product_id: product.id },
+          });
+        }
 
        // Step 6: Log activity
        await supabase.from('activity_logs').insert({
@@ -125,7 +136,7 @@ interface Product {
            product_title: product.title,
            amount: product.price,
            payment_method: 'wallet',
-           license_key: licenseKey,
+           license_key: finalLicenseKey,
          },
        });
  
@@ -133,7 +144,7 @@ interface Product {
        await supabase.from('notifications').insert({
          user_id: user.id,
          title: 'Purchase Successful',
-         message: `You purchased ${product.title} for ₹${product.price.toLocaleString()}`,
+         message: `You purchased ${product.title} for ₹${product.price.toLocaleString()}. Your License Key: ${finalLicenseKey}`,
          type: 'success',
          action_url: '/keys',
        });
@@ -142,7 +153,7 @@ interface Product {
        return {
          success: true,
          orderId: order.id,
-         licenseKey,
+         licenseKey: finalLicenseKey,
        };
      } catch (error: any) {
        setProcessing(false);
@@ -162,25 +173,3 @@ interface Product {
  
    return { purchaseProduct, processing };
  }
- 
-const CATEGORY_CODES: Record<string, string> = {
-  Healthcare: 'HEALTH', Finance: 'FIN', Education: 'EDU',
-  Food: 'FOOD', Transport: 'TRANS', Retail: 'RETAIL',
-  Marketing: 'MKT', HR: 'HR', Logistics: 'LOGI',
-  Gaming: 'GAME', 'Real Estate': 'REALTY', Legal: 'LEGAL',
-  IoT: 'IOT', Blockchain: 'CHAIN', Media: 'MEDIA',
-  Agriculture: 'AGRI', Construction: 'CONST', Manufacturing: 'MFG',
-  Automotive: 'AUTO', Travel: 'TRAVEL',
-};
-
-function generateLicenseKey(category?: string): string {
-  const year = new Date().getFullYear();
-  const catCode = (category && CATEGORY_CODES[category]) ? CATEGORY_CODES[category] : 'SFT';
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let suffix = '';
-  for (let i = 0; i < 3; i++) {
-    suffix += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  const num = String(Math.floor(Math.random() * 900) + 100);
-  return `SV-${year}-${catCode}-${suffix}${num}`;
-}

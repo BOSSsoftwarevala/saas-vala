@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Heart, Star, ExternalLink, Download, KeyRound, CheckCircle2, Lock, ShieldCheck, AlertTriangle, FolderOpen } from 'lucide-react';
 import { toast } from 'sonner';
+import { validateLicenseKeyInDb } from '@/lib/licenseUtils';
 import { cn } from '@/lib/utils';
 
 const PFX = 'ecom-pwa';
@@ -55,15 +56,15 @@ const PRODUCTS = [
   },
 ];
 
-const VALID_KEYS = ['ECOM-APK-2026-001', 'ECOM-APK-2026-002', 'ECOM-APK-2026-003', 'ECOM-PWA-2026-001'];
 
 function getLicense(): { key: string; activation: string; expiry: string } | null {
   try { const r = localStorage.getItem(`${PFX}-license`); return r ? JSON.parse(r) : null; } catch { return null; }
 }
-function saveLicense(key: string) {
+function saveLicense(key: string, dbExpiry?: string) {
   const now = new Date();
-  localStorage.setItem(`${PFX}-license`, JSON.stringify({ key, activation: now.toISOString(), expiry: new Date(now.getTime() + 30 * 86400000).toISOString() }));
-}
+  const expiry = dbExpiry ? new Date(dbExpiry) : new Date(now.getTime() + 30 * 86400000);
+  localStorage.setItem(`${PFX}-license`, JSON.stringify({ key, activation: now.toISOString(), expiry: expiry.toISOString() }));
+  }
 function isLicenseValid(): { valid: boolean; expired: boolean; daysLeft: number } {
   const lic = getLicense();
   if (!lic) return { valid: false, expired: false, daysLeft: 0 };
@@ -91,12 +92,13 @@ export default function EcomPwa() {
 
   const handleBuy = () => { if (licStatus.valid) { toast.success('License active!'); return; } setShowActivation(true); };
 
-  const handleActivate = () => {
+  const handleActivate = async () => {
     const trimmed = keyInput.trim().toUpperCase();
-    if (VALID_KEYS.includes(trimmed)) {
-      saveLicense(trimmed); refreshLicense(); setShowActivation(false); setKeyInput('');
+    const result = await validateLicenseKeyInDb(trimmed);
+    if (result.valid) {
+      saveLicense(trimmed, result.expiresAt); refreshLicense(); setShowActivation(false); setKeyInput('');
       toast.success('🎉 License activated for 30 days! All 5 E-Commerce demos unlocked.');
-    } else { toast.error('Invalid license key.'); }
+    } else { toast.error(result.error || 'Invalid license key.'); }
   };
 
   const handleMasterDownload = () => {

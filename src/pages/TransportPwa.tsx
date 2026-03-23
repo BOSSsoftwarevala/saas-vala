@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Heart, Star, ExternalLink, Download, KeyRound, CheckCircle2, Lock, ShieldCheck, Play, Clock, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+import { validateLicenseKeyInDb } from '@/lib/licenseUtils';
 import { cn } from '@/lib/utils';
 
 const PRODUCTS = [
@@ -18,7 +19,6 @@ const PRODUCTS = [
   { id: 'transport-apk-5', name: 'Grab Ride Sharing Clone', demoFolder: 'grab-ride', repo: 'https://github.com/saasvala/grab-ride-clone-software', price: 5, old_price: 10, rating: 4.9, description: 'Multi-service ride sharing and delivery platform.', features: ['Ride Booking', 'Driver Dashboard', 'Real-Time GPS Tracking', 'Fare Calculator', 'Payment Integration', 'Trip History', 'Admin Panel'] },
 ];
 
-const VALID_KEYS = ['TRANSPORT-APK-2026-001', 'TRANSPORT-APK-2026-002', 'TRANSPORT-APK-2026-003', 'TRANSPORT-PWA-2026-001', 'RIDE-APK-2026-001'];
 const PFX = 'transport-pwa';
 const LICENSE_DAYS = 30;
 
@@ -46,17 +46,20 @@ export default function TransportPwa() {
     toast.success(next.includes(id) ? 'Added to wishlist' : 'Removed from wishlist');
   };
 
-  const activate = () => {
-    if (VALID_KEYS.includes(keyInput.trim().toUpperCase())) {
+  const activate = async () => {
+    const trimmed = keyInput.trim().toUpperCase();
+    const result = await validateLicenseKeyInDb(trimmed);
+    if (result.valid) {
       const now = new Date();
-      const expiry = new Date(now.getTime() + LICENSE_DAYS * 86400000);
-      const lic = { key: keyInput.trim().toUpperCase(), activated: now.toISOString(), expiry: expiry.toISOString() };
+      const expiry = result.expiresAt ? new Date(result.expiresAt) : new Date(now.getTime() + LICENSE_DAYS * 86400000);
+      const daysLeft = Math.max(0, Math.ceil((expiry.getTime() - now.getTime()) / 86400000));
+      const lic = { key: trimmed, activated: now.toISOString(), expiry: expiry.toISOString() };
       localStorage.setItem(`${PFX}-license`, JSON.stringify(lic));
       localStorage.setItem(`${PFX}-activated`, 'true');
-      setLicenseState({ valid: true, expired: false, daysLeft: LICENSE_DAYS });
+      setLicenseState({ valid: true, expired: false, daysLeft });
       setShowKey(false); setKeyInput('');
-      toast.success(`🎉 License activated! Valid for ${LICENSE_DAYS} days. All 5 Transportation software demos unlocked.`);
-    } else toast.error('Invalid license key.');
+      toast.success(`🎉 License activated! Valid for ${daysLeft} days. All 5 Transportation software demos unlocked.`);
+    } else toast.error(result.error || 'Invalid license key.');
   };
 
   const handleMasterDownload = () => {

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useFraudDetection } from './useFraudDetection';
+import { generateSecureLicenseKey } from '@/lib/licenseUtils';
 import { toast } from 'sonner';
 
 interface ApkProduct {
@@ -25,14 +26,6 @@ export function useApkPurchase() {
   const { user } = useAuth();
   const { checkUserStatus, reportViolation } = useFraudDetection();
   const [processing, setProcessing] = useState(false);
-
-  // Generate transaction ID based license key
-  const generateTransactionLicenseKey = (transactionId: string): string => {
-    // Use transaction ID as the base for the license key
-    // Format: TXN-{first8chars}-{last4chars}
-    const cleanId = transactionId.replace(/-/g, '').toUpperCase();
-    return `TXN-${cleanId.substring(0, 8)}-${cleanId.substring(cleanId.length - 4)}`;
-  };
 
   // Helper: check if an ID looks like a valid UUID
   const isUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -96,8 +89,8 @@ export function useApkPurchase() {
         throw new Error('Failed to create transaction');
       }
 
-      // Step 4: Generate license key from transaction ID
-      const licenseKey = generateTransactionLicenseKey(transaction.id);
+      // Step 4: Generate secure crypto-random license key
+      const licenseKey = generateSecureLicenseKey();
 
       // Step 5: Update wallet balance
       await supabase
@@ -119,23 +112,34 @@ export function useApkPurchase() {
       }
 
       // Step 6.5: Save license key to license_keys table (so user can see it on /keys page)
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 30); // 30-day license
-      await supabase.from('license_keys').insert({
-        product_id: isGeneratedProduct ? null : product.id,
-        license_key: licenseKey,
-        key_type: 'monthly' as const,
-        status: 'active' as const,
-        owner_email: user.email || null,
-        owner_name: user.user_metadata?.full_name || null,
-        max_devices: 1,
-        activated_devices: 0,
-        activated_at: new Date().toISOString(),
-        expires_at: expiresAt.toISOString(),
-        created_by: user.id,
-        notes: `Purchased: ${product.title}`,
-        meta: { product_title: product.title, transaction_id: transaction.id, product_id: product.id }
-      });
+      // Guard against duplicate license for the same transaction
+      const { data: existingLicense } = await supabase
+        .from('license_keys')
+        .select('license_key')
+        .filter('meta->>transaction_id', 'eq', transaction.id)
+        .maybeSingle();
+
+      const finalLicenseKey = existingLicense ? existingLicense.license_key : licenseKey;
+
+      if (!existingLicense) {
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 30); // 30-day license
+        await supabase.from('license_keys').insert({
+          product_id: isGeneratedProduct ? null : product.id,
+          license_key: licenseKey,
+          key_type: 'monthly' as const,
+          status: 'active' as const,
+          owner_email: user.email || null,
+          owner_name: user.user_metadata?.full_name || null,
+          max_devices: 1,
+          activated_devices: 0,
+          activated_at: new Date().toISOString(),
+          expires_at: expiresAt.toISOString(),
+          created_by: user.id,
+          notes: `Purchased: ${product.title}`,
+          meta: { product_title: product.title, transaction_id: transaction.id, product_id: product.id }
+        });
+      }
 
       // Step 7: Create marketplace order (only for real DB products)
       if (!isGeneratedProduct) {
@@ -161,7 +165,7 @@ export function useApkPurchase() {
         details: {
           product_id: product.id,
           product_title: product.title,
-          license_key: licenseKey,
+          license_key: finalLicenseKey,
           amount: product.price,
           transaction_id: transaction.id,
           is_generated: isGeneratedProduct
@@ -172,7 +176,7 @@ export function useApkPurchase() {
       await supabase.from('notifications').insert({
         user_id: user.id,
         title: '📱 APK Ready for Download',
-        message: `${product.title} purchased. Your License Key: ${licenseKey}`,
+        message: `${product.title} purchased. Your License Key: ${finalLicenseKey}`,
         type: 'success',
         action_url: '/keys'
       });
@@ -182,8 +186,8 @@ export function useApkPurchase() {
       return {
         success: true,
         transactionId: transaction.id,
-        licenseKey,
-        downloadUrl: `/download/apk/${product.id}?key=${licenseKey}`
+        licenseKey: finalLicenseKey,
+        downloadUrl: `/download/apk/${product.id}?key=${finalLicenseKey}`
       };
     } catch (error: any) {
       setProcessing(false);
@@ -277,7 +281,6 @@ export function useApkPurchase() {
   return { 
     purchaseApk,
     verifyApkUsage, 
-    processing,
-    generateTransactionLicenseKey
+    processing
   };
 }

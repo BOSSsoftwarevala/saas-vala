@@ -47,8 +47,8 @@ Deno.serve(async (req) => {
 
     const adminClient = createClient(supabaseUrl, serviceKey);
 
-    // 3. Verify license key belongs to this user and product
-    const { data: download, error: dlErr } = await adminClient
+    // 3. Verify license key — check apk_downloads first, then license_keys as fallback
+    const { data: apkDownload, error: dlErr } = await adminClient
       .from("apk_downloads")
       .select("*")
       .eq("license_key", license_key)
@@ -57,7 +57,25 @@ Deno.serve(async (req) => {
       .eq("is_blocked", false)
       .single();
 
-    if (dlErr || !download) {
+    // If not found in apk_downloads, check license_keys table (marketplace purchases)
+    let purchaseVerified = !dlErr && !!apkDownload;
+    if (!purchaseVerified) {
+      const { data: licKey, error: licErr } = await adminClient
+        .from("license_keys")
+        .select("id, status, expires_at")
+        .eq("license_key", license_key)
+        .eq("status", "active")
+        .single();
+
+      if (!licErr && licKey) {
+        // Check not expired
+        if (!licKey.expires_at || new Date(licKey.expires_at) > new Date()) {
+          purchaseVerified = true;
+        }
+      }
+    }
+
+    if (!purchaseVerified) {
       return new Response(
         JSON.stringify({ error: "No valid purchase found for this license key" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }

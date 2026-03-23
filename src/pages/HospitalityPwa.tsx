@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Heart, Star, ExternalLink, Download, KeyRound, CheckCircle2, Lock, ShieldCheck, Play, Clock, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+import { validateLicenseKeyInDb } from '@/lib/licenseUtils';
 import { cn } from '@/lib/utils';
 
 const PRODUCTS = [
@@ -18,7 +19,6 @@ const PRODUCTS = [
   { id: 'hotel-apk-5', name: 'Expedia Travel Clone', demoFolder: 'expedia-travel', repo: 'https://github.com/saasvala/expedia-travel-clone-software', price: 5, old_price: 10, rating: 4.9, description: 'Travel and hotel booking marketplace with property dashboard.', features: ['Hotel Listings', 'Room Booking', 'Availability Calendar', 'Guest Reviews', 'Payment Gateway', 'Property Dashboard', 'Booking Management'] },
 ];
 
-const VALID_KEYS = ['HOTEL-APK-2026-001', 'HOTEL-APK-2026-002', 'HOTEL-APK-2026-003', 'HOTEL-PWA-2026-001', 'HOSPITALITY-APK-2026-001'];
 const PFX = 'hotel-pwa';
 const LICENSE_DAYS = 30;
 
@@ -46,17 +46,20 @@ export default function HospitalityPwa() {
     toast.success(next.includes(id) ? 'Added to wishlist' : 'Removed from wishlist');
   };
 
-  const activate = () => {
-    if (VALID_KEYS.includes(keyInput.trim().toUpperCase())) {
+  const activate = async () => {
+    const trimmed = keyInput.trim().toUpperCase();
+    const result = await validateLicenseKeyInDb(trimmed);
+    if (result.valid) {
       const now = new Date();
-      const expiry = new Date(now.getTime() + LICENSE_DAYS * 86400000);
-      const lic = { key: keyInput.trim().toUpperCase(), activated: now.toISOString(), expiry: expiry.toISOString() };
+      const expiry = result.expiresAt ? new Date(result.expiresAt) : new Date(now.getTime() + LICENSE_DAYS * 86400000);
+      const daysLeft = Math.max(0, Math.ceil((expiry.getTime() - now.getTime()) / 86400000));
+      const lic = { key: trimmed, activated: now.toISOString(), expiry: expiry.toISOString() };
       localStorage.setItem(`${PFX}-license`, JSON.stringify(lic));
       localStorage.setItem(`${PFX}-activated`, 'true');
-      setLicenseState({ valid: true, expired: false, daysLeft: LICENSE_DAYS });
+      setLicenseState({ valid: true, expired: false, daysLeft });
       setShowKey(false); setKeyInput('');
-      toast.success(`🎉 License activated! Valid for ${LICENSE_DAYS} days. All 5 Hospitality software demos unlocked.`);
-    } else toast.error('Invalid license key.');
+      toast.success(`🎉 License activated! Valid for ${daysLeft} days. All 5 Hospitality software demos unlocked.`);
+    } else toast.error(result.error || 'Invalid license key.');
   };
 
   const handleMasterDownload = () => {

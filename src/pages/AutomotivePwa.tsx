@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Heart, Star, ExternalLink, Download, KeyRound, CheckCircle2, Lock, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
+import { validateLicenseKeyInDb } from '@/lib/licenseUtils';
 import { cn } from '@/lib/utils';
 
 const PRODUCTS = [
@@ -18,7 +19,6 @@ const PRODUCTS = [
   { id: 'auto-pwa-5', name: 'ChargePoint Management Clone', repo: 'https://github.com/saasvala/chargepoint-clone-software', price: 5, old_price: 10, rating: 4.9, description: 'Charging station management with fleet analytics and payment gateway.', features: ['Charging Station Management', 'Fleet Analytics', 'Mobile App', 'Maintenance Alerts', 'Payment Gateway'] },
 ];
 
-const VALID_KEYS = ['AUTO-PWA-2026-001', 'AUTO-PWA-2026-002', 'AUTO-PWA-2026-003', 'AUTO-APK-2026-001'];
 const PFX = 'auto-pwa';
 
 export default function AutomotivePwa() {
@@ -35,11 +35,13 @@ export default function AutomotivePwa() {
     toast.success(next.includes(id) ? 'Added to wishlist' : 'Removed from wishlist');
   };
 
-  const activate = () => {
-    if (VALID_KEYS.includes(keyInput.trim().toUpperCase())) {
+  const activate = async () => {
+    const trimmed = keyInput.trim().toUpperCase();
+    const result = await validateLicenseKeyInDb(trimmed);
+    if (result.valid) {
       setActivated(true); localStorage.setItem(`${PFX}-activated`, 'true'); setShowKey(false); setKeyInput('');
       toast.success('🎉 License activated! All 5 Automotive & EV software demos unlocked.');
-    } else toast.error('Invalid license key.');
+    } else toast.error(result.error || 'Invalid license key.');
   };
 
   const download = () => {
