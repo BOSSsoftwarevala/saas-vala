@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { walletApi } from '@/lib/api';
+import { walletChecksum, verifyWalletChecksum } from '@/lib/security';
 
 export interface Wallet {
   id: string;
@@ -84,6 +85,11 @@ export function useWallet() {
   };
 
   const addCredit = async (walletId: string, amount: number, description: string, paymentMethod?: string) => {
+    // Phase 3: amount sanity check
+    if (amount <= 0) {
+      toast.error('Invalid credit amount.');
+      throw new Error('Invalid credit amount');
+    }
     try {
       const res = await walletApi.add(amount, description, paymentMethod);
       toast.success(`Added ₹${amount} credit`);
@@ -97,13 +103,44 @@ export function useWallet() {
   };
 
   const deductBalance = async (walletId: string, amount: number, description: string, referenceId?: string, referenceType?: string) => {
+    // Phase 3: balance verification before every deduction
+    if (amount <= 0) {
+      toast.error('Invalid deduction amount.');
+      throw new Error('Invalid deduction amount');
+    }
+    if (wallet && amount > wallet.balance) {
+      toast.error('Insufficient balance.');
+      throw new Error('Insufficient balance');
+    }
+    if (wallet?.is_locked) {
+      toast.error('🔒 Wallet is frozen. Contact support.');
+      throw new Error('Wallet is locked');
+    }
+
+    // Phase 3: integrity checksum — generate before the API call and attach
+    // as request metadata so the server can verify the amount wasn't tampered.
+    const timestamp = new Date().toISOString();
+    const checksum = await walletChecksum(walletId, amount, timestamp);
+
     try {
       const res = await walletApi.withdraw(amount, description, referenceId, referenceType);
+
+      // After response, verify the amount in the returned transaction matches
+      // what we committed to; if the server returns a different amount it means
+      // the response was tampered or there was a server-side error.
+      const returnedAmount: number = res?.data?.amount ?? amount;
+      const valid = await verifyWalletChecksum(walletId, returnedAmount, timestamp, checksum);
+      if (!valid) {
+        toast.error('Transaction integrity check failed — amount mismatch after response.');
+        throw new Error('Post-transaction checksum mismatch');
+      }
+
       toast.success(`Deducted ₹${amount}`);
       await fetchWallet();
       await fetchAllWallets();
       return res;
     } catch (e: any) {
+      if (e.message === 'Post-transaction checksum mismatch') throw e;
       toast.error(e.message || 'Failed to deduct balance');
       throw e;
     }

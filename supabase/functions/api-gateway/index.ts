@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version, x-request-nonce, x-request-timestamp, x-request-signature, x-device-id',
   'Content-Type': 'application/json',
 }
 
@@ -13,6 +13,53 @@ function json(data: unknown, status = 200) {
 function err(message: string, status = 400) {
   return json({ error: message }, status)
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 6: API Security — server-side rate limiter, replay prevention
+// ─────────────────────────────────────────────────────────────────────────────
+
+// In-memory rate-limit store (per Deno isolate; resets on cold start)
+const rateLimitMap = new Map<string, { count: number; windowStart: number }>()
+const RATE_LIMIT_DEFAULT = 60        // requests per window
+const RATE_LIMIT_PAYMENT = 10        // stricter for payment endpoints
+const RATE_LIMIT_WINDOW_MS = 60_000  // 1-minute window
+
+function serverRateLimit(key: string, limit: number): boolean {
+  const now = Date.now()
+  const record = rateLimitMap.get(key)
+  if (!record || now - record.windowStart > RATE_LIMIT_WINDOW_MS) {
+    rateLimitMap.set(key, { count: 1, windowStart: now })
+    return true
+  }
+  if (record.count >= limit) return false
+  record.count += 1
+  return true
+}
+
+// In-memory nonce store — prevents replay attacks within the same isolate
+const usedNonces = new Map<string, number>() // nonce -> expiresAt
+const NONCE_TTL_MS = 5 * 60 * 1000  // 5 minutes
+
+function consumeNonce(nonce: string): boolean {
+  const now = Date.now()
+  // Prune expired nonces
+  for (const [k, exp] of usedNonces) {
+    if (exp < now) usedNonces.delete(k)
+  }
+  if (usedNonces.has(nonce)) return false  // replay detected
+  usedNonces.set(nonce, now + NONCE_TTL_MS)
+  return true
+}
+
+/** Validate the request timestamp — reject anything older than 5 minutes. */
+function validateTimestamp(ts: string | null): boolean {
+  if (!ts) return true  // header optional for non-signed clients
+  const t = new Date(ts).getTime()
+  if (isNaN(t)) return false
+  return Math.abs(Date.now() - t) <= 5 * 60 * 1000
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function authenticate(req: Request) {
   const authHeader = req.headers.get('Authorization')
@@ -827,6 +874,28 @@ Deno.serve(async (req) => {
     const module = parts[0]
     const subParts = parts.slice(1)
 
+    // ── Phase 6: Timestamp validation (replay attack prevention) ──────────
+    const reqTimestamp = req.headers.get('X-Request-Timestamp')
+    if (reqTimestamp && !validateTimestamp(reqTimestamp)) {
+      return err('Request timestamp is too old or invalid. Possible replay attack.', 400)
+    }
+
+    // ── Phase 6: Nonce replay prevention ─────────────────────────────────
+    const reqNonce = req.headers.get('X-Request-Nonce')
+    if (reqNonce) {
+      if (!consumeNonce(reqNonce)) {
+        return err('Duplicate request nonce detected. Replay attack blocked.', 400)
+      }
+    }
+
+    // ── Phase 6: Default rate limiting per IP ─────────────────────────────
+    const clientIp = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
+    const isPaymentModule = module === 'wallet'
+    const rateLimit = isPaymentModule ? RATE_LIMIT_PAYMENT : RATE_LIMIT_DEFAULT
+    if (!serverRateLimit(`ip:${clientIp}:${module}`, rateLimit)) {
+      return err('Rate limit exceeded. Please slow down.', 429)
+    }
+
     // Parse body for POST/PUT/DELETE, query params for GET
     let body: any = {}
     if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
@@ -845,6 +914,11 @@ Deno.serve(async (req) => {
     if (!auth) return err('Unauthorized', 401)
 
     const { userId, supabase: sb } = auth
+
+    // ── Phase 6: Per-user rate limiting ───────────────────────────────────
+    if (!serverRateLimit(`user:${userId}:${module}`, rateLimit)) {
+      return err('Too many requests. Please try again later.', 429)
+    }
 
     switch (module) {
       case 'products': return await handleProducts(req.method, subParts, body, userId, sb)

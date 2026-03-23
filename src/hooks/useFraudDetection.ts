@@ -1,12 +1,31 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import {
+  checkRateLimit,
+  registerPaymentRef,
+  verifyAmount,
+  getDeviceId,
+  recordActivity,
+} from '@/lib/security';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Payment-fraud specific limits
+// ─────────────────────────────────────────────────────────────────────────────
+const PAYMENT_RATE_LIMIT = 5;           // max payment attempts per 60-second window
+const PAYMENT_RATE_WINDOW_MS = 60_000;  // 60-second sliding window
 
 interface FraudCheckResult {
   isBlocked: boolean;
   violationCount: number;
   totalFines: number;
   canProceed: boolean;
+  message: string;
+}
+
+export interface PaymentFraudCheck {
+  allowed: boolean;
+  status: 'ok' | 'duplicate_ref' | 'amount_mismatch' | 'rate_limited' | 'review_required';
   message: string;
 }
 
@@ -302,11 +321,119 @@ export function useFraudDetection() {
     }
   };
 
+  // ─── Phase 2: Payment fraud detection ──────────────────────────────────
+  /**
+   * Validate a payment attempt before submitting it.
+   *
+   * Checks:
+   *  1. Client-side rate limit (5 attempts / 60 s)
+   *  2. Duplicate payment reference
+   *  3. Amount sanity (declared amount must equal server amount)
+   *  4. Flags any payment reference already stored in DB as REVIEW REQUIRED
+   */
+  const checkPaymentFraud = async (
+    userId: string,
+    amount: number,
+    serverAmount: number,
+    referenceId: string
+  ): Promise<PaymentFraudCheck> => {
+    setChecking(true);
+    try {
+      // 1. Rate limit
+      const rateLimitKey = `payment:${userId}`;
+      if (!checkRateLimit(rateLimitKey, PAYMENT_RATE_LIMIT, PAYMENT_RATE_WINDOW_MS)) {
+        toast.error('⚠️ Too many payment attempts. Please wait before trying again.');
+        await supabase.from('activity_logs').insert({
+          entity_type: 'payment_fraud',
+          entity_id: userId,
+          action: 'rate_limited',
+          performed_by: userId,
+          details: { referenceId, amount },
+        });
+        return {
+          allowed: false,
+          status: 'rate_limited',
+          message: 'Too many payment attempts in a short time. Please wait.',
+        };
+      }
+
+      // 2. Amount verification (server-side value must match declared value)
+      if (!verifyAmount(amount, serverAmount)) {
+        toast.error('⚠️ Payment amount mismatch detected.');
+        await supabase.from('activity_logs').insert({
+          entity_type: 'payment_fraud',
+          entity_id: userId,
+          action: 'amount_mismatch',
+          performed_by: userId,
+          details: { referenceId, declaredAmount: amount, serverAmount },
+        });
+        return {
+          allowed: false,
+          status: 'amount_mismatch',
+          message: 'Payment amount mismatch. Transaction blocked.',
+        };
+      }
+
+      // 3. Duplicate reference — check client-side registry
+      if (!registerPaymentRef(referenceId)) {
+        toast.error('⚠️ Duplicate payment reference detected.');
+        await supabase.from('activity_logs').insert({
+          entity_type: 'payment_fraud',
+          entity_id: userId,
+          action: 'duplicate_ref_client',
+          performed_by: userId,
+          details: { referenceId, amount },
+        });
+        return {
+          allowed: false,
+          status: 'duplicate_ref',
+          message: 'This payment reference has already been used.',
+        };
+      }
+
+      // 4. Duplicate reference — cross-check DB
+      const { data: existingTx } = await supabase
+        .from('transactions')
+        .select('id, status')
+        .eq('reference_id', referenceId)
+        .limit(1);
+
+      if (existingTx && existingTx.length > 0) {
+        // Flag as REVIEW REQUIRED
+        const deviceId = await getDeviceId();
+        await supabase.from('activity_logs').insert({
+          entity_type: 'payment_fraud',
+          entity_id: userId,
+          action: 'duplicate_ref_db',
+          performed_by: userId,
+          details: {
+            referenceId,
+            amount,
+            deviceId,
+            review_required: true,
+          },
+        });
+        toast.warning('⚠️ Payment flagged for review.');
+        recordActivity('duplicate_payment');
+        return {
+          allowed: false,
+          status: 'review_required',
+          message: 'Payment flagged as REVIEW REQUIRED — duplicate reference found.',
+        };
+      }
+
+      return { allowed: true, status: 'ok', message: 'Payment checks passed.' };
+    } finally {
+      setChecking(false);
+    }
+  };
+
   return {
     checking,
     checkUserStatus,
     reportViolation,
     verifyLicenseKey,
-    blockLicense
+    blockLicense,
+    checkPaymentFraud,
   };
 }

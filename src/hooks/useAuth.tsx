@@ -1,6 +1,10 @@
-import { useState, useEffect, useRef, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, useRef, createContext, useContext, ReactNode, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { getRiskScore, getDeviceId } from '@/lib/security';
+
+// Auto-logout when risk score exceeds this threshold
+const AUTO_LOGOUT_RISK_THRESHOLD = 90;
 
 type AppRole = 'super_admin' | 'reseller';
 
@@ -15,6 +19,10 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string, requestedRole?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  /** Phase 1: Auto-logout when suspicious activity is detected. */
+  triggerSuspiciousLogout: (reason?: string) => Promise<void>;
+  /** Phase 5: Return the stable device fingerprint for this browser. */
+  getDeviceFingerprint: () => Promise<string>;
   isSuperAdmin: boolean;
   isReseller: boolean;
 }
@@ -197,6 +205,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRole(null);
   };
 
+  /**
+   * Phase 1: Auto-logout when suspicious activity risk score is too high.
+   * Called by security-aware components after recording a high-risk event.
+   */
+  const triggerSuspiciousLogout = useCallback(async (reason = 'Suspicious activity detected') => {
+    const score = getRiskScore();
+    if (score >= AUTO_LOGOUT_RISK_THRESHOLD) {
+      try {
+        if (user) {
+          await supabase.from('activity_logs').insert({
+            entity_type: 'security_event',
+            entity_id: user.id,
+            action: 'auto_logout',
+            performed_by: user.id,
+            details: { reason, riskScore: score },
+          });
+        }
+      } catch (_e) {
+        // Non-blocking
+      }
+      await supabase.auth.signOut();
+      setUser(null);
+      setSession(null);
+      setRole(null);
+    }
+  }, [user]); // user is the only reactive dep needed — signOut is inlined to avoid circular deps
+
+  /** Phase 5: Expose device fingerprint to callers. */
+  const getDeviceFingerprint = useCallback((): Promise<string> => getDeviceId(), []);
+
   const loading = initializing || roleLoading;
 
   const value = {
@@ -208,6 +246,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signIn,
     signUp,
     signOut,
+    triggerSuspiciousLogout,
+    getDeviceFingerprint,
     isSuperAdmin: role === 'super_admin',
     isReseller: role === 'reseller',
   };
