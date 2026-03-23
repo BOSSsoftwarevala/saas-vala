@@ -120,7 +120,7 @@ export const chatApi = {
 export const apiKeysApi = {
   create: (data: any) => apiCall('POST', 'api-keys/create', data),
   list: () => apiCall('GET', 'api-keys'),
-  usage: () => apiCall('GET', 'api-keys/usage'),
+  usage: () => apiCall('GET', 'api-usage'),
 };
 
 // ===================== AUTO-PILOT =====================
