@@ -210,7 +210,7 @@ async function executeCommandOnAgent(server: ServerRecord, command: string, para
   throw new Error(`Agent command failed on all endpoints. Attempts: ${JSON.stringify(attempts)}`);
 }
 
-async function getServerByIdOrIp(supabase: ReturnType<typeof createClient>, serverId: string): Promise<ServerRecord | null> {
+async function getServerByIdOrIp(supabase: any, serverId: string): Promise<ServerRecord | null> {
   if (!serverId) return null;
 
   let query = supabase.from('servers').select('*');
@@ -218,11 +218,11 @@ async function getServerByIdOrIp(supabase: ReturnType<typeof createClient>, serv
 
   const { data, error } = await query.single();
   if (error || !data) return null;
-  return data as ServerRecord;
+  return data as unknown as ServerRecord;
 }
 
 async function logServerActivity(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   entityId: string,
   action: string,
   details: Record<string, unknown>,

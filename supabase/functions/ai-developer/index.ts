@@ -9,7 +9,7 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
     const res = await fetch(url, { ...options, signal: controller.signal });
     clearTimeout(timeout);
     return res;
-  } catch (e) {
+  } catch (e: any) {
     clearTimeout(timeout);
     if (e.name === 'AbortError') {
       throw new Error(`Connection timeout (${timeoutMs/1000}s) — server unreachable at ${url}`);
@@ -804,7 +804,7 @@ async function executeServerStatus(args: any, supabase: any): Promise<ToolResult
           success: true
         };
       }
-    } catch (e) {
+    } catch (e: any) {
       console.log(`[TOOL] Agent call failed: ${e.message}`);
     }
   }
@@ -877,7 +877,7 @@ async function executeDatabaseQuery(args: any, supabase: any): Promise<ToolResul
       content: JSON.stringify(result, null, 2),
       success: true
     };
-  } catch (e) {
+  } catch (e: any) {
     return { tool_call_id: '', content: `Error: ${e.message}`, success: false };
   }
 }
@@ -1545,7 +1545,7 @@ async function executeGitOperations(args: any, supabase: any): Promise<ToolResul
                 const agentData = await agentRes.json();
                 return { tool_call_id: '', content: JSON.stringify({ success: true, operation, server: server.name, live_execution: true, ...agentData.data }, null, 2), success: true };
               }
-            } catch (e) {
+            } catch (e: any) {
               return { tool_call_id: '', content: JSON.stringify({ error: `VALA Agent error: ${e.message}`, server: server.name }), success: false };
             }
           }
@@ -1559,7 +1559,7 @@ async function executeGitOperations(args: any, supabase: any): Promise<ToolResul
       default:
         return { tool_call_id: '', content: JSON.stringify({ error: `Unknown git operation: ${operation}` }), success: false };
     }
-  } catch (error) {
+  } catch (error: any) {
     return { tool_call_id: '', content: JSON.stringify({ error: error.message }), success: false };
   }
 }
@@ -1741,7 +1741,7 @@ async function executeUploadToGithub(args: any, supabase: any): Promise<ToolResu
             console.warn(`[TOOL] Failed to push ${fileName}: ${await putRes.text()}`);
           }
         }
-      } catch (e) {
+      } catch (e: any) {
         console.warn(`[TOOL] File download/push error: ${e.message}`);
       }
     }
@@ -1773,7 +1773,7 @@ async function executeUploadToGithub(args: any, supabase: any): Promise<ToolResu
             } else {
               console.warn(`[TOOL] Push failed for ${f.path}: ${await putRes.text()}`);
             }
-          } catch (e) {
+          } catch (e: any) {
             console.warn(`[TOOL] Push error for ${f.path}: ${e.message}`);
           }
         }
@@ -1808,7 +1808,7 @@ async function executeUploadToGithub(args: any, supabase: any): Promise<ToolResu
       }),
       success: true
     };
-  } catch (error) {
+  } catch (error: any) {
     return { tool_call_id: '', content: JSON.stringify({ error: `GitHub API error: ${error.message}` }), success: false };
   }
 }
@@ -1912,7 +1912,7 @@ async function executeListGithubRepos(args: any): Promise<ToolResult> {
       }),
       success: true
     };
-  } catch (error) {
+  } catch (error: any) {
     return { 
       tool_call_id: '', 
       content: JSON.stringify({ error: error.message }), 
@@ -1972,7 +1972,7 @@ async function executeAnalyzeZipFile(args: any, supabase: any): Promise<ToolResu
       content: JSON.stringify(analysis, null, 2),
       success: true
     };
-  } catch (error) {
+  } catch (error: any) {
     return { 
       tool_call_id: '', 
       content: JSON.stringify({ error: error.message }), 
@@ -2706,7 +2706,7 @@ Format: [{"path": "src/App.tsx", "content": "actual code here"}, ...]`;
         });
         if (putRes.ok) { pushed.push(f.path); } 
         else { errors.push(`${f.path}: ${(await putRes.json()).message || 'failed'}`); }
-      } catch (e) { errors.push(`${f.path}: ${e.message}`); }
+      } catch (e: any) { errors.push(`${f.path}: ${e.message}`); }
     }
 
     // Step 4: Get proof commit

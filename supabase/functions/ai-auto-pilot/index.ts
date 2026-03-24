@@ -89,7 +89,7 @@ Respond with JSON:
 
         const aiResult = await response.json();
         const toolCall = aiResult.choices?.[0]?.message?.tool_calls?.[0];
-        let aiAction = { action_type: "custom", action_steps: [], estimated_cost: 0, response_to_client: "Processing your request..." };
+        let aiAction: Record<string, any> = { action_type: "custom", action_steps: [], estimated_cost: 0, response_to_client: "Processing your request..." };
         
         if (toolCall?.function?.arguments) {
           aiAction = JSON.parse(toolCall.function.arguments);

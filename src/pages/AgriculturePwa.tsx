@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Heart, Star, ExternalLink, Download, KeyRound, CheckCircle2, Lock, ShieldCheck } from 'lucide-react';
+import { Heart, Star, ExternalLink, Download, KeyRound, CheckCircle2, Lock, ShieldCheck, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { validateLicenseKeyInDb } from '@/lib/licenseUtils';
 import { cn } from '@/lib/utils';

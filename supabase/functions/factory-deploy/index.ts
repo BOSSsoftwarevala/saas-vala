@@ -210,7 +210,7 @@ serve(async (req) => {
               domain_ok: !domainResult.error,
             });
             successCount++;
-          } catch (e) {
+          } catch (e: any) {
             results.push({ slug: r.slug, success: false, error: e.message });
             failCount++;
           }
@@ -324,7 +324,7 @@ serve(async (req) => {
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
-  } catch (error) {
+  } catch (error: any) {
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

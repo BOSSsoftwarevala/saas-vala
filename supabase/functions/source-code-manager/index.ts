@@ -290,7 +290,7 @@ Deno.serve(async (req) => {
               })
               .eq("id", project.id);
 
-            results.push({ name: project.project_name, status: "analyzed", vala_name: analysis.vala_name });
+            results.push({ name: project.project_name, status: "analyzed", vala_name: (analysis as any).vala_name });
           } catch (error) {
             results.push({ name: project.project_name, status: `error: ${error}` });
           }

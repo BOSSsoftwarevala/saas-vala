@@ -260,7 +260,7 @@ Deno.serve(async (req) => {
             buildResult.message = `Repo verified, queued for build (Actions dispatch: ${dispatchRes.status})`;
             buildResult.repo_verified = true;
           }
-        } catch (e) {
+        } catch (e: any) {
           buildResult.status = "error";
           buildResult.message = `Error: ${e.message}`;
         }
@@ -796,7 +796,7 @@ Deno.serve(async (req) => {
       default:
         return respond({ error: `Unknown action: ${action}` }, 400);
     }
-  } catch (err) {
+  } catch (err: any) {
     return new Response(
       JSON.stringify({ error: err.message || "Internal error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
