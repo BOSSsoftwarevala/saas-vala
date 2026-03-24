@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface SectionSliderProps {
   children: React.ReactNode;
@@ -13,6 +14,7 @@ interface SectionSliderProps {
  */
 export const SectionSlider = React.forwardRef<HTMLDivElement, SectionSliderProps>(({ children, className }, ref) => {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
 
@@ -38,12 +40,19 @@ export const SectionSlider = React.forwardRef<HTMLDivElement, SectionSliderProps
   // Auto-scroll every 4 seconds
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el) return;
+    if (!el || isMobile) return;
+
     let paused = false;
     const onEnter = () => { paused = true; };
     const onLeave = () => { paused = false; };
+    const onVisibilityChange = () => {
+      paused = document.hidden;
+    };
+
     el.addEventListener('mouseenter', onEnter);
     el.addEventListener('mouseleave', onLeave);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
     const interval = setInterval(() => {
       if (paused || !el) return;
       const { scrollLeft, scrollWidth, clientWidth } = el;
@@ -57,8 +66,9 @@ export const SectionSlider = React.forwardRef<HTMLDivElement, SectionSliderProps
       clearInterval(interval);
       el.removeEventListener('mouseenter', onEnter);
       el.removeEventListener('mouseleave', onLeave);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, []);
+  }, [isMobile]);
 
   const scroll = (direction: 'left' | 'right') => {
     if (!scrollRef.current) return;
@@ -70,7 +80,7 @@ export const SectionSlider = React.forwardRef<HTMLDivElement, SectionSliderProps
   return (
     <div className="relative group">
       {/* Left arrow */}
-      {canScrollLeft && (
+      {canScrollLeft && !isMobile && (
         <button
           onClick={() => scroll('left')}
           className={cn(
@@ -92,7 +102,7 @@ export const SectionSlider = React.forwardRef<HTMLDivElement, SectionSliderProps
       <div
         ref={scrollRef}
         className={cn(
-          'flex gap-4 overflow-x-auto scrollbar-hide px-4 md:px-8 pb-2',
+          'flex gap-4 overflow-x-auto scrollbar-hide px-4 md:px-8 pb-2 snap-x snap-mandatory touch-pan-x',
           className
         )}
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
@@ -101,7 +111,7 @@ export const SectionSlider = React.forwardRef<HTMLDivElement, SectionSliderProps
       </div>
 
       {/* Right arrow */}
-      {canScrollRight && (
+      {canScrollRight && !isMobile && (
         <button
           onClick={() => scroll('right')}
           className={cn(

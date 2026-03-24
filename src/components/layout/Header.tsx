@@ -15,7 +15,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ArrowLeft, Search, Bell, User, Settings, LogOut, ShoppingCart } from 'lucide-react';
 import { WalletHeaderButton } from '@/components/wallet/WalletHeaderButton';
 import { useCart } from '@/hooks/useCart';
-import { motion } from 'framer-motion';
 
 const pageTitles: Record<string, string> = {
   '/': 'Marketplace',
@@ -29,6 +28,7 @@ const pageTitles: Record<string, string> = {
   '/ai-apis': 'AI API Manager',
   '/wallet': 'Wallet & Billing',
   '/seo-leads': 'SEO & Lead Manager',
+  '/reseller-manager': 'Reseller Manager',
   '/resellers': 'Reseller Manager',
   '/audit-logs': 'Audit Logs',
   '/system-health': 'System Health',
@@ -56,27 +56,19 @@ export function Header() {
       {/* Left section */}
       <div className="flex items-center gap-4">
         {canGoBack && (
-          <motion.div whileHover={{ x: -2 }} whileTap={{ scale: 0.9 }}>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate(-1)}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </motion.div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(-1)}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
         )}
         <div>
-          <motion.h1
-            key={pageTitle}
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="font-display text-xl font-bold text-foreground"
-          >
+          <h1 className="font-display text-xl font-bold text-foreground">
             {pageTitle}
-          </motion.h1>
+          </h1>
           {isSuperAdmin && (
             <Badge variant="outline" className="mt-0.5 text-xs border-primary/30 text-primary bg-primary/5">
               Super Admin
@@ -105,65 +97,49 @@ export function Header() {
       {/* Right section */}
       <div className="flex items-center gap-3">
         {/* Cart */}
-        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative text-muted-foreground hover:text-foreground"
-            onClick={() => navigate('/cart')}
-          >
-            <ShoppingCart className="h-5 w-5" />
-            {cartCount > 0 && (
-              <motion.span
-                key={cartCount}
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-primary text-[10px] font-bold text-primary-foreground flex items-center justify-center"
-              >
-                {cartCount > 9 ? '9+' : cartCount}
-              </motion.span>
-            )}
-          </Button>
-        </motion.div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative text-muted-foreground hover:text-foreground"
+          onClick={() => navigate('/cart')}
+        >
+          <ShoppingCart className="h-5 w-5" />
+          {cartCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-primary text-[10px] font-bold text-primary-foreground flex items-center justify-center">
+              {cartCount > 9 ? '9+' : cartCount}
+            </span>
+          )}
+        </Button>
 
         {/* Wallet */}
         <WalletHeaderButton />
 
         {/* Notifications */}
-        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative text-muted-foreground hover:text-foreground"
-          >
-            <Bell className="h-5 w-5" />
-            <motion.span
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: 'spring', stiffness: 500, damping: 15 }}
-              className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-primary text-[10px] font-bold text-primary-foreground flex items-center justify-center"
-            >
-              3
-            </motion.span>
-          </Button>
-        </motion.div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative text-muted-foreground hover:text-foreground"
+        >
+          <Bell className="h-5 w-5" />
+          <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-primary text-[10px] font-bold text-primary-foreground flex items-center justify-center">
+            3
+          </span>
+        </Button>
 
         {/* User menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button
-                variant="ghost"
-                className="relative h-10 w-10 rounded-full"
-              >
-                <Avatar className="h-9 w-9 ring-2 ring-primary/20 hover:ring-primary/40 transition-all duration-300">
-                  <AvatarImage src="" alt={user?.email || ''} />
-                  <AvatarFallback className="bg-muted text-foreground font-medium text-sm">
-                    {userInitials}
-                  </AvatarFallback>
-                </Avatar>
-              </Button>
-            </motion.div>
+            <Button
+              variant="ghost"
+              className="relative h-10 w-10 rounded-full"
+            >
+              <Avatar className="h-9 w-9 ring-2 ring-primary/20 hover:ring-primary/40 transition-all duration-300">
+                <AvatarImage src="" alt={user?.email || ''} />
+                <AvatarFallback className="bg-muted text-foreground font-medium text-sm">
+                  {userInitials}
+                </AvatarFallback>
+              </Avatar>
+            </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-56 bg-popover/95 backdrop-blur-xl border-border/50" align="end">
             <DropdownMenuLabel className="font-normal">

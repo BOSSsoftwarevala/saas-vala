@@ -70,33 +70,27 @@ const MarketplaceAdmin = React.lazy(() => import("./pages/MarketplaceAdmin"));
 
 const queryClient = new QueryClient();
 
-const PageLoader = React.forwardRef<HTMLDivElement>((_, ref) => {
+function PageLoader() {
   return (
-    <div ref={ref} className="min-h-screen flex items-center justify-center bg-background">
+    <div className="min-h-screen flex items-center justify-center bg-background">
       <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   );
-});
+}
 
-PageLoader.displayName = "PageLoader";
-
-const ProtectedRoute = React.forwardRef<unknown, { children: React.ReactNode }>(({ children }, _ref) => {
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return <PageLoader />;
   if (!user) return <Navigate to="/auth" replace />;
   return <>{children}</>;
-});
+}
 
-ProtectedRoute.displayName = "ProtectedRoute";
-
-const AdminRoute = React.forwardRef<unknown, { children: React.ReactNode }>(({ children }, _ref) => {
+function AdminRoute({ children }: { children: React.ReactNode }) {
   const { isSuperAdmin, loading } = useAuth();
   if (loading) return <PageLoader />;
   if (!isSuperAdmin) return <Navigate to="/" replace />;
   return <>{children}</>;
-});
-
-AdminRoute.displayName = "AdminRoute";
+}
 
 function AppRoutes() {
   return (
@@ -155,6 +149,7 @@ function AppRoutes() {
         <Route path="/reseller-dashboard" element={<ProtectedRoute><ResellerDashboard /></ProtectedRoute>} />
 
         {/* Admin routes */}
+        <Route path="/reseller-manager" element={<ProtectedRoute><AdminRoute><Resellers /></AdminRoute></ProtectedRoute>} />
         <Route path="/resellers" element={<ProtectedRoute><AdminRoute><Resellers /></AdminRoute></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><AdminRoute><Settings /></AdminRoute></ProtectedRoute>} />
         <Route path="/audit-logs" element={<ProtectedRoute><AdminRoute><AuditLogs /></AdminRoute></ProtectedRoute>} />
