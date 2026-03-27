@@ -18,23 +18,31 @@ import { useCart } from '@/hooks/useCart';
 
 const pageTitles: Record<string, string> = {
   '/': 'Marketplace',
+  '/marketplace': 'Marketplace',
   '/dashboard': 'Dashboard',
   '/products': 'Product Manager',
   '/admin/marketplace': 'Marketplace Admin',
+  '/admin/add-product': 'Add Product',
   '/keys': 'Key Management',
   '/servers': 'Server Manager',
-  '/ai-chat': 'SaaS AI Chat',
+  '/ai-chat': 'VALA AI Chat',
   '/saas-ai-dashboard': 'SaaS AI Dashboard',
   '/ai-apis': 'AI API Manager',
+  '/vala-builder': 'VALA Builder',
   '/wallet': 'Wallet & Billing',
   '/seo-leads': 'SEO & Lead Manager',
   '/reseller-manager': 'Reseller Manager',
   '/resellers': 'Reseller Manager',
+  '/reseller-dashboard': 'Reseller Dashboard',
+  '/automation': 'Auto-Pilot & Monitor',
+  '/apk-pipeline': 'APK Pipeline',
   '/audit-logs': 'Audit Logs',
   '/system-health': 'System Health',
   '/settings': 'Settings & Security',
   '/education': 'Education Systems',
   '/role-detail': 'Role Configuration',
+  '/cart': 'Shopping Cart',
+  '/install': 'Install App',
 };
 
 export function Header() {
