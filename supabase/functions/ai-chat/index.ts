@@ -10,63 +10,118 @@ interface Message {
   content: string;
 }
 
-const SYSTEM_PROMPT = `You are VALA AI, an advanced internal assistant for the SaaS VALA platform by SoftwareVala™.
+const DEFAULT_SYSTEM_PROMPT = `You are VALA AI, an advanced internal assistant for the SaaS VALA platform by SoftwareVala™.
 
 ## Core Capabilities
 - **Source Code Analysis**: Upload any size ZIP, PHP, JS, Python, or mixed projects
 - **AI-Powered Code Fixing**: Auto-detect bugs, security issues, and performance problems
 - **One-Click Deployment**: Deploy to servers without developer knowledge
-- **Addon Integration**: Payment gateways, wallet systems, language packs
-- **Security Scanning**: Real-time threat detection and auto-fix
 - **License Management**: Generate, validate, and manage software licenses
 
 ## Response Guidelines
-1. Be precise and accurate - verify information before responding
+1. Be precise and accurate
 2. Use proper code formatting with syntax highlighting
 3. Provide step-by-step instructions for complex tasks
-4. Include error handling and edge cases in code examples
-5. Always explain the "why" behind recommendations
-6. Use markdown tables for structured data
-7. Break complex answers into clear sections
+4. Hinglish response preferred. Professional tone.
+5. ACTION FIRST → Result → Short summary.
 
-## AUTONOMOUS EXECUTION MODE
-- User command = EXECUTE. No questions, no approval needed.
-- Auto-fix errors, auto-retry 3 times, auto-fallback.
-- NEVER say "cannot", "limitation", "manual required".
-- ACTION FIRST → Result table → Short summary.
-- Hinglish response preferred. Professional tone.
-- Multi-step commands = complete full chain, don't stop midway.
+Powered by SoftwareVala™ Technology | VALA AI`;
 
-Powered by SoftwareVala™ Technology | VALA AI Autonomous Mode`;
+// ─── Lovable AI Gateway (Google/OpenAI models) ────────────────────────────────
+async function callLovableAI(messages: Message[], model: string, temperature: number, maxTokens: number) {
+  const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+  if (!LOVABLE_API_KEY) return null;
 
-// ─── OpenAI Direct (Server-Side Only) ────────────────────────────────────────
-async function callOpenAI(messages: Message[], model: string, stream: boolean, apiKey: string) {
-  // Map display model names to real OpenAI model IDs
+  try {
+    const response = await fetch('https://api.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        max_tokens: maxTokens,
+        temperature,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[VALA AI] Lovable AI error [${response.status}]: ${errText}`);
+      return null;
+    }
+
+    const data = await response.json();
+    return {
+      content: data.choices?.[0]?.message?.content || '',
+      usage: data.usage,
+      model: data.model || model,
+      provider: 'lovable-ai',
+    };
+  } catch (e) {
+    console.error('[VALA AI] Lovable AI request failed:', e);
+    return null;
+  }
+}
+
+// ─── OpenAI Direct ────────────────────────────────────────────────────────────
+async function callOpenAI(messages: Message[], model: string, temperature: number, maxTokens: number) {
+  const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+  if (!OPENAI_API_KEY) return null;
+
   const modelMap: Record<string, string> = {
-    'openai/gpt-5':        'gpt-4o',
-    'openai/gpt-5-mini':   'gpt-4o-mini',
-    'openai/gpt-5.2':      'gpt-4o',
-    'gpt-4o':              'gpt-4o',
-    'gpt-4o-mini':         'gpt-4o-mini',
+    'openai/gpt-5': 'gpt-4o',
+    'openai/gpt-5-mini': 'gpt-4o-mini',
+    'openai/gpt-5-nano': 'gpt-4o-mini',
+    'openai/gpt-5.2': 'gpt-4o',
+    'gpt-4o': 'gpt-4o',
+    'gpt-4o-mini': 'gpt-4o-mini',
   };
-  const openaiModel = modelMap[model] ?? (model.startsWith('gpt-') ? model : 'gpt-4o-mini');
+  const openaiModel = modelMap[model] ?? 'gpt-4o-mini';
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: openaiModel,
+        messages,
+        max_tokens: maxTokens,
+        temperature,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[VALA AI] OpenAI error [${response.status}]: ${errText}`);
+      // Return specific error info for billing/auth issues
+      if (response.status === 401) throw new Error('❌ OpenAI API Key invalid. Settings check karo.');
+      if (response.status === 402) throw new Error('💳 OpenAI credits khatam. Account recharge karo.');
+      if (response.status === 429) throw new Error('⏳ Rate limit hit. 30 sec baad retry karo.');
+      return null;
+    }
+
+    const data = await response.json();
+    return {
+      content: data.choices?.[0]?.message?.content || '',
+      usage: data.usage,
       model: openaiModel,
-      messages,
-      max_tokens: 8192,
-      temperature: 0.3,
-      stream,
-    }),
-  });
+      provider: 'openai',
+    };
+  } catch (e: any) {
+    if (e.message?.includes('❌') || e.message?.includes('💳') || e.message?.includes('⏳')) throw e;
+    console.error('[VALA AI] OpenAI request failed:', e);
+    return null;
+  }
+}
 
-  return { response, provider: 'openai', modelUsed: openaiModel };
+function isGoogleModel(model: string): boolean {
+  return model.startsWith('google/') || model.startsWith('gemini');
 }
 
 serve(async (req) => {
@@ -76,166 +131,83 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { messages, stream = false, model = 'gpt-4o-mini', diagnostic = false } = body as {
+    const {
+      messages,
+      model = 'google/gemini-3-flash-preview',
+      system_prompt,
+      temperature = 0.7,
+      max_tokens = 4096,
+    } = body as {
       messages: Message[];
-      stream?: boolean;
       model?: string;
-      diagnostic?: boolean;
+      system_prompt?: string;
+      temperature?: number;
+      max_tokens?: number;
     };
 
-    if (!messages || !Array.isArray(messages)) {
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return new Response(
         JSON.stringify({ error: 'Messages array is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') ?? '';
-
-    if (!OPENAI_API_KEY) {
-      console.error('[VALA AI] OPENAI_API_KEY not configured');
-      return new Response(
-        JSON.stringify({ error: 'OpenAI API key not configured. Please add OPENAI_API_KEY to secrets.' }),
-        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
+    const systemMsg = system_prompt || DEFAULT_SYSTEM_PROMPT;
     const allMessages: Message[] = [
-      { role: 'system', content: SYSTEM_PROMPT },
-      ...messages,
+      { role: 'system', content: systemMsg },
+      ...messages.slice(-10), // Context window limit
     ];
 
-    // ─── BOOT DIAGNOSTICS ─────────────────────────────────────────────────────
-    if (diagnostic) {
-      console.log('═══════════════════════════════════════════');
-      console.log('VALA AI — SYSTEM DIAGNOSTIC');
-      console.log('═══════════════════════════════════════════');
-      console.log(`Active Model       : ${model}`);
-      console.log(`API Base URL       : https://api.openai.com/v1`);
-      console.log(`OPENAI_API_KEY     : ${OPENAI_API_KEY.length > 0 ? 'PRESENT' : 'MISSING'}`);
-      console.log(`Key (last 4 chars) : ...${OPENAI_API_KEY.slice(-4)}`);
-      console.log(`Environment        : PRODUCTION`);
-      console.log(`Provider           : OpenAI Direct (no fallback)`);
-      console.log(`Stream Mode        : ${stream}`);
-      console.log('═══════════════════════════════════════════');
+    console.log(`[VALA AI] Request | model: ${model} | msgs: ${allMessages.length} | temp: ${temperature}`);
+
+    let result: { content: string; usage?: any; model: string; provider: string } | null = null;
+
+    // Route 1: Google models → Lovable AI Gateway
+    if (isGoogleModel(model)) {
+      result = await callLovableAI(allMessages, model, temperature, max_tokens);
     }
 
-    // ─── CALL OPENAI ──────────────────────────────────────────────────────────
-    console.log(`[VALA AI] Calling OpenAI | model: ${model} | stream: ${stream}`);
-    let result: { response: Response; provider: string; modelUsed: string };
+    // Route 2: OpenAI models → Direct OpenAI
+    if (!result && !isGoogleModel(model)) {
+      result = await callOpenAI(allMessages, model, temperature, max_tokens);
+    }
 
-    try {
-      result = await callOpenAI(allMessages, model, stream, OPENAI_API_KEY);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error('[VALA AI] OpenAI request failed:', msg);
+    // Fallback: Try the other provider
+    if (!result) {
+      console.log('[VALA AI] Primary failed, trying fallback...');
+      if (isGoogleModel(model)) {
+        result = await callOpenAI(allMessages, 'gpt-4o-mini', temperature, max_tokens);
+      } else {
+        result = await callLovableAI(allMessages, 'google/gemini-2.5-flash', temperature, max_tokens);
+      }
+    }
+
+    if (!result || !result.content) {
       return new Response(
-        JSON.stringify({ error: `OpenAI request failed: ${msg}` }),
+        JSON.stringify({ error: 'AI response failed. Koi provider available nahi hai. Check API keys in settings.' }),
         { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    if (!result.response.ok) {
-      const errText = await result.response.text();
-      console.error(`[VALA AI] OpenAI error [${result.response.status}]: ${errText}`);
-
-      // Surface specific error codes clearly
-      if (result.response.status === 401) {
-        return new Response(
-          JSON.stringify({ error: '❌ 401 Invalid API Key — Update OPENAI_API_KEY in secrets.', code: 401, type: 'invalid_api_key' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      if (result.response.status === 403) {
-        return new Response(
-          JSON.stringify({ error: '❌ 403 Permission Denied — Check OpenAI organization/project permissions.', code: 403, type: 'permission_denied' }),
-          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      if (result.response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: '⚠️ 429 Rate Limited — OpenAI rate limit hit. Wait and retry.', code: 429, type: 'rate_limit' }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      if (result.response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: '💳 402 Billing Issue — Add credits to your OpenAI account.', code: 402, type: 'billing' }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      if (result.response.status >= 500) {
-        return new Response(
-          JSON.stringify({ error: `🔴 ${result.response.status} OpenAI Server Error — Retry later.`, code: result.response.status, type: 'server_error' }),
-          { status: result.response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      return new Response(
-        JSON.stringify({ error: errText }),
-        { status: result.response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // ─── STREAMING RESPONSE ───────────────────────────────────────────────────
-    if (stream) {
-      console.log(`[VALA AI] ✅ Streaming | model: ${result.modelUsed}`);
-      return new Response(result.response.body, {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'text/event-stream',
-          'X-AI-Provider': result.provider,
-          'X-AI-Model': result.modelUsed,
-        },
-      });
-    }
-
-    // ─── NON-STREAMING RESPONSE ───────────────────────────────────────────────
-    const data = await result.response.json();
-    const assistantMessage = data.choices?.[0]?.message?.content;
-
-    if (!assistantMessage) {
-      console.error('[VALA AI] Empty response from OpenAI');
-      return new Response(
-        JSON.stringify({ error: 'OpenAI returned empty response. Please retry.' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log(`[VALA AI] ✅ Success | model: ${result.modelUsed} | tokens: ${data.usage?.total_tokens ?? 'N/A'}`);
+    console.log(`[VALA AI] ✅ Success | provider: ${result.provider} | model: ${result.model} | tokens: ${result.usage?.total_tokens ?? 'N/A'}`);
 
     return new Response(
       JSON.stringify({
-        response: assistantMessage,
-        model: result.modelUsed,
+        response: result.content,
+        model: result.model,
         provider: result.provider,
-        usage: data.usage,
-        ...(diagnostic ? {
-          _diagnostic: {
-            provider_used: 'openai_direct',
-            model_requested: model,
-            model_used: result.modelUsed,
-            api_base: 'https://api.openai.com/v1',
-            openai_key_present: OPENAI_API_KEY.length > 0,
-            key_last4: OPENAI_API_KEY.slice(-4),
-            environment: 'PRODUCTION',
-            input_tokens: data.usage?.prompt_tokens,
-            output_tokens: data.usage?.completion_tokens,
-            total_tokens: data.usage?.total_tokens,
-            cors_blocked: false,
-            client_side_calls: false,
-          }
-        } : {})
+        usage: result.usage,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[VALA AI] Fatal error:', msg);
+    console.error('[VALA AI] Error:', msg);
+    const status = msg.includes('401') ? 401 : msg.includes('402') ? 402 : msg.includes('429') ? 429 : 500;
     return new Response(
       JSON.stringify({ error: msg }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
