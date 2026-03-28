@@ -28,9 +28,9 @@ const catColors: Record<string, string> = {
   Marketing: '#e879f9', HR: '#818cf8', Logistics: '#facc15',
 };
 
-export const MarketplaceProductCard = React.memo<MarketplaceProductCardProps>(({
+export const MarketplaceProductCard = React.memo(React.forwardRef<HTMLDivElement, MarketplaceProductCardProps>(function MarketplaceProductCard({
   product, index = 0, onBuyNow, rank,
-}) => {
+}, _ref) {
   const [favorited, setFavorited] = useState(false);
   const [notified, setNotified] = useState(false);
   const [demoOpen, setDemoOpen] = useState(false);
@@ -287,7 +287,7 @@ export const MarketplaceProductCard = React.memo<MarketplaceProductCardProps>(({
       )}
     </>
   );
-});
+}));
 MarketplaceProductCard.displayName = 'MarketplaceProductCard';
 
 export function ComingSoonCard({ label }: { label: string }) {
