@@ -1,3 +1,4 @@
+import React from 'react';
 import { SectionHeader } from './SectionHeader';
 import { SectionSlider } from './SectionSlider';
 import { MarketplaceProductCard, ComingSoonCard } from './MarketplaceProductCard';
@@ -10,7 +11,7 @@ interface Props {
   onBuyNow: (p: any) => void;
 }
 
-export function MarketplaceCategoryRow({ category, onBuyNow }: Props) {
+export const MarketplaceCategoryRow = React.forwardRef<HTMLElement, Props>(function MarketplaceCategoryRow({ category, onBuyNow }, ref) {
   const { products, loading } = useProductsByCategory(category.keywords);
 
   const displayProducts = fillToTarget(products as any, category.id, category.title, 50);
@@ -56,4 +57,5 @@ export function MarketplaceCategoryRow({ category, onBuyNow }: Props) {
       </SectionSlider>
     </section>
   );
-}
+});
+MarketplaceCategoryRow.displayName = 'MarketplaceCategoryRow';
