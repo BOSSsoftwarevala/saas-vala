@@ -52,7 +52,7 @@ const typeConfig: Record<string, { icon: typeof Server; label: string }> = {
   cloud: { icon: Shield, label: 'Cloud' },
   vercel: { icon: Globe, label: 'Vercel' },
   hybrid: { icon: Server, label: 'Hybrid' },
-  hostinger: { icon: Globe, label: 'Hostinger' },
+  digitalocean: { icon: Globe, label: 'DigitalOcean' },
   vps: { icon: Server, label: 'VPS' },
 };
 
@@ -450,9 +450,9 @@ export function ServerListPanel() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="self">Self-Hosted (VPS)</SelectItem>
-                  <SelectItem value="hostinger">Hostinger</SelectItem>
+                  <SelectItem value="digitalocean">DigitalOcean</SelectItem>
                   <SelectItem value="cloud">Cloud</SelectItem>
-                  <SelectItem value="vercel">Vercel</SelectItem>
+                  <SelectItem value="vps">VPS</SelectItem>
                   <SelectItem value="hybrid">Hybrid</SelectItem>
                 </SelectContent>
               </Select>
@@ -463,7 +463,7 @@ export function ServerListPanel() {
               <Input
                 value={newServer.ip_address}
                 onChange={(e) => setNewServer((prev) => ({ ...prev, ip_address: e.target.value }))}
-                placeholder="e.g. 72.61.236.249"
+                placeholder="e.g. 64.226.91.27"
               />
             </div>
 
@@ -472,7 +472,7 @@ export function ServerListPanel() {
               <Input
                 value={newServer.agent_url}
                 onChange={(e) => setNewServer((prev) => ({ ...prev, agent_url: e.target.value }))}
-                placeholder="e.g. http://72.61.236.249:9876"
+                placeholder="e.g. http://64.226.91.27:9876"
               />
             </div>
 
@@ -533,11 +533,10 @@ export function ServerListPanel() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="self">Self-Hosted (VPS)</SelectItem>
-                  <SelectItem value="hostinger">Hostinger</SelectItem>
+                  <SelectItem value="digitalocean">DigitalOcean</SelectItem>
                   <SelectItem value="cloud">Cloud</SelectItem>
-                  <SelectItem value="vercel">Vercel</SelectItem>
-                  <SelectItem value="hybrid">Hybrid</SelectItem>
                   <SelectItem value="vps">VPS</SelectItem>
+                  <SelectItem value="hybrid">Hybrid</SelectItem>
                 </SelectContent>
               </Select>
             </div>

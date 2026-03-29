@@ -578,18 +578,18 @@ const developerTools = [
       }
     }
   },
-  // ═══ HOSTINGER API TOOLS ═══
+  // ═══ SERVER SSH/API TOOLS ═══
   {
     type: "function",
     function: {
-      name: "hostinger_api",
-      description: "Manage Hostinger VPS servers via official Hostinger API. Can list VPS, get info, restart, stop, start, check metrics, manage firewall, backups, snapshots, and SSH keys. No VALA Agent needed — works directly with Hostinger's cloud API.",
+      name: "server_manage",
+      description: "Manage self-hosted VPS (DigitalOcean/Ubuntu) via VALA Agent or SSH. Actions: status, restart, deploy, logs, metrics, firewall, backups, SSL. Works with any VPS that has VALA Agent installed.",
       parameters: {
         type: "object",
         properties: {
-          action: { type: "string", enum: ["list_vps", "get_vps", "restart_vps", "stop_vps", "start_vps", "get_metrics", "list_backups", "create_backup", "list_snapshots", "list_firewall", "add_firewall_rule", "delete_firewall_rule", "list_ssh_keys", "get_templates"], description: "Hostinger API action to perform" },
-          vps_id: { type: "number", description: "VPS ID (numeric, from Hostinger panel URL e.g. /vps/123456/overview)" },
-          params: { type: "object", description: "Additional parameters for the action (e.g. firewall rule details, backup config)" }
+          action: { type: "string", enum: ["status", "restart_service", "deploy", "logs", "metrics", "list_firewall", "add_firewall_rule", "delete_firewall_rule", "backup", "ssl_status", "nginx_reload"], description: "Server management action" },
+          server_id: { type: "string", description: "Server UUID or IP address" },
+          params: { type: "object", description: "Additional parameters for the action" }
         },
         required: ["action"]
       }
@@ -1115,8 +1115,8 @@ async function executeDeployProject(args: any, supabase: any): Promise<ToolResul
             subdomain_setup: subdomainSetup,
             dns_record_needed: !subdomainSetup.configured ? null : {
               type: 'A', host: repoSlug, domain: 'saasvala.com',
-              value: server.ip_address || '72.61.236.249', ttl: 3600,
-              note: `Add A record: ${repoSlug} -> ${server.ip_address || '72.61.236.249'} at your DNS provider`
+              value: server.ip_address || '64.226.91.27', ttl: 3600,
+              note: `Add A record: ${repoSlug} -> ${server.ip_address || '64.226.91.27'} at your DNS provider`
             },
             agent_response: agentData.data || agentData,
             message: `✅ REAL deployment complete via VALA Agent | ${duration}s | Subdomain: ${subdomainSetup.configured ? '✅ ' + subdomain : '⚠️ manual setup needed'}`
