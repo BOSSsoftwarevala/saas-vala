@@ -79,6 +79,8 @@ function getCandidateUrls(server: ServerRecord): string[] {
   }
 
   if (server.ip_address) {
+    // Try Nginx proxy path first (port 80), then direct agent port
+    urls.add(`http://${server.ip_address}/vala-agent`);
     urls.add(`http://${server.ip_address}:9876`);
   }
 
