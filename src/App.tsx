@@ -32,7 +32,7 @@ const Resellers = React.lazy(() => import("./pages/Resellers"));
 const Settings = React.lazy(() => import("./pages/Settings"));
 const AuditLogs = React.lazy(() => import("./pages/AuditLogs"));
 const SystemHealth = React.lazy(() => import("./pages/SystemHealth"));
-const NotFound = React.lazy(() => import("./pages/NotFound"));
+// NotFound removed - 404 redirects to /dashboard
 const ResellerDashboard = React.lazy(() => import("./pages/ResellerDashboard"));
 const Automation = React.lazy(() => import("./pages/Automation"));
 const AddProduct = React.lazy(() => import("./pages/AddProduct"));
