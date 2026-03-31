@@ -134,6 +134,9 @@ function AppRoutes() {
         {/* Protected routes */}
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
+        <Route path="/products/add" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
+        <Route path="/products/edit/:id" element={<ProtectedRoute><Products /></ProtectedRoute>} />
+        <Route path="/products/view/:id" element={<ProtectedRoute><Products /></ProtectedRoute>} />
         <Route path="/keys" element={<ProtectedRoute><Keys /></ProtectedRoute>} />
         <Route path="/servers" element={<ProtectedRoute><Servers /></ProtectedRoute>} />
         <Route path="/role-detail" element={<ProtectedRoute><RoleDetail /></ProtectedRoute>} />
@@ -143,6 +146,7 @@ function AppRoutes() {
         <Route path="/vala-builder" element={<ProtectedRoute><ValaBuilder /></ProtectedRoute>} />
         <Route path="/ai-chat" element={<ProtectedRoute><AiChat /></ProtectedRoute>} />
         <Route path="/saas-ai-dashboard" element={<ProtectedRoute><SaasAiDashboard /></ProtectedRoute>} />
+        <Route path="/saas-ai" element={<ProtectedRoute><SaasAiDashboard /></ProtectedRoute>} />
         <Route path="/ai-apis" element={<ProtectedRoute><AiApis /></ProtectedRoute>} />
         <Route path="/wallet" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
         <Route path="/seo-leads" element={<ProtectedRoute><SeoLeads /></ProtectedRoute>} />
@@ -161,10 +165,8 @@ function AppRoutes() {
         <Route path="/admin/marketplace" element={<ProtectedRoute><AdminRoute><MarketplaceAdmin /></AdminRoute></ProtectedRoute>} />
         <Route path="/marketplace-admin" element={<ProtectedRoute><AdminRoute><MarketplaceAdmin /></AdminRoute></ProtectedRoute>} />
 
-        {/* Aliases for alternate paths */}
-        <Route path="/saas-ai" element={<ProtectedRoute><SaasAiDashboard /></ProtectedRoute>} />
-
-        <Route path="*" element={<NotFound />} />
+        {/* 404 fallback → redirect to dashboard */}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Suspense>
   );

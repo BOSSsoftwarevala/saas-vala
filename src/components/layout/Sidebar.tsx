@@ -62,7 +62,7 @@ export function Sidebar() {
 
   const isItemActive = (item: NavItem) => {
     const paths = item.activePaths ?? [item.href];
-    return paths.includes(location.pathname);
+    return paths.some(p => location.pathname === p || location.pathname.startsWith(p + '/'));
   };
 
   const filteredNavItems = navItems.filter(
