@@ -92,6 +92,11 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function FallbackRedirect() {
+  const { isReseller } = useAuth();
+  return <Navigate to={isReseller ? '/reseller-dashboard' : '/dashboard'} replace />;
+}
+
 function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
