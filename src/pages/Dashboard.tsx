@@ -15,7 +15,13 @@ import { useAuditLogs } from '@/hooks/useAuditLogs';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { isSuperAdmin } = useAuth();
+  const { isSuperAdmin, isReseller } = useAuth();
+
+  // Resellers should not access admin dashboard
+  if (isReseller) {
+    return <Navigate to="/reseller-dashboard" replace />;
+  }
+
   const { stats, loading: statsLoading } = useDashboardStats();
   const { products, loading: productsLoading } = useProducts();
   const { servers, loading: serversLoading } = useServers();
