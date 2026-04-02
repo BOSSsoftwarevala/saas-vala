@@ -37,10 +37,12 @@
    const location = useLocation();
    const { signOut } = useAuth();
  
-   const isActive = (href: string) => {
-     if (href === '/reseller-dashboard' && !location.search) return true;
-     return location.pathname + location.search === href;
-   };
+    const isActive = (href: string) => {
+      if (href === '/reseller-dashboard') {
+        return location.pathname === '/reseller-dashboard' && !location.search;
+      }
+      return location.pathname + location.search === href;
+    };
  
    return (
      <aside
