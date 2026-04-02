@@ -92,6 +92,11 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function FallbackRedirect() {
+  const { isReseller } = useAuth();
+  return <Navigate to={isReseller ? '/reseller-dashboard' : '/dashboard'} replace />;
+}
+
 function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
@@ -165,8 +170,8 @@ function AppRoutes() {
         <Route path="/admin/marketplace" element={<ProtectedRoute><AdminRoute><MarketplaceAdmin /></AdminRoute></ProtectedRoute>} />
         <Route path="/marketplace-admin" element={<ProtectedRoute><AdminRoute><MarketplaceAdmin /></AdminRoute></ProtectedRoute>} />
 
-        {/* 404 fallback → redirect to dashboard */}
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        {/* 404 fallback → redirect to appropriate dashboard */}
+        <Route path="*" element={<FallbackRedirect />} />
       </Routes>
     </Suspense>
   );

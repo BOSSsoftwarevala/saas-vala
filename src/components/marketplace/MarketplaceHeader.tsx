@@ -198,7 +198,7 @@ export function MarketplaceHeader() {
 
           {/* Auth */}
           {user ? (
-            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="h-9 w-9">
+            <Button variant="ghost" size="icon" onClick={() => navigate(isReseller ? '/reseller-dashboard' : '/dashboard')} className="h-9 w-9">
               <User className="h-4 w-4" />
             </Button>
           ) : (

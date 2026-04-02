@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { Package, Key, Server, Users, FileText, TrendingUp, Loader2 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { StatsCard } from '@/components/dashboard/StatsCard';
@@ -15,7 +15,13 @@ import { useAuditLogs } from '@/hooks/useAuditLogs';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { isSuperAdmin } = useAuth();
+  const { isSuperAdmin, isReseller } = useAuth();
+
+  // Resellers should not access admin dashboard
+  if (isReseller) {
+    return <Navigate to="/reseller-dashboard" replace />;
+  }
+
   const { stats, loading: statsLoading } = useDashboardStats();
   const { products, loading: productsLoading } = useProducts();
   const { servers, loading: serversLoading } = useServers();

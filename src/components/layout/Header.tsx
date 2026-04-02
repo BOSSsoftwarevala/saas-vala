@@ -164,14 +164,16 @@ export function Header() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator className="bg-border/50" />
-            <DropdownMenuItem className="cursor-pointer" onClick={() => navigate('/settings')}>
+            <DropdownMenuItem className="cursor-pointer" onClick={() => navigate(role === 'reseller' ? '/reseller-dashboard?tab=password' : '/settings')}>
               <User className="mr-2 h-4 w-4" />
               <span>Profile</span>
             </DropdownMenuItem>
-            <DropdownMenuItem className="cursor-pointer" onClick={() => navigate('/settings')}>
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Settings</span>
-            </DropdownMenuItem>
+            {isSuperAdmin && (
+              <DropdownMenuItem className="cursor-pointer" onClick={() => navigate('/settings')}>
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator className="bg-border/50" />
             <DropdownMenuItem
               className="cursor-pointer text-destructive focus:text-destructive"
