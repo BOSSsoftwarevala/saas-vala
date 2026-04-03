@@ -1079,6 +1079,144 @@ export type Database = {
           },
         ]
       }
+      chat_channel_members: {
+        Row: {
+          channel_id: string
+          id: string
+          joined_at: string | null
+          last_read_at: string | null
+          role: string | null
+          user_id: string
+        }
+        Insert: {
+          channel_id: string
+          id?: string
+          joined_at?: string | null
+          last_read_at?: string | null
+          role?: string | null
+          user_id: string
+        }
+        Update: {
+          channel_id?: string
+          id?: string
+          joined_at?: string | null
+          last_read_at?: string | null
+          role?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_channel_members_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "chat_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_channels: {
+        Row: {
+          channel_type: string
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_archived: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          channel_type?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_archived?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          channel_type?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_archived?: boolean | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      chat_messages: {
+        Row: {
+          channel_id: string
+          content: string
+          created_at: string | null
+          id: string
+          is_edited: boolean | null
+          message_type: string | null
+          sender_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          channel_id: string
+          content: string
+          created_at?: string | null
+          id?: string
+          is_edited?: boolean | null
+          message_type?: string | null
+          sender_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          channel_id?: string
+          content?: string
+          created_at?: string | null
+          id?: string
+          is_edited?: boolean | null
+          message_type?: string | null
+          sender_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "chat_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_typing: {
+        Row: {
+          channel_id: string
+          id: string
+          started_at: string | null
+          user_id: string
+        }
+        Insert: {
+          channel_id: string
+          id?: string
+          started_at?: string | null
+          user_id: string
+        }
+        Update: {
+          channel_id?: string
+          id?: string
+          started_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_typing_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "chat_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_requests: {
         Row: {
           ai_action_taken: string | null

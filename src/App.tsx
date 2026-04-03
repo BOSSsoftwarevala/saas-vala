@@ -67,6 +67,7 @@ const Cart = React.lazy(() => import("./pages/Cart"));
 const ApkPipeline = React.lazy(() => import("./pages/ApkPipeline"));
 const OfflineAppTemplate = React.lazy(() => import("./pages/OfflineAppTemplate"));
 const MarketplaceAdmin = React.lazy(() => import("./pages/MarketplaceAdmin"));
+const Support = React.lazy(() => import("./pages/Support"));
 
 const queryClient = new QueryClient();
 
@@ -156,6 +157,7 @@ function AppRoutes() {
         <Route path="/wallet" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
         <Route path="/seo-leads" element={<ProtectedRoute><SeoLeads /></ProtectedRoute>} />
         <Route path="/reseller-dashboard" element={<ProtectedRoute><ResellerDashboard /></ProtectedRoute>} />
+        <Route path="/support" element={<ProtectedRoute><Support /></ProtectedRoute>} />
 
         {/* Admin routes */}
         <Route path="/reseller-manager" element={<ProtectedRoute><AdminRoute><Resellers /></AdminRoute></ProtectedRoute>} />
