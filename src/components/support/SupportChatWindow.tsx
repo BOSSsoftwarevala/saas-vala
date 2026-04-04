@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import {
-  Send, Hash, Users, Phone, Pin, Search, Smile, Paperclip,
+  Send, Hash, Users, Pin, Search, Smile, Paperclip, Bookmark,
   AtSign, Bold, Italic, List, Code, Link as LinkIcon,
-  MoreHorizontal, MessageCircle, ChevronDown, Strikethrough,
+  MoreHorizontal, MessageCircle, Strikethrough,
   ListOrdered, Quote, Video
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
