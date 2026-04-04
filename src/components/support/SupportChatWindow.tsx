@@ -1,7 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Hash, Users, Phone, Pin, Search, Smile, Paperclip, AtSign, Bold, Italic, List, Code, Link as LinkIcon, MoreHorizontal, MessageCircle } from 'lucide-react';
+import {
+  Send, Hash, Users, Phone, Pin, Search, Smile, Paperclip,
+  AtSign, Bold, Italic, List, Code, Link as LinkIcon,
+  MoreHorizontal, MessageCircle, ChevronDown, Strikethrough,
+  ListOrdered, Quote, Video
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -19,7 +23,7 @@ interface Props {
 }
 
 function formatTime(dateStr: string) {
-  return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return new Date(dateStr).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
 function formatDate(dateStr: string) {
@@ -48,8 +52,8 @@ function groupMessagesByDate(messages: ChatMessage[]) {
 }
 
 const avatarColors = [
-  'bg-green-600', 'bg-blue-600', 'bg-purple-600', 'bg-orange-600',
-  'bg-pink-600', 'bg-teal-600', 'bg-indigo-600', 'bg-rose-600',
+  '#e8912d', '#2eb67d', '#36c5f0', '#ecb22e',
+  '#e01e5a', '#6b2fa0', '#1264a3', '#d83b7d',
 ];
 
 function getAvatarColor(name: string) {
@@ -83,11 +87,13 @@ export function SupportChatWindow({ channel, messages, members, typingUsers, onS
 
   if (!channel) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-white text-gray-500">
+      <div className="flex-1 flex items-center justify-center" style={{ background: '#1a1d21' }}>
         <div className="text-center">
-          <Hash className="h-16 w-16 mx-auto mb-4 opacity-20" />
-          <p className="text-xl font-medium text-gray-700">Welcome to Support</p>
-          <p className="text-sm text-gray-400 mt-1">Select a channel from the sidebar to start messaging</p>
+          <div className="w-[80px] h-[80px] rounded-[16px] mx-auto mb-5 flex items-center justify-center" style={{ background: '#2e2e38' }}>
+            <Hash className="h-[40px] w-[40px]" style={{ color: '#ababad' }} />
+          </div>
+          <p className="text-[22px] font-bold text-white">Welcome to SaasVala Support</p>
+          <p className="text-[15px] mt-2" style={{ color: '#ababad' }}>Select a channel from the sidebar to start messaging</p>
         </div>
       </div>
     );
@@ -97,29 +103,29 @@ export function SupportChatWindow({ channel, messages, members, typingUsers, onS
   const typingNames = members.filter(m => typingUsers.includes(m.user_id)).map(m => m.full_name || 'Someone');
 
   return (
-    <div className="flex-1 flex flex-col bg-white min-w-0">
-      {/* Slack-style header */}
-      <div className="h-12 px-4 flex items-center justify-between border-b bg-white flex-shrink-0">
-        <div className="flex items-center gap-1.5">
-          <Hash className="h-4 w-4 text-gray-400" />
-          <span className="font-bold text-[15px] text-gray-900">{channel.name}</span>
+    <div className="flex-1 flex flex-col min-w-0" style={{ background: '#1a1d21' }}>
+      {/* Slack header bar */}
+      <div className="h-[49px] px-4 flex items-center justify-between border-b flex-shrink-0" style={{ background: '#1a1d21', borderColor: '#383838' }}>
+        <div className="flex items-center gap-[6px]">
+          <Hash className="h-[16px] w-[16px]" style={{ color: '#b9bbbe' }} />
+          <span className="font-bold text-[16px] text-white">{channel.name}</span>
           {channel.description && (
             <>
-              <span className="text-gray-300 mx-1">|</span>
-              <span className="text-xs text-gray-500 truncate max-w-[200px]">{channel.description}</span>
+              <div className="w-px h-[16px] mx-1" style={{ background: '#383838' }} />
+              <span className="text-[13px] truncate max-w-[300px]" style={{ color: '#ababad' }}>{channel.description}</span>
             </>
           )}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-[2px]">
           {[
-            { icon: Phone, label: 'Huddle' },
-            { icon: Pin, label: 'Pins' },
+            { icon: Video, label: 'Huddle' },
+            { icon: Pin, label: 'Pinned' },
             { icon: Search, label: 'Search' },
           ].map((item, i) => (
-            <Tooltip key={i}>
+            <Tooltip key={i} delayDuration={0}>
               <TooltipTrigger asChild>
-                <button className="w-8 h-8 rounded flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors">
-                  <item.icon className="h-4 w-4" />
+                <button className="w-[32px] h-[32px] rounded-[6px] flex items-center justify-center transition-colors hover:bg-white/10" style={{ color: '#b9bbbe' }}>
+                  <item.icon className="h-[16px] w-[16px]" />
                 </button>
               </TooltipTrigger>
               <TooltipContent className="text-xs">{item.label}</TooltipContent>
@@ -128,12 +134,13 @@ export function SupportChatWindow({ channel, messages, members, typingUsers, onS
           <button
             onClick={() => setShowMembers(!showMembers)}
             className={cn(
-              'h-8 px-2 rounded flex items-center gap-1 text-sm transition-colors',
-              showMembers ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:bg-gray-100'
+              'h-[32px] px-[8px] rounded-[6px] flex items-center gap-[4px] text-[13px] transition-colors',
+              showMembers ? 'bg-white/15 text-white' : 'hover:bg-white/10'
             )}
+            style={{ color: showMembers ? 'white' : '#b9bbbe' }}
           >
-            <Users className="h-4 w-4" />
-            <span className="text-xs">{members.length}</span>
+            <Users className="h-[16px] w-[16px]" />
+            <span>{members.length}</span>
           </button>
         </div>
       </div>
@@ -142,30 +149,31 @@ export function SupportChatWindow({ channel, messages, members, typingUsers, onS
         {/* Messages area */}
         <div className="flex-1 flex flex-col min-w-0">
           <div ref={scrollRef} className="flex-1 overflow-y-auto">
-            {/* Channel intro */}
+            {/* Channel welcome */}
             {messages.length === 0 && (
-              <div className="px-5 pt-8 pb-4">
-                <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center mb-3">
-                  <Hash className="h-6 w-6 text-gray-400" />
+              <div className="px-[20px] pt-[40px] pb-[16px]">
+                <div className="w-[48px] h-[48px] rounded-[12px] flex items-center justify-center mb-[12px]" style={{ background: '#2e2e38' }}>
+                  <Hash className="h-[24px] w-[24px]" style={{ color: '#e8912d' }} />
                 </div>
-                <h2 className="text-xl font-bold text-gray-900">#{channel.name}</h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  {channel.description || `This is the very beginning of the #${channel.name} channel.`}
+                <h2 className="text-[22px] font-black text-white">#{channel.name}</h2>
+                <p className="text-[15px] mt-[6px]" style={{ color: '#ababad' }}>
+                  {channel.description || `This is the very beginning of the #${channel.name} channel. Send a message to get started.`}
                 </p>
               </div>
             )}
 
             {messageGroups.map((group, gi) => (
               <div key={gi}>
-                {/* Date divider */}
-                <div className="flex items-center gap-3 px-5 my-4">
-                  <div className="flex-1 h-px bg-gray-200" />
-                  <span className="text-xs font-bold text-gray-500 bg-white px-3 py-0.5 rounded-full border border-gray-200">{group.date}</span>
-                  <div className="flex-1 h-px bg-gray-200" />
+                {/* Date divider — Slack style */}
+                <div className="flex items-center gap-0 px-[20px] my-[16px]">
+                  <div className="flex-1 h-px" style={{ background: '#383838' }} />
+                  <button className="text-[12px] font-bold px-[12px] py-[2px] rounded-full border flex-shrink-0" style={{ color: '#e8e8e8', borderColor: '#383838', background: '#1a1d21' }}>
+                    {group.date}
+                  </button>
+                  <div className="flex-1 h-px" style={{ background: '#383838' }} />
                 </div>
 
                 {group.messages.map((msg, mi) => {
-                  const isMe = msg.sender_id === user?.id;
                   const prevMsg = mi > 0 ? group.messages[mi - 1] : null;
                   const sameAuthor = prevMsg?.sender_id === msg.sender_id;
                   const initials = (msg.sender_name || '?').slice(0, 2).toUpperCase();
@@ -175,44 +183,58 @@ export function SupportChatWindow({ channel, messages, members, typingUsers, onS
                     <div
                       key={msg.id}
                       className={cn(
-                        'group relative flex gap-2 px-5 py-0.5 hover:bg-gray-50 transition-colors',
-                        !sameAuthor && 'mt-2 pt-1'
+                        'group relative flex gap-[8px] px-[20px] py-[2px] transition-colors',
+                        !sameAuthor && 'mt-[4px] pt-[6px]'
                       )}
+                      style={{ ['--hover-bg' as any]: '#222529' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#222529')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >
-                      <div className="w-9 flex-shrink-0 pt-0.5">
+                      <div className="w-[36px] flex-shrink-0 pt-[2px]">
                         {!sameAuthor ? (
-                          <Avatar className="h-9 w-9">
-                            <AvatarFallback className={cn('text-xs font-semibold text-white', color)}>
+                          <Avatar className="h-[36px] w-[36px] rounded-[8px]">
+                            <AvatarFallback className="text-[13px] font-bold text-white rounded-[8px]" style={{ background: color }}>
                               {initials}
                             </AvatarFallback>
                           </Avatar>
                         ) : (
-                          <span className="text-[10px] text-gray-400 opacity-0 group-hover:opacity-100 leading-[22px] block text-right">
+                          <span className="text-[11px] opacity-0 group-hover:opacity-100 leading-[22px] block text-right tabular-nums" style={{ color: '#ababad' }}>
                             {formatTime(msg.created_at)}
                           </span>
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
                         {!sameAuthor && (
-                          <div className="flex items-baseline gap-2">
-                            <span className="font-bold text-[15px] text-gray-900 hover:underline cursor-pointer">{msg.sender_name}</span>
-                            <span className="text-xs text-gray-400">{formatTime(msg.created_at)}</span>
+                          <div className="flex items-baseline gap-[8px]">
+                            <span className="font-bold text-[15px] text-white hover:underline cursor-pointer">{msg.sender_name}</span>
+                            <span className="text-[12px]" style={{ color: '#ababad' }}>{formatTime(msg.created_at)}</span>
                           </div>
                         )}
-                        <p className="text-[15px] leading-[22px] text-gray-900 break-words whitespace-pre-wrap">{msg.content}</p>
+                        <p className="text-[15px] leading-[22px] text-white/90 break-words whitespace-pre-wrap">{msg.content}</p>
                       </div>
 
-                      {/* Hover toolbar (Slack-style) */}
-                      <div className="absolute -top-3 right-5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="flex items-center gap-0.5 bg-white border border-gray-200 rounded-lg shadow-sm px-1 py-0.5">
-                          {[Smile, MessageCircle, MoreHorizontal].map((Icon, i) => (
-                            <button
-                              key={i}
-                              onClick={() => i === 1 && onOpenThread?.(msg.id)}
-                              className="w-7 h-7 rounded flex items-center justify-center text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-                            >
-                              <Icon className="h-4 w-4" />
-                            </button>
+                      {/* Hover toolbar */}
+                      <div className="absolute -top-[14px] right-[20px] opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                        <div className="flex items-center gap-0 rounded-[6px] border shadow-lg px-[2px] py-[2px]" style={{ background: '#222529', borderColor: '#383838' }}>
+                          {[
+                            { icon: Smile, action: () => {}, tip: 'React' },
+                            { icon: MessageCircle, action: () => onOpenThread?.(msg.id), tip: 'Reply in thread' },
+                            { icon: Pin, action: () => {}, tip: 'Pin' },
+                            { icon: Bookmark, action: () => {}, tip: 'Save' },
+                            { icon: MoreHorizontal, action: () => {}, tip: 'More' },
+                          ].map((btn, i) => (
+                            <Tooltip key={i} delayDuration={0}>
+                              <TooltipTrigger asChild>
+                                <button
+                                  onClick={btn.action}
+                                  className="w-[28px] h-[28px] rounded-[4px] flex items-center justify-center transition-colors hover:bg-white/10"
+                                  style={{ color: '#b9bbbe' }}
+                                >
+                                  <btn.icon className="h-[16px] w-[16px]" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent className="text-xs">{btn.tip}</TooltipContent>
+                            </Tooltip>
                           ))}
                         </div>
                       </div>
@@ -225,24 +247,24 @@ export function SupportChatWindow({ channel, messages, members, typingUsers, onS
 
           {/* Typing indicator */}
           {typingNames.length > 0 && (
-            <div className="px-5 py-1 text-xs text-gray-500 flex items-center gap-1">
-              <span className="flex gap-0.5">
-                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            <div className="px-[20px] py-[4px] text-[13px] flex items-center gap-[6px]" style={{ color: '#ababad' }}>
+              <span className="flex gap-[3px]">
+                <span className="w-[6px] h-[6px] rounded-full animate-bounce" style={{ background: '#ababad', animationDelay: '0ms' }} />
+                <span className="w-[6px] h-[6px] rounded-full animate-bounce" style={{ background: '#ababad', animationDelay: '150ms' }} />
+                <span className="w-[6px] h-[6px] rounded-full animate-bounce" style={{ background: '#ababad', animationDelay: '300ms' }} />
               </span>
-              <span className="font-medium">{typingNames.join(', ')}</span> {typingNames.length === 1 ? 'is' : 'are'} typing...
+              <span><strong className="text-white">{typingNames.join(', ')}</strong> {typingNames.length === 1 ? 'is' : 'are'} typing...</span>
             </div>
           )}
 
-          {/* Slack-style message input */}
-          <div className="px-5 pb-4 pt-1">
-            <div className="border border-gray-300 rounded-lg bg-white focus-within:border-gray-400 focus-within:shadow-sm transition-all">
+          {/* Slack-style compose box */}
+          <div className="px-[20px] pb-[16px] pt-[4px]">
+            <div className="rounded-[8px] border overflow-hidden transition-colors focus-within:border-white/30" style={{ background: '#222529', borderColor: '#565856' }}>
               {/* Formatting toolbar */}
-              <div className="flex items-center gap-0.5 px-2 py-1 border-b border-gray-100">
-                {[Bold, Italic, Code, LinkIcon, List].map((Icon, i) => (
-                  <button key={i} className="w-7 h-7 rounded flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600">
-                    <Icon className="h-3.5 w-3.5" />
+              <div className="flex items-center gap-0 px-[6px] py-[4px] border-b" style={{ borderColor: '#383838' }}>
+                {[Bold, Italic, Strikethrough, Code, LinkIcon, ListOrdered, List, Quote].map((Icon, i) => (
+                  <button key={i} className="w-[28px] h-[28px] rounded-[4px] flex items-center justify-center transition-colors hover:bg-white/10" style={{ color: '#b9bbbe' }}>
+                    <Icon className="h-[15px] w-[15px]" />
                   </button>
                 ))}
               </div>
@@ -255,30 +277,29 @@ export function SupportChatWindow({ channel, messages, members, typingUsers, onS
                 onKeyDown={handleKeyDown}
                 placeholder={`Message #${channel.name}`}
                 rows={1}
-                className="w-full px-3 py-2 resize-none text-[15px] outline-none bg-transparent min-h-[36px] max-h-[200px] leading-[22px] text-gray-900 placeholder:text-gray-400"
-                style={{ height: Math.min(200, Math.max(36, input.split('\n').length * 22)) }}
+                className="w-full px-[12px] py-[8px] resize-none text-[15px] outline-none bg-transparent min-h-[38px] max-h-[200px] leading-[22px] text-white placeholder:text-white/40"
+                style={{ height: Math.min(200, Math.max(38, input.split('\n').length * 22)) }}
               />
 
-              {/* Bottom bar */}
-              <div className="flex items-center justify-between px-2 py-1">
-                <div className="flex items-center gap-0.5">
-                  {[Paperclip, Smile, AtSign].map((Icon, i) => (
-                    <button key={i} className="w-7 h-7 rounded flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600">
-                      <Icon className="h-4 w-4" />
+              {/* Bottom bar with send */}
+              <div className="flex items-center justify-between px-[6px] py-[4px]">
+                <div className="flex items-center gap-0">
+                  {[Paperclip, Smile, AtSign, Video].map((Icon, i) => (
+                    <button key={i} className="w-[28px] h-[28px] rounded-[4px] flex items-center justify-center transition-colors hover:bg-white/10" style={{ color: '#b9bbbe' }}>
+                      <Icon className="h-[16px] w-[16px]" />
                     </button>
                   ))}
                 </div>
                 <button
                   onClick={handleSend}
                   disabled={!input.trim()}
-                  className={cn(
-                    'w-8 h-8 rounded-lg flex items-center justify-center transition-colors',
-                    input.trim()
-                      ? 'bg-[hsl(155,60%,40%)] text-white hover:bg-[hsl(155,60%,35%)]'
-                      : 'bg-gray-100 text-gray-300'
-                  )}
+                  className="w-[28px] h-[28px] rounded-[4px] flex items-center justify-center transition-colors"
+                  style={{
+                    background: input.trim() ? '#007a5a' : 'transparent',
+                    color: input.trim() ? 'white' : '#565856',
+                  }}
                 >
-                  <Send className="h-4 w-4" />
+                  <Send className="h-[16px] w-[16px]" />
                 </button>
               </div>
             </div>
@@ -287,27 +308,28 @@ export function SupportChatWindow({ channel, messages, members, typingUsers, onS
 
         {/* Members panel */}
         {showMembers && (
-          <div className="w-[260px] border-l bg-white flex flex-col flex-shrink-0">
-            <div className="h-12 px-4 flex items-center border-b">
-              <h3 className="font-bold text-[15px] text-gray-900">Members</h3>
-              <span className="ml-2 text-xs text-gray-400">{members.length}</span>
+          <div className="w-[260px] border-l flex flex-col flex-shrink-0" style={{ background: '#1a1d21', borderColor: '#383838' }}>
+            <div className="h-[49px] px-4 flex items-center border-b" style={{ borderColor: '#383838' }}>
+              <h3 className="font-bold text-[15px] text-white">Members</h3>
+              <span className="ml-2 text-[13px]" style={{ color: '#ababad' }}>{members.length}</span>
             </div>
-            <ScrollArea className="flex-1 p-3">
+            <ScrollArea className="flex-1 p-[8px]">
+              <p className="text-[13px] font-medium px-[8px] py-[6px]" style={{ color: '#ababad' }}>Online — {members.length}</p>
               {members.map(m => (
-                <div key={m.user_id} className="flex items-center gap-2 py-2 px-1 rounded hover:bg-gray-50 cursor-pointer">
-                  <div className="relative">
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className={cn('text-[11px] font-semibold text-white', getAvatarColor(m.full_name || '?'))}>
+                <button key={m.user_id} className="flex items-center gap-[8px] py-[6px] px-[8px] rounded-[6px] hover:bg-white/10 cursor-pointer w-full transition-colors">
+                  <div className="relative flex-shrink-0">
+                    <Avatar className="h-[32px] w-[32px] rounded-[8px]">
+                      <AvatarFallback className="text-[11px] font-bold text-white rounded-[8px]" style={{ background: getAvatarColor(m.full_name || '?') }}>
                         {(m.full_name || '?').slice(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white" />
+                    <span className="absolute -bottom-[1px] -right-[1px] w-[10px] h-[10px] bg-[#2bac76] rounded-full border-2" style={{ borderColor: '#1a1d21' }} />
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{m.full_name}</p>
-                    {m.role === 'admin' && <p className="text-[10px] text-blue-500 font-medium">Admin</p>}
+                  <div className="min-w-0 text-left">
+                    <p className="text-[14px] font-medium text-white truncate">{m.full_name}</p>
+                    {m.role === 'admin' && <p className="text-[11px] font-medium" style={{ color: '#1264a3' }}>Admin</p>}
                   </div>
-                </div>
+                </button>
               ))}
             </ScrollArea>
           </div>

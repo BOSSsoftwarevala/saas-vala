@@ -15,15 +15,18 @@ const Support = () => {
 
   if (loading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-[hsl(215,72%,8%)]">
-        <Loader2 className="h-10 w-10 animate-spin text-white/60" />
+      <div className="h-screen w-screen flex items-center justify-center" style={{ background: '#1a1d21' }}>
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin" style={{ color: '#ababad' }} />
+          <span className="text-[14px] font-medium" style={{ color: '#ababad' }}>Loading workspace...</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen w-screen flex overflow-hidden bg-[hsl(215,72%,8%)]">
-      {/* Workspace icon sidebar (leftmost narrow bar like Slack) */}
+    <div className="h-screen w-screen flex overflow-hidden" style={{ background: '#1a1d21' }}>
+      {/* Workspace icon sidebar (leftmost narrow bar) */}
       <SupportWorkspaceSidebar />
 
       {/* Channel sidebar */}
@@ -46,7 +49,7 @@ const Support = () => {
         onOpenThread={(msgId) => setThreadMessage(msgId)}
       />
 
-      {/* Thread panel (Slack-style right panel) */}
+      {/* Thread panel */}
       {threadMessage && (
         <SupportThreadPanel
           messageId={threadMessage}
