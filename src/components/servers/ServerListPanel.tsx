@@ -463,7 +463,7 @@ export function ServerListPanel() {
               <Input
                 value={newServer.ip_address}
                 onChange={(e) => setNewServer((prev) => ({ ...prev, ip_address: e.target.value }))}
-                placeholder="e.g. 64.226.91.27"
+                placeholder="e.g. 72.61.236.249"
               />
             </div>
 
@@ -472,7 +472,7 @@ export function ServerListPanel() {
               <Input
                 value={newServer.agent_url}
                 onChange={(e) => setNewServer((prev) => ({ ...prev, agent_url: e.target.value }))}
-                placeholder="e.g. http://64.226.91.27:9876"
+                placeholder="e.g. http://72.61.236.249:9876"
               />
             </div>
 
