@@ -1115,8 +1115,8 @@ async function executeDeployProject(args: any, supabase: any): Promise<ToolResul
             subdomain_setup: subdomainSetup,
             dns_record_needed: !subdomainSetup.configured ? null : {
               type: 'A', host: repoSlug, domain: 'saasvala.com',
-              value: server.ip_address || '64.226.91.27', ttl: 3600,
-              note: `Add A record: ${repoSlug} -> ${server.ip_address || '64.226.91.27'} at your DNS provider`
+              value: server.ip_address || '72.61.236.249', ttl: 3600,
+              note: `Add A record: ${repoSlug} -> ${server.ip_address || '72.61.236.249'} at your DNS provider`
             },
             agent_response: agentData.data || agentData,
             message: `✅ REAL deployment complete via VALA Agent | ${duration}s | Subdomain: ${subdomainSetup.configured ? '✅ ' + subdomain : '⚠️ manual setup needed'}`
