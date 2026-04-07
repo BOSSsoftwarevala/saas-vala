@@ -213,15 +213,23 @@ export default function ApkPipeline() {
               Auto-convert Git repos → Offline Android APKs → Marketplace listing
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={fetchBuilds} disabled={loading}>
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" onClick={fetchBuilds} disabled={loading} size="sm">
               <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} /> Refresh
             </Button>
-            <Button onClick={scanRepos} disabled={scanning} variant="outline">
+            <Button onClick={scanRepos} disabled={scanning} variant="outline" size="sm">
               <GitBranch className="h-4 w-4 mr-1" />
               {scanning ? 'Scanning...' : 'Scan Repos'}
             </Button>
-            <Button onClick={runAutoWorkflow} disabled={runningWorkflow} className="bg-green-600 hover:bg-green-700">
+            <Button onClick={setupFactory} disabled={settingUpFactory} variant="outline" size="sm">
+              <Shield className="h-4 w-4 mr-1" />
+              {settingUpFactory ? 'Setting up...' : 'Setup Factory'}
+            </Button>
+            <Button onClick={triggerBulkBuild} disabled={triggeringBulk} variant="secondary" size="sm">
+              <Package className="h-4 w-4 mr-1" />
+              {triggeringBulk ? 'Triggering...' : 'Build 5 APKs'}
+            </Button>
+            <Button onClick={runAutoWorkflow} disabled={runningWorkflow} className="bg-green-600 hover:bg-green-700 text-white" size="sm">
               <Rocket className="h-4 w-4 mr-1" />
               {runningWorkflow ? 'Running...' : '🚀 Auto Workflow'}
             </Button>
