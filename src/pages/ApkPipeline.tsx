@@ -124,6 +124,42 @@ export default function ApkPipeline() {
 
   const [runningWorkflow, setRunningWorkflow] = useState(false);
   const [workflowResult, setWorkflowResult] = useState<any>(null);
+  const [settingUpFactory, setSettingUpFactory] = useState(false);
+  const [triggeringBulk, setTriggeringBulk] = useState(false);
+
+  const setupFactory = async () => {
+    setSettingUpFactory(true);
+    toast.info('⚙️ Setting up APK Factory on GitHub...');
+    try {
+      const { data: result, error } = await supabase.functions.invoke('apk-factory', {
+        body: { action: 'setup_factory' },
+      });
+      if (error) throw error;
+      if (result?.success) toast.success(result.message);
+      else toast.error(result?.error || 'Setup failed');
+    } catch (err: any) {
+      toast.error(err.message || 'Factory setup error');
+    }
+    setSettingUpFactory(false);
+  };
+
+  const triggerBulkBuild = async () => {
+    setTriggeringBulk(true);
+    toast.info('🔧 Triggering APK builds for pending repos...');
+    try {
+      const { data: result, error } = await supabase.functions.invoke('apk-factory', {
+        body: { action: 'bulk_trigger', data: { limit: 5 } },
+      });
+      if (error) throw error;
+      setWorkflowResult(result);
+      if (result?.success) toast.success(result.message);
+      else toast.error(result?.error || 'Bulk build failed');
+      fetchBuilds();
+    } catch (err: any) {
+      toast.error(err.message || 'Bulk build error');
+    }
+    setTriggeringBulk(false);
+  };
 
   const runAutoWorkflow = async () => {
     setRunningWorkflow(true);
@@ -135,11 +171,8 @@ export default function ApkPipeline() {
       });
       if (error) throw error;
       setWorkflowResult(result);
-      if (result?.success) {
-        toast.success(result.message);
-      } else {
-        toast.error(result?.error || 'Workflow failed');
-      }
+      if (result?.success) toast.success(result.message);
+      else toast.error(result?.error || 'Workflow failed');
       fetchBuilds();
     } catch (err: any) {
       toast.error(err.message || 'Workflow error');
@@ -180,15 +213,23 @@ export default function ApkPipeline() {
               Auto-convert Git repos → Offline Android APKs → Marketplace listing
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={fetchBuilds} disabled={loading}>
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" onClick={fetchBuilds} disabled={loading} size="sm">
               <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} /> Refresh
             </Button>
-            <Button onClick={scanRepos} disabled={scanning} variant="outline">
+            <Button onClick={scanRepos} disabled={scanning} variant="outline" size="sm">
               <GitBranch className="h-4 w-4 mr-1" />
               {scanning ? 'Scanning...' : 'Scan Repos'}
             </Button>
-            <Button onClick={runAutoWorkflow} disabled={runningWorkflow} className="bg-green-600 hover:bg-green-700">
+            <Button onClick={setupFactory} disabled={settingUpFactory} variant="outline" size="sm">
+              <Shield className="h-4 w-4 mr-1" />
+              {settingUpFactory ? 'Setting up...' : 'Setup Factory'}
+            </Button>
+            <Button onClick={triggerBulkBuild} disabled={triggeringBulk} variant="secondary" size="sm">
+              <Package className="h-4 w-4 mr-1" />
+              {triggeringBulk ? 'Triggering...' : 'Build 5 APKs'}
+            </Button>
+            <Button onClick={runAutoWorkflow} disabled={runningWorkflow} className="bg-green-600 hover:bg-green-700 text-white" size="sm">
               <Rocket className="h-4 w-4 mr-1" />
               {runningWorkflow ? 'Running...' : '🚀 Auto Workflow'}
             </Button>
