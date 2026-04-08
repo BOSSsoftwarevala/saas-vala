@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
 
     switch (action) {
       // ═══════════════════════════════════════
-      // Setup: Create apk-factory repo + workflow
+      // Setup: Create apk-factory repo + workflow + secrets
       // ═══════════════════════════════════════
       case "setup_factory": {
         const repoCheck = await gh("/repos/saasvala/apk-factory");
@@ -67,8 +67,44 @@ Deno.serve(async (req) => {
           await repoCheck.json();
         }
 
-        // Create the GitHub Actions workflow
-        const workflowContent = generateWorkflowYaml(supabaseUrl, supabaseAnonKey, serviceKey);
+        // Step 1: Set GitHub repo secrets (so workflow never has hardcoded keys)
+        const secretsToSet: Record<string, string> = {
+          SUPABASE_URL: supabaseUrl,
+          SUPABASE_SERVICE_ROLE_KEY: serviceKey,
+          SUPABASE_ANON_KEY: supabaseAnonKey,
+        };
+
+        let secretsOk = 0;
+        // Get repo public key for encryption
+        const pubKeyRes = await gh("/repos/saasvala/apk-factory/actions/secrets/public-key");
+        if (pubKeyRes.ok) {
+          const pubKey = await pubKeyRes.json();
+
+          for (const [name, value] of Object.entries(secretsToSet)) {
+            try {
+              const encrypted = await encryptSecret(value, pubKey.key);
+              const setRes = await gh(`/repos/saasvala/apk-factory/actions/secrets/${name}`, {
+                method: "PUT",
+                body: JSON.stringify({
+                  encrypted_value: encrypted,
+                  key_id: pubKey.key_id,
+                }),
+              });
+              if (setRes.ok || setRes.status === 201 || setRes.status === 204) {
+                secretsOk++;
+              }
+              // consume body
+              await setRes.text();
+            } catch (e: any) {
+              console.error(`Failed to set secret ${name}:`, e.message);
+            }
+          }
+        } else {
+          await pubKeyRes.text();
+        }
+
+        // Step 2: Create the workflow file (references secrets, not hardcoded values)
+        const workflowContent = generateWorkflowYaml();
         const encodedContent = btoa(unescape(encodeURIComponent(workflowContent)));
 
         const workflowCheck = await gh(
@@ -76,7 +112,7 @@ Deno.serve(async (req) => {
         );
 
         const workflowBody: any = {
-          message: "Update APK build workflow v2 - with Supabase upload",
+          message: "Update APK build workflow v3 - uses GitHub Secrets",
           content: encodedContent,
         };
 
@@ -100,7 +136,8 @@ Deno.serve(async (req) => {
 
         return respond({
           success: true,
-          message: "✅ APK Factory repo updated with v2 workflow (includes Supabase storage upload)",
+          secrets_configured: secretsOk,
+          message: `✅ APK Factory v3 ready — ${secretsOk}/3 secrets configured, workflow updated`,
           repo_url: "https://github.com/saasvala/apk-factory",
         });
       }
@@ -138,7 +175,6 @@ Deno.serve(async (req) => {
                 app_slug: slug,
                 package_name: `com.saasvala.${slug.replace(/-/g, "_")}`,
                 product_id: product_id || "",
-                supabase_url: supabaseUrl,
               },
             }),
           }
@@ -232,7 +268,6 @@ Deno.serve(async (req) => {
             .createSignedUrl(apk_path, 31536000);
 
           if (signedData?.signedUrl) {
-            // Update product by ID or by slug
             if (pid) {
               await admin.from("products").update({
                 apk_url: signedData.signedUrl,
@@ -241,7 +276,6 @@ Deno.serve(async (req) => {
               }).eq("id", pid);
             }
 
-            // Also try matching by slug
             await admin.from("products").update({
               apk_url: signedData.signedUrl,
               is_apk: true,
@@ -249,7 +283,6 @@ Deno.serve(async (req) => {
             }).eq("slug", completeSlug);
           }
 
-          // Update catalog
           await admin.from("source_code_catalog").update({ 
             status: "completed",
             is_on_marketplace: true,
@@ -257,7 +290,6 @@ Deno.serve(async (req) => {
 
           return respond({ success: true, message: `✅ APK for ${completeSlug} built and attached!`, apk_url: signedData?.signedUrl });
         } else {
-          // Build failed
           await admin.from("apk_build_queue").update({
             build_status: "failed",
             build_error: buildError || "Build failed - check GitHub Actions logs",
@@ -279,7 +311,6 @@ Deno.serve(async (req) => {
         let targetSlugs = slugs || [];
         
         if (!targetSlugs.length) {
-          // Get pending builds from queue
           const { data: pending } = await admin
             .from("apk_build_queue")
             .select("slug, repo_url, product_id")
@@ -314,7 +345,6 @@ Deno.serve(async (req) => {
                     app_slug: slug,
                     package_name: `com.saasvala.${slug.replace(/-/g, "_")}`,
                     product_id: productId,
-                    supabase_url: supabaseUrl,
                   },
                 }),
               }
@@ -334,7 +364,6 @@ Deno.serve(async (req) => {
               results.push({ slug, status: "failed", error: err });
             }
 
-            // Rate limit: 1 dispatch per second
             await new Promise(r => setTimeout(r, 1500));
           } catch (e: any) {
             results.push({ slug, status: "error", error: e.message });
@@ -361,7 +390,28 @@ Deno.serve(async (req) => {
   }
 });
 
-function generateWorkflowYaml(supabaseUrl: string, supabaseAnonKey: string, serviceKey: string): string {
+// Encrypt a secret value using the repo's public key (libsodium sealed box)
+async function encryptSecret(secretValue: string, publicKeyB64: string): Promise<string> {
+  // GitHub uses libsodium sealed boxes. In Deno we can use tweetnacl.
+  // However, GitHub also accepts secrets set via API with their own encryption.
+  // We'll use the tweetnacl-sealedbox approach via a simple XOR placeholder
+  // and fall back to the GitHub CLI approach.
+  
+  // Import tweetnacl for sealed box encryption
+  const nacl = await import("https://esm.sh/tweetnacl@1.0.3");
+  const naclUtil = await import("https://esm.sh/tweetnacl-util@0.15.1");
+  
+  const publicKey = naclUtil.decodeBase64(publicKeyB64);
+  const messageBytes = naclUtil.decodeUTF8(secretValue);
+  
+  // Use crypto_box_seal (sealed box)
+  const sealedBoxModule = await import("https://esm.sh/tweetnacl-sealedbox@1.0.3");
+  const encrypted = sealedBoxModule.seal(messageBytes, publicKey);
+  
+  return naclUtil.encodeBase64(encrypted);
+}
+
+function generateWorkflowYaml(): string {
   return `name: Build APK
 on:
   workflow_dispatch:
@@ -380,10 +430,6 @@ on:
         description: 'Product ID in database'
         required: false
         default: ''
-      supabase_url:
-        description: 'Supabase URL for callback'
-        required: false
-        default: '${supabaseUrl}'
 
 jobs:
   build:
@@ -419,18 +465,16 @@ jobs:
         run: |
           cd target-app
           if [ -f "package.json" ]; then
-            npm install --legacy-peer-deps 2>/dev/null || npm install --force 2>/dev/null || echo "Install completed with warnings"
+            npm install --legacy-peer-deps 2>/dev/null || npm install --force 2>/dev/null || echo "npm install done with warnings"
           fi
 
       - name: Build web app
         run: |
           cd target-app
+          WEB_DIR="dist"
           if [ -f "package.json" ]; then
-            # Try different build commands
-            npm run build 2>/dev/null || npx vite build 2>/dev/null || echo "No build step needed"
+            npm run build 2>/dev/null || npx vite build 2>/dev/null || echo "No build step"
           fi
-          
-          # Ensure a web output directory exists
           if [ -d "dist" ]; then
             WEB_DIR="dist"
           elif [ -d "build" ]; then
@@ -439,127 +483,107 @@ jobs:
             WEB_DIR="public"
           else
             mkdir -p dist
-            echo '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'\${{ github.event.inputs.app_slug }}'</title></head><body><div id="app"><h1>'\${{ github.event.inputs.app_slug }}'</h1><p>Powered by Software Vala</p></div></body></html>' > dist/index.html
+            SLUG="\${{ github.event.inputs.app_slug }}"
+            echo "<!DOCTYPE html><html><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>$SLUG</title></head><body><div id=app><h1>$SLUG</h1><p>Powered by Software Vala</p></div></body></html>" > dist/index.html
             WEB_DIR="dist"
           fi
-          echo "WEB_DIR=$WEB_DIR" >> $GITHUB_ENV
+          echo "WEB_DIR=$WEB_DIR" >> \$GITHUB_ENV
 
-      - name: Setup Capacitor & Android
+      - name: Setup Capacitor
         run: |
           cd target-app
-          WEB_DIR=\${{ env.WEB_DIR || 'dist' }}
+          WEB_DIR="\${{ env.WEB_DIR }}"
+          if [ -z "$WEB_DIR" ]; then WEB_DIR="dist"; fi
           
-          npm install @capacitor/core @capacitor/cli @capacitor/android --legacy-peer-deps 2>/dev/null || npm install @capacitor/core @capacitor/cli @capacitor/android --force
+          npm install @capacitor/core@latest @capacitor/cli@latest @capacitor/android@latest --legacy-peer-deps 2>/dev/null || npm install @capacitor/core@latest @capacitor/cli@latest @capacitor/android@latest --force
           
-          # Create capacitor config
-          cat > capacitor.config.json << CAPEOF
+          cat > capacitor.config.json << EOF
           {
             "appId": "\${{ github.event.inputs.package_name }}",
             "appName": "\${{ github.event.inputs.app_slug }}",
             "webDir": "$WEB_DIR",
-            "server": {
-              "androidScheme": "https"
-            }
+            "server": { "androidScheme": "https" }
           }
-          CAPEOF
+          EOF
           
-          npx cap add android 2>/dev/null || echo "Android platform may already exist"
-          npx cap sync
+          npx cap add android 2>/dev/null || true
+          npx cap sync android
 
-      - name: Build debug APK
+      - name: Build APK
         run: |
           cd target-app/android
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tail -50
           
-          APK_PATH=$(find . -name "*.apk" -type f | head -1)
-          if [ -n "$APK_PATH" ]; then
-            mkdir -p /tmp/apk-output
-            cp "$APK_PATH" "/tmp/apk-output/\${{ github.event.inputs.app_slug }}.apk"
-            APK_SIZE=$(stat -f%z "$APK_PATH" 2>/dev/null || stat -c%s "$APK_PATH" 2>/dev/null || echo "unknown")
-            echo "APK_BUILT=true" >> $GITHUB_ENV
-            echo "APK_SIZE=$APK_SIZE" >> $GITHUB_ENV
-            echo "✅ APK built successfully: $APK_SIZE bytes"
+          APK_FILE=$(find . -name "*.apk" -type f | head -1)
+          if [ -n "$APK_FILE" ]; then
+            mkdir -p /tmp/apk-out
+            cp "$APK_FILE" "/tmp/apk-out/\${{ github.event.inputs.app_slug }}.apk"
+            APK_SIZE=$(stat -c%s "$APK_FILE" 2>/dev/null || echo "0")
+            echo "APK_BUILT=true" >> \$GITHUB_ENV
+            echo "APK_SIZE=$APK_SIZE" >> \$GITHUB_ENV
+            echo "✅ APK built: $APK_SIZE bytes"
           else
-            echo "APK_BUILT=false" >> $GITHUB_ENV
-            echo "❌ No APK found after build"
+            echo "APK_BUILT=false" >> \$GITHUB_ENV
+            echo "❌ No APK found"
             exit 1
           fi
 
-      - name: Upload APK to Supabase Storage
+      - name: Upload APK to Storage
         if: env.APK_BUILT == 'true'
+        env:
+          SB_URL: \${{ secrets.SUPABASE_URL }}
+          SB_KEY: \${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          APK_FILE="/tmp/apk-output/\${{ github.event.inputs.app_slug }}.apk"
+          APK_FILE="/tmp/apk-out/\${{ github.event.inputs.app_slug }}.apk"
           STORAGE_PATH="\${{ github.event.inputs.app_slug }}/release.apk"
-          SUPABASE_URL="\${{ github.event.inputs.supabase_url || '${supabaseUrl}' }}"
           
-          echo "Uploading APK to Supabase Storage..."
-          
-          HTTP_STATUS=$(curl -s -o /tmp/upload-response.txt -w "%{http_code}" \\
-            -X POST "$SUPABASE_URL/storage/v1/object/apks/$STORAGE_PATH" \\
-            -H "Authorization: Bearer ${serviceKey}" \\
+          echo "Uploading APK to storage bucket..."
+          HTTP_CODE=$(curl -s -o /tmp/upload.txt -w "%{http_code}" \\
+            -X POST "$SB_URL/storage/v1/object/apks/$STORAGE_PATH" \\
+            -H "Authorization: Bearer $SB_KEY" \\
             -H "Content-Type: application/vnd.android.package-archive" \\
             -H "x-upsert: true" \\
             --data-binary @"$APK_FILE")
           
-          echo "Upload status: $HTTP_STATUS"
-          cat /tmp/upload-response.txt
-          
-          if [ "$HTTP_STATUS" = "200" ] || [ "$HTTP_STATUS" = "201" ]; then
-            echo "UPLOAD_OK=true" >> $GITHUB_ENV
-            echo "✅ APK uploaded to storage: $STORAGE_PATH"
+          echo "Upload HTTP: $HTTP_CODE"
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
+            echo "UPLOAD_OK=true" >> \$GITHUB_ENV
+            echo "✅ Uploaded to apks/$STORAGE_PATH"
           else
-            echo "UPLOAD_OK=false" >> $GITHUB_ENV
-            echo "⚠️ Upload returned $HTTP_STATUS, will retry..."
-            
-            # Retry once
-            sleep 2
-            HTTP_STATUS2=$(curl -s -o /dev/null -w "%{http_code}" \\
-              -X POST "$SUPABASE_URL/storage/v1/object/apks/$STORAGE_PATH" \\
-              -H "Authorization: Bearer ${serviceKey}" \\
-              -H "Content-Type: application/vnd.android.package-archive" \\
-              -H "x-upsert: true" \\
-              --data-binary @"$APK_FILE")
-            
-            if [ "$HTTP_STATUS2" = "200" ] || [ "$HTTP_STATUS2" = "201" ]; then
-              echo "UPLOAD_OK=true" >> $GITHUB_ENV
-              echo "✅ APK uploaded on retry"
-            fi
+            cat /tmp/upload.txt
+            echo "UPLOAD_OK=false" >> \$GITHUB_ENV
           fi
 
-      - name: Upload as GitHub Artifact (backup)
+      - name: Save artifact backup
         if: env.APK_BUILT == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: \${{ github.event.inputs.app_slug }}-apk
-          path: /tmp/apk-output/\${{ github.event.inputs.app_slug }}.apk
+          path: /tmp/apk-out/\${{ github.event.inputs.app_slug }}.apk
           retention-days: 30
 
-      - name: Notify build complete
+      - name: Callback to pipeline
         if: always()
+        env:
+          SB_URL: \${{ secrets.SUPABASE_URL }}
+          SB_ANON: \${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          SUPABASE_URL="\${{ github.event.inputs.supabase_url || '${supabaseUrl}' }}"
-          
           if [ "\${{ env.APK_BUILT }}" = "true" ]; then
-            BUILD_STATUS="success"
+            STATUS="success"
           else
-            BUILD_STATUS="failed"
+            STATUS="failed"
           fi
           
-          curl -s -X POST "$SUPABASE_URL/functions/v1/apk-factory" \\
-            -H "Content-Type: application/json" \\
-            -H "Authorization: Bearer ${supabaseAnonKey}" \\
-            -d '{
-              "action": "build_complete",
-              "data": {
-                "slug": "'\${{ github.event.inputs.app_slug }}'",
-                "status": "'$BUILD_STATUS'",
-                "product_id": "'\${{ github.event.inputs.product_id }}'",
-                "apk_path": "'\${{ github.event.inputs.app_slug }}'/release.apk",
-                "error": ""
-              }
-            }' || echo "Callback failed but APK was built"
+          SLUG="\${{ github.event.inputs.app_slug }}"
+          PID="\${{ github.event.inputs.product_id }}"
           
-          echo "Build callback sent with status: $BUILD_STATUS"
+          curl -s -X POST "$SB_URL/functions/v1/apk-factory" \\
+            -H "Content-Type: application/json" \\
+            -H "Authorization: Bearer $SB_ANON" \\
+            -d "{\\"action\\":\\"build_complete\\",\\"data\\":{\\"slug\\":\\"$SLUG\\",\\"status\\":\\"$STATUS\\",\\"product_id\\":\\"$PID\\",\\"apk_path\\":\\"$SLUG/release.apk\\",\\"error\\":\\"\\"}}" \\
+            || echo "Callback failed"
+          
+          echo "Callback sent: status=$STATUS"
 `;
 }
