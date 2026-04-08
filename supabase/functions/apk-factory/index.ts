@@ -390,25 +390,21 @@ Deno.serve(async (req) => {
   }
 });
 
-// Encrypt a secret value using the repo's public key (libsodium sealed box)
+// Encrypt a secret for GitHub Actions using libsodium sealed box
 async function encryptSecret(secretValue: string, publicKeyB64: string): Promise<string> {
-  // GitHub uses libsodium sealed boxes. In Deno we can use tweetnacl.
-  // However, GitHub also accepts secrets set via API with their own encryption.
-  // We'll use the tweetnacl-sealedbox approach via a simple XOR placeholder
-  // and fall back to the GitHub CLI approach.
+  // Decode the base64 public key
+  const binaryKey = Uint8Array.from(atob(publicKeyB64), c => c.charCodeAt(0));
+  const messageBytes = new TextEncoder().encode(secretValue);
   
-  // Import tweetnacl for sealed box encryption
-  const nacl = await import("https://esm.sh/tweetnacl@1.0.3");
-  const naclUtil = await import("https://esm.sh/tweetnacl-util@0.15.1");
+  // Use libsodium via esm.sh
+  const _sodium = await import("https://esm.sh/libsodium-wrappers@0.7.13");
+  const sodium = _sodium.default || _sodium;
+  await sodium.ready;
   
-  const publicKey = naclUtil.decodeBase64(publicKeyB64);
-  const messageBytes = naclUtil.decodeUTF8(secretValue);
+  const encrypted = sodium.crypto_box_seal(messageBytes, binaryKey);
   
-  // Use crypto_box_seal (sealed box)
-  const sealedBoxModule = await import("https://esm.sh/tweetnacl-sealedbox@1.0.3");
-  const encrypted = sealedBoxModule.seal(messageBytes, publicKey);
-  
-  return naclUtil.encodeBase64(encrypted);
+  // Encode to base64
+  return btoa(String.fromCharCode(...encrypted));
 }
 
 function generateWorkflowYaml(): string {
