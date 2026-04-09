@@ -9,14 +9,18 @@ interface SectionSliderProps {
 }
 
 /**
- * Reusable horizontal slider with left/right arrow navigation.
- * Wraps any horizontally scrollable card list.
+ * Netflix-style horizontal slider with smooth scroll, perfect alignment, and premium feel.
+ * - Smooth left/right scroll with fixed-width cards
+ * - Scroll-snap for clean alignment
+ * - All cards contained within frame
+ * - Premium 7D styling with soft shadows and glow effects
  */
 export const SectionSlider = React.forwardRef<HTMLDivElement, SectionSliderProps>(({ children, className }, ref) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
+  const [isOverContainer, setIsOverContainer] = useState(false);
 
   const checkScroll = () => {
     if (!scrollRef.current) return;
@@ -37,7 +41,7 @@ export const SectionSlider = React.forwardRef<HTMLDivElement, SectionSliderProps
     };
   }, []);
 
-  // Auto-scroll every 4 seconds
+  // Auto-scroll every 5 seconds (paused on hover)
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || isMobile) return;
@@ -61,7 +65,8 @@ export const SectionSlider = React.forwardRef<HTMLDivElement, SectionSliderProps
       } else {
         el.scrollBy({ left: clientWidth * 0.75, behavior: 'smooth' });
       }
-    }, 4000);
+    }, 5000);
+    
     return () => {
       clearInterval(interval);
       el.removeEventListener('mouseenter', onEnter);
@@ -72,60 +77,84 @@ export const SectionSlider = React.forwardRef<HTMLDivElement, SectionSliderProps
 
   const scroll = (direction: 'left' | 'right') => {
     if (!scrollRef.current) return;
-    const amount = scrollRef.current.clientWidth * 0.75;
-    scrollRef.current.scrollBy({ left: direction === 'left' ? -amount : amount, behavior: 'smooth' });
+    const card = scrollRef.current.firstElementChild as HTMLElement | null;
+    const gap = 20;
+    const amount = card ? card.offsetWidth + gap : 280;
+    scrollRef.current.scrollBy({
+      left: direction === 'left' ? -amount : amount,
+      behavior: 'smooth',
+    });
     setTimeout(checkScroll, 350);
   };
 
   return (
-    <div className="relative group">
-      {/* Left arrow */}
+    <div
+      className="relative group/slider"
+      onMouseEnter={() => setIsOverContainer(true)}
+      onMouseLeave={() => setIsOverContainer(false)}
+    >
+      {/* Left scroll button - Netflix style */}
       {canScrollLeft && !isMobile && (
         <button
           onClick={() => scroll('left')}
           className={cn(
-            'absolute left-1 top-1/2 -translate-y-1/2 z-20',
-            'h-10 w-10 rounded-full',
-            'bg-background/90 border border-border shadow-xl',
+            'absolute left-0 top-1/2 -translate-y-1/2 z-20',
+            'h-12 w-12 rounded-full',
+            'bg-gradient-to-r from-background/95 to-background/70 backdrop-blur-sm',
+            'border border-white/5 shadow-2xl',
             'flex items-center justify-center',
-            'text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary',
-            'transition-all duration-200',
-            'opacity-0 group-hover:opacity-100'
+            'text-foreground/60 hover:text-foreground hover:bg-gradient-to-r hover:from-background/98 hover:to-background/80 hover:border-white/20',
+            'transition-all duration-300 ease-out',
+            'opacity-0 group-hover/slider:opacity-100 hover:scale-110',
+            'flex-shrink-0'
           )}
           aria-label="Scroll left"
         >
-          <ChevronLeft className="h-5 w-5" />
+          <ChevronLeft className="h-6 w-6" />
         </button>
       )}
 
-      {/* Scrollable content */}
+      {/* Scrollable container - Netflix smooth scroll */}
       <div
         ref={scrollRef}
         className={cn(
-          'flex gap-4 overflow-x-auto scrollbar-hide px-4 md:px-8 pb-2 snap-x snap-mandatory touch-pan-x',
+          'flex flex-nowrap gap-5 overflow-x-auto overflow-y-hidden',
+          'px-5 py-2',
+          'scroll-smooth snap-x snap-mandatory',
+          'touch-pan-x',
+          'scrollbar-hide',
           className
         )}
-        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        style={{
+          paddingInline: 20,
+          scrollPaddingInline: 20,
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+          WebkitOverflowScrolling: 'touch',
+          scrollBehavior: 'smooth'
+        }}
       >
         {children}
       </div>
 
-      {/* Right arrow */}
+      {/* Right scroll button - Netflix style */}
       {canScrollRight && !isMobile && (
         <button
           onClick={() => scroll('right')}
           className={cn(
-            'absolute right-1 top-1/2 -translate-y-1/2 z-20',
-            'h-10 w-10 rounded-full',
-            'bg-background/90 border border-border shadow-xl',
+            'absolute right-0 top-1/2 -translate-y-1/2 z-20',
+            'h-12 w-12 rounded-full',
+            'bg-gradient-to-l from-background/95 to-background/70 backdrop-blur-sm',
+            'border border-white/5 shadow-2xl',
             'flex items-center justify-center',
-            'text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary',
-            'transition-all duration-200',
-            'opacity-0 group-hover:opacity-100'
+            'text-foreground/60 hover:text-foreground hover:bg-gradient-to-l hover:from-background/98 hover:to-background/80 hover:border-white/20',
+            'transition-all duration-300 ease-out',
+            'opacity-0 group-hover/slider:opacity-100 hover:scale-110',
+            'flex-shrink-0'
           )}
           aria-label="Scroll right"
         >
-          <ChevronRight className="h-5 w-5" />
+          <ChevronRight className="h-6 w-6" />
         </button>
       )}
     </div>

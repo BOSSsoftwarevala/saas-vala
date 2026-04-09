@@ -64,7 +64,7 @@ export default function Auth() {
        if (role === 'super_admin') {
          navigate('/dashboard', { replace: true });
        } else if (role === 'reseller') {
-         navigate('/reseller-dashboard', { replace: true });
+         navigate('/reseller/dashboard', { replace: true });
        } else {
          navigate('/', { replace: true });
        }

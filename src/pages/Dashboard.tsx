@@ -1,4 +1,5 @@
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useState, useCallback, useMemo } from 'react';
+import { Navigate } from 'react-router-dom';
 import { Package, Key, Server, Users, FileText, TrendingUp, Loader2 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { StatsCard } from '@/components/dashboard/StatsCard';
@@ -8,10 +9,16 @@ import { ServerCard } from '@/components/dashboard/ServerCard';
 import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
 import { QuickActions } from '@/components/dashboard/QuickActions';
 import { useAuth } from '@/hooks/useAuth';
-import { useDashboardStats } from '@/hooks/useDashboardStats';
-import { useProducts } from '@/hooks/useProducts';
-import { useServers } from '@/hooks/useServers';
-import { useAuditLogs } from '@/hooks/useAuditLogs';
+import { useDashboardStore } from '@/hooks/useDashboardStore';
+
+// Debounce utility function
+function debounce<T extends (...args: any[]) => any>(func: T, wait: number): (...args: Parameters<T>) => void {
+  let timeout: NodeJS.Timeout;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+}
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -19,13 +26,36 @@ export default function Dashboard() {
 
   // Resellers should not access admin dashboard
   if (isReseller) {
-    return <Navigate to="/reseller-dashboard" replace />;
+    return <Navigate to="/reseller/dashboard" replace />;
   }
 
-  const { stats, loading: statsLoading } = useDashboardStats();
-  const { products, loading: productsLoading } = useProducts();
-  const { servers, loading: serversLoading } = useServers();
-  const { logs } = useAuditLogs();
+  const {
+    stats,
+    products,
+    servers,
+    logs,
+    notifications,
+    loading,
+    restartServer,
+    markServerOffline,
+    searchGlobal,
+    getSystemMetrics,
+  } = useDashboardStore();
+
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Debounced search
+  const debouncedSearch = useCallback(
+    debounce((query: string) => {
+      searchGlobal(query);
+    }, 300),
+    [searchGlobal]
+  );
+
+  const handleSearchChange = useCallback((query: string) => {
+    setSearchQuery(query);
+    debouncedSearch(query);
+  }, [debouncedSearch]);
 
   // Convert server status to display format
   const getServerDisplayStatus = (status: string) => {
@@ -48,15 +78,53 @@ export default function Dashboard() {
   };
 
   // Map audit logs to activity feed format
-  const activities = logs.slice(0, 10).map(log => ({
-    id: log.id,
-    type: (log.table_name === 'license_keys' ? 'key' :
-           log.table_name === 'products' ? 'product' :
-           log.table_name === 'servers' ? 'server' :
-           log.table_name === 'transactions' ? 'payment' : 'user') as 'key' | 'payment' | 'server' | 'product' | 'user',
-    message: `${log.action} on ${log.table_name}`,
-    time: new Date(log.created_at).toLocaleString(),
-  }));
+  const activities = useMemo(() => {
+    return logs.slice(0, 10).map(log => {
+      let type: 'key' | 'product' | 'server' | 'payment' | 'user' | 'security' = 'user';
+      let iconType: string = 'user';
+
+      switch (log.table_name) {
+        case 'license_keys':
+          type = 'key';
+          iconType = 'key';
+          break;
+        case 'products':
+          type = 'product';
+          iconType = 'product';
+          break;
+        case 'servers':
+          type = 'server';
+          iconType = 'server';
+          break;
+        case 'resellers':
+        case 'transactions':
+          type = 'payment';
+          iconType = 'payment';
+          break;
+        case 'leads':
+          type = 'user';
+          iconType = 'user';
+          break;
+        default:
+          if (log.action.includes('security') || log.table_name === 'security') {
+            type = 'security';
+            iconType = 'security';
+          }
+          break;
+      }
+
+      return {
+        id: log.id,
+        type,
+        message: `${log.action.replace(/_/g, ' ')} ${log.table_name ? `on ${log.table_name}` : ''}`,
+        time: new Date(log.timestamp).toLocaleString(),
+        iconType,
+      };
+    });
+  }, [logs]);
+
+  // Memoized system metrics
+  const systemMetrics = useMemo(() => getSystemMetrics(), [getSystemMetrics]);
 
   return (
     <DashboardLayout>
@@ -65,7 +133,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatsCard
             title="Total Products"
-            value={statsLoading ? 0 : stats.totalProducts}
+            value={loading ? 0 : stats.totalProducts}
             icon={Package}
             trend={{ value: stats.activeProducts, positive: true }}
             accentColor="orange"
@@ -73,7 +141,7 @@ export default function Dashboard() {
           />
           <StatsCard
             title="Active Keys"
-            value={statsLoading ? 0 : stats.activeKeys}
+            value={loading ? 0 : stats.activeKeys}
             icon={Key}
             trend={{ value: Math.round((stats.activeKeys / Math.max(stats.totalKeys, 1)) * 100), positive: true }}
             accentColor="cyan"
@@ -81,7 +149,7 @@ export default function Dashboard() {
           />
           <StatsCard
             title="Resellers"
-            value={statsLoading ? 0 : stats.totalResellers}
+            value={loading ? 0 : stats.totalResellers}
             prefix=""
             icon={Users}
             trend={{ value: stats.activeResellers, positive: true }}
@@ -90,7 +158,7 @@ export default function Dashboard() {
           />
           <StatsCard
             title="Live Servers"
-            value={statsLoading ? 0 : stats.liveServers}
+            value={loading ? 0 : stats.liveServers}
             icon={Server}
             trend={{ value: stats.totalServers - stats.liveServers, positive: false }}
             accentColor="purple"
@@ -107,7 +175,7 @@ export default function Dashboard() {
           subtitle="Your latest products, demos, and APKs"
           onViewAll={() => navigate('/products')}
         >
-          {productsLoading ? (
+          {loading ? (
             <div className="flex items-center justify-center p-8">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
@@ -119,11 +187,8 @@ export default function Dashboard() {
             products.slice(0, 5).map((product) => (
               <ProductCard
                 key={product.id}
-                name={product.name}
-                description={product.description || ''}
-                price={product.price}
-                status={getProductDisplayStatus(product.status)}
-                type="product"
+                product={product}
+                servers={servers}
                 onClick={() => navigate('/products')}
               />
             ))
@@ -135,7 +200,7 @@ export default function Dashboard() {
           subtitle="Monitor your deployed applications"
           onViewAll={() => navigate('/servers')}
         >
-          {serversLoading ? (
+          {loading ? (
             <div className="flex items-center justify-center p-8">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
@@ -147,11 +212,12 @@ export default function Dashboard() {
             servers.slice(0, 5).map((server) => (
               <ServerCard
                 key={server.id}
-                name={server.name}
-                domain={server.custom_domain || `${server.subdomain}.saasvala.com`}
-                repo={server.git_repo || ''}
-                status={getServerDisplayStatus(server.status)}
-                lastDeployed={server.last_deploy_at ? new Date(server.last_deploy_at).toLocaleString() : 'Never'}
+                server={server}
+                onRestart={restartServer}
+                onMarkOffline={markServerOffline}
+                onDeployProduct={deployProductToServer}
+                logs={logs}
+                products={products}
                 onClick={() => navigate('/servers')}
               />
             ))

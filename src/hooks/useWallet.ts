@@ -6,6 +6,9 @@ export interface Wallet {
   id: string;
   user_id: string;
   balance: number;
+  total_added?: number;
+  total_spent?: number;
+  total_earned?: number;
   currency: string;
   is_locked: boolean;
   created_at: string;

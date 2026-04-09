@@ -14,11 +14,13 @@ import type { MarketplaceProduct } from '@/hooks/useMarketplaceProducts';
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
+import { rateLimiter } from '@/lib/errorHandling';
 
 interface MarketplaceProductCardProps {
   product: MarketplaceProduct;
   index?: number;
   onBuyNow: (p: any) => void;
+  onDemo?: (p: any) => void;
   rank?: number;
 }
 
@@ -49,20 +51,26 @@ export const MarketplaceProductCard = React.memo(React.forwardRef<HTMLDivElement
   const discount = (product as any).discount_percent || 0;
   const rating = (product as any).rating || 4.5;
   const originalPrice = discount > 0 ? Math.round(price / (1 - discount / 100)) : price * 2;
-  const apkEnabled = (product as any).apk_enabled !== false;
+  
+  // Control flags from admin
+  const demoEnabled = (product as any).demo_enabled === true;
+    const buyEnabled = product.buy_enabled !== false;
+  const apkEnabled = (product as any).apk_enabled === true || (product as any).download_enabled === true;
   const licenseEnabled = (product as any).license_enabled !== false;
 
   const features: string[] = Array.isArray(product.features)
     ? product.features.slice(0, 4).map((f: any) => typeof f === 'string' ? f : f.text)
-    : ['Dashboard', 'Reports', 'Analytics', 'API'];
+      : ['APK Download', 'License Key', 'Auto Updates', '24/7 Support'];
 
   const getDemoUrl = useCallback((): string | null => {
+    // Only return if demo is enabled by admin
+    if (!demoEnabled) return null;
     const d = (product as any).demoUrl || (product as any).demo_url;
     if (d && d.startsWith('http') && !d.includes('github.com')) return d;
     const g = (product as any).gitRepoUrl || (product as any).git_repo_url;
     if (g && g.startsWith('http')) return g;
     return null;
-  }, [product]);
+  }, [product, demoEnabled]);
 
   const isIframeable = (url: string | null) => url ? !url.includes('github.com') : false;
   const hasDemoAvailable = getDemoUrl() !== null;
@@ -85,79 +93,182 @@ export const MarketplaceProductCard = React.memo(React.forwardRef<HTMLDivElement
   }, [user, product.title]);
 
   const handleDemo = useCallback(() => {
-    const url = getDemoUrl();
-    if (!url) { setFeaturesOpen(true); return; }
-    if (!isIframeable(url)) {
-      window.open(url, '_blank', 'noopener,noreferrer');
-    } else {
-      setDemoOpen(true);
+    if (onDemo) {
+      onDemo(product);
+      return;
     }
-  }, [getDemoUrl]);
+
+    const demoUrl = (product as any).demoUrl || (product as any).demo_url;
+    if (demoUrl) {
+      window.open(demoUrl, '_blank', 'noopener,noreferrer');
+    } else {
+      toast.info('Demo not available for this product');
+    }
+  }, [onDemo, product]);
 
   const handleDownloadApk = useCallback(async () => {
-    if (!apkEnabled) { toast.info('APK download is currently disabled for this product.'); return; }
-    if (!user) { toast.error('Please sign in to download APK'); return; }
+    if (!apkEnabled) {
+      toast.info('APK download is currently disabled for this product.');
+      return;
+    }
+    if (!user) {
+      toast.error('Please sign in to download APK');
+      return;
+    }
+
+    // Rate limit: max 3 download attempts per product per minute
+    const dlRateKey = `apk-download:${user.id}:${product.id}`;
+    if (!rateLimiter.checkLimit(dlRateKey, 3, 60 * 1000)) {
+      toast.error('Too many download attempts. Please wait a minute before trying again.');
+      return;
+    }
+
     setDownloadChecking(true);
     try {
-      const { data: licenseRecord } = await supabase
-        .from('license_keys').select('license_key, status, expires_at, meta')
-        .eq('created_by', user.id).eq('status', 'active').limit(50);
-      const match = licenseRecord?.find((l: any) => {
-        const m = l.meta as any;
-        return m?.product_id === product.id || m?.product_title === product.title;
-      });
-      if (!match?.license_key) {
-        toast.error('Please purchase first', { action: { label: 'BUY NOW', onClick: () => onBuyNow(product) } });
-        setDownloadChecking(false); return;
+      const { data: reseller, error: resellerError } = await supabase
+        .from('resellers')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (resellerError || !reseller) {
+        toast.error('Unable to verify reseller account. Please sign in again.');
+        setDownloadChecking(false);
+        return;
       }
-      if (match.expires_at && new Date(match.expires_at) < new Date()) {
-        toast.error('License expired. Please renew.'); setDownloadChecking(false); return;
+
+      const { data: licenseKey, error: keyError } = await supabase
+        .from('license_keys')
+        .select('*')
+        .eq('assigned_to', reseller.id)
+        .eq('product_id', product.id)
+        .eq('status', 'active')
+        .single();
+
+      if (keyError || !licenseKey) {
+        toast.error('No active license key found for this product. Please purchase first.');
+        setDownloadChecking(false);
+        return;
       }
-      const isUuid = /^[0-9a-f]{8}-/.test(product.id);
-      if (isUuid) {
-        const { data, error } = await supabase.functions.invoke('download-apk', {
-          body: { product_id: product.id, license_key: match.license_key },
-        });
-        if (!error && data?.success) { window.open(data.download_url, '_blank'); setDownloadChecking(false); return; }
+
+      // Block expired licenses
+      if (licenseKey.expires_at && new Date(licenseKey.expires_at).getTime() < Date.now()) {
+        toast.error('Your license key has expired. Please purchase a renewal.');
+        setDownloadChecking(false);
+        return;
       }
-      toast.success(`✅ License Key: ${match.license_key}`, {
-        duration: 10000,
-        action: { label: 'Copy', onClick: () => navigator.clipboard.writeText(match.license_key) },
-      });
-    } catch { toast.info('APK download will be available soon.'); }
-    setDownloadChecking(false);
-  }, [user, product, onBuyNow, apkEnabled]);
+
+      // Block revoked / blocked keys
+      if (licenseKey.key_status === 'blocked' || licenseKey.key_status === 'revoked') {
+        toast.error('Your license key has been revoked. Contact support.');
+        setDownloadChecking(false);
+        return;
+      }
+
+      // Get APK storage path from apks table (preferred) or product's apk_url field
+      const { data: apkRecord } = await supabase
+        .from('apks')
+        .select('file_url')
+        .eq('product_id', product.id)
+        .eq('status', 'published')
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const storagePath = apkRecord?.file_url
+        || (product as any).apkUrl
+        || (product as any).apk_url
+        || null;
+
+      if (!storagePath) {
+        toast.error('APK file is not yet available for this product. Contact support.');
+        setDownloadChecking(false);
+        return;
+      }
+
+      // Generate a real Supabase storage signed URL (15-minute TTL)
+      const { data: signedData, error: signError } = await supabase.storage
+        .from('apks')
+        .createSignedUrl(storagePath, 900);
+
+      if (signError || !signedData?.signedUrl) {
+        const msg = signError?.message || '';
+        if (msg.includes('404') || msg.toLowerCase().includes('not found')) {
+          toast.error('APK file not found in storage. Contact support.');
+        } else if (msg.toLowerCase().includes('timeout')) {
+          toast.error('Download timed out. Please try again.');
+        } else {
+          toast.error('Could not generate download link. Please try again.');
+        }
+        setDownloadChecking(false);
+        return;
+      }
+
+      // Log download with path and timestamp
+      await (supabase as any).from('apk_download_logs').insert({
+        user_id: user.id,
+        product_id: product.id,
+        license_key: licenseKey.license_key,
+        file_path: storagePath,
+        downloaded_at: new Date().toISOString(),
+        meta: {
+          reseller_id: reseller.id,
+          license_id: licenseKey.id,
+        },
+      }).catch(() => { /* best-effort logging */ });
+
+      window.open(signedData.signedUrl, '_blank', 'noopener,noreferrer');
+      toast.success('APK download started! Link valid for 15 minutes.');
+    } catch (error: any) {
+      console.error('Error checking license:', error);
+      toast.error('Failed to verify license. Please try again.');
+    } finally {
+      setDownloadChecking(false);
+    }
+  }, [user, product, apkEnabled]);
 
   const demoUrl = getDemoUrl();
 
   return (
     <>
       <div
-        className="flex-shrink-0 rounded-2xl overflow-hidden flex flex-col group cursor-pointer"
+        className="flex-shrink-0 rounded-2xl overflow-hidden flex flex-col group cursor-pointer snap-start"
         style={{
-          width: 280,
+          width: 260,
+          minWidth: 260,
+          maxWidth: 260,
           background: 'rgba(255,255,255,0.03)',
           border: '1px solid rgba(255,255,255,0.07)',
-          transition: 'transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease',
+          transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, border-color 0.3s ease',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.08)',
+          willChange: 'transform, box-shadow',
         }}
-        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 8px 32px rgba(37,99,235,0.15)'; e.currentTarget.style.borderColor = 'rgba(37,99,235,0.3)'; }}
-        onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; }}
+        onMouseEnter={e => {
+          e.currentTarget.style.transform = 'scale(1.05) translateY(-6px)';
+          e.currentTarget.style.boxShadow = '0 20px 60px rgba(37,99,235,0.25), inset 0 1px 1px rgba(255,255,255,0.12), inset 0 0 30px rgba(37,99,235,0.1)';
+          e.currentTarget.style.borderColor = 'rgba(37,99,235,0.5)';
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.transform = 'scale(1) translateY(0)';
+          e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.08)';
+          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)';
+        }}
       >
         {/* Header */}
-        <div className="relative px-4 py-4 flex items-center gap-3" style={{ background: `linear-gradient(135deg, rgba(37,99,235,0.08), transparent)` }}>
-          <div className="h-12 w-12 rounded-xl flex items-center justify-center" style={{ background: 'rgba(37,99,235,0.15)', border: '1px solid rgba(37,99,235,0.25)' }}>
-            <Box style={{ width: 24, height: 24, color: iconColor }} />
+        <div className="relative px-4 py-4 flex items-center gap-3 backdrop-blur-sm" style={{ background: `linear-gradient(135deg, rgba(37,99,235,0.12), rgba(37,99,235,0.04))` }}>
+          <div className="h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(37,99,235,0.2)', border: '1px solid rgba(37,99,235,0.35)', boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.1), 0 2px 8px rgba(37,99,235,0.1)' }}>
+            <Box style={{ width: 24, height: 24, color: iconColor, filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }} />
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="font-bold text-[13px] text-foreground truncate leading-tight">{product.title}</h3>
             <p className="text-[11px] truncate" style={{ color: iconColor }}>{product.category}</p>
           </div>
           {!isPipeline ? (
-            <span className="text-[9px] font-black text-white px-2 py-0.5 rounded-full" style={{ background: 'linear-gradient(90deg,#22C55E,#16A34A)' }}>LIVE</span>
+            <span className="text-[9px] font-black text-white px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: 'linear-gradient(90deg,#22C55E,#16A34A)', boxShadow: '0 2px 8px rgba(34,197,94,0.3)' }}>LIVE</span>
           ) : (
-            <span className="text-[9px] font-black text-black px-2 py-0.5 rounded-full bg-amber-400">PIPELINE</span>
+            <span className="text-[9px] font-black text-black px-2 py-0.5 rounded-full bg-amber-400 flex-shrink-0" style={{ boxShadow: '0 2px 8px rgba(251,191,36,0.3)' }}>PIPELINE</span>
           )}
-          <span className="absolute top-2 right-3 text-[10px] font-bold text-white/20">#{cardRank}</span>
+          <span className="absolute top-2 right-3 text-[10px] font-bold text-white/15">#{cardRank}</span>
         </div>
 
         {/* Body */}
@@ -196,19 +307,25 @@ export const MarketplaceProductCard = React.memo(React.forwardRef<HTMLDivElement
           ) : (
             <>
               <div className="flex gap-1.5">
-                <Button size="sm" variant="outline" className="flex-1 h-8 text-[10px] font-bold rounded-lg border-white/10 text-foreground/70 hover:border-white/20" onClick={handleDemo}>
-                  <Play style={{ width: 11, height: 11 }} className="mr-1" />{hasDemoAvailable ? 'DEMO' : 'VIEW'}
-                </Button>
+                {/* DEMO BUTTON - Show only if demo_enabled is true */}
+                {demoEnabled && (
+                  <Button size="sm" variant="outline" className="flex-1 h-8 text-[10px] font-bold rounded-lg border-white/10 text-foreground/70 hover:border-white/20" onClick={handleDemo}>
+                    <Play style={{ width: 11, height: 11 }} className="mr-1" />{hasDemoAvailable ? 'DEMO' : 'N/A'}
+                  </Button>
+                )}
                 <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={handleFavorite}>
                   <Heart style={{ width: 14, height: 14 }} className={favorited ? 'fill-pink-400 text-pink-400' : 'text-muted-foreground'} />
                 </Button>
-                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={handleAddToCart}>
+                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={handleAddToCart} disabled={!buyEnabled}>
                   <ShoppingCart style={{ width: 14, height: 14 }} className={inCart ? 'text-primary' : 'text-muted-foreground'} />
                 </Button>
               </div>
-              <Button size="sm" className="w-full h-9 text-[11px] font-black rounded-lg text-white border-0" style={{ background: 'linear-gradient(90deg,#2563EB,#1D4ED8)' }} onClick={() => onBuyNow(product)}>
-                <Package style={{ width: 13, height: 13 }} className="mr-1" /> BUY NOW — ${price}
-              </Button>
+              {/* BUY NOW BUTTON - Show only if buy_enabled is true */}
+              {buyEnabled && (
+                <Button size="sm" className="w-full h-9 text-[11px] font-black rounded-lg text-white border-0" style={{ background: 'linear-gradient(90deg,#2563EB,#1D4ED8)' }} onClick={() => onBuyNow(product)}>
+                  <Package style={{ width: 13, height: 13 }} className="mr-1" /> BUY NOW — ${price}
+                </Button>
+              )}
             </>
           )}
           <div className="flex gap-1.5">
@@ -230,7 +347,7 @@ export const MarketplaceProductCard = React.memo(React.forwardRef<HTMLDivElement
           <DialogContent className="max-w-4xl w-[95vw] h-[80vh] flex flex-col p-0 gap-0">
             <DialogHeader className="px-4 pt-3 pb-2 border-b border-border shrink-0">
               <DialogTitle className="text-sm font-black uppercase">{product.title} — Live Demo</DialogTitle>
-              <DialogDescription className="text-xs">{(product as any).demoLogin || 'demo@softwarevala.com'} / {(product as any).demoPassword || 'Demo@2026'}</DialogDescription>
+              <DialogDescription className="text-xs">{(product as any).demoLogin && (product as any).demoPassword ? `${(product as any).demoLogin} / ${(product as any).demoPassword}` : 'Demo credentials available'}</DialogDescription>
             </DialogHeader>
             <div className="flex-1 relative bg-muted/30 overflow-hidden">
               {demoUrl && isIframeable(demoUrl) ? (

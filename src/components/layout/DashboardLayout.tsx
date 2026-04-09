@@ -1,7 +1,8 @@
 import { ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
-import { useSidebarState } from '@/hooks/useSidebarState';
+import { useDashboardStore } from '@/hooks/useDashboardStore';
+import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
 interface DashboardLayoutProps {
@@ -10,6 +11,20 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const { collapsed } = useSidebarState();
+  const { getSystemMetrics, lastRefreshedAt } = useDashboardStore();
+
+  const systemMetrics = useMemo(() => getSystemMetrics(), [getSystemMetrics]);
+
+  const getTimeAgo = (dateString: string | null) => {
+    if (!dateString) return 'Never';
+    const now = new Date();
+    const date = new Date(dateString);
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (diffInSeconds < 60) return `${diffInSeconds} sec ago`;
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} min ago`;
+    return `${Math.floor(diffInSeconds / 3600)} hr ago`;
+  };
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
@@ -43,8 +58,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         </main>
         <footer className="border-t border-border/50 py-4 px-6 backdrop-blur-sm">
           <p className="text-center text-sm text-muted-foreground">
-            © 2025 SaaS VALA. Powered by{' '}
-            <span className="font-semibold text-gradient-primary">SoftwareVala™</span>
+            © 2025 SaaS VALA | System {systemMetrics.version} | Uptime: {systemMetrics.uptime}% | Last Sync: {getTimeAgo(lastRefreshedAt)} | {systemMetrics.environment}
           </p>
         </footer>
       </div>

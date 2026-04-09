@@ -5,13 +5,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { SidebarProvider } from "@/hooks/useSidebarState";
-import { CartProvider } from "@/hooks/useCart";
-import { Loader2 } from "lucide-react";
-import React, { Suspense } from "react";
+import { CartProvider } from '@/hooks/useCart';
+import { DashboardProvider } from '@/hooks/useDashboardStore';
+import { Loader2 } from 'lucide-react';
+import React, { Suspense } from 'react';
 
 // Only eagerly load the landing page (Marketplace) and Auth
 import Marketplace from "./pages/Marketplace";
 import Auth from "./pages/Auth";
+const DemoPage = React.lazy(() => import("./pages/DemoPage"));
 
 // Lazy load everything else
 const Dashboard = React.lazy(() => import("./pages/Dashboard"));
@@ -95,7 +97,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 
 function FallbackRedirect() {
   const { isReseller } = useAuth();
-  return <Navigate to={isReseller ? '/reseller-dashboard' : '/dashboard'} replace />;
+  return <Navigate to={isReseller ? '/reseller/dashboard' : '/dashboard'} replace />;
 }
 
 function AppRoutes() {
@@ -105,6 +107,7 @@ function AppRoutes() {
         <Route path="/auth" element={<Auth />} />
         <Route path="/" element={<Marketplace />} />
         <Route path="/marketplace" element={<Marketplace />} />
+        <Route path="/demo/:id" element={<DemoPage />} />
 
         {/* Public lazy routes */}
         <Route path="/edu-pwa" element={<EduPwa />} />
@@ -138,13 +141,47 @@ function AppRoutes() {
         <Route path="/offline-app" element={<OfflineAppTemplate />} />
 
         {/* Protected routes */}
-        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/dashboard" element={<ProtectedRoute><AdminRoute><Dashboard /></AdminRoute></ProtectedRoute>} />
+        
+        {/* Products module */}
         <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
+        <Route path="/products/list" element={<ProtectedRoute><Products /></ProtectedRoute>} />
+        <Route path="/products/create" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
         <Route path="/products/add" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
         <Route path="/products/edit/:id" element={<ProtectedRoute><Products /></ProtectedRoute>} />
         <Route path="/products/view/:id" element={<ProtectedRoute><Products /></ProtectedRoute>} />
+        <Route path="/products/deploy/:id" element={<ProtectedRoute><AdminRoute><Products /></AdminRoute></ProtectedRoute>} />
+        
+        {/* Keys module */}
         <Route path="/keys" element={<ProtectedRoute><Keys /></ProtectedRoute>} />
+        <Route path="/keys/list" element={<ProtectedRoute><Keys /></ProtectedRoute>} />
+        <Route path="/keys/generate" element={<ProtectedRoute><AdminRoute><Keys /></AdminRoute></ProtectedRoute>} />
+        <Route path="/keys/assign" element={<ProtectedRoute><AdminRoute><Keys /></AdminRoute></ProtectedRoute>} />
+        
+        {/* Servers module */}
         <Route path="/servers" element={<ProtectedRoute><Servers /></ProtectedRoute>} />
+        <Route path="/servers/list" element={<ProtectedRoute><Servers /></ProtectedRoute>} />
+        <Route path="/servers/deploy" element={<ProtectedRoute><AdminRoute><Servers /></AdminRoute></ProtectedRoute>} />
+        <Route path="/servers/logs" element={<ProtectedRoute><AdminRoute><Servers /></AdminRoute></ProtectedRoute>} />
+        
+        {/* Resellers module */}
+        <Route path="/resellers" element={<ProtectedRoute><AdminRoute><Resellers /></AdminRoute></ProtectedRoute>} />
+        <Route path="/resellers/list" element={<ProtectedRoute><AdminRoute><Resellers /></AdminRoute></ProtectedRoute>} />
+        <Route path="/resellers/create" element={<ProtectedRoute><AdminRoute><Resellers /></AdminRoute></ProtectedRoute>} />
+        <Route path="/resellers/credits" element={<ProtectedRoute><AdminRoute><Resellers /></AdminRoute></ProtectedRoute>} />
+        <Route path="/reseller-manager" element={<ProtectedRoute><AdminRoute><Resellers /></AdminRoute></ProtectedRoute>} />
+        
+        {/* Leads module */}
+        <Route path="/leads" element={<ProtectedRoute><AdminRoute><SeoLeads /></AdminRoute></ProtectedRoute>} />
+        <Route path="/leads/list" element={<ProtectedRoute><AdminRoute><SeoLeads /></AdminRoute></ProtectedRoute>} />
+        <Route path="/leads/update" element={<ProtectedRoute><AdminRoute><SeoLeads /></AdminRoute></ProtectedRoute>} />
+        <Route path="/seo-leads" element={<ProtectedRoute><AdminRoute><SeoLeads /></AdminRoute></ProtectedRoute>} />
+        
+        {/* System modules */}
+        <Route path="/notifications" element={<ProtectedRoute><AdminRoute><Dashboard /></AdminRoute></ProtectedRoute>} />
+        <Route path="/logs" element={<ProtectedRoute><AdminRoute><AuditLogs /></AdminRoute></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+        <Route path="/security" element={<ProtectedRoute><AdminRoute><SystemHealth /></AdminRoute></ProtectedRoute>} />
         <Route path="/role-detail" element={<ProtectedRoute><RoleDetail /></ProtectedRoute>} />
         <Route path="/transport-role-detail" element={<ProtectedRoute><TransportRoleDetail /></ProtectedRoute>} />
         <Route path="/manufacturing-role-detail" element={<ProtectedRoute><ManufacturingRoleDetail /></ProtectedRoute>} />
@@ -156,7 +193,7 @@ function AppRoutes() {
         <Route path="/ai-apis" element={<ProtectedRoute><AiApis /></ProtectedRoute>} />
         <Route path="/wallet" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
         <Route path="/seo-leads" element={<ProtectedRoute><SeoLeads /></ProtectedRoute>} />
-        <Route path="/reseller-dashboard" element={<ProtectedRoute><ResellerDashboard /></ProtectedRoute>} />
+        <Route path="/reseller/dashboard" element={<ProtectedRoute><ResellerDashboard /></ProtectedRoute>} />
         <Route path="/support" element={<ProtectedRoute><Support /></ProtectedRoute>} />
 
         {/* Admin routes */}
@@ -186,11 +223,13 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <CartProvider>
-            <SidebarProvider>
-              <AppRoutes />
-            </SidebarProvider>
-          </CartProvider>
+          <DashboardProvider>
+            <CartProvider>
+              <SidebarProvider>
+                <AppRoutes />
+              </SidebarProvider>
+            </CartProvider>
+          </DashboardProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

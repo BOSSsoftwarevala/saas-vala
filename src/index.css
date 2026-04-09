@@ -589,6 +589,11 @@
   100% { transform: translateY(100%); opacity: 0; }
 }
 
+@keyframes marquee {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
 @property --border-angle {
   syntax: '<angle>';
   initial-value: 0deg;
@@ -644,6 +649,10 @@
   animation: orbit 12s linear infinite;
 }
 
+.animate-marquee {
+  animation: marquee 30s linear infinite;
+}
+
 .animate-data-stream {
   animation: data-stream 3s linear infinite;
 }
@@ -687,6 +696,56 @@
 
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-primary/30;
+}
+
+/* ═══════════════════════════════════════════ */
+/* SCROLLBAR HIDE (Netflix-style)             */
+/* ═══════════════════════════════════════════ */
+
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;      /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
+
+.scroll-smooth {
+  scroll-behavior: smooth;
+}
+
+/* ═══════════════════════════════════════════ */
+/* NETFLIX SMOOTH SCROLL CONTAINER            */
+/* ═══════════════════════════════════════════ */
+
+.netflix-scroll-container {
+  @apply flex flex-nowrap gap-4 overflow-x-auto overflow-y-hidden;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.netflix-scroll-container::-webkit-scrollbar {
+  display: none;
+}
+
+.netflix-scroll-item {
+  @apply snap-start flex-shrink-0;
+}
+
+/* ═══════════════════════════════════════════ */
+/* SCROLL SNAP (Netflix alignment)            */
+/* ═══════════════════════════════════════════ */
+
+.snap-mandatory {
+  scroll-snap-type: x mandatory;
+}
+
+.snap-start {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
 }
 
 /* Selection styling */

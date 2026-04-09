@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useNavigate } from 'react-router-dom';
+import { ResellerApplicationForm } from './ResellerApplicationForm';
 import { useAuth } from '@/hooks/useAuth';
 import saasValaLogo from '@/assets/saas-vala-logo.jpg';
 
@@ -38,13 +39,19 @@ const languages = [
   { code: 'zh', name: '中文', flag: '🇨🇳' },
 ];
 
-export function MarketplaceHeader() {
+interface MarketplaceHeaderProps {
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+  onSearchSubmit: () => void;
+}
+
+export function MarketplaceHeader({ searchQuery, onSearchChange, onSearchSubmit }: MarketplaceHeaderProps) {
   const navigate = useNavigate();
   const { user, isReseller } = useAuth();
   const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [selectedCurrency, setSelectedCurrency] = useState(currencies[0]);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [applicationFormOpen, setApplicationFormOpen] = useState(false);
 
   useEffect(() => {
     if (searchOpen && searchInputRef.current) {
@@ -53,13 +60,11 @@ export function MarketplaceHeader() {
   }, [searchOpen]);
 
   const handleSearch = () => {
-    if (searchQuery.trim()) {
-      // Scroll to products and filter — dispatch custom event
-      window.dispatchEvent(new CustomEvent('marketplace-search', { detail: searchQuery.trim() }));
-    }
+    onSearchSubmit();
   };
 
   return (
+    <>
     <header className="fixed top-0 left-0 right-0 z-50 h-16 border-b bg-background/90 backdrop-blur-xl border-border">
       <div className="h-full px-4 md:px-8 flex items-center justify-between gap-2">
         {/* Logo */}
@@ -88,13 +93,13 @@ export function MarketplaceHeader() {
               ref={searchInputRef}
               placeholder="Search 2000+ software products..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => onSearchChange(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               className="pl-9 pr-3 h-9 text-sm bg-muted/50 border-border/50 focus:bg-background"
             />
             {searchQuery && (
               <button
-                onClick={() => { setSearchQuery(''); window.dispatchEvent(new CustomEvent('marketplace-search', { detail: '' })); }}
+                onClick={() => { onSearchChange(''); onSearchSubmit(); }}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
                 <X className="h-3.5 w-3.5" />
@@ -176,7 +181,7 @@ export function MarketplaceHeader() {
               variant="outline"
               size="sm"
               className="gap-1.5 border-primary/30 text-primary hover:bg-primary/10 hidden sm:flex"
-              onClick={() => navigate(user ? '/auth?apply=reseller' : '/auth?apply=reseller')}
+              onClick={() => setApplicationFormOpen(true)}
             >
               <Users className="h-4 w-4" />
               <span className="hidden lg:inline">Apply Reseller</span>
@@ -189,7 +194,7 @@ export function MarketplaceHeader() {
               variant="outline"
               size="sm"
               className="gap-1.5 border-secondary/30 text-secondary hover:bg-secondary/10"
-              onClick={() => navigate('/reseller-dashboard')}
+              onClick={() => navigate('/reseller/dashboard')}
             >
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Reseller</span>
@@ -198,7 +203,7 @@ export function MarketplaceHeader() {
 
           {/* Auth */}
           {user ? (
-            <Button variant="ghost" size="icon" onClick={() => navigate(isReseller ? '/reseller-dashboard' : '/dashboard')} className="h-9 w-9">
+            <Button variant="ghost" size="icon" onClick={() => navigate(isReseller ? '/reseller/dashboard' : '/dashboard')} className="h-9 w-9">
               <User className="h-4 w-4" />
             </Button>
           ) : (
@@ -223,7 +228,7 @@ export function MarketplaceHeader() {
             <Input
               placeholder="Search products..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => onSearchChange(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               className="pl-9 h-9 text-sm"
               autoFocus
@@ -232,5 +237,11 @@ export function MarketplaceHeader() {
         </div>
       )}
     </header>
+
+    <ResellerApplicationForm
+      open={applicationFormOpen}
+      onOpenChange={setApplicationFormOpen}
+    />
+    </>
   );
 }

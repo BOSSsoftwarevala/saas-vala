@@ -54,7 +54,7 @@ import { cn } from '@/lib/utils';
 const db = supabase as any;
 const PAGE_SIZE = 25;
 
-type ProductStatusDb = 'active' | 'suspended' | 'draft' | 'archived';
+type ProductStatusDb = 'active' | 'suspended' | 'draft' | 'archived' | 'upcoming' | 'inactive';
 
 interface Product {
   id: string;
@@ -194,16 +194,20 @@ interface MarketplaceOrder {
 
 const statusLabelMap: Record<ProductStatusDb, string> = {
   active: 'LIVE',
-  suspended: 'UPCOMING',
+  upcoming: 'UPCOMING',
+  suspended: 'SUSPENDED',
   draft: 'PIPELINE',
   archived: 'ARCHIVED',
+  inactive: 'INACTIVE',
 };
 
 const statusBadgeClass: Record<ProductStatusDb, string> = {
   active: 'bg-primary/10 text-primary border-primary/30',
-  suspended: 'bg-accent/20 text-accent-foreground border-accent/30',
+  upcoming: 'bg-accent/20 text-accent-foreground border-accent/30',
+  suspended: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30',
   draft: 'bg-muted text-muted-foreground border-border',
   archived: 'bg-destructive/10 text-destructive border-destructive/30',
+  inactive: 'bg-destructive/10 text-destructive border-destructive/30',
 };
 
 const emptyProduct = (): Product => ({
@@ -580,8 +584,24 @@ export default function MarketplaceAdmin() {
       toast.error('Product name is required');
       return;
     }
-    if (!productSlug) {
-      toast.error('Slug is required');
+    if (editProduct.demo_enabled && editProduct.demo_url) {
+      try {
+        const parsed = new URL(editProduct.demo_url);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          toast.error('Demo URL must start with http:// or https://');
+          return;
+        }
+      } catch {
+        toast.error('Demo URL must be a valid HTTP/HTTPS URL');
+        return;
+      }
+    }
+    if (editProduct.apk_enabled && !editProduct.apk_url) {
+      toast.error('APK URL is required when download is enabled');
+      return;
+    }
+    if (editProduct.buy_enabled && (!editProduct.price || editProduct.price <= 0)) {
+      toast.error('Price must be greater than 0 when buy is enabled');
       return;
     }
 
@@ -591,7 +611,7 @@ export default function MarketplaceAdmin() {
       description: editProduct.description || editProduct.short_description || '',
       short_description: editProduct.short_description || '',
       price: Number(editProduct.price || 0),
-      status: editProduct.status,
+      status: editProduct.status || 'active',
       business_type: editProduct.business_type || 'software',
       tags: editProduct.tags || [],
       demo_url: editProduct.demo_url || null,
@@ -621,6 +641,7 @@ export default function MarketplaceAdmin() {
         toast.success('Product created');
         setEditProduct(null);
         await Promise.all([fetchProducts(), fetchProductCatalog(), fetchStats()]);
+        window.dispatchEvent(new CustomEvent('marketplaceRefresh'));
       }
     } else {
       const { error } = await db.from('products').update(payload).eq('id', editProduct.id);
@@ -630,6 +651,7 @@ export default function MarketplaceAdmin() {
         toast.success('Product updated');
         setEditProduct(null);
         await Promise.all([fetchProducts(), fetchProductCatalog(), fetchStats(), fetchApks()]);
+        window.dispatchEvent(new CustomEvent('marketplaceRefresh'));
       }
     }
 
@@ -652,14 +674,15 @@ export default function MarketplaceAdmin() {
   };
 
   const deleteProduct = async (id: string) => {
-    if (!confirm('Delete this product permanently?')) return;
-    const { error } = await db.from('products').delete().eq('id', id);
+    if (!confirm('Set this product to inactive? It will be hidden from marketplace.')) return;
+    const { error } = await db.from('products').update({ status: 'inactive' }).eq('id', id);
     if (error) {
-      toast.error(`Delete failed: ${error.message}`);
+      toast.error(`Update failed: ${error.message}`);
       return;
     }
-    toast.success('Product deleted');
+    toast.success('Product set to inactive');
     await Promise.all([fetchProducts(), fetchProductCatalog(), fetchStats(), fetchApks()]);
+    window.dispatchEvent(new CustomEvent('marketplaceRefresh'));
   };
 
   const toggleSelect = (id: string) => {
@@ -687,16 +710,17 @@ export default function MarketplaceAdmin() {
     setBulkRunning(true);
 
     if (action === 'delete') {
-      if (!confirm(`Delete ${ids.length} selected products?`)) {
+      if (!confirm(`Set ${ids.length} selected products to inactive? They will be hidden from marketplace.`)) {
         setBulkRunning(false);
         return;
       }
-      const { error } = await db.from('products').delete().in('id', ids);
+      const { error } = await db.from('products').update({ status: 'inactive' }).in('id', ids);
       if (error) toast.error(error.message);
-      else toast.success(`Deleted ${ids.length} products`);
+      else toast.success(`Set ${ids.length} products to inactive`);
       setSelectedIds(new Set());
       setBulkRunning(false);
       await Promise.all([fetchProducts(), fetchProductCatalog(), fetchStats(), fetchApks()]);
+      window.dispatchEvent(new CustomEvent('marketplaceRefresh'));
       return;
     }
 
@@ -726,6 +750,7 @@ export default function MarketplaceAdmin() {
     setSelectedIds(new Set());
     setBulkRunning(false);
     await Promise.all([fetchProducts(), fetchProductCatalog(), fetchStats(), fetchApks()]);
+    window.dispatchEvent(new CustomEvent('marketplaceRefresh'));
   };
 
   const saveHeaderMenu = async () => {
@@ -1047,21 +1072,33 @@ export default function MarketplaceAdmin() {
       toast.error('Select APK file first');
       return;
     }
+    if (!apkFile.name.toLowerCase().endsWith('.apk')) {
+      toast.error('Only .apk files are allowed');
+      return;
+    }
 
     setUploadingApk(true);
 
     const safeFileName = apkFile.name.replace(/[^a-zA-Z0-9._-]/g, '-');
-    const path = `${apkForm.product_id}/${Date.now()}-${safeFileName}`;
+    // Standardized storage path: {productId}/{timestamp}-{filename} within 'apks' bucket
+    const storagePath = `${apkForm.product_id}/${Date.now()}-${safeFileName}`;
 
     const { error: uploadError } = await db.storage
       .from('apks')
-      .upload(path, apkFile, { upsert: true, contentType: apkFile.type || 'application/vnd.android.package-archive' });
+      .upload(storagePath, apkFile, { upsert: true, contentType: apkFile.type || 'application/vnd.android.package-archive' });
 
     if (uploadError) {
       setUploadingApk(false);
       toast.error(`Upload failed: ${uploadError.message}`);
       return;
     }
+
+    // Helper to rollback uploaded file on DB failure
+    const rollbackStorage = async () => {
+      try {
+        await db.storage.from('apks').remove([storagePath]);
+      } catch { /* best effort */ }
+    };
 
     let apkId = apkForm.replace_apk_id;
 
@@ -1071,7 +1108,7 @@ export default function MarketplaceAdmin() {
         .update({
           product_id: apkForm.product_id,
           version: apkForm.version,
-          file_url: path,
+          file_url: storagePath,
           file_size: apkFile.size,
           status: apkForm.status,
           changelog: apkForm.changelog || null,
@@ -1080,6 +1117,7 @@ export default function MarketplaceAdmin() {
         .eq('id', apkId);
 
       if (error) {
+        await rollbackStorage();
         setUploadingApk(false);
         toast.error(`APK update failed: ${error.message}`);
         return;
@@ -1090,7 +1128,7 @@ export default function MarketplaceAdmin() {
         .insert({
           product_id: apkForm.product_id,
           version: apkForm.version,
-          file_url: path,
+          file_url: storagePath,
           file_size: apkFile.size,
           status: apkForm.status,
           changelog: apkForm.changelog || null,
@@ -1100,6 +1138,7 @@ export default function MarketplaceAdmin() {
         .single();
 
       if (error || !inserted?.id) {
+        await rollbackStorage();
         setUploadingApk(false);
         toast.error(`APK create failed: ${error?.message || 'Unknown error'}`);
         return;
@@ -1114,7 +1153,7 @@ export default function MarketplaceAdmin() {
         apk_id: apkId,
         version_name: apkForm.version_name,
         version_code: Number(apkForm.version_code || 1),
-        file_path: path,
+        file_path: storagePath,
         file_size: apkFile.size,
         release_notes: apkForm.changelog || null,
         is_stable: apkForm.status === 'published',
@@ -1124,6 +1163,7 @@ export default function MarketplaceAdmin() {
       .single();
 
     if (versionError) {
+      await rollbackStorage();
       setUploadingApk(false);
       toast.error(`Version create failed: ${versionError.message}`);
       return;
@@ -1132,17 +1172,17 @@ export default function MarketplaceAdmin() {
     if (versionRow?.id) {
       await db
         .from('apks')
-        .update({ current_version_id: versionRow.id, file_url: path, updated_at: new Date().toISOString() })
+        .update({ current_version_id: versionRow.id, file_url: storagePath, updated_at: new Date().toISOString() })
         .eq('id', apkId);
     }
 
+    // Update product APK link WITHOUT changing product.status (APK upload is independent)
     await db
       .from('products')
       .update({
-        apk_url: path,
-        storage_path: path,
+        apk_url: storagePath,
+        storage_path: storagePath,
         apk_enabled: apkForm.status === 'published',
-        status: apkForm.status === 'published' ? 'active' : 'draft',
       })
       .eq('id', apkForm.product_id);
 
@@ -1160,6 +1200,7 @@ export default function MarketplaceAdmin() {
 
     toast.success('APK uploaded and linked');
     await Promise.all([fetchApks(), fetchProducts(), fetchProductCatalog(), fetchStats()]);
+    window.dispatchEvent(new CustomEvent('marketplaceRefresh'));
   };
 
   const toggleApkDownload = async (apk: Apk) => {

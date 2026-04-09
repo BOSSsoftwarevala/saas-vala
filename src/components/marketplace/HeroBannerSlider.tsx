@@ -8,6 +8,7 @@ interface HeroSlide {
   image: string;
   title: string;
   subtitle: string;
+  linkedCategory?: string;
   badge?: string;
   badgeColor?: string;
   offerText?: string;
@@ -20,7 +21,9 @@ interface TickerItem {
 }
 
 const fallbackSlides: HeroSlide[] = [
-  { id: 'fallback-1', image: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200&h=400&fit=crop', title: '🔥 ALL SOFTWARE — ONLY $5', subtitle: '2000+ products with source code.', badge: 'MEGA SALE', badgeColor: 'from-red-500 to-orange-500' },
+  { id: 'fallback-1', image: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200&h=400&fit=crop', title: 'Healthcare Software Sale', subtitle: 'Discover hospital, clinic & pharmacy products.', linkedCategory: 'Health Care', badge: 'MEGA SALE', badgeColor: 'from-red-500 to-orange-500' },
+  { id: 'fallback-2', image: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1200&h=400&fit=crop', title: 'Finance & Banking Tools', subtitle: 'Banking portals, loan apps and payment workflows.', linkedCategory: 'Finance', badge: 'HOT DEAL', badgeColor: 'from-emerald-500 to-teal-500' },
+  { id: 'fallback-3', image: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&h=400&fit=crop', title: 'Transport & Logistics Suite', subtitle: 'Fleet, delivery and route management solutions.', linkedCategory: 'Transport', badge: 'NEW', badgeColor: 'from-sky-500 to-indigo-500' },
 ];
 
 const fallbackTickers: TickerItem[] = [
@@ -39,13 +42,18 @@ async function getUserCountry(): Promise<{ country: string; region: string }> {
   }
 }
 
-export function HeroBannerSlider({ autoPlayInterval = 4000 }: { autoPlayInterval?: number }) {
-  const [slides, setSlides] = useState<HeroSlide[]>(fallbackSlides);
+export function HeroBannerSlider({ autoPlayInterval = 4000, onBannerClick, slides: slidesProp }: { autoPlayInterval?: number; onBannerClick?: (linkedCategory?: string) => void; slides?: HeroSlide[] }) {
+  const [slides, setSlides] = useState<HeroSlide[]>(slidesProp && slidesProp.length > 0 ? slidesProp : fallbackSlides);
   const [tickerItems, setTickerItems] = useState<TickerItem[]>(fallbackTickers);
   const [current, setCurrent] = useState(0);
   const [paused, setPaused] = useState(false);
 
   useEffect(() => {
+    if (slidesProp && slidesProp.length > 0) {
+      setSlides(slidesProp);
+      return;
+    }
+
     const fetchData = async () => {
       // Fetch banners, tickers, and festival offers in parallel
       const [bannersRes, tickersRes, festivalRes, location] = await Promise.all([
@@ -69,6 +77,7 @@ export function HeroBannerSlider({ autoPlayInterval = 4000 }: { autoPlayInterval
             image: b.image_url || 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200&h=400&fit=crop',
             title: b.title,
             subtitle: b.subtitle || '',
+            linkedCategory: b.link_url || undefined,
             badge: b.badge || undefined,
             badgeColor: b.badge_color || 'from-blue-500 to-indigo-500',
             offerText: b.offer_text || undefined,
@@ -112,6 +121,7 @@ export function HeroBannerSlider({ autoPlayInterval = 4000 }: { autoPlayInterval
             image: f.banner_image_url,
             title: f.festival_name,
             subtitle: f.description || '',
+            linkedCategory: f.link_url || undefined,
             badge: f.badge_text || undefined,
             badgeColor: f.badge_color || 'from-amber-500 to-orange-500',
             offerText: f.offer_text || undefined,
@@ -126,7 +136,7 @@ export function HeroBannerSlider({ autoPlayInterval = 4000 }: { autoPlayInterval
       if (baseTickers.length > 0) setTickerItems(baseTickers);
     };
     fetchData();
-  }, []);
+  }, [slidesProp]);
 
   const next = useCallback(() => setCurrent(p => (p + 1) % slides.length), [slides.length]);
   const prev = useCallback(() => setCurrent(p => (p - 1 + slides.length) % slides.length), [slides.length]);
@@ -153,13 +163,17 @@ export function HeroBannerSlider({ autoPlayInterval = 4000 }: { autoPlayInterval
 
       {/* Banner */}
       <div
-        className="relative overflow-hidden mx-2 sm:mx-4 md:mx-6 mt-2 rounded-xl group"
+        className="relative overflow-hidden mx-2 sm:mx-4 md:mx-6 mt-2 rounded-xl group cursor-pointer"
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
       >
         <div className="relative h-[160px] sm:h-[220px] md:h-[300px] w-full">
           {slides.map((s, i) => (
-            <div key={s.id} className={cn('absolute inset-0 transition-opacity duration-500', i === current ? 'opacity-100' : 'opacity-0 pointer-events-none')}>
+            <div
+              key={s.id}
+              className={cn('absolute inset-0 transition-opacity duration-500', i === current ? 'opacity-100' : 'opacity-0 pointer-events-none')}
+              onClick={() => onBannerClick?.(s.linkedCategory)}
+            >
               <img src={s.image} alt={s.title} className="w-full h-full object-cover" loading={i === 0 ? 'eager' : 'lazy'} />
               <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
             </div>

@@ -1,11 +1,12 @@
-import { Key, Package, Server, DollarSign, User } from 'lucide-react';
+import { Key, Package, Server, DollarSign, User, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Activity {
   id: string;
-  type: 'key' | 'product' | 'server' | 'payment' | 'user';
+  type: 'key' | 'product' | 'server' | 'payment' | 'user' | 'security';
   message: string;
   time: string;
+  iconType?: string;
 }
 
 const iconMap = {
@@ -14,6 +15,7 @@ const iconMap = {
   server: Server,
   payment: DollarSign,
   user: User,
+  security: Shield,
 };
 
 const colorMap = {
@@ -22,6 +24,7 @@ const colorMap = {
   server: 'bg-purple/20 text-purple',
   payment: 'bg-green/20 text-green',
   user: 'bg-gold/20 text-gold',
+  security: 'bg-red/20 text-red',
 };
 
 interface ActivityFeedProps {
@@ -36,7 +39,7 @@ export function ActivityFeed({ activities }: ActivityFeedProps) {
       </h3>
       <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
         {activities.map((activity, index) => {
-          const Icon = iconMap[activity.type];
+          const Icon = iconMap[activity.iconType as keyof typeof iconMap] || iconMap[activity.type];
           return (
             <div
               key={activity.id}

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   Table,
   TableBody,
@@ -60,11 +60,14 @@ import { PaginationControls } from '@/components/ui/pagination-controls';
 import { Switch } from '@/components/ui/switch';
  import { ResellerActivityPanel } from '@/components/reseller/ResellerActivityPanel';
  import { ResellerQuickActions } from '@/components/reseller/ResellerQuickActions';
+import { useDashboardStore } from '@/hooks/useDashboardStore';
+import { type ResellerApplication } from '@/lib/dashboardApi';
 
 const ITEMS_PER_PAGE = 25;
 
 export default function Resellers() {
    const { resellers, loading, total, fetchResellers, updateReseller, deleteReseller } = useResellers();
+  const { resellerApplications, getResellerApplications, approveResellerApplication, rejectResellerApplication } = useDashboardStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -72,6 +75,10 @@ export default function Resellers() {
   const [editReseller, setEditReseller] = useState<Reseller | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [applicationTab, setApplicationTab] = useState('pending');
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectApplicationId, setRejectApplicationId] = useState<string | null>(null);
+  const [mainTab, setMainTab] = useState('resellers');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -156,6 +163,41 @@ export default function Resellers() {
     setDeleteId(null);
   };
 
+  // Load applications on mount
+  useEffect(() => {
+    getResellerApplications();
+  }, [getResellerApplications]);
+
+  const handleApproveApplication = async (applicationId: string) => {
+    setSubmitting(true);
+    try {
+      await approveResellerApplication(applicationId);
+      await getResellerApplications();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRejectApplication = async () => {
+    if (!rejectApplicationId || !rejectionReason.trim()) return;
+
+    setSubmitting(true);
+    try {
+      await rejectResellerApplication(rejectApplicationId, rejectionReason);
+      await getResellerApplications();
+      setRejectDialogOpen(false);
+      setRejectApplicationId(null);
+      setRejectionReason('');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const openRejectDialog = (applicationId: string) => {
+    setRejectApplicationId(applicationId);
+    setRejectDialogOpen(true);
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -173,7 +215,7 @@ export default function Resellers() {
             <Button
               variant="outline"
               className="gap-2 border-border"
-              onClick={() => window.location.assign('/reseller-dashboard')}
+              onClick={() => window.location.assign('/reseller/dashboard')}
             >
               <Users className="h-4 w-4" />
               Reseller Dashboard
@@ -189,57 +231,70 @@ export default function Resellers() {
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="glass-card rounded-xl p-4 text-center">
-            <div className="h-10 w-10 mx-auto rounded-lg bg-primary/20 flex items-center justify-center mb-2">
-              <Users className="h-5 w-5 text-primary" />
-            </div>
-            <p className="text-2xl font-bold text-foreground">{stats.total}</p>
-            <p className="text-sm text-muted-foreground">Total</p>
-          </div>
-          <div className="glass-card rounded-xl p-4 text-center">
-            <div className="h-10 w-10 mx-auto rounded-lg bg-success/20 flex items-center justify-center mb-2">
-              <Play className="h-5 w-5 text-success" />
-            </div>
-            <p className="text-2xl font-bold text-success">{stats.active}</p>
-            <p className="text-sm text-muted-foreground">Active</p>
-          </div>
-          <div className="glass-card rounded-xl p-4 text-center">
-            <div className="h-10 w-10 mx-auto rounded-lg bg-destructive/20 flex items-center justify-center mb-2">
-              <Ban className="h-5 w-5 text-destructive" />
-            </div>
-            <p className="text-2xl font-bold text-destructive">{stats.suspended}</p>
-            <p className="text-sm text-muted-foreground">Suspended</p>
-          </div>
-          <div className="glass-card rounded-xl p-4 text-center">
-            <div className="h-10 w-10 mx-auto rounded-lg bg-cyan/20 flex items-center justify-center mb-2">
-              <Shield className="h-5 w-5 text-cyan" />
-            </div>
-            <p className="text-2xl font-bold text-cyan">{stats.verified}</p>
-            <p className="text-sm text-muted-foreground">Verified</p>
-          </div>
-        </div>
+        {/* Main Tabs */}
+        <Tabs value={mainTab} onValueChange={setMainTab} className="w-full">
+          <TabsList className="bg-muted w-full justify-start">
+            <TabsTrigger value="resellers" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              Resellers ({stats.total})
+            </TabsTrigger>
+            <TabsTrigger value="applications" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              Applications ({resellerApplications.filter(a => a.status === 'pending').length})
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Filters */}
-        <div className="glass-card rounded-xl p-4">
-          <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
-              <TabsList className="bg-muted">
-                <TabsTrigger value="all" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  All ({stats.total})
-                </TabsTrigger>
-                <TabsTrigger value="active" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  Active
-                </TabsTrigger>
-                <TabsTrigger value="suspended" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  Suspended
-                </TabsTrigger>
-                <TabsTrigger value="verified" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  Verified
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+          {/* Resellers Tab */}
+          <TabsContent value="resellers" className="space-y-4 mt-6">
+            {/* Reseller Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="glass-card rounded-xl p-4 text-center">
+                <div className="h-10 w-10 mx-auto rounded-lg bg-primary/20 flex items-center justify-center mb-2">
+                  <Users className="h-5 w-5 text-primary" />
+                </div>
+                <p className="text-2xl font-bold text-foreground">{stats.total}</p>
+                <p className="text-sm text-muted-foreground">Total</p>
+              </div>
+              <div className="glass-card rounded-xl p-4 text-center">
+                <div className="h-10 w-10 mx-auto rounded-lg bg-success/20 flex items-center justify-center mb-2">
+                  <Play className="h-5 w-5 text-success" />
+                </div>
+                <p className="text-2xl font-bold text-success">{stats.active}</p>
+                <p className="text-sm text-muted-foreground">Active</p>
+              </div>
+              <div className="glass-card rounded-xl p-4 text-center">
+                <div className="h-10 w-10 mx-auto rounded-lg bg-destructive/20 flex items-center justify-center mb-2">
+                  <Ban className="h-5 w-5 text-destructive" />
+                </div>
+                <p className="text-2xl font-bold text-destructive">{stats.suspended}</p>
+                <p className="text-sm text-muted-foreground">Suspended</p>
+              </div>
+              <div className="glass-card rounded-xl p-4 text-center">
+                <div className="h-10 w-10 mx-auto rounded-lg bg-cyan/20 flex items-center justify-center mb-2">
+                  <Shield className="h-5 w-5 text-cyan" />
+                </div>
+                <p className="text-2xl font-bold text-cyan">{stats.verified}</p>
+                <p className="text-sm text-muted-foreground">Verified</p>
+              </div>
+            </div>
+
+            {/* Reseller Filters */}
+            <div className="glass-card rounded-xl p-4">
+              <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
+                  <TabsList className="bg-muted">
+                    <TabsTrigger value="all" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                      All ({stats.total})
+                    </TabsTrigger>
+                    <TabsTrigger value="active" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                      Active
+                    </TabsTrigger>
+                    <TabsTrigger value="suspended" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                      Suspended
+                    </TabsTrigger>
+                    <TabsTrigger value="verified" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                      Verified
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
 
             <div className="flex items-center gap-3 w-full md:w-auto">
               <div className="relative flex-1 md:w-64">
@@ -384,12 +439,161 @@ export default function Resellers() {
             </>
              )}
            </div>
- 
+
            {/* Activity Panel */}
            <div className="xl:col-span-1">
              <ResellerActivityPanel />
            </div>
         </div>
+          </TabsContent>
+
+          {/* Applications Tab */}
+          <TabsContent value="applications" className="space-y-4 mt-6">
+            {/* Application Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="glass-card rounded-xl p-4 text-center">
+                <div className="h-10 w-10 mx-auto rounded-lg bg-primary/20 flex items-center justify-center mb-2">
+                  <Users className="h-5 w-5 text-primary" />
+                </div>
+                <p className="text-2xl font-bold text-foreground">{resellerApplications.length}</p>
+                <p className="text-sm text-muted-foreground">Total</p>
+              </div>
+              <div className="glass-card rounded-xl p-4 text-center">
+                <div className="h-10 w-10 mx-auto rounded-lg bg-warning/20 flex items-center justify-center mb-2">
+                  <Shield className="h-5 w-5 text-warning" />
+                </div>
+                <p className="text-2xl font-bold text-warning">{resellerApplications.filter(a => a.status === 'pending').length}</p>
+                <p className="text-sm text-muted-foreground">Pending</p>
+              </div>
+              <div className="glass-card rounded-xl p-4 text-center">
+                <div className="h-10 w-10 mx-auto rounded-lg bg-success/20 flex items-center justify-center mb-2">
+                  <CheckCircle className="h-5 w-5 text-success" />
+                </div>
+                <p className="text-2xl font-bold text-success">{resellerApplications.filter(a => a.status === 'approved').length}</p>
+                <p className="text-sm text-muted-foreground">Approved</p>
+              </div>
+              <div className="glass-card rounded-xl p-4 text-center">
+                <div className="h-10 w-10 mx-auto rounded-lg bg-destructive/20 flex items-center justify-center mb-2">
+                  <Ban className="h-5 w-5 text-destructive" />
+                </div>
+                <p className="text-2xl font-bold text-destructive">{resellerApplications.filter(a => a.status === 'rejected').length}</p>
+                <p className="text-sm text-muted-foreground">Rejected</p>
+              </div>
+            </div>
+
+            {/* Application Filters */}
+            <div className="glass-card rounded-xl p-4">
+              <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+                <Tabs value={applicationTab} onValueChange={setApplicationTab} className="w-full md:w-auto">
+                  <TabsList className="bg-muted">
+                    <TabsTrigger value="pending" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                      Pending ({resellerApplications.filter(a => a.status === 'pending').length})
+                    </TabsTrigger>
+                    <TabsTrigger value="approved" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                      Approved ({resellerApplications.filter(a => a.status === 'approved').length})
+                    </TabsTrigger>
+                    <TabsTrigger value="rejected" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                      Rejected ({resellerApplications.filter(a => a.status === 'rejected').length})
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+            </div>
+
+            {/* Applications Table */}
+            <div className="glass-card rounded-xl p-4">
+              {resellerApplications.filter(a => a.status === applicationTab).length === 0 ? (
+                <div className="flex flex-col items-center justify-center p-12 text-center">
+                  <Users className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="font-semibold text-foreground mb-2">No {applicationTab} applications</h3>
+                  <p className="text-muted-foreground">Applications will appear here when users apply</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table className="min-w-[1000px]">
+                    <TableHeader>
+                      <TableRow className="border-border hover:bg-muted/50">
+                        <TableHead className="text-muted-foreground">Applicant</TableHead>
+                        <TableHead className="text-muted-foreground">Business</TableHead>
+                        <TableHead className="text-muted-foreground">Contact</TableHead>
+                        <TableHead className="text-muted-foreground">Status</TableHead>
+                        <TableHead className="text-muted-foreground">Applied</TableHead>
+                        <TableHead className="text-muted-foreground text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {resellerApplications
+                        .filter(a => a.status === applicationTab)
+                        .map((application) => (
+                        <TableRow key={application.id} className="border-border hover:bg-muted/50">
+                          <TableCell>
+                            <div>
+                              <p className="font-medium text-foreground">{application.name}</p>
+                              <p className="text-sm text-muted-foreground">{application.email}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-foreground">{application.business_name}</span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              <p>{application.email}</p>
+                              {application.phone && <p className="text-muted-foreground">{application.phone}</p>}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={
+                                application.status === 'approved' ? 'default' :
+                                application.status === 'rejected' ? 'destructive' : 'secondary'
+                              }
+                              className="capitalize"
+                            >
+                              {application.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-muted-foreground">
+                              {new Date(application.created_at).toLocaleDateString()}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {application.status === 'pending' && (
+                              <div className="flex gap-2 justify-end">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleApproveApplication(application.id)}
+                                  disabled={submitting}
+                                  className="bg-success hover:bg-success/90"
+                                >
+                                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => openRejectDialog(application.id)}
+                                  disabled={submitting}
+                                  className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                                >
+                                  <Ban className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
+                            {application.status === 'rejected' && application.rejection_reason && (
+                              <span className="text-sm text-muted-foreground">
+                                {application.rejection_reason}
+                              </span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Edit Dialog */}
@@ -479,6 +683,43 @@ export default function Resellers() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Rejection Dialog */}
+      <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject Application</DialogTitle>
+            <DialogDescription>
+              Please provide a reason for rejecting this reseller application.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="rejection-reason">Rejection Reason</Label>
+              <Textarea
+                id="rejection-reason"
+                placeholder="Please explain why this application is being rejected..."
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRejectApplication}
+              disabled={!rejectionReason.trim() || submitting}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Reject Application
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

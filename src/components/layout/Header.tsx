@@ -1,5 +1,7 @@
+import { useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useDashboardStore } from '@/hooks/useDashboardStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +17,15 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ArrowLeft, Search, Bell, User, Settings, LogOut, ShoppingCart } from 'lucide-react';
 import { WalletHeaderButton } from '@/components/wallet/WalletHeaderButton';
 import { useCart } from '@/hooks/useCart';
+
+// Debounce utility function
+function debounce<T extends (...args: any[]) => any>(func: T, wait: number): (...args: Parameters<T>) => void {
+  let timeout: NodeJS.Timeout;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+}
 
 const pageTitles: Record<string, string> = {
   '/': 'Marketplace',
@@ -35,7 +46,7 @@ const pageTitles: Record<string, string> = {
   '/seo-leads': 'SEO & Lead Manager',
   '/reseller-manager': 'Reseller Manager',
   '/resellers': 'Reseller Manager',
-  '/reseller-dashboard': 'Reseller Dashboard',
+  '/reseller/dashboard': 'Reseller Dashboard',
   '/automation': 'Auto-Pilot & Monitor',
   '/auto-pilot': 'Auto-Pilot & Monitor',
   '/apk-pipeline': 'APK Pipeline',
@@ -53,9 +64,20 @@ export function Header() {
   const location = useLocation();
   const { user, role, signOut, isSuperAdmin } = useAuth();
   const { count: cartCount } = useCart();
+  const { notifications, searchResults, searchGlobal, markAllNotificationsRead } = useDashboardStore();
+
+  // Debounced search
+  const debouncedSearch = useCallback(
+    debounce((query: string) => {
+      searchGlobal(query);
+    }, 300),
+    [searchGlobal]
+  );
+  const [searchText, setSearchText] = useState('');
 
   const pageTitle = pageTitles[location.pathname] || 'SaaS VALA';
   const canGoBack = location.pathname !== '/';
+  const unreadCount = notifications.filter((notice) => notice.status === 'unread').length;
 
   const userInitials = user?.email?.slice(0, 2).toUpperCase() || 'U';
 
@@ -99,9 +121,38 @@ export function Header() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
           <Input
             type="search"
+            value={searchText}
+            onChange={(event) => {
+              const value = event.target.value;
+              setSearchText(value);
+              debouncedSearch(value);
+            }}
             placeholder="Search products, keys, servers..."
             className="pl-10 bg-muted/30 border-border/50 focus:border-primary/50 focus:bg-muted/50 transition-all duration-300"
           />
+          {searchText && (
+            <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-border/50 bg-popover shadow-xl">
+              {searchResults.length === 0 ? (
+                <div className="p-3 text-sm text-muted-foreground">No results for "{searchText}"</div>
+              ) : (
+                <div className="divide-y divide-border/50">
+                  {searchResults.map((result) => (
+                    <button
+                      key={`${result.type}-${result.id}`}
+                      onClick={() => {
+                        navigate(result.href);
+                        setSearchText('');
+                      }}
+                      className="w-full px-4 py-3 text-left text-sm transition-colors hover:bg-muted/70"
+                    >
+                      <div className="font-medium text-foreground">{result.title}</div>
+                      <div className="text-xs text-muted-foreground">{result.subtitle}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -126,16 +177,58 @@ export function Header() {
         <WalletHeaderButton />
 
         {/* Notifications */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative text-muted-foreground hover:text-foreground"
-        >
-          <Bell className="h-5 w-5" />
-          <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-primary text-[10px] font-bold text-primary-foreground flex items-center justify-center">
-            3
-          </span>
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative text-muted-foreground hover:text-foreground"
+            >
+              <Bell className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-primary text-[10px] font-bold text-primary-foreground flex items-center justify-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-80 bg-popover/95 backdrop-blur-xl border-border/50" align="end">
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Notifications</p>
+                  <p className="text-xs text-muted-foreground">Latest system events</p>
+                </div>
+                <button
+                  onClick={markAllNotificationsRead}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Mark all read
+                </button>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator className="bg-border/50" />
+            {notifications.length === 0 ? (
+              <div className="p-4 text-sm text-muted-foreground">No notifications yet.</div>
+            ) : (
+              notifications.slice(0, 6).map((message) => (
+                <DropdownMenuItem
+                  key={message.id}
+                  className="flex flex-col gap-1 text-left"
+                  onClick={() => {
+                    if (message.action_url) navigate(message.action_url);
+                  }}
+                >
+                  <span className="font-medium text-foreground">{message.title}</span>
+                  <span className="text-xs text-muted-foreground line-clamp-2">{message.message}</span>
+                  <span className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                    {message.status === 'unread' ? 'New' : 'Read'} • {message.type}
+                  </span>
+                </DropdownMenuItem>
+              ))
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         {/* User menu */}
         <DropdownMenu>
@@ -164,7 +257,7 @@ export function Header() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator className="bg-border/50" />
-            <DropdownMenuItem className="cursor-pointer" onClick={() => navigate(role === 'reseller' ? '/reseller-dashboard?tab=password' : '/settings')}>
+            <DropdownMenuItem className="cursor-pointer" onClick={() => navigate(role === 'reseller' ? '/reseller/dashboard?tab=password' : '/settings')}>
               <User className="mr-2 h-4 w-4" />
               <span>Profile</span>
             </DropdownMenuItem>

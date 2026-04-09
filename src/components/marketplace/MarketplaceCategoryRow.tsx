@@ -9,14 +9,19 @@ import type { MarketplaceCategory } from '@/data/marketplaceCategories';
 interface Props {
   category: MarketplaceCategory;
   onBuyNow: (p: any) => void;
+  onDemo?: (p: any) => void;
+  filteredProducts?: any[];
+  productsOverride?: any[];
 }
 
-export const MarketplaceCategoryRow = React.forwardRef<HTMLElement, Props>(function MarketplaceCategoryRow({ category, onBuyNow }, ref) {
+export const MarketplaceCategoryRow = React.forwardRef<HTMLElement, Props>(function MarketplaceCategoryRow({ category, onBuyNow, filteredProducts, productsOverride }, ref) {
   const { products, loading } = useProductsByCategory(category.keywords);
 
-  const displayProducts = fillToTarget(products as any, category.id, category.title, 50);
+  const effectiveProducts = productsOverride !== undefined ? productsOverride : (filteredProducts !== undefined ? filteredProducts : products);
+  const categoryLoading = productsOverride !== undefined ? false : loading;
+  const displayProducts = effectiveProducts.slice(0, 10);
 
-  if (!loading && displayProducts.length === 0) {
+  if (!categoryLoading && displayProducts.length === 0) {
     return (
       <section className="py-4">
         <SectionHeader
@@ -51,6 +56,7 @@ export const MarketplaceCategoryRow = React.forwardRef<HTMLElement, Props>(funct
             product={product as any}
             index={i}
             onBuyNow={onBuyNow}
+            onDemo={onDemo}
             rank={i + 1}
           />
         ))}

@@ -30,30 +30,50 @@
    branch: 'Main Branch, Mumbai',
  };
  
+const MIN_TOP_UP_AMOUNT = 50;
  const amountPresets = [50, 100, 200, 500, 1000];
  
  export function AddBalancePanel() {
-  const { wallet } = useWallet();
+  const { wallet, addCredit, fetchWallet, fetchTransactions } = useWallet();
    const [selectedMethod, setSelectedMethod] = useState('bank');
    const [amount, setAmount] = useState('100');
    const [transactionId, setTransactionId] = useState('');
+  const [submitting, setSubmitting] = useState(false);
  
    const copyToClipboard = (text: string, label: string) => {
      navigator.clipboard.writeText(text);
      toast.success(`${label} copied!`);
    };
  
-   const handleSubmit = () => {
-     if (!amount || parseFloat(amount) < 50) {
-       toast.error('Minimum amount is $50');
+  const handleSubmit = async () => {
+    const parsedAmount = Number(amount);
+
+    if (!Number.isFinite(parsedAmount) || parsedAmount < MIN_TOP_UP_AMOUNT) {
+      toast.error(`Minimum amount is $${MIN_TOP_UP_AMOUNT}`);
        return;
      }
      if (!transactionId) {
        toast.error('Please enter transaction ID');
        return;
      }
-     toast.success('Payment verification request submitted! We will verify and credit your balance within 24 hours.');
-     setTransactionId('');
+
+    setSubmitting(true);
+    try {
+      await addCredit(
+        wallet?.id || '',
+        parsedAmount,
+        `Reseller wallet top-up (${selectedMethod.toUpperCase()})`,
+        selectedMethod,
+      );
+      await fetchWallet();
+      await fetchTransactions();
+      toast.success(`$${parsedAmount.toFixed(2)} added to wallet successfully.`);
+      setTransactionId('');
+    } catch {
+      // Hook already surfaces the error toast.
+    } finally {
+      setSubmitting(false);
+    }
    };
  
    return (
@@ -72,7 +92,7 @@
                </div>
              </div>
              <Badge variant="outline" className="text-lg px-4 py-2">
-               Minimum: $50
+               Minimum: ${MIN_TOP_UP_AMOUNT}
              </Badge>
            </div>
          </CardContent>
@@ -103,13 +123,13 @@
                <Label>Custom Amount ($)</Label>
                <Input
                  type="number"
-                 min="50"
+                 min={String(MIN_TOP_UP_AMOUNT)}
                  value={amount}
                  onChange={(e) => setAmount(e.target.value)}
                  placeholder="Enter amount"
                />
-               {parseFloat(amount) < 50 && (
-                 <p className="text-sm text-destructive">Minimum amount is $50</p>
+               {Number(amount || 0) < MIN_TOP_UP_AMOUNT && (
+                 <p className="text-sm text-destructive">Minimum amount is ${MIN_TOP_UP_AMOUNT}</p>
                )}
              </div>
  
@@ -206,12 +226,12 @@
                  value={transactionId}
                  onChange={(e) => setTransactionId(e.target.value)}
                />
-               <Button className="w-full" size="lg" onClick={handleSubmit}>
+                <Button className="w-full" size="lg" onClick={handleSubmit} disabled={submitting}>
                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                 Submit for Verification
+                  {submitting ? 'Adding Balance...' : 'Add Balance'}
                </Button>
                <p className="text-xs text-muted-foreground text-center">
-                 Balance will be credited within 24 hours after verification
+                  Balance is stored directly in your wallet after successful top-up.
                </p>
              </div>
            </CardContent>

@@ -15,12 +15,12 @@ import { ArrowLeft, Bell, Lock, LogOut, Wallet } from 'lucide-react';
  import { useWallet } from '@/hooks/useWallet';
  
  const pageTitles: Record<string, string> = {
-   '/reseller-dashboard': 'Reseller Dashboard',
-   '/reseller-dashboard?tab=keys': 'Generate Keys',
-   '/reseller-dashboard?tab=clients': 'My Clients',
-   '/reseller-dashboard?tab=wallet': 'Add Balance',
-   '/reseller-dashboard?tab=referral': 'Refer & Earn',
-   '/reseller-dashboard?tab=password': 'Change Password',
+   '/reseller/dashboard': 'Reseller Dashboard',
+   '/reseller/dashboard?tab=keys': 'Generate Keys',
+   '/reseller/dashboard?tab=clients': 'My Clients',
+   '/reseller/dashboard?tab=wallet': 'Add Balance',
+   '/reseller/dashboard?tab=referral': 'Refer & Earn',
+   '/reseller/dashboard?tab=password': 'Change Password',
  };
  
  export function ResellerHeader() {
@@ -43,7 +43,7 @@ import { ArrowLeft, Bell, Lock, LogOut, Wallet } from 'lucide-react';
            <Button
              variant="ghost"
              size="icon"
-             onClick={() => navigate('/reseller-dashboard')}
+             onClick={() => navigate('/reseller/dashboard')}
              className="text-muted-foreground hover:text-foreground"
            >
              <ArrowLeft className="h-5 w-5" />
@@ -108,7 +108,7 @@ import { ArrowLeft, Bell, Lock, LogOut, Wallet } from 'lucide-react';
                </div>
              </DropdownMenuLabel>
              <DropdownMenuSeparator className="bg-border" />
-             <DropdownMenuItem className="cursor-pointer" onClick={() => navigate('/reseller-dashboard?tab=password')}>
+             <DropdownMenuItem className="cursor-pointer" onClick={() => navigate('/reseller/dashboard?tab=password')}>
                <Lock className="mr-2 h-4 w-4" />
                <span>Change Password</span>
              </DropdownMenuItem>

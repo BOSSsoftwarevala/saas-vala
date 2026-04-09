@@ -730,39 +730,122 @@ async function handleWallet(method: string, pathParts: string[], body: any, user
 
   // POST /wallet/add
   if (method === 'POST' && action === 'add') {
-    const { data: wallet } = await sb.from('wallets').select('id, balance').eq('user_id', userId).single()
-    if (!wallet) return err('Wallet not found', 404)
+    const amount = Number(body.amount || 0)
+    if (!Number.isFinite(amount) || amount <= 0) return err('Invalid amount', 400)
+    if (amount < 50) return err('Minimum top-up amount is $50', 400)
 
-    const newBalance = (wallet.balance || 0) + body.amount
+    let { data: wallet } = await sb
+      .from('wallets')
+      .select('id, balance, total_added, version')
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (!wallet) {
+      const { data: createdWallet, error: walletCreateError } = await sb
+        .from('wallets')
+        .insert({
+          user_id: userId,
+          balance: 0,
+          total_added: 0,
+          total_spent: 0,
+          total_earned: 0,
+          currency: 'USD',
+          is_locked: false,
+        })
+        .select('id, balance, total_added, version')
+        .single()
+
+      if (walletCreateError || !createdWallet) {
+        return err(walletCreateError?.message || 'Failed to create wallet', 500)
+      }
+
+      wallet = createdWallet
+    }
+
+    const currentBalance = Number(wallet.balance || 0)
+    const currentTotalAdded = Number((wallet as any).total_added || 0)
+    const currentVersion = Number((wallet as any).version || 0)
+    const newBalance = Number((currentBalance + amount).toFixed(2))
+    const nextTotalAdded = Number((currentTotalAdded + amount).toFixed(2))
+
+    const { data: updatedWallet, error: walletUpdateError } = await sb
+      .from('wallets')
+      .update({
+        balance: newBalance,
+        total_added: nextTotalAdded,
+        version: currentVersion + 1,
+      })
+      .eq('id', wallet.id)
+      .eq('version', currentVersion)
+      .select('id, balance')
+      .maybeSingle()
+    if (walletUpdateError) return err(walletUpdateError.message)
+    if (!updatedWallet) return err('Wallet was updated by another request. Please retry.', 409)
+
     const { error: txErr } = await sb.from('transactions').insert({
-      wallet_id: wallet.id, type: 'credit', amount: body.amount,
+      wallet_id: wallet.id, type: 'credit', amount,
       balance_after: newBalance, status: 'completed',
       description: body.description || 'Credit added', created_by: userId,
       meta: body.payment_method ? { payment_method: body.payment_method } : null,
     })
-    if (txErr) return err(txErr.message)
+    if (txErr) {
+      await sb
+        .from('wallets')
+        .update({ balance: currentBalance, total_added: currentTotalAdded, version: currentVersion + 2 })
+        .eq('id', wallet.id)
+        .eq('version', currentVersion + 1)
+      return err(txErr.message)
+    }
 
-    await sb.from('wallets').update({ balance: newBalance }).eq('id', wallet.id)
-    await logActivity(admin, 'wallet', wallet.id, 'credit_added', userId, { amount: body.amount })
+    await logActivity(admin, 'wallet', wallet.id, 'credit_added', userId, { amount })
     return json({ success: true, balance: newBalance })
   }
 
   // POST /wallet/withdraw
   if (method === 'POST' && action === 'withdraw') {
-    const { data: wallet } = await sb.from('wallets').select('id, balance').eq('user_id', userId).single()
+    const { data: wallet } = await sb
+      .from('wallets')
+      .select('id, balance, total_spent, version')
+      .eq('user_id', userId)
+      .single()
     if (!wallet) return err('Wallet not found', 404)
     if ((wallet.balance || 0) < body.amount) return err('Insufficient balance')
 
-    const newBalance = (wallet.balance || 0) - body.amount
+    const currentBalance = Number(wallet.balance || 0)
+    const currentSpent = Number((wallet as any).total_spent || 0)
+    const currentVersion = Number((wallet as any).version || 0)
+    const newBalance = Number((currentBalance - Number(body.amount || 0)).toFixed(2))
+    const nextSpent = Number((currentSpent + Number(body.amount || 0)).toFixed(2))
+
+    const { data: updatedWallet, error: walletUpdateError } = await sb
+      .from('wallets')
+      .update({
+        balance: newBalance,
+        total_spent: nextSpent,
+        version: currentVersion + 1,
+      })
+      .eq('id', wallet.id)
+      .eq('version', currentVersion)
+      .select('id')
+      .maybeSingle()
+    if (walletUpdateError) return err(walletUpdateError.message)
+    if (!updatedWallet) return err('Wallet was updated by another request. Please retry.', 409)
+
     const { error: txErr } = await sb.from('transactions').insert({
       wallet_id: wallet.id, type: 'debit', amount: body.amount,
       balance_after: newBalance, status: 'completed',
       description: body.description || 'Withdrawal', created_by: userId,
       reference_id: body.reference_id, reference_type: body.reference_type,
     })
-    if (txErr) return err(txErr.message)
+    if (txErr) {
+      await sb
+        .from('wallets')
+        .update({ balance: currentBalance, total_spent: currentSpent, version: currentVersion + 2 })
+        .eq('id', wallet.id)
+        .eq('version', currentVersion + 1)
+      return err(txErr.message)
+    }
 
-    await sb.from('wallets').update({ balance: newBalance }).eq('id', wallet.id)
     await logActivity(admin, 'wallet', wallet.id, 'debit', userId, { amount: body.amount })
     return json({ success: true, balance: newBalance })
   }

@@ -24,12 +24,12 @@
  }
  
  const resellerNavItems: NavItem[] = [
-   { title: 'Dashboard', icon: LayoutDashboard, href: '/reseller-dashboard' },
-   { title: 'Generate Keys', icon: Key, href: '/reseller-dashboard?tab=keys' },
-   { title: 'My Clients', icon: Users, href: '/reseller-dashboard?tab=clients' },
-   { title: 'Add Balance', icon: Wallet, href: '/reseller-dashboard?tab=wallet' },
-   { title: 'Refer & Earn', icon: Share2, href: '/reseller-dashboard?tab=referral' },
-   { title: 'Change Password', icon: Lock, href: '/reseller-dashboard?tab=password' },
+   { title: 'Dashboard', icon: LayoutDashboard, href: '/reseller/dashboard' },
+   { title: 'Generate Keys', icon: Key, href: '/reseller/dashboard?tab=keys' },
+   { title: 'My Clients', icon: Users, href: '/reseller/dashboard?tab=clients' },
+   { title: 'Add Balance', icon: Wallet, href: '/reseller/dashboard?tab=wallet' },
+   { title: 'Refer & Earn', icon: Share2, href: '/reseller/dashboard?tab=referral' },
+   { title: 'Change Password', icon: Lock, href: '/reseller/dashboard?tab=password' },
  ];
  
  export function ResellerSidebar() {
@@ -38,8 +38,8 @@
    const { signOut } = useAuth();
  
     const isActive = (href: string) => {
-      if (href === '/reseller-dashboard') {
-        return location.pathname === '/reseller-dashboard' && !location.search;
+      if (href === '/reseller/dashboard') {
+        return location.pathname === '/reseller/dashboard' && !location.search;
       }
       return location.pathname + location.search === href;
     };

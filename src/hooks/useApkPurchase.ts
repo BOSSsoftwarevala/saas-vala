@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useFraudDetection } from './useFraudDetection';
-import { generateSecureLicenseKey } from '@/lib/licenseUtils';
+import { generateSecureOfflineLicenseKey } from '@/lib/licenseUtils';
 import { toast } from 'sonner';
+import { rateLimiter } from '@/lib/errorHandling';
 
 interface ApkProduct {
   id: string;
@@ -35,9 +36,19 @@ export function useApkPurchase() {
       return { success: false, error: 'Please sign in to download APK' };
     }
 
+    const buyAttemptKey = `apk-buy:${user.id}`;
+    if (!rateLimiter.checkLimit(buyAttemptKey, 5, 60 * 1000)) {
+      return { success: false, error: 'Too many purchase attempts. Please wait before trying again.' };
+    }
+
     const isGeneratedProduct = !isUuid(product.id);
 
     setProcessing(true);
+
+    // Track wallet state for rollback
+    let walletDeducted = false;
+    let walletId = '';
+    let originalBalance = 0;
 
     try {
       // Step 1: Check if user is blocked
@@ -57,16 +68,30 @@ export function useApkPurchase() {
         .single();
 
       if (walletError || !wallet) {
-        throw new Error('Could not fetch wallet balance');
+        throw new Error('Wallet not found. Please contact support.');
       }
 
       if ((wallet.balance || 0) < product.price) {
         throw new Error(`Insufficient balance. Need $${product.price}, have $${(wallet.balance || 0).toFixed(2)}`);
       }
 
-      // Step 3: Create transaction (this becomes the license key source)
-      const newBalance = (wallet.balance || 0) - product.price;
-      
+      // Capture wallet info for potential rollback
+      walletId = wallet.id;
+      originalBalance = wallet.balance || 0;
+
+      // Step 3: Deduct wallet balance FIRST (atomic check)
+      const newBalance = originalBalance - product.price;
+      const { error: walletUpdateError } = await supabase
+        .from('wallets')
+        .update({ balance: newBalance, updated_at: new Date().toISOString() })
+        .eq('id', wallet.id);
+
+      if (walletUpdateError) {
+        throw new Error('Failed to deduct balance. Please try again.');
+      }
+      walletDeducted = true;
+
+      // Step 4: Create transaction record (after deduction)
       const { data: transaction, error: txError } = await supabase
         .from('transactions')
         .insert({
@@ -89,14 +114,11 @@ export function useApkPurchase() {
         throw new Error('Failed to create transaction');
       }
 
-      // Step 4: Generate secure crypto-random license key
-      const licenseKey = generateSecureLicenseKey();
-
-      // Step 5: Update wallet balance
-      await supabase
-        .from('wallets')
-        .update({ balance: newBalance, updated_at: new Date().toISOString() })
-        .eq('id', wallet.id);
+      // Step 5: Generate secure signed offline license key
+      const secureKeyBundle = await generateSecureOfflineLicenseKey({
+        productId: isGeneratedProduct ? 'offline-generated-product' : product.id,
+        assignedTo: user.id,
+      });
 
       // Step 6: Create APK download record (only for real DB products)
       if (!isGeneratedProduct) {
@@ -104,7 +126,7 @@ export function useApkPurchase() {
           user_id: user.id,
           product_id: product.id,
           transaction_id: transaction.id,
-          license_key: licenseKey,
+          license_key: secureKeyBundle.key,
           is_verified: true,
           verification_attempts: 0,
           is_blocked: false
@@ -119,25 +141,33 @@ export function useApkPurchase() {
         .filter('meta->>transaction_id', 'eq', transaction.id)
         .maybeSingle();
 
-      const finalLicenseKey = existingLicense ? existingLicense.license_key : licenseKey;
+      const finalLicenseKey = existingLicense ? existingLicense.license_key : secureKeyBundle.key;
 
       if (!existingLicense) {
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 30); // 30-day license
-        await supabase.from('license_keys').insert({
+        await (supabase as any).from('license_keys').insert({
           product_id: isGeneratedProduct ? null : product.id,
-          license_key: licenseKey,
+          license_key: secureKeyBundle.key,
+          key_signature: secureKeyBundle.signature,
           key_type: 'monthly' as const,
+          key_status: 'unused' as const,
           status: 'active' as const,
           owner_email: user.email || null,
           owner_name: user.user_metadata?.full_name || null,
           max_devices: 1,
           activated_devices: 0,
-          activated_at: new Date().toISOString(),
+          activated_at: null,
           expires_at: expiresAt.toISOString(),
           created_by: user.id,
+          purchase_transaction_id: transaction.id,
           notes: `Purchased: ${product.title}`,
-          meta: { product_title: product.title, transaction_id: transaction.id, product_id: product.id }
+          meta: {
+            product_title: product.title,
+            transaction_id: transaction.id,
+            product_id: product.id,
+            offline_payload: secureKeyBundle.payload,
+          }
         });
       }
 
@@ -183,15 +213,70 @@ export function useApkPurchase() {
 
       setProcessing(false);
       
+      // Step 10: Generate real Supabase storage signed URL (15-minute TTL)
+      let downloadUrl = '';
+      if (!isGeneratedProduct) {
+        const { data: apkRecord } = await supabase
+          .from('apks')
+          .select('file_url')
+          .eq('product_id', product.id)
+          .eq('status', 'published')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const storagePath = apkRecord?.file_url || null;
+        if (storagePath) {
+          const { data: signedData } = await supabase.storage
+            .from('apks')
+            .createSignedUrl(storagePath, 900); // 15-minute TTL
+          downloadUrl = signedData?.signedUrl || '';
+
+          await (supabase as any).from('activity_logs').insert({
+            entity_type: 'apk_download',
+            entity_id: transaction.id,
+            action: 'download_link_issued',
+            performed_by: user.id,
+            details: {
+              product_id: product.id,
+              file_path: storagePath,
+              ttl_seconds: 900,
+              downloaded_at: new Date().toISOString(),
+            },
+          }).catch(() => { /* best-effort */ });
+        }
+      }
+
       return {
         success: true,
         transactionId: transaction.id,
         licenseKey: finalLicenseKey,
-        downloadUrl: `/download/apk/${product.id}?key=${finalLicenseKey}`
+        downloadUrl,
       };
     } catch (error: any) {
       setProcessing(false);
       const errorMessage = error.message || 'Purchase failed';
+
+      // Best-effort wallet refund: restore original balance if deduction already happened
+      if (walletDeducted && walletId) {
+        try {
+          await supabase
+            .from('wallets')
+            .update({ balance: originalBalance, updated_at: new Date().toISOString() })
+            .eq('id', walletId);
+          // Insert compensating credit log
+          await (supabase as any).from('transactions').insert({
+            wallet_id: walletId,
+            type: 'credit',
+            amount: product.price,
+            balance_after: originalBalance,
+            status: 'completed',
+            description: `Refund: Failed APK purchase for ${product.title}`,
+            reference_type: 'refund',
+            meta: { product_id: product.id, reason: errorMessage },
+          }).catch(() => { /* best effort */ });
+        } catch { /* best effort */ }
+      }
       
       // Log error
       await supabase.from('error_logs').insert({

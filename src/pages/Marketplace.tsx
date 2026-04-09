@@ -1,16 +1,18 @@
-import { useState, useRef, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MarketplaceHeader } from '@/components/marketplace/MarketplaceHeader';
 import { LazySection } from '@/components/marketplace/LazySection';
 import { MarketplaceCategoryRow } from '@/components/marketplace/MarketplaceCategoryRow';
 import { MARKETPLACE_CATEGORIES } from '@/data/marketplaceCategories';
-import { useMarketplaceProducts } from '@/hooks/useMarketplaceProducts';
+import { useMarketplaceProducts, type MarketplaceProduct } from '@/hooks/useMarketplaceProducts';
 import { toast } from 'sonner';
 import { useApkPurchase } from '@/hooks/useApkPurchase';
 import { useFraudDetection } from '@/hooks/useFraudDetection';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { dashboardApi } from '@/lib/dashboardApi';
 import { HeroBannerSlider } from '@/components/marketplace/HeroBannerSlider';
+import { supabase } from '@/integrations/supabase/client';
+import { generateSecureOfflineLicenseKey } from '@/lib/licenseUtils';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
@@ -22,11 +24,6 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-interface Product {
-  id: string; title: string; subtitle: string; image: string;
-  status: 'upcoming' | 'live' | 'bestseller' | 'draft'; price: number;
-}
-
 const bankDetails = {
   accountName: 'SOFTWARE VALA', bankName: 'INDIAN BANK',
   accountNumber: '8045924772', ifsc: 'IDIB000K196',
@@ -36,8 +33,40 @@ const bankDetails = {
 
 type BuyPayMethod = 'wallet' | 'upi' | 'bank' | 'crypto';
 
+const offers = [
+  'Festival Buy 3 Get 1 FREE',
+  'India Special ₹99',
+  'Eid Sale RTL Ready',
+  'Transport & Logistics NEW',
+  'Finance & Banking HOT',
+];
+
+const bannerSlides = [
+  {
+    id: 'healthcare-banner',
+    title: 'Healthcare & Medical Software',
+    subtitle: 'Hospital, clinic and pharmacy systems with APK downloads.',
+    image: 'https://images.unsplash.com/photo-1580281657521-90c5213f4876?w=1200&h=520&fit=crop',
+    linkedCategory: 'Healthcare',
+  },
+  {
+    id: 'finance-banner',
+    title: 'Banking & Finance Tools',
+    subtitle: 'Loan originating, accounting and payment platforms.',
+    image: 'https://images.unsplash.com/photo-1496307042754-b4aa456c4a2d?w=1200&h=520&fit=crop',
+    linkedCategory: 'Finance',
+  },
+  {
+    id: 'transport-banner',
+    title: 'Transport & Logistics Suite',
+    subtitle: 'Fleet management, delivery tracking and logistics apps.',
+    image: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1200&h=520&fit=crop',
+    linkedCategory: 'Transport',
+  },
+];
+
 export default function Marketplace() {
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<MarketplaceProduct | null>(null);
   const [showPayment, setShowPayment] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [generatedLicenseKey, setGeneratedLicenseKey] = useState('');
@@ -48,6 +77,11 @@ export default function Marketplace() {
   const [manualTxnRef, setManualTxnRef] = useState('');
   const [_manualSubmitted, setManualSubmitted] = useState(false);
   const paymentLockRef = useRef(false);
+  const purchaseLockRef = useRef<Record<string, boolean>>({});
+  const [resellerId, setResellerId] = useState<string | null>(null);
+  const [resellerCredits, setResellerCredits] = useState<number | null>(null);
+  const [ownedLicenseKeys, setOwnedLicenseKeys] = useState<any[]>([]);
+  const navigate = useNavigate();
   const buyParamHandled = useRef(false);
   const { purchaseApk, processing } = useApkPurchase();
   const { checkUserStatus } = useFraudDetection();
@@ -55,30 +89,175 @@ export default function Marketplace() {
   const [searchParams, setSearchParams] = useSearchParams();
   
   const { products } = useMarketplaceProducts();
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const healthcareCategory = useMemo(
+    () => MARKETPLACE_CATEGORIES.find((category) => category.id === 'healthcare'),
+    []
+  );
+
+  const healthcareProducts = useMemo(() => {
+    if (!healthcareCategory) return [];
+    const keywords = healthcareCategory.keywords.map((keyword) => keyword.toLowerCase());
+    return products.filter((product) => {
+      const category = (product.category || '').toLowerCase();
+      const businessType = (product.businessType || '').toLowerCase();
+      return keywords.some((keyword) => category.includes(keyword) || businessType.includes(keyword));
+    });
+  }, [products, healthcareCategory]);
+
+  const filteredHealthcareProducts = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return healthcareProducts;
+    return healthcareProducts.filter((product) =>
+      product.title.toLowerCase().includes(query) ||
+      product.subtitle.toLowerCase().includes(query) ||
+      product.category.toLowerCase().includes(query) ||
+      product.businessType.toLowerCase().includes(query)
+    );
+  }, [healthcareProducts, searchQuery]);
+
+  const visibleProducts = useMemo(() => filteredHealthcareProducts.slice(0, 10), [filteredHealthcareProducts]);
+
+  const loadResellerData = async () => {
+    if (!user) {
+      setResellerId(null);
+      setResellerCredits(null);
+      setOwnedLicenseKeys([]);
+      return;
+    }
+
+    try {
+      const { data: reseller, error: resellerError } = await supabase
+        .from('resellers')
+        .select('id, credits')
+        .eq('user_id', user.id)
+        .single();
+
+      if (resellerError || !reseller) {
+        setResellerId(null);
+        setResellerCredits(null);
+        setOwnedLicenseKeys([]);
+        return;
+      }
+
+      setResellerId(reseller.id);
+      setResellerCredits(reseller.credits);
+
+      const { data: keys, error: keysError } = await supabase
+        .from('license_keys')
+        .select('*')
+        .eq('assigned_to', reseller.id);
+
+      if (!keysError && Array.isArray(keys)) {
+        setOwnedLicenseKeys(keys);
+      }
+    } catch (loadError) {
+      console.error('Failed to load reseller data:', loadError);
+    }
+  };
+
+  useEffect(() => {
+    loadResellerData();
+  }, [user]);
+
+  const handleDemo = (product: MarketplaceProduct) => {
+    const demoUrl = product.demoUrl || (product as any).demo_url;
+    if (demoUrl) {
+      window.open(demoUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    navigate(`/demo/${product.id}`);
+  };
 
   // Handle ?buy=PRODUCT_ID query param coming from cart checkout
   useEffect(() => {
     if (buyParamHandled.current) return;
     const buyId = searchParams.get('buy');
     if (!buyId || !products.length) return;
-    // Mark as handled immediately (before async work) to prevent duplicate triggers
     buyParamHandled.current = true;
     const product = products.find((p) => p.id === buyId);
     if (product) {
       setSearchParams((prev) => { prev.delete('buy'); return prev; }, { replace: true });
-      handleBuyNow(product as Product);
+      handleBuyNow(product);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products, searchParams]);
 
-  const handleBuyNow = async (product: Product) => {
-    if (!user) { toast.error('Please sign in to purchase'); return; }
-    const fraud = await checkUserStatus(user.id, user.email || '');
-    if (fraud.isBlocked) { toast.error(fraud.message); return; }
-    setSelectedProduct(product); setShowPayment(true); setPaymentSuccess(false);
-    setGeneratedLicenseKey(''); setDownloadUrl(''); setShowMorePayment(false); setPaymentSubmitting(false);
-    setBuyPayMethod('wallet'); setManualTxnRef(''); setManualSubmitted(false);
-    paymentLockRef.current = false;
+  const handleBuyNow = async (product: MarketplaceProduct) => {
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
+
+    // Block mock products
+    if (product.id.startsWith('gen-')) {
+      toast.error('This is a demo product and cannot be purchased.');
+      return;
+    }
+
+    if (purchaseLockRef.current[product.id]) {
+      return;
+    }
+
+    purchaseLockRef.current[product.id] = true;
+
+    try {
+      const fraudStatus = await checkUserStatus(user.id, user.email || '');
+      if (fraudStatus.isBlocked) {
+        toast.error(fraudStatus.message);
+        return;
+      }
+
+      const { data: roleRows, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id);
+
+      if (roleError || !Array.isArray(roleRows) || !roleRows.some((row: any) => row.role === 'reseller')) {
+        toast.error('Only approved resellers can purchase products');
+        return;
+      }
+
+      const { data: reseller, error: resellerError } = await supabase
+        .from('resellers')
+        .select('id, credits')
+        .eq('user_id', user.id)
+        .single();
+
+      if (resellerError || !reseller) {
+        toast.error('Unable to verify reseller account.');
+        return;
+      }
+
+      if (reseller.credits < product.price) {
+        toast.error('Insufficient credits. Please add more credits.');
+        return;
+      }
+
+      const result = await dashboardApi.resellerPurchaseProduct(product.id, user.id);
+
+      if (result.success) {
+        toast.success('🎉 Purchase successful! License key generated and saved.');
+        if (result.reseller && typeof result.reseller.credits === 'number') {
+          setResellerCredits(result.reseller.credits);
+        }
+        if (result.licenseKey) {
+          setOwnedLicenseKeys((prev) => [...prev, result.licenseKey]);
+        }
+
+        if (!resellerId && result.reseller?.id) {
+          setResellerId(result.reseller.id);
+        }
+      } else {
+        toast.error(result.error || 'Purchase failed');
+      }
+    } catch (error) {
+      console.error('Purchase error:', error);
+      toast.error('Purchase failed. Please try again.');
+    } finally {
+      purchaseLockRef.current[product.id] = false;
+    }
   };
 
   const handleWalletPayment = async () => {
@@ -100,84 +279,163 @@ export default function Marketplace() {
     setPaymentSubmitting(true);
     try {
       const { data: w } = await supabase.from('wallets').select('id').eq('user_id', user.id).maybeSingle();
-      if (w) {
-        await supabase.from('transactions').insert({
-          wallet_id: w.id, type: 'credit', amount: selectedProduct.price, status: 'pending',
-          description: `${buyPayMethod.toUpperCase()} for ${selectedProduct.title}`,
-          created_by: user.id, reference_id: manualTxnRef, reference_type: buyPayMethod,
-          meta: { payment_method: buyPayMethod, transaction_ref: manualTxnRef, product_id: selectedProduct.id },
-        });
+      if (!w) {
+        toast.error('Wallet not found. Please contact support.');
+        return;
       }
+
+      // Create pending transaction (payment not yet verified by admin)
+      const { data: transaction, error: txError } = await (supabase as any).from('transactions').insert({
+        wallet_id: w.id,
+        type: 'debit',
+        amount: selectedProduct.price,
+        status: 'pending',
+        description: `${buyPayMethod.toUpperCase()} for ${selectedProduct.title}`,
+        created_by: user.id,
+        reference_id: manualTxnRef,
+        reference_type: buyPayMethod,
+        product_id: selectedProduct.id,
+        meta: {
+          payment_method: buyPayMethod,
+          transaction_ref: manualTxnRef,
+          product_id: selectedProduct.id,
+          payment_mode: 'manual',
+          requires_admin_approval: true,
+          buyer_user_id: user.id,
+        },
+      }).select().single();
+
+      if (txError) throw txError;
+
+      // Generate license key immediately; key_status='unused' until admin approves payment
+      const secureKeyBundle = await generateSecureOfflineLicenseKey({
+        productId: selectedProduct.id,
+        assignedTo: user.id,
+      });
+
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30);
+
+      // Insert license key (not yet active for download — awaiting admin approval)
+      await (supabase as any).from('license_keys').insert({
+        product_id: selectedProduct.id,
+        license_key: secureKeyBundle.key,
+        key_signature: secureKeyBundle.signature,
+        key_type: 'monthly',
+        key_status: 'unused',
+        status: 'active',
+        owner_email: user.email || null,
+        owner_name: user.user_metadata?.full_name || null,
+        max_devices: 1,
+        activated_devices: 0,
+        activated_at: null,
+        expires_at: expiresAt.toISOString(),
+        created_by: user.id,
+        purchase_transaction_id: transaction.id,
+        notes: `Manual payment (${buyPayMethod.toUpperCase()}): ${manualTxnRef}`,
+        meta: {
+          product_title: selectedProduct.title,
+          transaction_id: transaction.id,
+          product_id: selectedProduct.id,
+          payment_method: buyPayMethod,
+          transaction_ref: manualTxnRef,
+          offline_payload: secureKeyBundle.payload,
+          requires_admin_approval: true,
+        },
+      });
+
+      // Insert APK download record linked to transaction
+      await (supabase as any).from('apk_downloads').insert({
+        user_id: user.id,
+        product_id: selectedProduct.id,
+        transaction_id: transaction.id,
+        license_key: secureKeyBundle.key,
+        is_verified: false,
+        verification_attempts: 0,
+        is_blocked: false,
+      }).catch(() => { /* non-critical */ });
+
+      setPaymentSuccess(true);
+      setGeneratedLicenseKey(secureKeyBundle.key);
+      setDownloadUrl('');
       setManualSubmitted(true);
-    } catch { toast.error('Submission failed'); }
-    setPaymentSubmitting(false);
+      toast.success('Payment submitted. License key generated — download available after admin approval.');
+    } catch (error) {
+      console.error('Manual payment error:', error);
+      toast.error('Submission failed. Please try again.');
+    } finally {
+      setPaymentSubmitting(false);
+    }
   };
 
   const handleCopy = (text: string, label: string) => {
     navigator.clipboard.writeText(text); toast.success(`${label} copied!`);
   };
 
+  const handleSearchSubmit = () => {
+    setSearchQuery((prev) => prev.trim());
+    document.getElementById('marketplace-healthcare-section')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleOfferClick = (offer: string) => {
+    setSearchQuery(offer);
+  };
+
+  const handleBannerClick = (linkedCategory?: string) => {
+    if (!linkedCategory) {
+      setSearchQuery('');
+      return;
+    }
+    setSearchQuery(linkedCategory);
+  };
+
   return (
     <div className="min-h-screen" style={{ background: '#0B1020' }}>
-      <MarketplaceHeader />
-      <main className="pt-16 pb-8">
-        <HeroBannerSlider />
-
-        {/* All categories as dynamic rows — no duplicate hardcoded sections */}
-        {MARKETPLACE_CATEGORIES.map((cat) => (
-          <LazySection key={cat.id} height={280}>
-            <MarketplaceCategoryRow category={cat} onBuyNow={handleBuyNow} />
-          </LazySection>
-        ))}
-
-        {/* Simple Pricing */}
-        <section id="pricing" className="py-12 px-4 md:px-8 border-t border-border">
-          <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-2xl md:text-3xl font-black text-foreground mb-3">💰 Simple Pricing</h2>
-            <p className="text-muted-foreground mb-6">Every software. One price. No hidden fees.</p>
-            <div className="grid md:grid-cols-3 gap-4">
-              <div className="rounded-xl border border-border p-5 flex flex-col items-center gap-2">
-                <h3 className="font-bold text-foreground">Free Trial</h3>
-                <p className="text-3xl font-black text-foreground">$0</p>
-                <p className="text-xs text-muted-foreground">7-day demo access</p>
-                <Button variant="outline" size="sm" className="w-full mt-2" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Browse</Button>
-              </div>
-              <div className="rounded-xl border-2 border-primary p-5 flex flex-col items-center gap-2 relative bg-primary/5">
-                <Badge className="absolute -top-2.5 bg-primary text-primary-foreground text-[10px] font-black px-2">POPULAR</Badge>
-                <h3 className="font-bold text-foreground">Pro License</h3>
-                <p className="text-3xl font-black text-primary">$5</p>
-                <p className="text-xs text-muted-foreground">Source + APK + 30 days</p>
-                <Button size="sm" className="w-full mt-2" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Buy Now</Button>
-              </div>
-              <div className="rounded-xl border border-border p-5 flex flex-col items-center gap-2">
-                <h3 className="font-bold text-foreground">Enterprise</h3>
-                <p className="text-3xl font-black text-foreground">Custom</p>
-                <p className="text-xs text-muted-foreground">White-label + deploy</p>
-                <Button variant="outline" size="sm" className="w-full mt-2">Contact</Button>
-              </div>
-            </div>
+      <MarketplaceHeader
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onSearchSubmit={handleSearchSubmit}
+      />
+      <div className="pt-16">
+        {/* Top Offers Strip */}
+        <div className="bg-primary/10 border-b border-primary/20 py-2 overflow-hidden">
+          <div className="flex items-center whitespace-nowrap animate-marquee">
+            {offers.map((offer, i) => (
+              <button
+                type="button"
+                key={i}
+                className="inline-flex items-center mx-6 text-sm font-medium text-primary cursor-pointer hover:text-primary/80 transition-colors"
+                onClick={() => handleOfferClick(offer)}
+              >
+                {offer}
+              </button>
+            ))}
           </div>
-        </section>
+        </div>
 
-        {/* Contact */}
-        <section id="contact" className="py-12 px-4 md:px-8 border-t border-border">
-          <div className="max-w-xl mx-auto text-center">
-            <h2 className="text-2xl font-black text-foreground mb-4">📬 Contact Us</h2>
-            <div className="grid gap-3 text-left">
-              <a href="mailto:support@saasvala.com" className="rounded-xl border border-border p-4 flex items-center gap-3 hover:border-primary/50 transition-colors">
-                <span className="text-xl">📧</span>
-                <div><p className="font-bold text-sm text-foreground">Email</p><p className="text-xs text-muted-foreground">support@saasvala.com</p></div>
-              </a>
-              <a href="https://wa.me/919876543210" target="_blank" rel="noopener noreferrer" className="rounded-xl border border-border p-4 flex items-center gap-3 hover:border-primary/50 transition-colors">
-                <span className="text-xl">💬</span>
-                <div><p className="font-bold text-sm text-foreground">WhatsApp</p><p className="text-xs text-muted-foreground">Chat instantly</p></div>
-              </a>
-            </div>
-          </div>
-        </section>
+        <main className="pb-8">
+          <HeroBannerSlider slides={bannerSlides} onBannerClick={handleBannerClick} />
+
+        <div id="marketplace-healthcare-section" className="px-4 md:px-8 mt-4 mb-4 text-sm text-muted-foreground">
+          {searchQuery.trim()
+            ? `${filteredHealthcareProducts.length} Healthcare products matching “${searchQuery.trim()}”`
+            : `${healthcareProducts.length} Healthcare & Medical products available`}
+        </div>
+
+        {/* Healthcare & Medical Category Only */}
+        {MARKETPLACE_CATEGORIES
+          .filter(cat => cat.title === 'Healthcare & Medical')
+          .map((cat) => (
+            <LazySection key={cat.id} height={280}>
+              <MarketplaceCategoryRow
+                category={cat}
+                onBuyNow={handleBuyNow}
+                onDemo={handleDemo}
+                productsOverride={visibleProducts}
+              />
+            </LazySection>
+          ))}
       </main>
-
-      <footer className="border-t border-border py-4 px-4"><p className="text-center text-xs text-muted-foreground">Powered by <span className="font-semibold text-primary">SoftwareVala™</span></p></footer>
 
       {/* Payment Dialog */}
       {showPayment && (
@@ -267,6 +525,7 @@ export default function Marketplace() {
           </DialogContent>
         </Dialog>
       )}
+    </div>
     </div>
   );
 }

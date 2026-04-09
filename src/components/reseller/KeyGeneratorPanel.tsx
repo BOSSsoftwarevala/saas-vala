@@ -1,248 +1,230 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAuth } from '@/hooks/useAuth';
 import { useWallet } from '@/hooks/useWallet';
 import { supabase } from '@/integrations/supabase/client';
+import { dashboardApi } from '@/lib/dashboardApi';
 import { toast } from 'sonner';
 import {
   Key,
-  AlertCircle,
   Wallet,
   Copy,
   CheckCircle2,
   Loader2,
   Lock,
-  FileText,
-  Receipt,
+  Calendar,
+  Package,
 } from 'lucide-react';
 
-const MINIMUM_BALANCE = 50;
-const KEY_COST = 5;
+const PLAN_OPTIONS = [
+  { value: '1M', label: '1 Month', multiplier: 1 },
+  { value: '3M', label: '3 Months', multiplier: 3 },
+  { value: '6M', label: '6 Months', multiplier: 6 },
+  { value: '12M', label: '12 Months', multiplier: 12 },
+  { value: 'lifetime', label: 'Lifetime', multiplier: 24 },
+] as const;
 
-const products = [
-  { id: 'restaurant-pos', name: 'Restaurant POS System', price: 5 },
-  { id: 'hotel-mgmt', name: 'Hotel Management System', price: 5 },
-  { id: 'retail-pos', name: 'Retail POS System', price: 5 },
-  { id: 'salon-mgmt', name: 'Salon Management System', price: 5 },
-  { id: 'gym-mgmt', name: 'Gym Management System', price: 5 },
-];
+type PlanDuration = typeof PLAN_OPTIONS[number]['value'];
 
-// Generate license key format: XXXX-XXXX-XXXX-XXXX
-const generateLicenseKey = () => {
-  return Array(4).fill(0).map(() => 
-    Math.random().toString(36).substring(2, 6).toUpperCase()
-  ).join('-');
-};
+interface ResellerProductOption {
+  id: string;
+  name: string;
+  price: number;
+}
 
-// Generate invoice number
-const generateInvoiceNumber = () => {
-  const year = new Date().getFullYear();
-  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
-  return `INV-${year}-${random}`;
-};
+interface ResellerClientOption {
+  id: string;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+}
+
+interface GeneratedKeyState {
+  key: string;
+  productName: string;
+  planDuration: PlanDuration;
+  chargedPrice: number;
+  expiresAt: string | null;
+}
+
+function getPlanPrice(basePrice: number, planDuration: PlanDuration): number {
+  const plan = PLAN_OPTIONS.find((item) => item.value === planDuration);
+  return Number((Number(basePrice || 0) * Number(plan?.multiplier || 1)).toFixed(2));
+}
 
 export function KeyGeneratorPanel() {
-  const { wallet, fetchWallet, deductBalance } = useWallet();
+  const { user } = useAuth();
+  const { wallet, fetchWallet, fetchTransactions } = useWallet();
+  const [products, setProducts] = useState<ResellerProductOption[]>([]);
+  const [clients, setClients] = useState<ResellerClientOption[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState('');
-  const [clientName, setClientName] = useState('');
-  const [clientEmail, setClientEmail] = useState('');
-  const [quantity, setQuantity] = useState(1);
+  const [selectedPlan, setSelectedPlan] = useState<PlanDuration>('1M');
+  const [selectedClientId, setSelectedClientId] = useState('none');
+  const [sellPriceInput, setSellPriceInput] = useState('');
+  const [deliveryMethod, setDeliveryMethod] = useState<'none' | 'whatsapp' | 'email' | 'manual' | 'sms'>('none');
+  const [deliveryTarget, setDeliveryTarget] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedKeys, setGeneratedKeys] = useState<string[]>([]);
-  const [lastInvoice, setLastInvoice] = useState<string | null>(null);
+  const [generatedKey, setGeneratedKey] = useState<GeneratedKeyState | null>(null);
 
-  const balance = wallet?.balance || 0;
-  const canGenerate = balance >= MINIMUM_BALANCE;
-  const totalCost = quantity * KEY_COST;
-  const hasEnoughBalance = balance >= totalCost;
-  const selectedProductData = products.find(p => p.id === selectedProduct);
+  const balance = Number(wallet?.balance || 0);
+
+  useEffect(() => {
+    const loadProducts = async () => {
+      setLoadingProducts(true);
+      try {
+        const { data, error } = await (supabase as any)
+          .from('products')
+          .select('id, name, price')
+          .eq('status', 'active')
+          .neq('license_enabled', false)
+          .order('name', { ascending: true });
+
+        if (error) throw error;
+
+        setProducts((data || []).map((product: any) => ({
+          id: product.id,
+          name: product.name,
+          price: Number(product.price || 0),
+        })));
+      } catch (error) {
+        console.error('Failed to load products for reseller key generation:', error);
+        toast.error('Failed to load products');
+        setProducts([]);
+      } finally {
+        setLoadingProducts(false);
+      }
+    };
+
+    loadProducts();
+  }, []);
+
+  useEffect(() => {
+    const loadClients = async () => {
+      if (!user?.id) return;
+      try {
+        const data = await (dashboardApi as any).getResellerClients(user.id);
+        setClients((data || []).map((row: any) => ({
+          id: row.id,
+          full_name: row.full_name,
+          email: row.email || null,
+          phone: row.phone || null,
+        })));
+      } catch (error) {
+        console.error('Failed to load reseller clients', error);
+      }
+    };
+
+    loadClients();
+  }, [user?.id]);
+
+  const selectedProductData = useMemo(
+    () => products.find((product) => product.id === selectedProduct) || null,
+    [products, selectedProduct],
+  );
+
+  const planPrice = useMemo(
+    () => (selectedProductData ? getPlanPrice(selectedProductData.price, selectedPlan) : 0),
+    [selectedProductData, selectedPlan],
+  );
+
+  const hasEnoughBalance = balance >= planPrice && planPrice > 0;
 
   const handleGenerate = async () => {
-    if (!selectedProduct || !clientName.trim() || !clientEmail.trim()) {
-      toast.error('Please fill all required fields');
+    if (!user?.id) {
+      toast.error('Please login to generate keys');
       return;
     }
 
-    // Validate email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(clientEmail)) {
-      toast.error('Please enter a valid email address');
+    if (!selectedProductData) {
+      toast.error('Please select a product');
       return;
     }
 
-    if (!canGenerate) {
-      toast.error(`⛔ BLOCKED: Minimum balance of $${MINIMUM_BALANCE} required`, {
-        description: `Your balance: $${balance.toFixed(2)}. Add funds to continue.`
-      });
-      return;
-    }
-
-    if (!hasEnoughBalance) {
-      toast.error(`⛔ BLOCKED: Insufficient balance`, {
-        description: `Need $${totalCost} but have $${balance.toFixed(2)}`
-      });
+    if (planPrice <= 0) {
+      toast.error('Invalid plan price for selected product');
       return;
     }
 
     if (!wallet) {
-      toast.error('Wallet not found');
+      toast.error('Wallet not found. Add balance first.');
+      return;
+    }
+
+    if (!hasEnoughBalance) {
+      toast.error(`Insufficient balance. Need $${planPrice.toFixed(2)}, have $${balance.toFixed(2)}`);
+      return;
+    }
+
+    const sellPrice = sellPriceInput ? Number(sellPriceInput) : undefined;
+    if (sellPrice !== undefined && (!Number.isFinite(sellPrice) || sellPrice < 0)) {
+      toast.error('Sell price must be zero or greater');
+      return;
+    }
+
+    if (deliveryMethod !== 'none' && !deliveryTarget.trim()) {
+      toast.error('Delivery target is required when delivery method is selected');
       return;
     }
 
     setIsGenerating(true);
-    const keys: string[] = [];
-
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) {
-        toast.error('Please login to generate keys');
-        return;
-      }
-
-      // Get product from database - product_id is required
-      const { data: productData } = await supabase
-        .from('products')
-        .select('id, name')
-        .limit(1)
-        .maybeSingle();
-
-      if (!productData) {
-        toast.error('No products found. Please add a product first.');
-        setIsGenerating(false);
-        return;
-      }
-
-      // Generate keys and insert into database
-      for (let i = 0; i < quantity; i++) {
-        const key = generateLicenseKey();
-        keys.push(key);
-
-        // Insert license key with all required fields
-        const { error: keyError } = await supabase.from('license_keys').insert({
-          license_key: key,
-          product_id: productData.id,
-          owner_name: clientName,
-          owner_email: clientEmail,
-          status: 'active',
-          key_type: 'yearly' as const,
-          created_by: userData.user.id,
-          expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-        });
-
-        if (keyError) {
-          console.error('Key insert error:', keyError);
-          throw new Error(`Failed to create key: ${keyError.message}`);
-        }
-      }
-
-      // Deduct from wallet
-      await deductBalance(
-        wallet.id,
-        totalCost,
-        `Generated ${quantity} license key(s) for ${clientName}`,
-        keys[0], // Reference first key
-        'license_key'
-      );
-
-      // Auto-generate invoice
-      const invoiceNumber = generateInvoiceNumber();
-      const invoiceData = {
-        invoice_number: invoiceNumber,
-        user_id: userData.user.id,
-        customer_name: clientName,
-        customer_email: clientEmail,
-        items: JSON.stringify([{
-          product: selectedProductData?.name || 'License Key',
-          quantity: quantity,
-          unit_price: KEY_COST,
-          total: totalCost
-        }]),
-        subtotal: totalCost,
-        total_amount: totalCost,
-        status: 'paid',
-        notes: `Auto-generated invoice for ${quantity} license key(s). Keys: ${keys.join(', ')}`
-      };
-
-      const { error: invoiceError } = await supabase
-        .from('invoices')
-        .insert(invoiceData);
-
-      if (!invoiceError) {
-        setLastInvoice(invoiceNumber);
-        toast.success(`📄 Invoice ${invoiceNumber} auto-generated`);
-      }
-
-      // Log activity
-      await supabase.from('activity_logs').insert({
-        entity_type: 'license_key',
-        entity_id: keys[0],
-        action: 'reseller_key_generation',
-        performed_by: userData.user.id,
-        details: {
-          quantity,
-          client_name: clientName,
-          client_email: clientEmail,
-          product: selectedProductData?.name,
-          total_cost: totalCost,
-          invoice_number: invoiceNumber,
-          keys: keys
-        }
+      const result = await (dashboardApi as any).generateResellerLicenseKey({
+        userId: user.id,
+        productId: selectedProductData.id,
+        planDuration: selectedPlan,
+        clientId: selectedClientId !== 'none' ? selectedClientId : undefined,
+        sellPrice,
+        deliveryMethod: deliveryMethod !== 'none' ? deliveryMethod : undefined,
+        deliveryTarget: deliveryTarget.trim() || undefined,
       });
 
-      setGeneratedKeys(keys);
-      toast.success(`✅ ${quantity} license key(s) generated successfully!`, {
-        description: `Invoice: ${invoiceNumber} | Charged: $${totalCost}`
+      setGeneratedKey({
+        key: result.licenseKey.license_key,
+        productName: selectedProductData.name,
+        planDuration: selectedPlan,
+        chargedPrice: Number(result.planPrice || planPrice),
+        expiresAt: result.expiresAt || null,
       });
-      
-      // Refresh wallet
-      fetchWallet();
-      
+
+      await Promise.all([fetchWallet(), fetchTransactions()]);
+      toast.success('License key generated successfully');
     } catch (error: any) {
-      console.error('Key generation error:', error);
-      toast.error('Failed to generate keys: ' + error.message);
+      console.error('Reseller key generation failed:', error);
+      toast.error(error.message || 'Failed to generate license key');
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const copyKey = (key: string) => {
-    navigator.clipboard.writeText(key);
-    toast.success('Key copied to clipboard!');
-  };
-
-  const copyAllKeys = () => {
-    navigator.clipboard.writeText(generatedKeys.join('\n'));
-    toast.success('All keys copied to clipboard!');
+  const copyKey = () => {
+    if (!generatedKey?.key) return;
+    navigator.clipboard.writeText(generatedKey.key);
+    toast.success('Key copied to clipboard');
   };
 
   return (
     <div className="space-y-6">
-      {/* Balance Warning - HARD BLOCK */}
-      {!canGenerate && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+      {!hasEnoughBalance && selectedProductData && planPrice > 0 && (
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
           <Card className="border-destructive/50 bg-destructive/10">
             <CardContent className="p-4 flex items-center gap-4">
               <div className="h-12 w-12 rounded-full bg-destructive/20 flex items-center justify-center">
                 <Lock className="h-6 w-6 text-destructive" />
               </div>
               <div className="flex-1">
-                <h3 className="font-semibold text-foreground">⛔ KEY GENERATION BLOCKED</h3>
+                <h3 className="font-semibold text-foreground">Insufficient Wallet Balance</h3>
                 <p className="text-sm text-muted-foreground">
-                  Minimum balance of <strong>${MINIMUM_BALANCE}</strong> required.
+                  Selected plan requires <strong>${planPrice.toFixed(2)}</strong>.
                   Current balance: <strong className="text-destructive">${balance.toFixed(2)}</strong>
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Add at least ${(MINIMUM_BALANCE - balance).toFixed(2)} to unlock key generation
-                </p>
               </div>
-              <Button onClick={() => window.location.href = '/reseller-dashboard?tab=wallet'}>
+              <Button onClick={() => window.location.href = '/reseller/dashboard?tab=wallet'}>
                 <Wallet className="h-4 w-4 mr-2" />
                 Add Balance
               </Button>
@@ -251,19 +233,44 @@ export function KeyGeneratorPanel() {
         </motion.div>
       )}
 
-      {/* Balance Info */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="glass-card">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${canGenerate ? 'bg-success/20' : 'bg-destructive/20'}`}>
-                <Wallet className={`h-5 w-5 ${canGenerate ? 'text-success' : 'text-destructive'}`} />
+              <div className="h-10 w-10 rounded-lg bg-success/20 flex items-center justify-center">
+                <Wallet className="h-5 w-5 text-success" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Your Balance</p>
-                <p className={`text-xl font-bold ${canGenerate ? 'text-success' : 'text-destructive'}`}>
-                  ${balance.toFixed(2)}
-                </p>
+                <p className="text-sm text-muted-foreground">Wallet Balance</p>
+                <p className="text-xl font-bold text-foreground">${balance.toFixed(2)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-primary/20 flex items-center justify-center">
+                <Package className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Products</p>
+                <p className="text-xl font-bold text-foreground">{loadingProducts ? '...' : products.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-warning/20 flex items-center justify-center">
+                <Calendar className="h-5 w-5 text-warning" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Selected Plan</p>
+                <p className="text-xl font-bold text-foreground">{selectedPlan}</p>
               </div>
             </div>
           </CardContent>
@@ -276,66 +283,36 @@ export function KeyGeneratorPanel() {
                 <Key className="h-5 w-5 text-secondary" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Cost Per Key</p>
-                <p className="text-xl font-bold text-foreground">${KEY_COST}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-warning/20 flex items-center justify-center">
-                <AlertCircle className="h-5 w-5 text-warning" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Min. Balance</p>
-                <p className="text-xl font-bold text-foreground">${MINIMUM_BALANCE}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="glass-card">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-primary/20 flex items-center justify-center">
-                <Receipt className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Auto Invoice</p>
-                <p className="text-xl font-bold text-success">Enabled</p>
+                <p className="text-sm text-muted-foreground">Plan Price</p>
+                <p className="text-xl font-bold text-foreground">${planPrice.toFixed(2)}</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Key Generation Form */}
       <Card className="glass-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Key className="h-5 w-5 text-primary" />
-            Generate License Keys
+            Generate License Key
           </CardTitle>
           <CardDescription>
-            Create license keys for your clients. Each key costs ${KEY_COST}. 
-            <strong className="text-primary"> Auto-Invoice & Auto-Billing enabled.</strong>
+            Select a product and plan. The system checks wallet balance, deducts the plan price, then generates one secure license key.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Select Product *</Label>
-              <Select value={selectedProduct} onValueChange={setSelectedProduct} disabled={!canGenerate}>
+              <Label>Select Product</Label>
+              <Select value={selectedProduct} onValueChange={setSelectedProduct} disabled={loadingProducts || isGenerating}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choose a product" />
+                  <SelectValue placeholder={loadingProducts ? 'Loading products...' : 'Choose a product'} />
                 </SelectTrigger>
                 <SelectContent>
                   {products.map((product) => (
                     <SelectItem key={product.id} value={product.id}>
-                      {product.name} - ${product.price}
+                      {product.name} - ${product.price.toFixed(2)}/month
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -343,69 +320,93 @@ export function KeyGeneratorPanel() {
             </div>
 
             <div className="space-y-2">
-              <Label>Quantity</Label>
-              <Select 
-                value={quantity.toString()} 
-                onValueChange={(v) => setQuantity(parseInt(v))}
-                disabled={!canGenerate}
-              >
+              <Label>Select Plan</Label>
+              <Select value={selectedPlan} onValueChange={(value) => setSelectedPlan(value as PlanDuration)} disabled={isGenerating}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Choose a plan" />
                 </SelectTrigger>
                 <SelectContent>
-                  {[1, 2, 3, 5, 10, 20, 50].map((q) => (
-                    <SelectItem 
-                      key={q} 
-                      value={q.toString()}
-                      disabled={q * KEY_COST > balance}
-                    >
-                      {q} Key(s) - ${q * KEY_COST} {q * KEY_COST > balance && '(Insufficient)'}
+                  {PLAN_OPTIONS.map((plan) => (
+                    <SelectItem key={plan.value} value={plan.value}>
+                      {plan.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Client Name *</Label>
+              <Label>Assign to Client (Optional)</Label>
+              <Select value={selectedClientId} onValueChange={setSelectedClientId} disabled={isGenerating}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select client" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No client selected</SelectItem>
+                  {clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.full_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Client Sell Price (Optional)</Label>
               <Input
-                placeholder="Enter client name"
-                value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
-                disabled={!canGenerate}
-                maxLength={100}
+                type="number"
+                min="0"
+                step="0.01"
+                value={sellPriceInput}
+                onChange={(e) => setSellPriceInput(e.target.value)}
+                placeholder="Example: 49.99"
+                disabled={isGenerating}
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Client Email *</Label>
-              <Input
-                type="email"
-                placeholder="client@example.com"
-                value={clientEmail}
-                onChange={(e) => setClientEmail(e.target.value)}
-                disabled={!canGenerate}
-                maxLength={255}
-              />
+              <Label>Delivery Method (Optional)</Label>
+              <Select value={deliveryMethod} onValueChange={(value: any) => setDeliveryMethod(value)} disabled={isGenerating}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select delivery method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No delivery log</SelectItem>
+                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                  <SelectItem value="email">Email</SelectItem>
+                  <SelectItem value="sms">SMS</SelectItem>
+                  <SelectItem value="manual">Manual</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+
+            {deliveryMethod !== 'none' && (
+              <div className="space-y-2 md:col-span-2">
+                <Label>Delivery Target</Label>
+                <Input
+                  value={deliveryTarget}
+                  onChange={(e) => setDeliveryTarget(e.target.value)}
+                  placeholder={deliveryMethod === 'email' ? 'client@email.com' : '+91 98XXXXXXXX'}
+                  disabled={isGenerating}
+                />
+              </div>
+            )}
           </div>
 
-          {/* Cost Summary */}
           <div className="p-4 rounded-lg bg-muted/50 border border-border">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-muted-foreground">Total Cost:</span>
+                <span className="text-muted-foreground">Charge Summary</span>
                 <p className="text-xs text-muted-foreground">
-                  Auto-deducted from wallet • Invoice auto-generated
+                  Product: {selectedProductData?.name || 'Not selected'}
                 </p>
               </div>
-              <span className="text-xl font-bold text-foreground">${totalCost}</span>
+              <span className="text-xl font-bold text-foreground">${planPrice.toFixed(2)}</span>
             </div>
-            {!hasEnoughBalance && canGenerate && (
+            {!hasEnoughBalance && selectedProductData && planPrice > 0 && (
               <p className="text-sm text-destructive mt-2">
-                ⛔ Insufficient balance for this order
+                Balance is lower than the selected plan price.
               </p>
             )}
           </div>
@@ -413,69 +414,46 @@ export function KeyGeneratorPanel() {
           <Button
             className="w-full"
             size="lg"
-            disabled={!canGenerate || !hasEnoughBalance || isGenerating || !selectedProduct}
+            disabled={loadingProducts || isGenerating || !selectedProductData || !hasEnoughBalance}
             onClick={handleGenerate}
           >
             {isGenerating ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Generating & Billing...
-              </>
-            ) : !canGenerate ? (
-              <>
-                <Lock className="h-4 w-4 mr-2" />
-                Balance Below ${MINIMUM_BALANCE} - BLOCKED
+                Deducting Balance & Generating Key...
               </>
             ) : (
               <>
                 <Key className="h-4 w-4 mr-2" />
-                Generate {quantity} Key(s) - Charge ${totalCost}
+                Generate Key for ${planPrice.toFixed(2)}
               </>
             )}
           </Button>
         </CardContent>
       </Card>
 
-      {/* Generated Keys */}
-      {generatedKeys.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+      {generatedKey && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <Card className="glass-card border-success/30">
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-success">
-                    <CheckCircle2 className="h-5 w-5" />
-                    Generated Keys
-                  </CardTitle>
-                  {lastInvoice && (
-                    <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                      <FileText className="h-3 w-3" />
-                      Invoice: {lastInvoice}
-                    </p>
-                  )}
-                </div>
-                <Button variant="outline" size="sm" onClick={copyAllKeys}>
-                  <Copy className="h-4 w-4 mr-2" />
-                  Copy All
+              <CardTitle className="flex items-center gap-2 text-success">
+                <CheckCircle2 className="h-5 w-5" />
+                Generated License Key
+              </CardTitle>
+              <CardDescription>
+                {generatedKey.productName} • {generatedKey.planDuration} • Charged ${generatedKey.chargedPrice.toFixed(2)}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border gap-3">
+                <code className="font-mono text-sm text-foreground break-all">{generatedKey.key}</code>
+                <Button variant="ghost" size="sm" onClick={copyKey}>
+                  <Copy className="h-4 w-4" />
                 </Button>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {generatedKeys.map((key, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border"
-                  >
-                    <code className="font-mono text-sm text-foreground">{key}</code>
-                    <Button variant="ghost" size="sm" onClick={() => copyKey(key)}>
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
+
+              <div className="text-sm text-muted-foreground">
+                Expires: {generatedKey.expiresAt ? new Date(generatedKey.expiresAt).toLocaleString() : 'Lifetime'}
               </div>
             </CardContent>
           </Card>

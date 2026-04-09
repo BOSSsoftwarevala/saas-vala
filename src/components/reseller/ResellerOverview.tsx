@@ -1,10 +1,12 @@
- import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
  import { useNavigate } from 'react-router-dom';
  import { Card, CardContent } from '@/components/ui/card';
  import { Button } from '@/components/ui/button';
  import { Badge } from '@/components/ui/badge';
  import { useAuth } from '@/hooks/useAuth';
  import { useWallet } from '@/hooks/useWallet';
+import { dashboardApi } from '@/lib/dashboardApi';
  import {
    Key,
    Users,
@@ -30,9 +32,34 @@
    const navigate = useNavigate();
    const { user } = useAuth();
    const { wallet } = useWallet();
+  const [metrics, setMetrics] = useState({
+    keysGenerated: 0,
+    activeClients: 0,
+    referralEarnings: 0,
+  });
  
    const balance = wallet?.balance || 0;
    const canGenerate = balance >= MINIMUM_BALANCE;
+
+  useEffect(() => {
+    const loadMetrics = async () => {
+      if (!user?.id) return;
+      try {
+        const data = await (dashboardApi as any).getResellerData(user.id);
+        setMetrics({
+          keysGenerated: Number(data?.reseller?.keys_generated || data?.keys?.length || 0),
+          activeClients: Number(data?.reseller?.active_clients || 0),
+          referralEarnings: Number(data?.reseller?.total_earned || wallet?.total_earned || 0),
+        });
+      } catch (error) {
+        console.error('Failed to load reseller overview metrics', error);
+      }
+    };
+
+    loadMetrics();
+    const interval = window.setInterval(loadMetrics, 15000);
+    return () => window.clearInterval(interval);
+  }, [user?.id, wallet?.total_earned]);
  
    return (
      <div className="space-y-6">
@@ -65,7 +92,7 @@
                    Current balance: <strong>${balance.toFixed(2)}</strong>
                  </p>
                </div>
-               <Button onClick={() => navigate('/reseller-dashboard?tab=wallet')}>
+               <Button onClick={() => navigate('/reseller/dashboard?tab=wallet')}>
                  <Wallet className="h-4 w-4 mr-2" />
                  Add Balance
                </Button>
@@ -110,7 +137,7 @@
                  <Key className="h-6 w-6 text-white" />
                </div>
                <div className="mt-4">
-                 <p className="text-2xl font-bold text-foreground">24</p>
+                <p className="text-2xl font-bold text-foreground">{metrics.keysGenerated}</p>
                  <p className="text-sm text-muted-foreground">Keys Generated</p>
                </div>
              </CardContent>
@@ -128,7 +155,7 @@
                  <Users className="h-6 w-6 text-white" />
                </div>
                <div className="mt-4">
-                 <p className="text-2xl font-bold text-foreground">12</p>
+                <p className="text-2xl font-bold text-foreground">{metrics.activeClients}</p>
                  <p className="text-sm text-muted-foreground">Active Clients</p>
                </div>
              </CardContent>
@@ -146,7 +173,7 @@
                  <DollarSign className="h-6 w-6 text-white" />
                </div>
                <div className="mt-4">
-                 <p className="text-2xl font-bold text-foreground">$75</p>
+                <p className="text-2xl font-bold text-foreground">${metrics.referralEarnings.toFixed(2)}</p>
                  <p className="text-sm text-muted-foreground">Referral Earnings</p>
                </div>
              </CardContent>
@@ -168,7 +195,7 @@
              >
                <Card
                  className="glass-card border-border/50 hover:border-primary/30 cursor-pointer transition-all h-full"
-                 onClick={() => navigate(`/reseller-dashboard?tab=${module.tab}`)}
+                 onClick={() => navigate(`/reseller/dashboard?tab=${module.tab}`)}
                >
                  <CardContent className="p-6">
                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${module.color} flex items-center justify-center mb-4`}>

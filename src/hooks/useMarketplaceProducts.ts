@@ -27,6 +27,7 @@ export interface MarketplaceProduct {
   tags: string[];
   apk_enabled: boolean;
   license_enabled: boolean;
+    buy_enabled: boolean;
 }
 
 const stockImages = [
@@ -94,8 +95,11 @@ export function mapDbProduct(product: any, index: number): MarketplaceProduct {
     title: formatProductName(product.name || product.slug || 'Software Product'),
     subtitle: product.short_description || product.description?.substring(0, 80) || 'Professional Software Solution',
     image: product.thumbnail_url || stockImages[index % stockImages.length],
-    status: product.status === 'draft' ? 'draft' : product.trending ? 'bestseller' : 'live',
-    price: Number(product.price) || 5,
+    status: product.status === 'active' ? 'live'
+      : product.status === 'draft' ? 'draft'
+      : product.status === 'suspended' || product.status === 'upcoming' ? 'upcoming'
+      : 'upcoming',
+    price: Number(product.price) || 0,
     features, techStack: defaultTechStack,
     category: product.business_type || 'Software',
     businessType: product.business_type || '',
@@ -103,8 +107,9 @@ export function mapDbProduct(product: any, index: number): MarketplaceProduct {
     demoUrl: product.demo_url || undefined, demoLogin: product.demo_login || undefined,
     demoPassword: product.demo_password || undefined, demoEnabled: Boolean(product.demo_enabled),
     featured: Boolean(product.featured), trending: Boolean(product.trending), isAvailable,
-    discount_percent: Number(product.discount_percent) || 0, rating: Number(product.rating) || 4.5,
+    discount_percent: Number(product.discount_percent) || 0, rating: Number(product.rating) || 0,
     tags: product.tags || [], apk_enabled: product.apk_enabled !== false, license_enabled: product.license_enabled !== false,
+      buy_enabled: product.buy_enabled !== false,
   };
 }
 
@@ -112,20 +117,24 @@ export function useMarketplaceProducts() {
   const [products, setProducts] = useState<MarketplaceProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchProducts = async () => {
+    setLoading(true);
+    try {
+      const res = await marketplaceApi.products();
+      const mapped = (res.data || []).map((p: any, i: number) => mapDbProduct(p, i));
+      setProducts(prioritizeProducts(mapped));
+    } catch (e) {
+      console.error('Failed to fetch marketplace products:', e);
+      setProducts([]);
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
-    const fetchProducts = async () => {
-      setLoading(true);
-      try {
-        const res = await marketplaceApi.products();
-        const mapped = (res.data || []).map((p: any, i: number) => mapDbProduct(p, i));
-        setProducts(prioritizeProducts(mapped));
-      } catch (e) {
-        console.error('Failed to fetch marketplace products:', e);
-        setProducts([]);
-      }
-      setLoading(false);
-    };
     fetchProducts();
+    const handler = () => fetchProducts();
+    window.addEventListener('marketplaceRefresh', handler);
+    return () => window.removeEventListener('marketplaceRefresh', handler);
   }, []);
 
   const dbRow1 = products.slice(0, 30);
