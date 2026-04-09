@@ -14,6 +14,8 @@ import React, { Suspense } from 'react';
 import Auth from "./pages/Auth";
 const Marketplace = React.lazy(() => import("./pages/Marketplace"));
 const DemoPage = React.lazy(() => import("./pages/DemoPage"));
+const ProductDetail = React.lazy(() => import("./pages/ProductDetail"));
+const Orders = React.lazy(() => import("./pages/Orders"));
 
 // Lazy load everything else
 const Dashboard = React.lazy(() => import("./pages/Dashboard"));
@@ -107,7 +109,9 @@ function AppRoutes() {
         <Route path="/auth" element={<Auth />} />
         <Route path="/" element={<Marketplace />} />
         <Route path="/marketplace" element={<Marketplace />} />
+        <Route path="/marketplace/product/:id" element={<ProductDetail />} />
         <Route path="/demo/:id" element={<DemoPage />} />
+        <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
 
         {/* Public lazy routes */}
         <Route path="/edu-pwa" element={<EduPwa />} />

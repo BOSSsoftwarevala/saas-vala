@@ -14,6 +14,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { serversApi } from '@/lib/api';
 import { toast } from 'sonner';
 
 interface SecurityIssue {
@@ -58,15 +59,10 @@ export function ServerSecurityMonitor() {
 
   const fetchServers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('servers')
-        .select('id, name, status')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setServers(data || []);
-      if (data?.[0]) {
-        setSelectedServerId(data[0].id);
+      const data = await serversApi.list();
+      setServers(data?.data || []);
+      if (data?.data?.[0]) {
+        setSelectedServerId(data.data[0].id);
       }
     } catch (err) {
       console.error('Failed to fetch servers:', err);
@@ -80,28 +76,29 @@ export function ServerSecurityMonitor() {
     if (!selectedServerId) return;
 
     try {
-      // Call AI security scan endpoint
-      const { data, error } = await supabase.functions.invoke('server-agent', {
-        body: {
-          action: 'security_scan',
-          serverId: selectedServerId,
-        },
-      });
+      const { data, error } = await supabase
+        .from('servers')
+        .select('last_security_scan, security_score')
+        .eq('id', selectedServerId)
+        .maybeSingle();
 
-      if (error) throw error;
+      if (!error && data) {
+        const { data: issues } = await supabase
+          .from('server_security_issues')
+          .select('*')
+          .eq('server_id', selectedServerId)
+          .eq('fixed', false);
 
-      if (data?.success) {
         setSecurityStatus({
-          score: data.score || 0,
-          lastScan: new Date().toISOString(),
-          issuesCount: data.issues?.length || 0,
-          criticalCount: data.issues?.filter((i: any) => i.severity === 'critical').length || 0,
-          vulnerabilities: data.issues || [],
+          score: data.security_score || 0,
+          lastScan: data.last_security_scan,
+          issuesCount: issues?.length || 0,
+          criticalCount: issues?.filter(i => i.severity === 'critical').length || 0,
+          vulnerabilities: issues || [],
         });
       }
     } catch (err) {
       console.error('Failed to fetch security status:', err);
-      toast.error('Failed to fetch security status');
     }
   };
 
@@ -113,22 +110,15 @@ export function ServerSecurityMonitor() {
 
     setScanning(true);
     try {
-      const { data, error } = await supabase.functions.invoke('server-agent', {
-        body: {
-          action: 'run_security_scan',
-          serverId: selectedServerId,
-        },
-      });
+      const result = await serversApi.securityScan(selectedServerId);
 
-      if (error) throw error;
-
-      if (data?.success) {
+      if (result.success) {
         setSecurityStatus({
-          score: data.score || 0,
+          score: result.score || 0,
           lastScan: new Date().toISOString(),
-          issuesCount: data.issues?.length || 0,
-          criticalCount: data.issues?.filter((i: any) => i.severity === 'critical').length || 0,
-          vulnerabilities: data.issues || [],
+          issuesCount: result.issues?.length || 0,
+          criticalCount: result.issues?.filter((i: any) => i.severity === 'critical').length || 0,
+          vulnerabilities: result.issues || [],
         });
         toast.success('Security scan completed');
       }

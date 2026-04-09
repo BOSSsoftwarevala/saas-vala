@@ -10,6 +10,8 @@ import {
   Search,
   RefreshCw,
   X,
+  ShoppingCart,
+  Heart,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -122,15 +124,35 @@ export function MarketplaceHeader({ searchQuery, onSearchChange, onSearchSubmit 
 
           {/* Renew / Recharge */}
           {user && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 text-xs border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
-              onClick={() => navigate('/wallet')}
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Renew</span>
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                onClick={() => navigate('/orders')}
+              >
+                <ShoppingCart className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Orders</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs border-rose-500/30 text-rose-400 hover:bg-rose-500/10"
+                onClick={() => navigate('/favorites')}
+              >
+                <Heart className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Favorites</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                onClick={() => navigate('/wallet')}
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Wallet</span>
+              </Button>
+            </>
           )}
 
           {/* Currency Selector */}

@@ -97,6 +97,24 @@ export const serversApi = {
   verifyDomain: (domainId: string) => apiCall('POST', 'domain/verify', { domain_id: domainId }),
   removeDomain: (domainId: string) => apiCall('DELETE', `domain/remove/${domainId}`),
   health: () => apiCall('GET', 'server/health'),
+
+  // Security Monitoring
+  securityScan: (serverId: string) => apiCall('POST', `server/security/scan/${serverId}`),
+  
+  // Health Monitoring
+  healthMetrics: (serverId: string) => apiCall('GET', `server/health/metrics/${serverId}`),
+  
+  // SSL/TLS Management
+  sslStatus: (serverId: string) => apiCall('GET', `server/ssl/${serverId}`),
+  provisionSSL: (serverId: string) => apiCall('POST', `server/ssl/provision/${serverId}`),
+  
+  // Backup Management
+  listBackups: (serverId: string) => apiCall('GET', `server/backups/${serverId}`),
+  createBackup: (serverId: string, type: 'full' | 'incremental' | 'database' = 'full') =>
+    apiCall('POST', `server/backups/create/${serverId}`, { type }),
+  restoreBackup: (serverId: string, backupId: string) =>
+    apiCall('POST', `server/backups/restore/${serverId}`, { backup_id: backupId }),
+  deleteBackup: (backupId: string) => apiCall('DELETE', `server/backups/${backupId}`),
 };
 
 // ===================== GITHUB =====================
@@ -161,4 +179,89 @@ export const leadsApi = {
 
 export const seoApi = {
   analytics: () => apiCall('GET', 'seo/analytics'),
+};
+
+// ===================== PUBLIC MARKETPLACE =====================
+export const publicMarketplaceApi = {
+  // Products
+  listProducts: (params?: { category?: string; search?: string; sort?: string; limit?: number; offset?: number }) =>
+    apiCall('GET', 'marketplace/products', params),
+  getProduct: (id: string) => apiCall('GET', `marketplace/products/${id}`),
+  getProductPricing: (id: string) => apiCall('GET', `marketplace/products/${id}/pricing`),
+  
+  // Categories
+  getCategories: () => apiCall('GET', 'marketplace/categories'),
+  
+  // Banners
+  getBanners: () => apiCall('GET', 'marketplace/banners'),
+  
+  // Ratings & Reviews
+  getRatings: (productId: string) => apiCall('GET', `marketplace/products/${productId}/ratings`),
+  submitRating: (productId: string, data: { rating: number; review_title?: string; review_text?: string }) =>
+    apiCall('POST', `marketplace/products/${productId}/ratings`, data),
+  
+  // Favorites
+  getFavorites: () => apiCall('GET', 'marketplace/favorites'),
+  addFavorite: (productId: string) => apiCall('POST', 'marketplace/favorites', { product_id: productId }),
+  removeFavorite: (productId: string) => apiCall('DELETE', `marketplace/favorites/${productId}`),
+  isFavorite: (productId: string) => apiCall('GET', `marketplace/favorites/${productId}/check`),
+  
+  // Orders
+  getOrders: (params?: { page?: number; limit?: number; status?: string }) =>
+    apiCall('GET', 'marketplace/orders', params),
+  getOrder: (id: string) => apiCall('GET', `marketplace/orders/${id}`),
+  
+  // Payments
+  initiatePayment: (data: {
+    product_id: string;
+    duration_days: number;
+    payment_method: 'wallet' | 'upi' | 'bank' | 'wise' | 'payu' | 'binance';
+    amount: number;
+  }) => apiCall('POST', 'marketplace/payments/initiate', data),
+  
+  verifyPayment: (data: { order_id: string; transaction_ref?: string; provider?: string }) =>
+    apiCall('POST', 'marketplace/payments/verify', data),
+  
+  getPaymentGateways: () => apiCall('GET', 'marketplace/payment-gateways'),
+  
+  // License Keys
+  getLicenseKeys: () => apiCall('GET', 'marketplace/licenses'),
+  getLicenseKey: (id: string) => apiCall('GET', `marketplace/licenses/${id}`),
+  validateLicense: (licenseKey: string, deviceId?: string) =>
+    apiCall('POST', 'marketplace/licenses/validate', { license_key: licenseKey, device_id: deviceId }),
+  downloadAPK: (productId: string, licenseKeyId?: string) =>
+    apiCall('POST', 'marketplace/download-apk', { product_id: productId, license_key_id: licenseKeyId }),
+  
+  // APK Downloads
+  getDownloadLink: (productId: string) => apiCall('GET', `marketplace/apk/${productId}/download-link`),
+  getDownloadHistory: () => apiCall('GET', 'marketplace/download-history'),
+  
+  // Demo Access
+  logDemoAccess: (productId: string, sessionId: string) =>
+    apiCall('POST', `marketplace/demo/${productId}/log`, { session_id: sessionId }),
+  
+  // Wallet
+  getWallet: () => apiCall('GET', 'marketplace/wallet'),
+  addWalletBalance: (amount: number, paymentMethod?: string) =>
+    apiCall('POST', 'marketplace/wallet/add', { amount, payment_method: paymentMethod }),
+  
+  // Reseller Specific
+  getResellerStats: () => apiCall('GET', 'marketplace/reseller/stats'),
+  getResellerPlans: () => apiCall('GET', 'marketplace/reseller/plans'),
+  subscribeToResellerPlan: (planId: string) =>
+    apiCall('POST', 'marketplace/reseller/subscribe', { plan_id: planId }),
+  getResellerEarnings: (params?: { period?: string }) =>
+    apiCall('GET', 'marketplace/reseller/earnings', params),
+  generateResellerKeys: (productId: string, quantity: number, durationDays?: number) =>
+    apiCall('POST', 'marketplace/reseller/generate-keys', { product_id: productId, quantity, duration_days: durationDays }),
+  
+  // Notifications
+  getNotifications: (params?: { page?: number; limit?: number; unread_only?: boolean }) =>
+    apiCall('GET', 'marketplace/notifications', params),
+  markNotificationAsRead: (notificationId: string) =>
+    apiCall('PUT', `marketplace/notifications/${notificationId}/read`, {}),
+  
+  // Search
+  search: (query: string, params?: { category?: string; min_price?: number; max_price?: number; min_rating?: number; sort?: string }) =>
+    apiCall('GET', 'marketplace/search', { q: query, ...params }),
 };

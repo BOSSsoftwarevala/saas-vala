@@ -907,6 +907,278 @@ async function handleServers(method: string, pathParts: string[], body: any, use
     return json({ stats, servers: data })
   }
 
+  // POST /server/security/scan/:serverId
+  if (method === 'POST' && segment === 'server' && pathParts[1] === 'security' && pathParts[2] === 'scan' && pathParts[3]) {
+    const serverId = String(pathParts[3] || '')
+    if (!isUuid(serverId)) return err('Invalid server_id', 400)
+
+    const { data: server, error: serverError } = await getOwnedServer(sb, serverId, userId)
+    if (serverError) return err(serverError.message)
+    if (!server) return err('Server not found', 404)
+
+    // Call server-agent for security scan
+    const { data: agentResult, error: agentError } = await adminClient().functions.invoke('server-agent', {
+      body: { action: 'run_security_scan', serverId },
+    })
+
+    if (agentError || !agentResult?.success) {
+      await appendDeploymentLog(sb, serverId, 'error', 'Security scan failed', { error: agentError?.message })
+      return err(agentError?.message || 'Security scan failed')
+    }
+
+    // Save results to database
+    if (agentResult.issues && Array.isArray(agentResult.issues)) {
+      for (const issue of agentResult.issues) {
+        await sb.from('server_security_issues').insert({
+          server_id: serverId,
+          severity: issue.severity,
+          title: issue.title,
+          description: issue.description,
+          recommendation: issue.recommendation,
+          fixed: issue.fixed || false,
+        }).catch(() => null)
+      }
+    }
+
+    await sb.from('servers').update({
+      last_security_scan: new Date().toISOString(),
+      security_score: agentResult.score || 0,
+    }).eq('id', serverId).catch(() => null)
+
+    await sb.from('server_activity_logs').insert({
+      server_id: serverId,
+      action: 'Security scan completed',
+      action_type: 'security_scan',
+      performed_by: userId,
+      details: { score: agentResult.score, issues_count: agentResult.issues?.length || 0 },
+    }).catch(() => null)
+
+    return json({ success: true, score: agentResult.score, issues: agentResult.issues })
+  }
+
+  // GET /server/health/metrics/:serverId
+  if (method === 'GET' && segment === 'server' && pathParts[1] === 'health' && pathParts[2] === 'metrics' && pathParts[3]) {
+    const serverId = String(pathParts[3] || '')
+    if (!isUuid(serverId)) return err('Invalid server_id', 400)
+
+    const { data: server, error: serverError } = await getOwnedServer(sb, serverId, userId)
+    if (serverError) return err(serverError.message)
+    if (!server) return err('Server not found', 404)
+
+    // Get latest metrics from database
+    const { data: metrics, error: metricsError } = await sb
+      .from('server_health_metrics')
+      .select('*')
+      .eq('server_id', serverId)
+      .order('checked_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (metricsError) return err(metricsError.message)
+
+    // Call server-agent for fresh check
+    const { data: agentResult } = await adminClient().functions.invoke('server-agent', {
+      body: { action: 'health_check', serverId },
+    }).catch(() => ({ data: null }))
+
+    if (agentResult?.success && agentResult.metrics) {
+      await sb.from('server_health_metrics').insert({
+        server_id: serverId,
+        cpu_usage: agentResult.metrics.cpu,
+        memory_usage: agentResult.metrics.memory,
+        disk_usage: agentResult.metrics.disk,
+        uptime_percent: agentResult.metrics.uptime,
+        response_time_ms: agentResult.metrics.responseTime,
+      }).catch(() => null)
+
+      await sb.from('servers').update({
+        last_health_check: new Date().toISOString(),
+      }).eq('id', serverId).catch(() => null)
+    }
+
+    return json({ success: true, current: agentResult?.metrics || metrics, latest: metrics })
+  }
+
+  // GET /server/ssl/:serverId
+  if (method === 'GET' && segment === 'server' && pathParts[1] === 'ssl' && pathParts[2]) {
+    const serverId = String(pathParts[2] || '')
+    if (!isUuid(serverId)) return err('Invalid server_id', 400)
+
+    const { data: server, error: serverError } = await getOwnedServer(sb, serverId, userId)
+    if (serverError) return err(serverError.message)
+    if (!server) return err('Server not found', 404)
+
+    const { data: certs, error: certsError } = await sb
+      .from('server_ssl_certificates')
+      .select('*')
+      .eq('server_id', serverId)
+      .order('valid_until', { ascending: true })
+
+    if (certsError) return err(certsError.message)
+
+    // Call server-agent for current SSL status
+    const { data: agentResult } = await adminClient().functions.invoke('server-agent', {
+      body: { action: 'ssl_status', serverId },
+    }).catch(() => ({ data: null }))
+
+    return json({ success: true, certificates: certs, agent_certs: agentResult?.certificates })
+  }
+
+  // POST /server/ssl/provision/:serverId
+  if (method === 'POST' && segment === 'server' && pathParts[1] === 'ssl' && pathParts[2] === 'provision' && pathParts[3]) {
+    const serverId = String(pathParts[3] || '')
+    if (!isUuid(serverId)) return err('Invalid server_id', 400)
+
+    const { data: server, error: serverError } = await getOwnedServer(sb, serverId, userId)
+    if (serverError) return err(serverError.message)
+    if (!server) return err('Server not found', 404)
+
+    const { data: agentResult, error: agentError } = await adminClient().functions.invoke('server-agent', {
+      body: { action: 'provision_ssl', serverId },
+    })
+
+    if (agentError || !agentResult?.success) {
+      return err(agentError?.message || 'SSL provisioning failed')
+    }
+
+    await sb.from('server_activity_logs').insert({
+      server_id: serverId,
+      action: 'SSL provisioning started',
+      action_type: 'ssl_provision',
+      performed_by: userId,
+      details: { status: 'provisioning' },
+    }).catch(() => null)
+
+    return json({ success: true, message: agentResult.message })
+  }
+
+  // GET /server/backups/:serverId
+  if (method === 'GET' && segment === 'server' && pathParts[1] === 'backups' && pathParts[2]) {
+    const serverId = String(pathParts[2] || '')
+    if (!isUuid(serverId)) return err('Invalid server_id', 400)
+
+    const { data: server, error: serverError } = await getOwnedServer(sb, serverId, userId)
+    if (serverError) return err(serverError.message)
+    if (!server) return err('Server not found', 404)
+
+    const { data: backups, error: backupsError } = await sb
+      .from('server_backups')
+      .select('*')
+      .eq('server_id', serverId)
+      .order('created_at', { ascending: false })
+
+    if (backupsError) return err(backupsError.message)
+
+    return json({ success: true, backups })
+  }
+
+  // POST /server/backups/create/:serverId
+  if (method === 'POST' && segment === 'server' && pathParts[1] === 'backups' && pathParts[2] === 'create' && pathParts[3]) {
+    const serverId = String(pathParts[3] || '')
+    if (!isUuid(serverId)) return err('Invalid server_id', 400)
+
+    const { data: server, error: serverError } = await getOwnedServer(sb, serverId, userId)
+    if (serverError) return err(serverError.message)
+    if (!server) return err('Server not found', 404)
+
+    const { data: agentResult, error: agentError } = await adminClient().functions.invoke('server-agent', {
+      body: { action: 'create_backup', serverId },
+    })
+
+    if (agentError || !agentResult?.success) {
+      return err(agentError?.message || 'Backup creation failed')
+    }
+
+    // Record backup in database
+    const { data: backup, error: backupError } = await sb.from('server_backups').insert({
+      server_id: serverId,
+      backup_type: body.type || 'full',
+      status: 'in_progress',
+      location: agentResult.location || `backup-${Date.now()}`,
+      created_by: userId,
+    }).select().single()
+
+    if (backupError) return err(backupError.message)
+
+    await sb.from('server_activity_logs').insert({
+      server_id: serverId,
+      action: 'Backup created',
+      action_type: 'backup',
+      performed_by: userId,
+      details: { backup_id: backup.id, type: body.type || 'full' },
+    }).catch(() => null)
+
+    return json({ success: true, backup_id: backup.id, message: agentResult.message })
+  }
+
+  // POST /server/backups/restore/:serverId
+  if (method === 'POST' && segment === 'server' && pathParts[1] === 'backups' && pathParts[2] === 'restore' && pathParts[3]) {
+    const serverId = String(pathParts[3] || '')
+    const backupId = String(body.backup_id || '')
+
+    if (!isUuid(serverId)) return err('Invalid server_id', 400)
+    if (!isUuid(backupId)) return err('Invalid backup_id', 400)
+
+    const { data: server, error: serverError } = await getOwnedServer(sb, serverId, userId)
+    if (serverError) return err(serverError.message)
+    if (!server) return err('Server not found', 404)
+
+    const { data: agentResult, error: agentError } = await adminClient().functions.invoke('server-agent', {
+      body: { action: 'restore_backup', serverId, backupId },
+    })
+
+    if (agentError || !agentResult?.success) {
+      return err(agentError?.message || 'Backup restoration failed')
+    }
+
+    // Update backup record
+    await sb.from('server_backups').update({
+      restored_from_id: backupId,
+      restored_at: new Date().toISOString(),
+    }).eq('id', backupId).catch(() => null)
+
+    await sb.from('server_activity_logs').insert({
+      server_id: serverId,
+      action: 'Backup restored',
+      action_type: 'backup',
+      performed_by: userId,
+      details: { backup_id: backupId },
+    }).catch(() => null)
+
+    return json({ success: true, message: agentResult.message })
+  }
+
+  // DELETE /server/backups/:backupId
+  if (method === 'DELETE' && segment === 'server' && pathParts[1] === 'backups' && pathParts[2]) {
+    const backupId = String(pathParts[2] || '')
+    if (!isUuid(backupId)) return err('Invalid backup_id', 400)
+
+    const { data: backup, error: backupError } = await sb
+      .from('server_backups')
+      .select('id, server_id, servers!inner(created_by)')
+      .eq('id', backupId)
+      .eq('servers.created_by', userId)
+      .maybeSingle()
+
+    if (backupError) return err(backupError.message)
+    if (!backup) return err('Backup not found', 404)
+
+    const serverId = String((backup as any).server_id)
+
+    const { error: deleteError } = await sb.from('server_backups').delete().eq('id', backupId)
+    if (deleteError) return err(deleteError.message)
+
+    await sb.from('server_activity_logs').insert({
+      server_id: serverId,
+      action: 'Backup deleted',
+      action_type: 'backup',
+      performed_by: userId,
+      details: { backup_id: backupId },
+    }).catch(() => null)
+
+    return json({ success: true, message: 'Backup deleted' })
+  }
+
   return err('Not found', 404)
 }
 
