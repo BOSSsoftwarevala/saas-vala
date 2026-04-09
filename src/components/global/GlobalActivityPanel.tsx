@@ -27,7 +27,7 @@
  
  // Global state for activities (simple pub/sub pattern)
  let globalActivities: GlobalActivity[] = [];
- let listeners: Set<() => void> = new Set();
+let listeners = new Set<() => void>();
  
  export const addGlobalActivity = (activity: Omit<GlobalActivity, 'startedAt'>) => {
    globalActivities = [...globalActivities, { ...activity, startedAt: new Date() }];

@@ -51,8 +51,12 @@ const pageTitles: Record<string, string> = {
   '/auto-pilot': 'Auto-Pilot & Monitor',
   '/apk-pipeline': 'APK Pipeline',
   '/audit-logs': 'Audit Logs',
+  '/logs': 'Audit Logs',
   '/system-health': 'System Health',
+  '/security': 'System Health',
   '/settings': 'Settings & Security',
+  '/profile': 'Profile & Settings',
+  '/support': 'Support',
   '/education': 'Education Systems',
   '/role-detail': 'Role Configuration',
   '/cart': 'Shopping Cart',
@@ -62,7 +66,7 @@ const pageTitles: Record<string, string> = {
 export function Header() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, role, signOut, isSuperAdmin } = useAuth();
+  const { user, role, signOut, isAdmin, isSuperAdmin } = useAuth();
   const { count: cartCount } = useCart();
   const { notifications, searchResults, searchGlobal, markAllNotificationsRead } = useDashboardStore();
 
@@ -107,9 +111,29 @@ export function Header() {
               Super Admin
             </Badge>
           )}
+          {!isSuperAdmin && isAdmin && (
+            <Badge variant="outline" className="mt-0.5 text-xs border-primary/30 text-primary bg-primary/5">
+              Admin
+            </Badge>
+          )}
           {role === 'reseller' && (
             <Badge variant="outline" className="mt-0.5 text-xs border-secondary/30 text-secondary bg-secondary/5">
               Reseller
+            </Badge>
+          )}
+          {role === 'master_reseller' && (
+            <Badge variant="outline" className="mt-0.5 text-xs border-secondary/30 text-secondary bg-secondary/5">
+              Master Reseller
+            </Badge>
+          )}
+          {role === 'support' && (
+            <Badge variant="outline" className="mt-0.5 text-xs border-blue-500/30 text-blue-400 bg-blue-500/5">
+              Support
+            </Badge>
+          )}
+          {role === 'user' && (
+            <Badge variant="outline" className="mt-0.5 text-xs border-border/60 text-muted-foreground bg-muted/10">
+              User
             </Badge>
           )}
         </div>

@@ -1,5 +1,3 @@
-BEGIN;
-
 ALTER TABLE public.products
   ADD COLUMN IF NOT EXISTS build_type TEXT;
 
@@ -243,5 +241,3 @@ $$;
 
 REVOKE ALL ON FUNCTION public.finalize_offline_conversion_build(UUID, UUID, TEXT, TEXT, TEXT, BIGINT, TEXT, TEXT, TEXT, JSONB, JSONB) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.finalize_offline_conversion_build(UUID, UUID, TEXT, TEXT, TEXT, BIGINT, TEXT, TEXT, TEXT, JSONB, JSONB) TO authenticated;
-
-COMMIT;

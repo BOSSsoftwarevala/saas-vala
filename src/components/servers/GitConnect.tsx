@@ -84,7 +84,9 @@ export function GitConnect() {
         setConnected(parsed.connected || false);
         setAccounts(parsed.accounts || []);
         setSelectedRepo(parsed.selectedRepo || null);
-      } catch {}
+      } catch {
+        localStorage.removeItem(STORAGE_KEY);
+      }
     }
   }, []);
 

@@ -60,7 +60,7 @@ const navItems: NavItem[] = [
 export function Sidebar() {
   const { collapsed, toggle } = useSidebarState();
   const location = useLocation();
-  const { isSuperAdmin, signOut } = useAuth();
+  const { isAdmin, signOut } = useAuth();
 
   const isItemActive = (item: NavItem) => {
     const paths = item.activePaths ?? [item.href];
@@ -68,7 +68,7 @@ export function Sidebar() {
   };
 
   const filteredNavItems = navItems.filter(
-    (item) => !item.adminOnly || isSuperAdmin
+    (item) => !item.adminOnly || isAdmin
   );
 
   return (

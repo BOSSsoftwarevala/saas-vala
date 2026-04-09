@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS public.rate_limits (
 -- 6. DNS_RECORDS TABLE
 CREATE TABLE IF NOT EXISTS public.dns_records (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-  domain_id UUID REFERENCES public.domains(id) ON DELETE CASCADE,
+  domain_id UUID,
   record_type TEXT NOT NULL DEFAULT 'A',
   name TEXT NOT NULL,
   value TEXT NOT NULL,
@@ -84,6 +84,25 @@ CREATE TABLE IF NOT EXISTS public.dns_records (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = 'domains'
+  ) THEN
+    BEGIN
+      ALTER TABLE public.dns_records
+      ADD CONSTRAINT dns_records_domain_id_fkey
+      FOREIGN KEY (domain_id) REFERENCES public.domains(id) ON DELETE CASCADE;
+    EXCEPTION WHEN duplicate_object THEN
+      NULL;
+    END;
+  END IF;
+END
+$$;
 
 -- 7. AI_MODELS TABLE
 CREATE TABLE IF NOT EXISTS public.ai_models (
@@ -188,9 +207,30 @@ CREATE POLICY "Users view own rate_limits" ON public.rate_limits FOR SELECT USIN
 
 -- DNS Records
 CREATE POLICY "Super admin full access dns_records" ON public.dns_records FOR ALL USING (has_role(auth.uid(), 'super_admin'));
-CREATE POLICY "Users view own dns_records" ON public.dns_records FOR SELECT USING (
-  domain_id IN (SELECT id FROM public.domains WHERE created_by = auth.uid())
-);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = 'domains'
+  ) THEN
+    EXECUTE $sql$
+      CREATE POLICY "Users view own dns_records"
+      ON public.dns_records FOR SELECT
+      USING (
+        domain_id IN (SELECT id FROM public.domains WHERE created_by = auth.uid())
+      )
+    $sql$;
+  ELSE
+    EXECUTE $sql$
+      CREATE POLICY "Users view own dns_records"
+      ON public.dns_records FOR SELECT
+      USING (FALSE)
+    $sql$;
+  END IF;
+END
+$$;
 
 -- AI Models (public read for active)
 CREATE POLICY "Anyone can view active ai_models" ON public.ai_models FOR SELECT USING (is_active = true);

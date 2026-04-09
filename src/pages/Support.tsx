@@ -9,7 +9,7 @@ import { Loader2 } from 'lucide-react';
 const Support = () => {
   const {
     channels, activeChannel, messages, members, typingUsers, unreadCounts, loading,
-    selectChannel, sendMessage, setTyping, createChannel,
+    selectChannel, sendMessage, sendFile, setTyping, createChannel, searchMessages,
   } = useSupport();
   const [threadMessage, setThreadMessage] = useState<string | null>(null);
 
@@ -56,7 +56,9 @@ const Support = () => {
         members={members}
         typingUsers={typingUsers}
         onSend={sendMessage}
+        onSendFile={sendFile}
         onTyping={setTyping}
+        onSearch={searchMessages}
         onOpenThread={(msgId) => setThreadMessage(msgId)}
       />
 

@@ -1,9 +1,6 @@
 -- Complete Public Marketplace System
 -- Includes: Products, Pricing, Orders, Payments, Licenses, Ratings, Favorites, Wallet, etc.
 -- Date: 2026-04-10
-
-BEGIN;
-
 -- ====================================================================
 -- 1) PRICING & SUBSCRIPTION PLANS
 -- ====================================================================
@@ -387,5 +384,3 @@ CREATE POLICY "favorites_users_insert" ON public.user_favorites
 DROP POLICY IF EXISTS "favorites_users_delete" ON public.user_favorites;
 CREATE POLICY "favorites_users_delete" ON public.user_favorites
   FOR DELETE USING (auth.uid() = user_id);
-
-COMMIT;

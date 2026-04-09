@@ -1,8 +1,5 @@
 -- Reseller pricing, key pool, and reporting support
 -- This migration aligns DB schema with marketplace reseller purchase flows.
-
-BEGIN;
-
 -- 1) Transaction enums: support marketplace reseller flow types/statuses used by API code.
 DO $$
 BEGIN
@@ -104,5 +101,3 @@ CREATE INDEX IF NOT EXISTS idx_license_activations_key ON public.license_activat
 CREATE INDEX IF NOT EXISTS idx_license_activations_device ON public.license_activations(device_id);
 CREATE INDEX IF NOT EXISTS idx_license_activations_hardware ON public.license_activations(hardware_id);
 CREATE INDEX IF NOT EXISTS idx_license_activations_installation ON public.license_activations(installation_id);
-
-COMMIT;

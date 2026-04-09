@@ -1,5 +1,3 @@
-BEGIN;
-
 CREATE UNIQUE INDEX IF NOT EXISTS uq_license_keys_license_key
   ON public.license_keys(license_key);
 
@@ -59,7 +57,7 @@ RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
-AS $$
+AS $function$
 DECLARE
   v_amount numeric(12,2);
   v_wallet record;
@@ -230,9 +228,7 @@ EXCEPTION
     WHERE reseller_id = p_reseller_id AND request_id = p_request_id;
     RAISE;
 END;
-$$;
+$function$;
 
 REVOKE ALL ON FUNCTION public.reseller_generate_license_key_atomic(text, uuid, uuid, uuid, uuid, numeric, text, text, text, text, timestamptz, uuid, numeric, text, text, jsonb) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.reseller_generate_license_key_atomic(text, uuid, uuid, uuid, uuid, numeric, text, text, text, text, timestamptz, uuid, numeric, text, text, jsonb) TO authenticated;
-
-COMMIT;

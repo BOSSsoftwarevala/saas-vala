@@ -66,7 +66,7 @@ export function SourceCodeCatalogPanel() {
       const projects = lines.map(line => {
         // Handle full paths like D:\Projects\MyApp or /home/user/projects/myapp
         const cleanLine = line.trim();
-        const pathParts = cleanLine.split(/[\\\/]/);
+        const pathParts = cleanLine.split(/[\\/]/);
         const folderName = pathParts[pathParts.length - 1] || pathParts[pathParts.length - 2] || cleanLine;
         
         return {

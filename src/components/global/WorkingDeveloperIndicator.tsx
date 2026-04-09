@@ -4,7 +4,7 @@ import { UserRound } from "lucide-react";
 
 // Subscribe to global activity state
 let isWorking = false;
-let workingListeners: Set<(working: boolean) => void> = new Set();
+let workingListeners = new Set<(working: boolean) => void>();
 
 export const setGlobalWorking = (working: boolean) => {
   isWorking = working;

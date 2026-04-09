@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -29,11 +29,29 @@ import {
   Loader2,
   Wallet,
   AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  Link as LinkIcon,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { useWallet, Wallet as WalletType } from '@/hooks/useWallet';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+
+interface PendingPayment {
+  id: string;
+  wallet_id: string;
+  type: 'credit' | 'debit';
+  amount: number;
+  status: 'pending' | 'completed' | 'failed' | 'cancelled';
+  description: string | null;
+  reference_id: string | null;
+  reference_type: string | null;
+  created_by: string | null;
+  created_at: string;
+  meta: Record<string, any> | null;
+}
 
 export function AdminWalletManager() {
   const { allWallets, fetchAllWallets, addCredit, deductBalance } = useWallet();
@@ -44,6 +62,10 @@ export function AdminWalletManager() {
   const [adjustmentReason, setAdjustmentReason] = useState('');
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [pendingPayments, setPendingPayments] = useState<PendingPayment[]>([]);
+  const [verifyingTxId, setVerifyingTxId] = useState<string | null>(null);
+  const [proofPreviewUrl, setProofPreviewUrl] = useState<string | null>(null);
+  const [proofPreviewIsImage, setProofPreviewIsImage] = useState(false);
 
   const filteredWallets = allWallets.filter((wallet) =>
     wallet.user_id.toLowerCase().includes(searchQuery.toLowerCase())
@@ -99,6 +121,139 @@ export function AdminWalletManager() {
     setProcessing(false);
   };
 
+  const fetchPendingPayments = async () => {
+    const { data, error } = await (supabase as any)
+      .from('transactions')
+      .select('id,wallet_id,type,amount,status,description,reference_id,reference_type,created_by,created_at,meta')
+      .in('type', ['credit', 'debit'])
+      .eq('status', 'pending')
+      .in('reference_type', ['wise_transfer', 'bank_transfer', 'upi', 'crypto_transfer', 'remit_transfer'])
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (error) {
+      toast.error('Failed to load pending payment proofs');
+      return;
+    }
+
+    setPendingPayments((data || []) as PendingPayment[]);
+  };
+
+  const approvePendingPayment = async (tx: PendingPayment) => {
+    setVerifyingTxId(tx.id);
+    try {
+      const approvedAmount = Number(tx.amount || 0);
+      if (!Number.isFinite(approvedAmount) || approvedAmount <= 0) {
+        throw new Error('Invalid payment amount');
+      }
+
+      let nextBalance: number | null = null;
+
+      // Credit tx means wallet top-up. Debit tx means manual product purchase.
+      if (tx.type === 'credit') {
+        const { data: wallet, error: walletError } = await (supabase as any)
+          .from('wallets')
+          .select('id, balance')
+          .eq('id', tx.wallet_id)
+          .maybeSingle();
+
+        if (walletError || !wallet) throw new Error('Wallet not found for this payment');
+
+        nextBalance = Number(wallet.balance || 0) + approvedAmount;
+
+        const { error: walletUpdateError } = await (supabase as any)
+          .from('wallets')
+          .update({ balance: nextBalance, updated_at: new Date().toISOString() })
+          .eq('id', wallet.id);
+
+        if (walletUpdateError) throw walletUpdateError;
+      }
+
+      const existingMeta = (tx.meta || {}) as Record<string, unknown>;
+      const approvedMeta = {
+        ...existingMeta,
+        verification_required: false,
+        verified: true,
+        verified_at: new Date().toISOString(),
+      };
+
+      const { error: txUpdateError } = await (supabase as any)
+        .from('transactions')
+        .update({
+          status: 'completed',
+          balance_after: nextBalance,
+          meta: approvedMeta,
+        })
+        .eq('id', tx.id)
+        .eq('status', 'pending');
+
+      if (txUpdateError) throw txUpdateError;
+
+      const pendingOrderId = typeof existingMeta.pending_order_id === 'string' ? existingMeta.pending_order_id : null;
+      if (pendingOrderId) {
+        await (supabase as any)
+          .from('marketplace_orders')
+          .update({
+            status: 'completed',
+            transaction_id: tx.id,
+            payment_method: String(existingMeta.payment_method || 'wise'),
+            completed_at: new Date().toISOString(),
+          })
+          .eq('id', pendingOrderId)
+          .eq('status', 'pending');
+      }
+
+          toast.success(tx.type === 'credit' ? 'Payment verified and wallet credited' : 'Payment verified and pending order activated');
+      await fetchAllWallets();
+      await fetchPendingPayments();
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to verify payment');
+    } finally {
+      setVerifyingTxId(null);
+    }
+  };
+
+  const rejectPendingPayment = async (tx: PendingPayment) => {
+    setVerifyingTxId(tx.id);
+    try {
+      const existingMeta = (tx.meta || {}) as Record<string, unknown>;
+      const rejectedMeta = {
+        ...existingMeta,
+        verification_required: false,
+        verified: false,
+        rejected_at: new Date().toISOString(),
+      };
+
+      const { error } = await (supabase as any)
+        .from('transactions')
+        .update({ status: 'failed', meta: rejectedMeta })
+        .eq('id', tx.id)
+        .eq('status', 'pending');
+
+      if (error) throw error;
+
+      const pendingOrderId = typeof existingMeta.pending_order_id === 'string' ? existingMeta.pending_order_id : null;
+      if (pendingOrderId) {
+        await (supabase as any)
+          .from('marketplace_orders')
+          .update({ status: 'cancelled' })
+          .eq('id', pendingOrderId)
+          .eq('status', 'pending');
+      }
+
+      toast.success('Payment marked as rejected');
+      await fetchPendingPayments();
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to reject payment');
+    } finally {
+      setVerifyingTxId(null);
+    }
+  };
+
+  useEffect(() => {
+    fetchPendingPayments();
+  }, []);
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -118,8 +273,126 @@ export function AdminWalletManager() {
         </div>
       </div>
 
-      {/* Wallets Table */}
+      {/* Pending Payment Verification */}
       <div className="glass-card rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+          <div>
+            <p className="font-semibold text-foreground">Pending Payment Verification</p>
+            <p className="text-xs text-muted-foreground">Verify reference/proof first, then approve to credit wallet</p>
+          </div>
+          <Badge variant="outline" className="bg-warning/15 text-warning border-warning/30">
+            {pendingPayments.length} pending
+          </Badge>
+        </div>
+
+        {pendingPayments.length === 0 ? (
+          <div className="p-6 text-sm text-muted-foreground">No pending Wise/UPI/manual payment proofs.</div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className="border-border hover:bg-muted/50">
+                <TableHead className="text-muted-foreground">Method</TableHead>
+                <TableHead className="text-muted-foreground">Amount</TableHead>
+                <TableHead className="text-muted-foreground">Reference</TableHead>
+                <TableHead className="text-muted-foreground">Proof</TableHead>
+                <TableHead className="text-muted-foreground">Submitted</TableHead>
+                <TableHead className="text-muted-foreground text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pendingPayments.map((tx) => {
+                const paymentMethod = String(tx.meta?.payment_method || tx.reference_type || 'manual');
+                const proofUrl = typeof tx.meta?.transaction_proof === 'string' ? tx.meta.transaction_proof : '';
+                const isImageProof = /\.(jpg|jpeg|png|webp|gif)(\?|$)/i.test(proofUrl);
+                const isPdfProof = /\.(pdf)(\?|$)/i.test(proofUrl);
+                return (
+                  <TableRow key={tx.id} className="border-border hover:bg-muted/30">
+                    <TableCell className="capitalize">{paymentMethod.replace('_', ' ')}</TableCell>
+                    <TableCell className="font-semibold">₹{Number(tx.amount || 0).toLocaleString()}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{tx.reference_id || '-'}</TableCell>
+                    <TableCell>
+                      {proofUrl ? (
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                          onClick={() => {
+                            setProofPreviewUrl(proofUrl);
+                            setProofPreviewIsImage(isImageProof);
+                          }}
+                        >
+                          {isImageProof ? (
+                            <><ImageIcon className="h-3 w-3" /> View image</>
+                          ) : (
+                            <><LinkIcon className="h-3 w-3" /> {isPdfProof ? 'View PDF' : 'View proof'}</>
+                          )}
+                        </button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">No proof link</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{new Date(tx.created_at).toLocaleString()}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          size="sm"
+                          className="h-8 bg-success hover:bg-success/90 text-white"
+                          onClick={() => approvePendingPayment(tx)}
+                          disabled={verifyingTxId === tx.id}
+                        >
+                          {verifyingTxId === tx.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 border-destructive/40 text-destructive hover:bg-destructive/10"
+                          onClick={() => rejectPendingPayment(tx)}
+                          disabled={verifyingTxId === tx.id}
+                        >
+                          <XCircle className="h-3.5 w-3.5" /> Reject
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </div>
+
+      {/* Proof Preview Modal */}
+      <Dialog open={!!proofPreviewUrl} onOpenChange={(open) => { if (!open) { setProofPreviewUrl(null); setProofPreviewIsImage(false); } }}>
+        <DialogContent className="sm:max-w-3xl bg-background border-border max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display">Payment Proof Preview</DialogTitle>
+            <DialogDescription>Review the uploaded payment proof before approving.</DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border border-border bg-muted/20 p-2">
+            {proofPreviewUrl ? (
+              proofPreviewIsImage ? (
+                <img src={proofPreviewUrl} alt="Payment proof" className="w-full max-h-[70vh] object-contain rounded" />
+              ) : (
+                <iframe
+                  src={proofPreviewUrl}
+                  title="Payment proof"
+                  className="w-full h-[70vh] rounded"
+                />
+              )
+            ) : null}
+          </div>
+          {proofPreviewUrl && (
+            <div className="flex justify-end">
+              <a href={proofPreviewUrl} target="_blank" rel="noopener noreferrer">
+                <Button variant="outline" size="sm">Open in new tab</Button>
+              </a>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <div className="glass-card rounded-xl overflow-hidden">
+
         <Table>
           <TableHeader>
             <TableRow className="border-border hover:bg-muted/50">

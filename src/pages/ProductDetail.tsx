@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, ShoppingCart, Heart, Share2, Star, Download, Play, ArrowLeft, Check, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
@@ -18,6 +19,14 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  formatCurrency,
+  getFallbackImage,
+  durationLabel,
+  generateIdempotencyKey,
+} from '@/lib/marketplaceUtils';
+import { publicMarketplaceApi } from '@/lib/api';
+import { usePaymentAvailability } from '@/hooks/useFeatureFlags';
 
 interface PricingOption {
   duration_days: number;
@@ -30,7 +39,7 @@ interface Product {
   name: string;
   description: string;
   short_description: string;
-  category: string;
+  category?: string;
   thumbnail_url: string;
   demo_url: string;
   apk_url: string;
@@ -46,6 +55,8 @@ export default function ProductDetailPage() {
   const { isFavorited, toggleFavorite } = useFavorites();
   const { ratings, submitRating, averageRating } = useProductRatings(id || '');
   const { initiatePayment, processing } = useMarketplacePayment();
+  const { walletEnabled, disabledReason } = usePaymentAvailability();
+  const [searchParams] = useSearchParams();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [pricing, setPricing] = useState<PricingOption[]>([]);
@@ -58,35 +69,60 @@ export default function ProductDetailPage() {
   const [reviewText, setReviewText] = useState('');
   const [submittingRating, setSubmittingRating] = useState(false);
 
+  /**
+   * Ref-based lock: prevents concurrent purchase calls (double-click,
+   * fast keyboard repeat, etc.).
+   */
+  const purchaseLockRef = useRef(false);
+  /** Per-dialog idempotency key locked in when the dialog opens. */
+  const purchaseIdempotencyKey = useRef<string>('');
+
   useEffect(() => {
     if (!id) return;
     fetchProduct();
   }, [id]);
+
+  useEffect(() => {
+    if (searchParams.get('action') !== 'buy') return;
+    if (!product || showPurchaseDialog) return;
+    if (!purchaseIdempotencyKey.current) {
+      purchaseIdempotencyKey.current = generateIdempotencyKey();
+    }
+    setShowPurchaseDialog(true);
+  }, [searchParams, product, showPurchaseDialog]);
 
   const fetchProduct = async () => {
     if (!id) return;
     setLoading(true);
     try {
       // Fetch product details
-      const { data: prod, error } = await supabase
+      const { data: prod, error } = await (supabase as any)
         .from('products')
         .select('*')
         .eq('id', id)
         .single();
 
       if (error) throw error;
-      setProduct(prod);
+      setProduct({
+        ...prod,
+        category: prod.category || prod.category_id || 'General',
+      });
 
       // Fetch pricing options
-      const { data: prices } = await supabase
+      const { data: prices } = await (supabase as any)
         .from('product_pricing')
         .select('*')
         .eq('product_id', id)
         .order('duration_days', { ascending: true });
 
       if (prices && prices.length > 0) {
-        setPricing(prices);
-        setSelectedDuration(prices[0].duration_days);
+        const mappedPrices: PricingOption[] = prices.map((p: any) => ({
+          duration_days: Number(p.duration_days || 30),
+          base_price: Number(p.base_price || 0),
+          currency: String(p.currency || 'USD'),
+        }));
+        setPricing(mappedPrices);
+        setSelectedDuration(mappedPrices[0].duration_days);
       } else {
         // Default pricing if none found
         setPricing([
@@ -112,24 +148,34 @@ export default function ProductDetailPage() {
 
     if (!product) return;
 
+    // Prevent double-submission
+    if (purchaseLockRef.current || processing) return;
+
     const selectedPrice = pricing.find((p) => p.duration_days === selectedDuration);
     if (!selectedPrice) {
       toast.error('Invalid pricing selection');
       return;
     }
 
-    const result = await initiatePayment(
-      product.id,
-      selectedDuration,
-      'wallet',
-      selectedPrice.base_price
-    );
+    purchaseLockRef.current = true;
 
-    if (result.success) {
-      setShowPurchaseDialog(false);
-      toast.success('Order placed successfully!');
-      // Redirect to orders page or show confirmation
-      setTimeout(() => navigate('/orders'), 2000);
+    try {
+      const result = await initiatePayment(
+        product.id,
+        selectedDuration,
+        'wallet',
+        selectedPrice.base_price,
+        purchaseIdempotencyKey.current
+      );
+
+      if (result?.success) {
+        setShowPurchaseDialog(false);
+        // Reset key so a re-open of the dialog gets a fresh key
+        purchaseIdempotencyKey.current = '';
+        setTimeout(() => navigate('/orders'), 2000);
+      }
+    } finally {
+      purchaseLockRef.current = false;
     }
   };
 
@@ -204,9 +250,13 @@ export default function ProductDetailPage() {
           {/* Product Image */}
           <div className="lg:col-span-1">
             <img
-              src={product.thumbnail_url}
-              alt={product.name}
+              src={product.thumbnail_url || getFallbackImage(product.category || 'general')}
+              alt={product.name ?? 'Product image'}
               className="w-full rounded-lg object-cover aspect-square"
+              onError={(e) => {
+                const img = e.currentTarget;
+                img.src = getFallbackImage(product.category || 'general');
+              }}
             />
           </div>
 
@@ -252,14 +302,9 @@ export default function ProductDetailPage() {
                           : 'border-border hover:border-primary/50'
                       }`}
                     >
-                      <p className="font-semibold">
-                        {option.duration_days === 30 && '1 Month'}
-                        {option.duration_days === 90 && '3 Months'}
-                        {option.duration_days === 180 && '6 Months'}
-                        {option.duration_days === 365 && '1 Year'}
-                      </p>
+                      <p className="font-semibold">{durationLabel(option.duration_days)}</p>
                       <p className="text-sm text-muted-foreground">
-                        ${option.base_price.toFixed(2)}/{option.currency}
+                        {formatCurrency(option.base_price ?? 0, option.currency ?? 'USD')}
                       </p>
                     </button>
                   ))}
@@ -271,18 +316,29 @@ export default function ProductDetailPage() {
                 <Button
                   size="lg"
                   className="flex-1 gap-2"
-                  onClick={() => setShowPurchaseDialog(true)}
-                  disabled={processing}
+                  onClick={() => {
+                    // Generate a fresh idempotency key each time the purchase dialog opens
+                    if (!purchaseIdempotencyKey.current) {
+                      purchaseIdempotencyKey.current = generateIdempotencyKey();
+                    }
+                    setShowPurchaseDialog(true);
+                  }}
+                  disabled={processing || purchaseLockRef.current}
                 >
                   <ShoppingCart className="h-5 w-5" />
-                  Buy Now - ${currentPrice?.base_price.toFixed(2)}
+                  Buy Now — {formatCurrency(currentPrice?.base_price ?? 0, currentPrice?.currency ?? 'USD')}
                 </Button>
                 {product.demo_url && (
                   <Button
                     size="lg"
                     variant="outline"
                     className="flex-1 gap-2"
-                    onClick={() => window.open(product.demo_url, '_blank')}
+                    onClick={() => {
+                      if (user?.id && product.id) {
+                        publicMarketplaceApi.logDemoAccess(product.id, crypto.randomUUID()).catch(() => {});
+                      }
+                      window.open(product.demo_url, '_blank', 'noopener,noreferrer');
+                    }}
                   >
                     <Play className="h-5 w-5" />
                     Try Demo
@@ -420,8 +476,9 @@ export default function ProductDetailPage() {
           <DialogHeader>
             <DialogTitle>Confirm Purchase</DialogTitle>
             <DialogDescription>
-              You're about to purchase {product.name} for {currentPrice?.duration_days} days at $
-              {currentPrice?.base_price.toFixed(2)}
+              You're about to purchase {product.name ?? 'this product'} for{' '}
+              {durationLabel(currentPrice?.duration_days ?? selectedDuration)} at{' '}
+              {formatCurrency(currentPrice?.base_price ?? 0, currentPrice?.currency ?? 'USD')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -435,9 +492,13 @@ export default function ProductDetailPage() {
               <Button variant="outline" onClick={() => setShowPurchaseDialog(false)}>
                 Cancel
               </Button>
-              <Button onClick={handlePurchase} disabled={processing}>
+              <Button
+                onClick={handlePurchase}
+                disabled={processing || purchaseLockRef.current || !walletEnabled}
+                title={!walletEnabled ? disabledReason : undefined}
+              >
                 {processing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Complete Purchase
+                {processing ? 'Processing…' : 'Complete Purchase'}
               </Button>
             </div>
           </div>
@@ -457,15 +518,18 @@ export default function ProductDetailPage() {
               <p className="font-semibold mb-3">Rate this product</p>
               <div className="flex gap-2">
                 {[1, 2, 3, 4, 5].map((val) => (
-                  <button
+                  <Button
                     key={val}
+                    type="button"
+                    variant={val <= rating ? 'default' : 'outline'}
+                    size="icon"
                     onClick={() => setRating(val)}
-                    className="transition-transform hover:scale-110"
+                    disabled={submittingRating}
                   >
                     <Star
                       className={`h-6 w-6 ${val <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`}
                     />
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -507,6 +571,3 @@ export default function ProductDetailPage() {
     </div>
   );
 }
-
-// Add missing import
-import { Alert, AlertDescription } from '@/components/ui/alert';

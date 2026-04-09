@@ -1,5 +1,3 @@
-BEGIN;
-
 ALTER TABLE public.wallets
   DROP CONSTRAINT IF EXISTS wallets_balance_non_negative_chk;
 
@@ -115,5 +113,3 @@ $$;
 
 REVOKE ALL ON FUNCTION public.reseller_wallet_debit_for_key_generation(uuid, uuid, uuid, uuid, numeric, text, jsonb) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.reseller_wallet_debit_for_key_generation(uuid, uuid, uuid, uuid, numeric, text, jsonb) TO authenticated;
-
-COMMIT;

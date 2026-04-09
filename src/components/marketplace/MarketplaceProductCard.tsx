@@ -31,7 +31,7 @@ const catColors: Record<string, string> = {
 };
 
 export const MarketplaceProductCard = React.memo(React.forwardRef<HTMLDivElement, MarketplaceProductCardProps>(function MarketplaceProductCard({
-  product, index = 0, onBuyNow, rank,
+  product, index = 0, onBuyNow, onDemo, rank,
 }, _ref) {
   const [favorited, setFavorited] = useState(false);
   const [notified, setNotified] = useState(false);
@@ -137,7 +137,7 @@ export const MarketplaceProductCard = React.memo(React.forwardRef<HTMLDivElement
         return;
       }
 
-      const { data: licenseKey, error: keyError } = await supabase
+      const { data: licenseKey, error: keyError } = await (supabase as any)
         .from('license_keys')
         .select('*')
         .eq('assigned_to', reseller.id)
@@ -159,14 +159,14 @@ export const MarketplaceProductCard = React.memo(React.forwardRef<HTMLDivElement
       }
 
       // Block revoked / blocked keys
-      if (licenseKey.key_status === 'blocked' || licenseKey.key_status === 'revoked') {
+      if (licenseKey?.key_status === 'blocked' || licenseKey?.key_status === 'revoked') {
         toast.error('Your license key has been revoked. Contact support.');
         setDownloadChecking(false);
         return;
       }
 
       // Get APK storage path from apks table (preferred) or product's apk_url field
-      const { data: apkRecord } = await supabase
+      const { data: apkRecord } = await (supabase as any)
         .from('apks')
         .select('file_url')
         .eq('product_id', product.id)

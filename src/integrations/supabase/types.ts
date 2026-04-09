@@ -4597,7 +4597,7 @@ export type Database = {
     }
     Enums: {
       apk_status: "published" | "draft" | "deprecated"
-      app_role: "super_admin" | "reseller"
+      app_role: "super_admin" | "admin" | "reseller" | "master_reseller" | "support" | "user"
       audit_action:
         | "create"
         | "read"
@@ -4777,7 +4777,7 @@ export const Constants = {
   public: {
     Enums: {
       apk_status: ["published", "draft", "deprecated"],
-      app_role: ["super_admin", "reseller"],
+      app_role: ["super_admin", "admin", "reseller", "master_reseller", "support", "user"],
       audit_action: [
         "create",
         "read",

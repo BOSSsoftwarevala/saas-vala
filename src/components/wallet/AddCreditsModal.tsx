@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -23,10 +23,13 @@ import {
   Send,
   Banknote,
   Globe,
+  Paperclip,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import softwareValaLogo from '@/assets/softwarevala-logo.png';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AddCreditsModalProps {
   open: boolean;
@@ -53,26 +56,73 @@ const cryptoDetails = {
   binanceIdMasked: '•••••8519',
 };
 
+const wiseDetails = {
+  payLink: 'https://wise.com/pay/business/manojkumar21?utm_source=quick_pay',
+};
+
 type PayMethod = 'upi' | 'bank' | 'wise' | 'remit' | 'crypto';
 
 export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsModalProps) {
   const [amount, setAmount] = useState<number>(1000);
   const [customAmount, setCustomAmount] = useState('');
-  const [payMethod, setPayMethod] = useState<PayMethod>('upi');
+  const [payMethod, setPayMethod] = useState<PayMethod>('wise');
   const [showMoreOptions, setShowMoreOptions] = useState(false);
   const [transactionRef, setTransactionRef] = useState('');
+  const [transactionProof, setTransactionProof] = useState('');
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proofUploading, setProofUploading] = useState(false);
+  const proofInputRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<'form' | 'processing' | 'success' | 'pending'>('form');
   const [retryCount, setRetryCount] = useState(0);
 
   const finalAmount = customAmount ? parseInt(customAmount) || 0 : amount;
   const isManualMethod = payMethod === 'bank' || payMethod === 'wise' || payMethod === 'remit' || payMethod === 'crypto';
 
+  /** Upload proof file to storage and return public URL, or null on failure. */
+  const uploadProofFile = async (userId: string, txId: string): Promise<string | null> => {
+    if (!proofFile) return transactionProof || null;
+    setProofUploading(true);
+    try {
+      const ext = proofFile.name.split('.').pop() ?? 'jpg';
+      const path = `${userId}/${txId}.${ext}`;
+      const { error } = await supabase.storage
+        .from('payment-proofs')
+        .upload(path, proofFile, { upsert: true, contentType: proofFile.type });
+      if (error) { console.warn('Proof upload failed:', error); return transactionProof || null; }
+      const { data: signed } = await supabase.storage
+        .from('payment-proofs')
+        .createSignedUrl(path, 60 * 60 * 24 * 365); // 1-year link
+      setProofUploading(false);
+      return signed?.signedUrl ?? null;
+    } catch (e) {
+      console.warn('Proof upload error:', e);
+      setProofUploading(false);
+      return transactionProof || null;
+    }
+  };
+
+  /** Call admin notification edge function (fire-and-forget). */
+  const notifyAdmin = (txId: string, userEmail: string) => {
+    supabase.functions.invoke('send-admin-notification', {
+      body: {
+        transaction_id: txId,
+        amount: finalAmount,
+        payment_method: payMethod,
+        reference_id: transactionRef,
+        user_email: userEmail,
+        context: 'wallet_topup',
+      },
+    }).catch(() => { /* non-critical */ });
+  };
+
   const handleClose = () => {
     setStep('form');
     setAmount(1000);
     setCustomAmount('');
-    setPayMethod('upi');
+    setPayMethod('wise');
     setTransactionRef('');
+    setTransactionProof('');
+    setProofFile(null);
     setRetryCount(0);
     setShowMoreOptions(false);
     onOpenChange(false);
@@ -90,7 +140,6 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
     }
     setStep('processing');
     try {
-      const { supabase } = await import('@/integrations/supabase/client');
       const { data: userData } = await supabase.auth.getUser();
       if (userData.user) {
         const { data: walletData } = await supabase
@@ -99,7 +148,8 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
           .eq('user_id', userData.user.id)
           .maybeSingle();
         if (walletData) {
-          await supabase.from('transactions').insert({
+          // Insert transaction first to get ID for proof upload path
+          const { data: tx, error: txErr } = await (supabase as any).from('transactions').insert({
             wallet_id: walletData.id,
             type: 'credit',
             amount: finalAmount,
@@ -108,12 +158,41 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
             description: `${payMethod.toUpperCase()} Transfer - Awaiting Verification`,
             created_by: userData.user.id,
             reference_id: transactionRef,
-            reference_type: payMethod === 'crypto' ? 'crypto_transfer' : 'bank_transfer',
-            meta: { payment_method: payMethod, transaction_ref: transactionRef },
-          });
+            reference_type:
+              payMethod === 'crypto'
+                ? 'crypto_transfer'
+                : payMethod === 'wise'
+                ? 'wise_transfer'
+                : payMethod === 'remit'
+                ? 'remit_transfer'
+                : 'bank_transfer',
+            meta: {
+              payment_method: payMethod,
+              transaction_ref: transactionRef,
+              transaction_proof: null,
+              wise_payment_link: payMethod === 'wise' ? wiseDetails.payLink : null,
+              verification_required: true,
+            },
+          }).select('id').single();
+
+          if (!txErr && tx?.id) {
+            // Upload proof file and patch transaction meta
+            const proofUrl = await uploadProofFile(userData.user.id, tx.id);
+            if (proofUrl) {
+              await (supabase as any).from('transactions').update({
+                meta: {
+                  payment_method: payMethod,
+                  transaction_ref: transactionRef,
+                  transaction_proof: proofUrl,
+                  wise_payment_link: payMethod === 'wise' ? wiseDetails.payLink : null,
+                  verification_required: true,
+                },
+              }).eq('id', tx.id);
+            }
+            notifyAdmin(tx.id, userData.user.email ?? 'unknown');
+          }
         }
       }
-      await new Promise(r => setTimeout(r, 800));
       setStep('pending');
     } catch {
       toast.error('Failed to submit. Please try again.');
@@ -143,7 +222,7 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
 
         const newBalance = (walletData.balance || 0) + finalAmount;
 
-        const { error: txError } = await supabase.from('transactions').insert({
+        const { data: tx, error: txError } = await (supabase as any).from('transactions').insert({
           wallet_id: walletData.id,
           type: 'credit',
           amount: finalAmount,
@@ -153,13 +232,33 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
           created_by: userData.user.id,
           reference_id: transactionRef,
           reference_type: 'upi',
-          meta: { payment_method: 'upi', upi_txn_id: transactionRef },
-        });
+          meta: {
+            payment_method: 'upi',
+            upi_txn_id: transactionRef,
+            transaction_proof: null,
+            verification_required: true,
+          },
+        }).select('id').single();
 
         if (txError && attempt < 3) {
           setRetryCount(attempt);
           await new Promise(r => setTimeout(r, 1500));
           return processPayment(attempt + 1);
+        }
+        if (!txError && tx?.id) {
+          const { data: authUser } = await supabase.auth.getUser();
+          const proofUrl = await uploadProofFile(authUser.user?.id ?? 'anon', tx.id);
+          if (proofUrl) {
+            await (supabase as any).from('transactions').update({
+              meta: {
+                payment_method: 'upi',
+                upi_txn_id: transactionRef,
+                transaction_proof: proofUrl,
+                verification_required: true,
+              },
+            }).eq('id', tx.id);
+          }
+          notifyAdmin(tx.id, authUser.user?.email ?? 'unknown');
         }
         return !txError;
       } catch {
@@ -182,6 +281,45 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
       setRetryCount(0);
     }
   };
+
+  /** Shared proof file picker shown inside each payment method block. */
+  const ProofUploadRow = () => (
+    <div className="space-y-1">
+      <input
+        ref={proofInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0] ?? null;
+          setProofFile(f);
+          if (f) setTransactionProof('');
+        }}
+      />
+      {proofFile ? (
+        <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2 text-xs">
+          <Paperclip className="h-3.5 w-3.5 text-primary shrink-0" />
+          <span className="flex-1 truncate text-foreground">{proofFile.name}</span>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setProofFile(null); if (proofInputRef.current) proofInputRef.current.value = ''; }}
+            className="text-muted-foreground hover:text-destructive"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); proofInputRef.current?.click(); }}
+          className="w-full flex items-center gap-2 border border-dashed border-border rounded-lg px-3 py-2 text-xs text-muted-foreground hover:border-primary/50 hover:text-foreground transition-colors"
+        >
+          <Paperclip className="h-3.5 w-3.5 shrink-0" />
+          Attach payment proof (screenshot / PDF) — optional but speeds up approval
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -281,7 +419,75 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
                 </div>
               </div>
 
-              {/* ── UPI PAYMENT (PRIMARY) ── */}
+              {/* ── WISE PAYMENT (PRIMARY) ── */}
+              <div
+                className={cn(
+                  'rounded-xl border-2 cursor-pointer transition-all',
+                  payMethod === 'wise' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                )}
+                onClick={() => setPayMethod('wise')}
+              >
+                <div className="flex items-center gap-3 p-4">
+                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Send className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-foreground">Wise Payment</p>
+                    <p className="text-xs text-muted-foreground">Global transfer with QR + direct pay link</p>
+                  </div>
+                  <Badge className="bg-primary/10 text-primary border-primary/30">Primary</Badge>
+                </div>
+
+                {payMethod === 'wise' && (
+                  <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
+                    <div className="flex items-start gap-3">
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(wiseDetails.payLink)}`}
+                        alt="Wise payment QR"
+                        className="h-28 w-28 rounded-lg border border-border bg-white p-1"
+                      />
+                      <div className="flex-1 space-y-2">
+                        <p className="text-xs text-muted-foreground">Scan QR or open the payment link in Wise to pay.</p>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.open(wiseDetails.payLink, '_blank', 'noopener,noreferrer');
+                            }}
+                          >
+                            Open Wise Link
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCopy(wiseDetails.payLink, 'Wise payment link');
+                            }}
+                          >
+                            <Copy className="h-3 w-3" /> Copy Link
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                    <Input
+                      placeholder="Enter Wise transfer reference"
+                      value={transactionRef}
+                      onChange={(e) => setTransactionRef(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <ProofUploadRow />
+                  </div>
+                )}
+              </div>
+
+              {/* ── UPI PAYMENT ── */}
               <div
                 className={cn(
                   'rounded-xl border-2 cursor-pointer transition-all',
@@ -297,7 +503,7 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
                     <p className="font-semibold text-foreground">UPI Payment</p>
                     <p className="text-xs text-muted-foreground">GPay, PhonePe, Paytm, BHIM • India 🇮🇳</p>
                   </div>
-                  <Badge className="bg-primary/10 text-primary border-primary/30">Recommended</Badge>
+                  <Badge className="bg-muted text-muted-foreground border-border">Alternative</Badge>
                 </div>
 
                 {payMethod === 'upi' && (
@@ -322,6 +528,7 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
                       onChange={(e) => setTransactionRef(e.target.value)}
                       onClick={(e) => e.stopPropagation()}
                     />
+                    <ProofUploadRow />
                   </div>
                 )}
               </div>
@@ -333,7 +540,7 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
                 onClick={() => setShowMoreOptions(!showMoreOptions)}
               >
                 {showMoreOptions ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                {showMoreOptions ? 'Hide' : 'More'} Payment Options (Bank / Crypto / International)
+                {showMoreOptions ? 'Hide' : 'More'} Payment Options (Bank / Remitly / Crypto / International)
               </Button>
 
               {/* ── OTHER METHODS ── */}
@@ -381,34 +588,7 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
                           onChange={(e) => setTransactionRef(e.target.value)}
                           onClick={(e) => e.stopPropagation()}
                         />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Wise */}
-                  <div
-                    className={cn(
-                      'rounded-xl border cursor-pointer transition-all',
-                      payMethod === 'wise' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'
-                    )}
-                    onClick={() => setPayMethod('wise')}
-                  >
-                    <div className="flex items-center gap-3 p-3">
-                      <Send className="h-5 w-5 text-muted-foreground" />
-                      <div className="flex-1">
-                        <p className="font-medium text-sm text-foreground">Wise (TransferWise)</p>
-                        <p className="text-xs text-muted-foreground">🌍 International • Low fees</p>
-                      </div>
-                    </div>
-                    {payMethod === 'wise' && (
-                      <div className="px-3 pb-3 space-y-2 border-t border-border pt-3">
-                        <p className="text-xs text-muted-foreground">Send to Indian Bank Account (same details as Bank Transfer above)</p>
-                        <Input
-                          placeholder="Enter Wise Transfer Reference"
-                          value={transactionRef}
-                          onChange={(e) => setTransactionRef(e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
-                        />
+                        <ProofUploadRow />
                       </div>
                     )}
                   </div>
@@ -437,6 +617,7 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
                           onChange={(e) => setTransactionRef(e.target.value)}
                           onClick={(e) => e.stopPropagation()}
                         />
+                        <ProofUploadRow />
                       </div>
                     )}
                   </div>
@@ -474,6 +655,7 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
                           onChange={(e) => setTransactionRef(e.target.value)}
                           onClick={(e) => e.stopPropagation()}
                         />
+                        <ProofUploadRow />
                       </div>
                     )}
                   </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { marketplaceApi } from '@/lib/api';
 import { supabase } from '@/integrations/supabase/client';
+import { cachedFetch } from '@/lib/cache';
 
 export interface MarketplaceProduct {
   id: string;
@@ -120,8 +121,12 @@ export function useMarketplaceProducts() {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const res = await marketplaceApi.products();
-      const mapped = (res.data || []).map((p: any, i: number) => mapDbProduct(p, i));
+      const data = await cachedFetch(
+        'marketplace:products:all',
+        () => marketplaceApi.products().then(r => r.data || []),
+        60_000,
+      );
+      const mapped = (data as any[]).map((p: any, i: number) => mapDbProduct(p, i));
       setProducts(prioritizeProducts(mapped));
     } catch (e) {
       console.error('Failed to fetch marketplace products:', e);

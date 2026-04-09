@@ -33,7 +33,7 @@ export default function Auth() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const applyReseller = searchParams.get('apply') === 'reseller';
-  const { user, role, signIn, signUp, loading, initializing } = useAuth();
+  const { user, role, homePath, signIn, signUp, loading, initializing } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>(applyReseller ? 'signup' : 'login');
@@ -60,16 +60,10 @@ export default function Auth() {
  
    // Redirect based on role after login
    useEffect(() => {
-     if (user && role && !loading) {
-       if (role === 'super_admin') {
-         navigate('/dashboard', { replace: true });
-       } else if (role === 'reseller') {
-         navigate('/reseller/dashboard', { replace: true });
-       } else {
-         navigate('/', { replace: true });
-       }
+     if (user && !loading) {
+       navigate(homePath, { replace: true });
      }
-   }, [user, role, loading, navigate]);
+   }, [user, loading, homePath, navigate, role]);
  
    const handleLogin = async (e: React.FormEvent) => {
      e.preventDefault();

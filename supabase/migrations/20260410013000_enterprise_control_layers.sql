@@ -1,5 +1,3 @@
-BEGIN;
-
 DO $$
 BEGIN
   ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'admin';
@@ -595,5 +593,3 @@ $$;
 
 REVOKE ALL ON FUNCTION public.reseller_generate_license_key_atomic_locked(text, uuid, uuid, uuid, uuid, numeric, text, text, text, text, timestamptz, uuid, numeric, text, text, jsonb, integer) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.reseller_generate_license_key_atomic_locked(text, uuid, uuid, uuid, uuid, numeric, text, text, text, text, timestamptz, uuid, numeric, text, text, jsonb, integer) TO authenticated;
-
-COMMIT;

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -60,6 +61,7 @@ function getPlanPrice(basePrice: number, planDuration: PlanDuration): number {
 
 export function KeyGeneratorPanel() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { wallet, fetchWallet, fetchTransactions } = useWallet();
   const [products, setProducts] = useState<ResellerProductOption[]>([]);
   const [clients, setClients] = useState<ResellerClientOption[]>([]);
@@ -182,10 +184,12 @@ export function KeyGeneratorPanel() {
     setIsGenerating(true);
     try {
       let idempotencyKey = `${Date.now()}-fallback`;
-      if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-        idempotencyKey = crypto.randomUUID();
-      } else if (typeof crypto !== 'undefined' && 'getRandomValues' in crypto) {
-        const bytes = crypto.getRandomValues(new Uint8Array(8));
+      const webCrypto = globalThis.crypto;
+      if (webCrypto?.randomUUID) {
+        idempotencyKey = webCrypto.randomUUID();
+      } else if (webCrypto?.getRandomValues) {
+        const bytes = new Uint8Array(8);
+        webCrypto.getRandomValues(bytes);
         idempotencyKey = `${Date.now()}-${Array.from(bytes).map((n) => n.toString(16).padStart(2, '0')).join('')}`;
       }
 
@@ -249,7 +253,7 @@ export function KeyGeneratorPanel() {
                   Current balance: <strong className="text-destructive">${balance.toFixed(2)}</strong>
                 </p>
               </div>
-              <Button onClick={() => window.location.href = '/reseller/dashboard?tab=wallet'}>
+              <Button onClick={() => navigate('/reseller/dashboard?tab=wallet')}>
                 <Wallet className="h-4 w-4 mr-2" />
                 Add Balance
               </Button>

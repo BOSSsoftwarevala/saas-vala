@@ -1,5 +1,3 @@
-BEGIN;
-
 CREATE TABLE IF NOT EXISTS public.deployment_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   deployment_id UUID NOT NULL REFERENCES public.deployments(id) ON DELETE CASCADE,
@@ -21,5 +19,3 @@ ALTER TABLE public.deployments
 
 CREATE INDEX IF NOT EXISTS idx_deployments_status_retry
   ON public.deployments(status, next_retry_at, created_at);
-
-COMMIT;

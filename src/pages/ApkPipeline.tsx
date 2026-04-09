@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
   Smartphone, GitBranch, Package, Shield, RefreshCw, Rocket, CheckCircle2,
-  XCircle, Clock, Loader2, Database, Key, Download, BarChart3
+  XCircle, Clock, Loader2, Database, Key, Download, BarChart3, Wrench
 } from 'lucide-react';
 
 interface BuildItem {
@@ -126,6 +126,7 @@ export default function ApkPipeline() {
   const [workflowResult, setWorkflowResult] = useState<any>(null);
   const [settingUpFactory, setSettingUpFactory] = useState(false);
   const [triggeringBulk, setTriggeringBulk] = useState(false);
+  const [healing, setHealing] = useState(false);
 
   const setupFactory = async () => {
     setSettingUpFactory(true);
@@ -180,6 +181,24 @@ export default function ApkPipeline() {
     setRunningWorkflow(false);
   };
 
+  const runSelfHeal = async () => {
+    setHealing(true);
+    toast.info('🛠️ Running self-healing module...');
+    try {
+      const { data: result, error } = await supabase.functions.invoke('auto-apk-pipeline', {
+        body: { action: 'self_heal_pipeline', data: { limit: 200, stale_minutes: 90, retry_limit: 3 } },
+      });
+      if (error) throw error;
+      setWorkflowResult(result);
+      if (result?.success) toast.success(result.message || 'Self-heal completed');
+      else toast.error(result?.error || 'Self-heal failed');
+      fetchBuilds();
+    } catch (err: any) {
+      toast.error(err.message || 'Self-heal error');
+    }
+    setHealing(false);
+  };
+
   const statusIcon = (s: string) => {
     switch (s) {
       case 'completed': return <CheckCircle2 className="h-4 w-4 text-green-500" />;
@@ -232,6 +251,10 @@ export default function ApkPipeline() {
             <Button onClick={runAutoWorkflow} disabled={runningWorkflow} className="bg-green-600 hover:bg-green-700 text-white" size="sm">
               <Rocket className="h-4 w-4 mr-1" />
               {runningWorkflow ? 'Running...' : '🚀 Auto Workflow'}
+            </Button>
+            <Button onClick={runSelfHeal} disabled={healing} className="bg-blue-600 hover:bg-blue-700 text-white" size="sm">
+              <Wrench className="h-4 w-4 mr-1" />
+              {healing ? 'Healing...' : '🛠️ Self Heal'}
             </Button>
           </div>
         </div>
@@ -310,6 +333,27 @@ export default function ApkPipeline() {
                 </div>
               ))}
             </CardContent>
+            {workflowResult?.summary && (
+              <CardContent className="pt-0">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+                  {[
+                    { label: 'Slug Fixes', value: workflowResult.summary.slugs_repaired || 0 },
+                    { label: 'Stale Recovered', value: workflowResult.summary.stale_recovered || 0 },
+                    { label: 'Failed Retried', value: workflowResult.summary.failed_retried || 0 },
+                    { label: 'Queue Repaired', value: workflowResult.summary.missing_queue_fixed || 0 },
+                    { label: 'APK Attached', value: workflowResult.summary.apk_attached || 0 },
+                    { label: 'Rebuild Queued', value: workflowResult.summary.rebuilds_queued || 0 },
+                    { label: 'Feature Gaps', value: workflowResult.summary.feature_gaps_found || 0 },
+                    { label: 'Patch Queued', value: workflowResult.summary.feature_patch_queued || 0 },
+                  ].map(s => (
+                    <div key={s.label} className="p-3 rounded-lg bg-muted/50">
+                      <p className="text-xl font-black">{s.value}</p>
+                      <p className="text-[10px] text-muted-foreground">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            )}
           </Card>
         )}
 

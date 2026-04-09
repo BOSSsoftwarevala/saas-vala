@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -66,7 +68,8 @@ import { type ResellerApplication } from '@/lib/dashboardApi';
 const ITEMS_PER_PAGE = 25;
 
 export default function Resellers() {
-   const { resellers, loading, total, fetchResellers, updateReseller, deleteReseller } = useResellers();
+  const navigate = useNavigate();
+  const { resellers, loading, total, fetchResellers, updateReseller, deleteReseller } = useResellers();
   const { resellerApplications, getResellerApplications, approveResellerApplication, rejectResellerApplication } = useDashboardStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
@@ -78,6 +81,7 @@ export default function Resellers() {
   const [applicationTab, setApplicationTab] = useState('pending');
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectApplicationId, setRejectApplicationId] = useState<string | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
   const [mainTab, setMainTab] = useState('resellers');
 
   // Form state
@@ -215,7 +219,7 @@ export default function Resellers() {
             <Button
               variant="outline"
               className="gap-2 border-border"
-              onClick={() => window.location.assign('/reseller/dashboard')}
+              onClick={() => navigate('/reseller/dashboard')}
             >
               <Users className="h-4 w-4" />
               Reseller Dashboard

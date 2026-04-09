@@ -76,25 +76,36 @@ export function ServerSecurityMonitor() {
     if (!selectedServerId) return;
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('servers')
-        .select('last_security_scan, security_score')
+        .select('*')
         .eq('id', selectedServerId)
         .maybeSingle();
 
       if (!error && data) {
-        const { data: issues } = await supabase
+        const { data: issues } = await (supabase as any)
           .from('server_security_issues')
           .select('*')
           .eq('server_id', selectedServerId)
           .eq('fixed', false);
 
+        const normalizedIssues: SecurityIssue[] = Array.isArray(issues)
+          ? issues.map((issue: any) => ({
+              id: String(issue.id || crypto.randomUUID()),
+              severity: (issue.severity || 'low') as SecurityIssue['severity'],
+              title: String(issue.title || issue.name || 'Security Issue'),
+              description: String(issue.description || issue.details || ''),
+              recommendation: String(issue.recommendation || issue.fix_suggestion || 'Review and patch this issue.'),
+              fixed: Boolean(issue.fixed),
+            }))
+          : [];
+
         setSecurityStatus({
-          score: data.security_score || 0,
-          lastScan: data.last_security_scan,
-          issuesCount: issues?.length || 0,
-          criticalCount: issues?.filter(i => i.severity === 'critical').length || 0,
-          vulnerabilities: issues || [],
+          score: Number(data.security_score || 0),
+          lastScan: data.last_security_scan || null,
+          issuesCount: normalizedIssues.length,
+          criticalCount: normalizedIssues.filter(i => i.severity === 'critical').length,
+          vulnerabilities: normalizedIssues,
         });
       }
     } catch (err) {

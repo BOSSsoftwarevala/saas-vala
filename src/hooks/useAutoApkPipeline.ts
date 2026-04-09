@@ -79,6 +79,17 @@ export function useAutoApkPipeline() {
     return result;
   }, [invoke]);
 
+  const selfHealPipeline = useCallback(async (limit = 120) => {
+    toast.info('🛠️ Running self-healing checks...');
+    const result = await invoke('auto-apk-pipeline', 'self_heal_pipeline', {
+      limit,
+      stale_minutes: 90,
+      retry_limit: 3,
+    });
+    if (result?.success) toast.success(result.message);
+    return result;
+  }, [invoke]);
+
   const getStats = useCallback(async () => {
     const result = await invoke('auto-apk-pipeline', 'get_stats');
     if (result?.success) setStats(result);
@@ -162,6 +173,7 @@ export function useAutoApkPipeline() {
     checkUpdates,
     runFullPipeline,
     autoMarketplaceWorkflow,
+    selfHealPipeline,
     getStats,
     setupFactory,
     triggerFactoryBuild,

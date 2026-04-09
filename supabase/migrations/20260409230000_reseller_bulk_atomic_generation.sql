@@ -1,5 +1,3 @@
-BEGIN;
-
 CREATE OR REPLACE FUNCTION public.reseller_generate_license_keys_bulk_atomic(
   p_request_id text,
   p_user_id uuid,
@@ -78,5 +76,3 @@ $$;
 
 REVOKE ALL ON FUNCTION public.reseller_generate_license_keys_bulk_atomic(text, uuid, uuid, uuid, uuid, text, numeric, text, timestamptz, text[], text[], integer, uuid, text, jsonb) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.reseller_generate_license_keys_bulk_atomic(text, uuid, uuid, uuid, uuid, text, numeric, text, timestamptz, text[], text[], integer, uuid, text, jsonb) TO authenticated;
-
-COMMIT;

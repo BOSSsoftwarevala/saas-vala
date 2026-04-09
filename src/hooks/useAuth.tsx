@@ -2,7 +2,27 @@ import { useState, useEffect, useRef, createContext, useContext, ReactNode } fro
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
-type AppRole = 'super_admin' | 'reseller';
+export type AppRole = 'super_admin' | 'admin' | 'reseller' | 'master_reseller' | 'support' | 'user';
+
+function resolvePrimaryRole(roles: Array<{ role: string }> | null | undefined): AppRole | null {
+  const roleSet = new Set((roles ?? []).map(({ role }) => role));
+
+  if (roleSet.has('super_admin')) return 'super_admin';
+  if (roleSet.has('admin')) return 'admin';
+  if (roleSet.has('master_reseller')) return 'master_reseller';
+  if (roleSet.has('reseller')) return 'reseller';
+  if (roleSet.has('support')) return 'support';
+  if (roleSet.has('user')) return 'user';
+
+  return null;
+}
+
+function getHomePathForRole(role: AppRole | null): string {
+  if (role === 'super_admin' || role === 'admin') return '/dashboard';
+  if (role === 'reseller' || role === 'master_reseller') return '/reseller/dashboard';
+  if (role === 'support') return '/support';
+  return '/';
+}
 
 interface AuthContextType {
   user: User | null;
@@ -15,8 +35,11 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string, requestedRole?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  isAdmin: boolean;
   isSuperAdmin: boolean;
   isReseller: boolean;
+  isSupport: boolean;
+  homePath: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -115,12 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        const resolvedRole: AppRole | null =
-          data?.some(({ role }) => role === 'super_admin')
-            ? 'super_admin'
-            : data?.some(({ role }) => role === 'reseller')
-              ? 'reseller'
-              : null;
+        const resolvedRole = resolvePrimaryRole(data as Array<{ role: string }> | null | undefined);
 
         setRole(resolvedRole);
         setRoleLoading(false);
@@ -198,6 +216,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const loading = initializing || roleLoading;
+  const isAdmin = role === 'super_admin' || role === 'admin';
+  const isReseller = role === 'reseller' || role === 'master_reseller';
+  const isSupport = role === 'support';
+  const homePath = getHomePathForRole(role);
 
   const value = {
     user,
@@ -208,8 +230,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signIn,
     signUp,
     signOut,
+    isAdmin,
     isSuperAdmin: role === 'super_admin',
-    isReseller: role === 'reseller',
+    isReseller,
+    isSupport,
+    homePath,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

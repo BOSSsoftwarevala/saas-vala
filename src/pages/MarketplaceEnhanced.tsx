@@ -4,7 +4,7 @@ import { MarketplaceHeader } from '@/components/marketplace/MarketplaceHeader';
 import { HeroBannerSlider } from '@/components/marketplace/HeroBannerSlider';
 import { MARKETPLACE_CATEGORIES } from '@/data/marketplaceCategories';
 import { useMarketplaceProducts } from '@/hooks/useMarketplaceProducts';
-import { useMarketplace } from '@/hooks/useMarketplace';
+import { useFavorites } from '@/hooks/useMarketplace';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -431,6 +431,3 @@ export default function MarketplacePublic() {
   );
 }
 
-// Re-export the existing Marketplace as default
-import { useFavorites } from '@/hooks/useMarketplace';
-export { MarketplacePublic as default };

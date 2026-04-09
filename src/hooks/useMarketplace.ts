@@ -1,7 +1,14 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { publicMarketplaceApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { useAuth } from './useAuth';
+import {
+  generateIdempotencyKey,
+  checkClientRateLimit,
+  resetClientRateLimit,
+  formatCurrency,
+  withRetry,
+} from '@/lib/marketplaceUtils';
 
 interface PaginationParams {
   page?: number;
@@ -26,16 +33,18 @@ export function useMarketplaceProducts() {
     setLoading(true);
     setError(null);
     try {
-      const data = await publicMarketplaceApi.listProducts({
-        category: params?.category,
-        search: params?.search,
-        sort: params?.sort,
-        limit: params?.limit || 20,
-        offset: (params?.page ? params.page - 1 : 0) * (params?.limit || 20),
-      });
-      setProducts(data?.products || []);
+      const data = await withRetry(() =>
+        publicMarketplaceApi.listProducts({
+          category: params?.category,
+          search: params?.search,
+          sort: params?.sort,
+          limit: params?.limit ?? 20,
+          offset: ((params?.page ?? 1) - 1) * (params?.limit ?? 20),
+        })
+      );
+      setProducts(data?.products ?? []);
     } catch (err: any) {
-      const errorMsg = err.message || 'Failed to fetch products';
+      const errorMsg = err?.message ?? 'Failed to fetch products';
       setError(errorMsg);
       toast.error(errorMsg);
     } finally {
@@ -54,7 +63,7 @@ export function useMarketplaceCategories() {
     setLoading(true);
     try {
       const data = await publicMarketplaceApi.getCategories();
-      setCategories(data?.categories || []);
+      setCategories(data?.categories ?? []);
     } catch (err) {
       console.error('Failed to fetch categories:', err);
       toast.error('Failed to load categories');
@@ -78,9 +87,9 @@ export function useProductRatings(productId: string) {
     setLoading(true);
     try {
       const data = await publicMarketplaceApi.getRatings(productId);
-      setRatings(data?.ratings || []);
-      setAverageRating(data?.average_rating || 0);
-      setTotalRatings(data?.total_count || 0);
+      setRatings(data?.ratings ?? []);
+      setAverageRating(data?.average_rating ?? 0);
+      setTotalRatings(data?.total_count ?? 0);
     } catch (err) {
       console.error('Failed to fetch ratings:', err);
     } finally {
@@ -144,19 +153,27 @@ export function useFavorites() {
         return;
       }
 
-      const isFavorited = favorites.includes(productId);
+      const wasAlreadyFavorited = favorites.includes(productId);
+
+      // Optimistic update — apply immediately for instant UI feedback
+      setFavorites((prev) =>
+        wasAlreadyFavorited ? prev.filter((id) => id !== productId) : [...prev, productId]
+      );
+
       try {
-        if (isFavorited) {
+        if (wasAlreadyFavorited) {
           await publicMarketplaceApi.removeFavorite(productId);
-          setFavorites((prev) => prev.filter((id) => id !== productId));
           toast.success('Removed from favorites');
         } else {
           await publicMarketplaceApi.addFavorite(productId);
-          setFavorites((prev) => [...prev, productId]);
           toast.success('Added to favorites');
         }
       } catch (err: any) {
-        toast.error(err.message || 'Failed to update favorite');
+        // Rollback optimistic update on failure
+        setFavorites((prev) =>
+          wasAlreadyFavorited ? [...prev, productId] : prev.filter((id) => id !== productId)
+        );
+        toast.error(err?.message ?? 'Failed to update favorites');
       }
     },
     [user, favorites]
@@ -182,11 +199,11 @@ export function useMarketplaceOrders() {
     if (!user) return;
     setLoading(true);
     try {
-      const data = await publicMarketplaceApi.getOrders(params);
-      setOrders(data?.orders || []);
-    } catch (err) {
+      const data = await withRetry(() => publicMarketplaceApi.getOrders(params));
+      setOrders(data?.orders ?? []);
+    } catch (err: any) {
       console.error('Failed to fetch orders:', err);
-      toast.error('Failed to load orders');
+      toast.error(err?.message ?? 'Failed to load orders');
     } finally {
       setLoading(false);
     }
@@ -199,61 +216,103 @@ export function useMarketplacePayment() {
   const [processing, setProcessing] = useState(false);
   const { user } = useAuth();
 
+  /**
+   * Ref-based lock: prevents concurrent payment calls (double-click,
+   * fast Enter key repeat, etc.). Only ONE payment can be in flight.
+   */
+  const paymentLockRef = useRef(false);
+
   const initiatePayment = useCallback(
-    async (productId: string, durationDays: number, paymentMethod: string, amount: number) => {
+    async (
+      productId: string,
+      durationDays: number,
+      paymentMethod: string,
+      amount: number,
+      idempotencyKey?: string
+    ) => {
       if (!user) {
         toast.error('Please login to proceed');
         return { success: false, error: 'Not authenticated' };
       }
 
-      setProcessing(true);
-      try {
-        const result = await publicMarketplaceApi.initiatePayment({
-          product_id: productId,
-          duration_days: durationDays,
-          payment_method: paymentMethod as any,
-          amount,
-        });
+      // Hard lock — prevents double-submit even if component re-renders
+      if (paymentLockRef.current) {
+        toast.warning('A payment is already in progress, please wait…');
+        return { success: false, error: 'Payment already in progress' };
+      }
 
-        if (result.success) {
-          toast.success('Payment initiated');
-          return { success: true, order_id: result.order_id, data: result };
-        } else {
-          throw new Error(result.error || 'Payment initiation failed');
+      // Client-side rate limit: max 3 payment attempts per 60s
+      const rateLimitKey = `payment:${user.id}`;
+      if (!checkClientRateLimit(rateLimitKey, 3, 60_000)) {
+        toast.error('Too many payment attempts. Please wait before trying again.');
+        return { success: false, error: 'Rate limit exceeded' };
+      }
+
+      paymentLockRef.current = true;
+      setProcessing(true);
+
+      // Per-call idempotency key — callers may supply their own
+      const idemKey = idempotencyKey ?? generateIdempotencyKey();
+
+      try {
+        const result = await publicMarketplaceApi.initiatePayment(
+          {
+            product_id: productId,
+            duration_days: durationDays,
+            payment_method: paymentMethod as any,
+            amount,
+            idempotency_key: idemKey,
+          },
+          { idempotencyKey: idemKey }
+        );
+
+        if (result?.success) {
+          resetClientRateLimit(rateLimitKey);
+          toast.success('Order placed successfully!');
+          return { success: true, order_id: result.order_id ?? null, data: result };
         }
+
+        throw new Error(result?.error ?? 'Payment initiation failed');
       } catch (err: any) {
-        const errorMsg = err.message || 'Payment initiation failed';
+        const errorMsg = err?.message ?? 'Payment initiation failed';
         toast.error(errorMsg);
         return { success: false, error: errorMsg };
       } finally {
+        paymentLockRef.current = false;
         setProcessing(false);
       }
     },
     [user]
   );
 
-  const verifyPayment = useCallback(async (orderId: string, transactionRef?: string, provider?: string) => {
-    setProcessing(true);
-    try {
-      const result = await publicMarketplaceApi.verifyPayment({
-        order_id: orderId,
-        transaction_ref: transactionRef,
-        provider,
-      });
+  const verifyPayment = useCallback(
+    async (orderId: string, transactionRef?: string, provider?: string) => {
+      if (paymentLockRef.current) return { success: false, error: 'Payment already in progress' };
+      paymentLockRef.current = true;
+      setProcessing(true);
+      try {
+        const result = await publicMarketplaceApi.verifyPayment({
+          order_id: orderId,
+          transaction_ref: transactionRef,
+          provider,
+        });
 
-      if (result.success) {
-        toast.success('Payment verified successfully');
-        return { success: true, ...result };
-      } else {
-        throw new Error(result.error || 'Payment verification failed');
+        if (result?.success) {
+          toast.success('Payment verified successfully');
+          return { success: true, ...result };
+        }
+
+        throw new Error(result?.error ?? 'Payment verification failed');
+      } catch (err: any) {
+        toast.error(err?.message ?? 'Payment verification failed');
+        return { success: false, error: err?.message ?? 'Unknown error' };
+      } finally {
+        paymentLockRef.current = false;
+        setProcessing(false);
       }
-    } catch (err: any) {
-      toast.error(err.message || 'Payment verification failed');
-      return { success: false, error: err.message };
-    } finally {
-      setProcessing(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   return { processing, initiatePayment, verifyPayment };
 }
@@ -283,16 +342,23 @@ export function useWallet() {
         return false;
       }
 
+      if (!Number.isFinite(amount) || amount <= 0) {
+        toast.error('Invalid amount');
+        return false;
+      }
+
       setLoading(true);
       try {
         const result = await publicMarketplaceApi.addWalletBalance(amount, paymentMethod);
-        if (result.success) {
-          setBalance(result.balance || balance + amount);
-          toast.success(`Added $${amount} to wallet`);
+        if (result?.success) {
+          setBalance(result.balance ?? balance + amount);
+          toast.success(`Added ${formatCurrency(amount)} to wallet`);
           return true;
         }
+        toast.error(result?.error ?? 'Failed to add balance');
+        return false;
       } catch (err: any) {
-        toast.error(err.message || 'Failed to add balance');
+        toast.error(err?.message ?? 'Failed to add balance');
         return false;
       } finally {
         setLoading(false);
@@ -313,8 +379,8 @@ export function useLicenseKeys() {
     if (!user) return;
     setLoading(true);
     try {
-      const data = await publicMarketplaceApi.getLicenseKeys();
-      setLicenses(data?.licenses || []);
+      const data = await withRetry(() => publicMarketplaceApi.getLicenseKeys());
+      setLicenses(data?.licenses ?? []);
     } catch (err) {
       console.error('Failed to fetch licenses:', err);
     } finally {
@@ -323,18 +389,22 @@ export function useLicenseKeys() {
   }, [user]);
 
   const validateLicense = useCallback(async (licenseKey: string, deviceId?: string) => {
+    if (!licenseKey?.trim()) {
+      return { valid: false, error: 'License key is required' };
+    }
     try {
-      const result = await publicMarketplaceApi.validateLicense(licenseKey, deviceId);
-      if (result.valid) {
+      const result = await publicMarketplaceApi.validateLicense(licenseKey.trim().toUpperCase(), deviceId);
+      if (result?.valid) {
         toast.success('License is valid');
         return { valid: true, ...result };
-      } else {
-        toast.error('License is invalid or expired');
-        return { valid: false, error: result.error };
       }
+      const reason = result?.error ?? 'License is invalid or expired';
+      toast.error(reason);
+      return { valid: false, error: reason };
     } catch (err: any) {
-      toast.error('License validation failed');
-      return { valid: false, error: err.message };
+      const errorMsg = err?.message ?? 'License validation failed';
+      toast.error(errorMsg);
+      return { valid: false, error: errorMsg };
     }
   }, []);
 

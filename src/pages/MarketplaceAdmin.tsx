@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { marketplaceAdminApi } from '@/lib/api';
 import {
   Plus,
   Search,
@@ -431,21 +432,15 @@ export default function MarketplaceAdmin() {
 
   const fetchProducts = async () => {
     setProductsLoading(true);
-    let query = db
-      .from('products')
-      .select('id, name, slug, description, short_description, price, status, business_type, tags, demo_url, demo_login, demo_password, demo_enabled, apk_url, thumbnail_url, featured, trending, marketplace_visible, discount_percent, rating, apk_enabled, license_enabled, buy_enabled, created_at')
-      .order('created_at', { ascending: false })
-      .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
-
-    if (search.trim()) {
-      query = query.or(`name.ilike.%${search}%,slug.ilike.%${search}%,business_type.ilike.%${search}%`);
-    }
-
-    const { data, error } = await query;
-    if (error) {
+    try {
+      const res = await marketplaceAdminApi.listProducts({
+        page: page + 1,
+        limit: PAGE_SIZE,
+        search: search.trim() || undefined,
+      }) as any;
+      setProducts((res?.data || []) as Product[]);
+    } catch {
       toast.error('Failed to load products');
-    } else {
-      setProducts((data || []) as Product[]);
     }
     setProductsLoading(false);
   };
@@ -525,32 +520,19 @@ export default function MarketplaceAdmin() {
   };
 
   const fetchStats = async () => {
-    const [
-      { count: totalProducts },
-      { count: activeProducts },
-      { count: pipelineProducts },
-      { count: totalDownloads },
-      { data: salesRows },
-    ] = await Promise.all([
-      db.from('products').select('id', { head: true, count: 'exact' }),
-      db.from('products').select('id', { head: true, count: 'exact' }).eq('status', 'active'),
-      db.from('products').select('id', { head: true, count: 'exact' }).eq('status', 'draft'),
-      db.from('apk_download_logs').select('id', { head: true, count: 'exact' }),
-      db.from('marketplace_orders').select('amount, final_amount').eq('status', 'completed').limit(100000),
-    ]);
-
-    const totalSales = (salesRows || []).reduce((sum: number, row: any) => {
-      const value = Number(row.final_amount ?? row.amount ?? 0);
-      return sum + (Number.isNaN(value) ? 0 : value);
-    }, 0);
-
-    setStats({
-      totalProducts: totalProducts || 0,
-      activeProducts: activeProducts || 0,
-      pipelineProducts: pipelineProducts || 0,
-      totalSales,
-      totalDownloads: totalDownloads || 0,
-    });
+    try {
+      const res = await marketplaceAdminApi.dashboard() as any;
+      const s = res?.stats || {};
+      setStats({
+        totalProducts: Number(s.total_products || 0),
+        activeProducts: Number(s.active_products || 0),
+        pipelineProducts: Math.max(0, Number(s.total_products || 0) - Number(s.active_products || 0)),
+        totalSales: Number(s.total_sales || 0),
+        totalDownloads: Number(s.downloads_total || 0),
+      });
+    } catch {
+      toast.error('Failed to load dashboard stats');
+    }
   };
 
   const refreshAll = async () => {
@@ -633,38 +615,28 @@ export default function MarketplaceAdmin() {
 
     setSaving(true);
 
-    if (editProduct.id.startsWith('new-')) {
-      const { error } = await db.from('products').insert(payload);
-      if (error) {
-        toast.error(`Create failed: ${error.message}`);
-      } else {
+    try {
+      if (editProduct.id.startsWith('new-')) {
+        await marketplaceAdminApi.createProduct(payload);
         toast.success('Product created');
-        setEditProduct(null);
-        await Promise.all([fetchProducts(), fetchProductCatalog(), fetchStats()]);
-        window.dispatchEvent(new CustomEvent('marketplaceRefresh'));
-      }
-    } else {
-      const { error } = await db.from('products').update(payload).eq('id', editProduct.id);
-      if (error) {
-        toast.error(`Update failed: ${error.message}`);
       } else {
+        await marketplaceAdminApi.updateProduct(editProduct.id, payload);
         toast.success('Product updated');
-        setEditProduct(null);
-        await Promise.all([fetchProducts(), fetchProductCatalog(), fetchStats(), fetchApks()]);
-        window.dispatchEvent(new CustomEvent('marketplaceRefresh'));
       }
+      setEditProduct(null);
+      await Promise.all([fetchProducts(), fetchProductCatalog(), fetchStats(), fetchApks()]);
+      window.dispatchEvent(new CustomEvent('marketplaceRefresh'));
+    } catch (e: any) {
+      toast.error(`Save failed: ${e?.message || 'Unknown error'}`);
     }
 
     setSaving(false);
   };
 
   const toggleVisibility = async (p: Product) => {
-    const { error } = await db
-      .from('products')
-      .update({ marketplace_visible: !p.marketplace_visible })
-      .eq('id', p.id);
-
-    if (error) {
+    try {
+      await marketplaceAdminApi.updateProduct(p.id, { marketplace_visible: !p.marketplace_visible });
+    } catch {
       toast.error('Visibility update failed');
       return;
     }
@@ -675,9 +647,10 @@ export default function MarketplaceAdmin() {
 
   const deleteProduct = async (id: string) => {
     if (!confirm('Set this product to inactive? It will be hidden from marketplace.')) return;
-    const { error } = await db.from('products').update({ status: 'inactive' }).eq('id', id);
-    if (error) {
-      toast.error(`Update failed: ${error.message}`);
+    try {
+      await marketplaceAdminApi.deleteProduct(id);
+    } catch (e: any) {
+      toast.error(`Update failed: ${e?.message || 'Unknown error'}`);
       return;
     }
     toast.success('Product set to inactive');
@@ -714,9 +687,12 @@ export default function MarketplaceAdmin() {
         setBulkRunning(false);
         return;
       }
-      const { error } = await db.from('products').update({ status: 'inactive' }).in('id', ids);
-      if (error) toast.error(error.message);
-      else toast.success(`Set ${ids.length} products to inactive`);
+      try {
+        await marketplaceAdminApi.bulkProducts('delete', ids);
+        toast.success(`Set ${ids.length} products to inactive`);
+      } catch (e: any) {
+        toast.error(e?.message || 'Bulk delete failed');
+      }
       setSelectedIds(new Set());
       setBulkRunning(false);
       await Promise.all([fetchProducts(), fetchProductCatalog(), fetchStats(), fetchApks()]);
@@ -743,9 +719,12 @@ export default function MarketplaceAdmin() {
       payload.require_payment = false;
     }
 
-    const { error } = await db.from('products').update(payload).in('id', ids);
-    if (error) toast.error(error.message);
-    else toast.success(`Updated ${ids.length} products`);
+    try {
+      await marketplaceAdminApi.bulkProducts(action, ids, payload);
+      toast.success(`Updated ${ids.length} products`);
+    } catch (e: any) {
+      toast.error(e?.message || 'Bulk update failed');
+    }
 
     setSelectedIds(new Set());
     setBulkRunning(false);

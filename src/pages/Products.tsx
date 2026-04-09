@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -103,6 +104,7 @@ interface GitHubRepo {
 
 export default function Products() {
   const navigate = useNavigate();
+  const { isSuperAdmin } = useAuth();
   const { products, categories, loading, createProduct, updateProduct, deleteProduct, suspendProduct, activateProduct } = useProducts();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
@@ -282,10 +284,12 @@ export default function Products() {
               Import from Git
               {gitConnected && <CheckCircle2 className="h-3 w-3 text-success" />}
             </Button>
-            <Button onClick={() => navigate('/admin/add-product')} className="bg-orange-gradient hover:opacity-90 text-white gap-2">
-              <Plus className="h-4 w-4" />
-              Add Product
-            </Button>
+            {isSuperAdmin && (
+              <Button onClick={() => navigate('/admin/add-product')} className="bg-orange-gradient hover:opacity-90 text-white gap-2">
+                <Plus className="h-4 w-4" />
+                Add Product
+              </Button>
+            )}
             <Button variant="outline" className="gap-2 border-border">
               <Upload className="h-4 w-4" />
               Upload APK

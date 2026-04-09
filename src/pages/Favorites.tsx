@@ -39,7 +39,7 @@ export default function FavoritesPage() {
     setLoading(true);
     try {
       // Get favorite product IDs
-      const { data: favorites, error: favError } = await supabase
+      const { data: favorites, error: favError } = await (supabase as any)
         .from('user_favorites')
         .select('product_id')
         .eq('user_id', user.id);
@@ -54,13 +54,25 @@ export default function FavoritesPage() {
 
       // Get product details
       const productIds = favorites.map((f: any) => f.product_id);
-      const { data: prods, error: prodError } = await supabase
+      const { data: prods, error: prodError } = await (supabase as any)
         .from('products')
-        .select('id, name, short_description, thumbnail_url, category, rating, created_at')
+        .select('id, name, short_description, thumbnail_url, category, category_id, rating, created_at')
         .in('id', productIds);
 
       if (prodError) throw prodError;
-      setProducts(prods || []);
+      setProducts(
+        Array.isArray(prods)
+          ? prods.map((p: any) => ({
+              id: p.id,
+              name: p.name,
+              short_description: p.short_description || '',
+              thumbnail_url: p.thumbnail_url || '/placeholder.svg',
+              category: p.category || p.category_id || 'General',
+              rating: Number(p.rating || 0),
+              created_at: p.created_at,
+            }))
+          : []
+      );
     } catch (err) {
       console.error('Failed to fetch favorites:', err);
       toast.error('Failed to load favorites');

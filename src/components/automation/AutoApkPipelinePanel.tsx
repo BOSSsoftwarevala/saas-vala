@@ -3,12 +3,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAutoApkPipeline } from '@/hooks/useAutoApkPipeline';
-import { Smartphone, ScanSearch, Hammer, RefreshCw, Rocket, BarChart3, ShoppingCart } from 'lucide-react';
+import { Smartphone, ScanSearch, Hammer, RefreshCw, Rocket, BarChart3, ShoppingCart, Wrench } from 'lucide-react';
 
 export function AutoApkPipelinePanel() {
   const {
     loading, stats,
-    scanAndRegister, bulkBuild, checkUpdates, runFullPipeline, autoMarketplaceWorkflow, getStats,
+    scanAndRegister, bulkBuild, checkUpdates, runFullPipeline, autoMarketplaceWorkflow, selfHealPipeline, getStats,
   } = useAutoApkPipeline();
 
   useEffect(() => {
@@ -83,6 +83,13 @@ export function AutoApkPipelinePanel() {
           title="Refresh Stats"
           description="Get latest pipeline statistics"
           onClick={getStats}
+          loading={loading}
+        />
+        <ActionCard
+          icon={<Wrench className="h-5 w-5" />}
+          title="Self Heal"
+          description="Recover stuck builds, retry failed jobs, and auto-repair missing pipeline links"
+          onClick={() => selfHealPipeline(120)}
           loading={loading}
         />
       </div>

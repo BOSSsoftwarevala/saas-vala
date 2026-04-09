@@ -67,6 +67,89 @@ function canRunAsSystem(action: string) {
   return true;
 }
 
+function extractRepoSlug(input: string): string {
+  const raw = String(input || "").trim();
+  if (!raw) return "";
+  const parts = raw.replace(/\.git$/, "").split("/").filter(Boolean);
+  return parts[parts.length - 1] || "";
+}
+
+async function fetchLatestCommitSha(githubToken: string, slug: string): Promise<string> {
+  const res = await fetch(`https://api.github.com/repos/saasvala/${slug}/commits?per_page=1`, {
+    headers: { Authorization: `Bearer ${githubToken}`, "User-Agent": "SaaSVala-APK-Pipeline" },
+  });
+  if (!res.ok) return "";
+  const rows = await res.json();
+  return Array.isArray(rows) && rows[0]?.sha ? String(rows[0].sha) : "";
+}
+
+async function fetchReadmeText(githubToken: string, slug: string): Promise<string> {
+  const res = await fetch(`https://api.github.com/repos/saasvala/${slug}/readme`, {
+    headers: {
+      Authorization: `Bearer ${githubToken}`,
+      Accept: "application/vnd.github.raw+json",
+      "User-Agent": "SaaSVala-APK-Pipeline",
+    },
+  });
+  if (!res.ok) return "";
+  return await res.text();
+}
+
+function scanMissingFeatures(industry: string, projectName: string, description: string, readme: string): string[] {
+  const text = `${projectName} ${description} ${readme}`.toLowerCase();
+  const requiredByIndustry: Record<string, string[]> = {
+    healthcare: ["patient", "appointment", "billing", "report"],
+    education: ["student", "course", "attendance", "exam"],
+    finance: ["invoice", "ledger", "payment", "report"],
+    retail: ["inventory", "order", "payment", "dashboard"],
+    hospitality: ["booking", "guest", "invoice", "report"],
+    logistics: ["tracking", "shipment", "route", "report"],
+    construction: ["project", "cost", "report", "team"],
+    manufacturing: ["production", "inventory", "quality", "report"],
+    general: ["auth", "dashboard", "report", "settings"],
+  };
+
+  const keys = requiredByIndustry[industry] || requiredByIndustry.general;
+  return keys.filter((k) => !text.includes(k));
+}
+
+async function attachApkFromStorageOrQueue(admin: any, productId: string, slug: string): Promise<boolean> {
+  if (!productId || !slug) return false;
+
+  const { data: files } = await admin.storage.from("apks").list(slug);
+  const hasRelease = Array.isArray(files) && files.some((f: any) => f.name === "release.apk");
+  if (hasRelease) {
+    const path = `${slug}/release.apk`;
+    const { data: signed } = await admin.storage.from("apks").createSignedUrl(path, 31536000);
+    if (signed?.signedUrl) {
+      await admin.from("products").update({ apk_url: signed.signedUrl, is_apk: true }).eq("id", productId);
+      await admin
+        .from("apk_build_queue")
+        .update({ apk_file_path: path, build_status: "completed", build_completed_at: new Date().toISOString() })
+        .eq("slug", slug);
+      return true;
+    }
+  }
+
+  const { data: completedQueue } = await admin
+    .from("apk_build_queue")
+    .select("apk_file_path")
+    .eq("slug", slug)
+    .eq("build_status", "completed")
+    .not("apk_file_path", "is", null)
+    .maybeSingle();
+
+  if (completedQueue?.apk_file_path) {
+    const { data: signed } = await admin.storage.from("apks").createSignedUrl(completedQueue.apk_file_path, 31536000);
+    if (signed?.signedUrl) {
+      await admin.from("products").update({ apk_url: signed.signedUrl, is_apk: true }).eq("id", productId);
+      return true;
+    }
+  }
+
+  return false;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -764,14 +847,73 @@ Deno.serve(async (req) => {
           }
         }
 
+        // Self-heal: recover stale building jobs
+        const staleCutoff = new Date(Date.now() - 90 * 60_000).toISOString();
+        const { data: staleRows } = await admin
+          .from("apk_build_queue")
+          .select("id, build_attempts")
+          .eq("build_status", "building")
+          .lt("build_started_at", staleCutoff)
+          .limit(150);
+
+        let staleRecovered = 0;
+        for (const row of staleRows || []) {
+          const nextAttempts = Number(row.build_attempts || 0) + 1;
+          await admin
+            .from("apk_build_queue")
+            .update({
+              build_status: nextAttempts >= 3 ? "failed" : "pending",
+              build_attempts: nextAttempts,
+              build_error: "Recovered by scheduled self-heal (stale build timeout)",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", row.id);
+          staleRecovered++;
+        }
+
+        // Self-heal: retry failed jobs with attempts < 3
+        const { data: failedRows } = await admin
+          .from("apk_build_queue")
+          .select("id")
+          .eq("build_status", "failed")
+          .lt("build_attempts", 3)
+          .limit(200);
+
+        let failedRetried = 0;
+        for (const row of failedRows || []) {
+          await admin
+            .from("apk_build_queue")
+            .update({ build_status: "pending", build_error: null, updated_at: new Date().toISOString() })
+            .eq("id", row.id);
+          failedRetried++;
+        }
+
+        // Self-heal: attach APK URL where artifact already exists but product apk_url is null
+        const { data: productsMissingApk } = await admin
+          .from("products")
+          .select("id, slug")
+          .eq("marketplace_visible", true)
+          .is("apk_url", null)
+          .limit(200);
+
+        let apkAttached = 0;
+        for (const p of productsMissingApk || []) {
+          if (!p.slug) continue;
+          const attached = await attachApkFromStorageOrQueue(admin, p.id, p.slug);
+          if (attached) apkAttached++;
+        }
+
         return respond({
           success: true,
           total_repos: allRepos.length,
           newly_registered: newlyRegistered,
           builds_queued: buildsQueued,
           rebuilds_queued: rebuildsQueued,
+          stale_recovered: staleRecovered,
+          failed_retried: failedRetried,
+          apk_attached: apkAttached,
           repaired_missing_slugs: repairedMissingSlugs,
-          message: `✅ Daily sync complete: ${newlyRegistered} new repos, ${buildsQueued} builds, ${rebuildsQueued} rebuilds, ${repairedMissingSlugs} slug repairs`,
+          message: `✅ Daily sync + self-heal complete: ${newlyRegistered} new repos, ${buildsQueued} builds, ${rebuildsQueued} rebuilds, ${staleRecovered} stale recovered, ${failedRetried} retries, ${apkAttached} APK attached`,
         });
       }
 
@@ -963,6 +1105,218 @@ Deno.serve(async (req) => {
           skipped,
           results,
           message: `✅ Workflow: ${processed} scanned, ${verified} repos verified, ${attached} APKs attached, ${queued} builds queued`,
+        });
+      }
+
+      // ═══════════════════════════════════════════
+      // SELF-HEALING MODULE: recover + retry + repair + verify + sync
+      // ═══════════════════════════════════════════
+      case "self_heal_pipeline": {
+        const githubToken = Deno.env.get("SAASVALA_GITHUB_TOKEN");
+        const staleMinutes = Number(data?.stale_minutes || 90);
+        const retryLimit = Number(data?.retry_limit || 3);
+        const scanLimit = Number(data?.limit || 120);
+
+        const summary = {
+          slugs_repaired: 0,
+          stale_recovered: 0,
+          failed_retried: 0,
+          missing_queue_fixed: 0,
+          apk_attached: 0,
+          rebuilds_queued: 0,
+          feature_gaps_found: 0,
+          feature_patch_queued: 0,
+          scanned: 0,
+        };
+
+        // 1) Repair missing slugs in catalog
+        summary.slugs_repaired = await repairMissingCatalogSlugs(admin);
+
+        // 2) Recover stale "building" jobs
+        const staleCutoff = new Date(Date.now() - staleMinutes * 60_000).toISOString();
+        const { data: staleRows } = await admin
+          .from("apk_build_queue")
+          .select("id, build_attempts")
+          .eq("build_status", "building")
+          .lt("build_started_at", staleCutoff)
+          .limit(scanLimit);
+
+        for (const row of staleRows || []) {
+          const nextAttempts = Number(row.build_attempts || 0) + 1;
+          const nextStatus = nextAttempts >= retryLimit ? "failed" : "pending";
+          await admin
+            .from("apk_build_queue")
+            .update({
+              build_status: nextStatus,
+              build_attempts: nextAttempts,
+              build_error: `Recovered by self-heal (${staleMinutes}m timeout)`,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", row.id);
+          summary.stale_recovered++;
+        }
+
+        // 3) Retry failed builds (within limit)
+        const { data: failedRows } = await admin
+          .from("apk_build_queue")
+          .select("id, slug, build_attempts")
+          .eq("build_status", "failed")
+          .lt("build_attempts", retryLimit)
+          .order("updated_at", { ascending: true })
+          .limit(scanLimit);
+
+        for (const row of failedRows || []) {
+          await admin
+            .from("apk_build_queue")
+            .update({
+              build_status: "pending",
+              build_error: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", row.id);
+          summary.failed_retried++;
+        }
+
+        // 4) Ensure every pending catalog row has queue entry + status sync
+        const { data: catalogs } = await admin
+          .from("source_code_catalog")
+          .select("id, slug, project_name, github_repo_url, target_industry, status")
+          .not("slug", "is", null)
+          .in("status", ["pending", "analyzed", "uploaded", "pending_build", "rebuilding", "failed"])
+          .limit(scanLimit);
+
+        for (const c of catalogs || []) {
+          const { data: queueRow } = await admin
+            .from("apk_build_queue")
+            .select("id")
+            .eq("slug", c.slug)
+            .maybeSingle();
+
+          if (!queueRow) {
+            await admin.from("apk_build_queue").insert({
+              repo_name: c.project_name || c.slug,
+              repo_url: c.github_repo_url || `https://github.com/saasvala/${c.slug}`,
+              slug: c.slug,
+              target_industry: c.target_industry || "general",
+              source_catalog_id: c.id,
+              build_status: "pending",
+            });
+
+            await admin
+              .from("bulk_upload_queue")
+              .insert({
+                catalog_id: c.id,
+                upload_type: "apk_build",
+                status: "queued",
+                priority: 5,
+              });
+
+            summary.missing_queue_fixed++;
+          }
+        }
+
+        // 5) Auto attach APK to products if artifact exists (storage or completed queue)
+        const { data: products } = await admin
+          .from("products")
+          .select("id, slug, apk_url")
+          .eq("marketplace_visible", true)
+          .is("apk_url", null)
+          .limit(scanLimit);
+
+        for (const p of products || []) {
+          if (!p.slug) continue;
+          const attached = await attachApkFromStorageOrQueue(admin, p.id, p.slug);
+          if (attached) summary.apk_attached++;
+        }
+
+        // 6) Verify Git updates + scan missing features + queue rebuilds
+        if (githubToken) {
+          const { data: queueRows } = await admin
+            .from("apk_build_queue")
+            .select("id, slug, target_industry, repo_name, repo_url, build_meta, product_id")
+            .not("slug", "is", null)
+            .limit(scanLimit);
+
+          for (const row of queueRows || []) {
+            const slug = String(row.slug || "");
+            if (!slug) continue;
+            summary.scanned++;
+
+            const repoSlug = slug || extractRepoSlug(row.repo_url || "");
+            const latestCommit = await fetchLatestCommitSha(githubToken, repoSlug);
+            const readme = await fetchReadmeText(githubToken, repoSlug);
+            const currentMeta = (row.build_meta || {}) as Record<string, unknown>;
+            const lastSyncedCommit = String((currentMeta as any).last_synced_commit || "");
+            const missingFeatures = scanMissingFeatures(
+              String(row.target_industry || "general"),
+              String(row.repo_name || repoSlug),
+              "",
+              readme
+            );
+
+            if (missingFeatures.length > 0) {
+              summary.feature_gaps_found += missingFeatures.length;
+            }
+
+            const commitChanged = !!latestCommit && !!lastSyncedCommit && latestCommit !== lastSyncedCommit;
+            const shouldRebuild = commitChanged || missingFeatures.length > 0;
+
+            await admin
+              .from("apk_build_queue")
+              .update({
+                build_meta: {
+                  ...(currentMeta || {}),
+                  last_seen_commit: latestCommit || null,
+                  last_synced_commit: latestCommit || lastSyncedCommit || null,
+                  missing_features: missingFeatures,
+                  last_feature_scan_at: new Date().toISOString(),
+                },
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", row.id);
+
+            if (shouldRebuild) {
+              await admin
+                .from("apk_build_queue")
+                .update({
+                  build_status: "pending",
+                  build_error: null,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", row.id);
+
+              if (row.product_id) {
+                const { data: catForSlug } = await admin
+                  .from("source_code_catalog")
+                  .select("id")
+                  .eq("slug", slug)
+                  .maybeSingle();
+
+                if (catForSlug?.id) {
+                  await admin.from("bulk_upload_queue").insert({
+                    catalog_id: catForSlug.id,
+                    upload_type: "apk_rebuild",
+                    status: "queued",
+                    priority: missingFeatures.length > 0 ? 2 : 3,
+                  });
+
+                  if (missingFeatures.length > 0) summary.feature_patch_queued++;
+                }
+              }
+
+              summary.rebuilds_queued++;
+            }
+          }
+        }
+
+        return respond({
+          success: true,
+          summary,
+          message:
+            `🛠️ Self-heal done: ${summary.slugs_repaired} slug fixes, ` +
+            `${summary.stale_recovered} stale recovered, ${summary.failed_retried} retries, ` +
+            `${summary.missing_queue_fixed} queue repairs, ${summary.apk_attached} APK attached, ` +
+            `${summary.rebuilds_queued} rebuilds queued, ${summary.feature_patch_queued} feature-patch queued`,
         });
       }
 

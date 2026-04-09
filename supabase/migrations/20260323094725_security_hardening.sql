@@ -35,23 +35,33 @@ CREATE TRIGGER update_topup_requests_updated_at
 -- PHASE 8: Activity logs RLS (ensure table has proper policies)
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE schemaname = 'public' AND tablename = 'activity_logs' AND policyname = 'Users can insert own activity logs'
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'activity_logs'
   ) THEN
-    EXECUTE 'CREATE POLICY "Users can insert own activity logs" ON public.activity_logs
-      FOR INSERT WITH CHECK (performed_by = auth.uid())';
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = 'public' AND tablename = 'activity_logs' AND policyname = 'Users can insert own activity logs'
+    ) THEN
+      EXECUTE 'CREATE POLICY "Users can insert own activity logs" ON public.activity_logs
+        FOR INSERT WITH CHECK (performed_by = auth.uid())';
+    END IF;
   END IF;
 END $$;
 
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE schemaname = 'public' AND tablename = 'activity_logs' AND policyname = 'Users can view own activity logs'
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'activity_logs'
   ) THEN
-    EXECUTE 'CREATE POLICY "Users can view own activity logs" ON public.activity_logs
-      FOR SELECT USING (performed_by = auth.uid() OR public.has_role(auth.uid(), ''super_admin''))';
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = 'public' AND tablename = 'activity_logs' AND policyname = 'Users can view own activity logs'
+    ) THEN
+      EXECUTE 'CREATE POLICY "Users can view own activity logs" ON public.activity_logs
+        FOR SELECT USING (performed_by = auth.uid() OR public.has_role(auth.uid(), ''super_admin''))';
+    END IF;
   END IF;
 END $$;
 

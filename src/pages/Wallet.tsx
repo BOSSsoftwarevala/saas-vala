@@ -47,6 +47,7 @@ const transactionStatusStyles = {
 const paymentMethodIcons: Record<string, React.ReactNode> = {
   card: <CreditCard className="h-3 w-3" />,
   upi: <Smartphone className="h-3 w-3" />,
+  wise: <Globe className="h-3 w-3" />,
   international: <Globe className="h-3 w-3" />,
 };
 

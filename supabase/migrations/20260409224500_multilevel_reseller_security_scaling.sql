@@ -1,5 +1,3 @@
-BEGIN;
-
 ALTER TABLE public.resellers
   ADD COLUMN IF NOT EXISTS parent_reseller_id UUID REFERENCES public.resellers(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS reseller_level TEXT NOT NULL DEFAULT 'sub' CHECK (reseller_level IN ('master', 'sub', 'client')),
@@ -435,5 +433,3 @@ $$;
 
 REVOKE ALL ON FUNCTION public.reseller_generate_license_key_atomic(text, uuid, uuid, uuid, uuid, numeric, text, text, text, text, timestamptz, uuid, numeric, text, text, jsonb, integer) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.reseller_generate_license_key_atomic(text, uuid, uuid, uuid, uuid, numeric, text, text, text, text, timestamptz, uuid, numeric, text, text, jsonb, integer) TO authenticated;
-
-COMMIT;

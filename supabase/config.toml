@@ -1,4 +1,4 @@
-project_id = "astmdnelnuqwpdbyzecr"
+project_id = "fufriwpzypqzangcfmqu"
 
 [functions.github-oauth]
 verify_jwt = false
@@ -55,4 +55,28 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.api-gateway]
+verify_jwt = false
+
+[functions.vala-builder-orchestrator]
+verify_jwt = false
+
+[functions.vala-builder-worker-v2]
+verify_jwt = false
+
+[functions.vala-builder-worker]
+verify_jwt = false
+
+[functions.auto-apk-pipeline]
+verify_jwt = false
+
+[functions.deployment-worker]
+verify_jwt = false
+
+[functions.atomic-payment]
+verify_jwt = false
+
+[functions.marketplace-sync-missing]
+verify_jwt = false
+
+[functions.seed-marketplace]
 verify_jwt = false

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,7 +23,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/integrations/supabase/client';
+import { systemApi } from '@/lib/api';
 import { toast } from 'sonner';
 
 interface HealthCheck {
@@ -31,10 +32,47 @@ interface HealthCheck {
   message: string;
   icon: React.ComponentType<{ className?: string }>;
   count?: number;
+  latencyMs?: number;
+  uptimePct?: number;
+  activity1h?: number;
+  autoAction?: string | null;
 }
 
 export default function SystemHealth() {
+  const navigate = useNavigate();
+  const iconByModule = useMemo<Record<string, React.ComponentType<{ className?: string }>>>(() => ({
+    database: Database,
+    auth: Shield,
+    users: Users,
+    products: Package,
+    license_keys: Key,
+    servers: Server,
+    wallet: CreditCard,
+    transactions: CreditCard,
+    audit_logs: Activity,
+    logs: Activity,
+    ai_usage: Cpu,
+    storage: HardDrive,
+    queue: RefreshCw,
+    background_jobs: RefreshCw,
+    api_services: Server,
+    api_gateway: Server,
+  }), []);
   const [loading, setLoading] = useState(true);
+  const [historyCount, setHistoryCount] = useState(0);
+  const [activeAlerts, setActiveAlerts] = useState(0);
+  const [queuePending, setQueuePending] = useState(0);
+  const [autoActions, setAutoActions] = useState(0);
+  const [severityFilter, setSeverityFilter] = useState<'all' | 'info' | 'warning' | 'critical'>('all');
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'health' | 'alert' | 'audit'>('all');
+  const [timelineEvents, setTimelineEvents] = useState<Array<{
+    id: string;
+    source: 'health' | 'alert' | 'audit';
+    severity: 'info' | 'warning' | 'critical';
+    module: string;
+    message: string;
+    timestamp: string;
+  }>>([]);
   const [lastCheck, setLastCheck] = useState<Date | null>(null);
   const [healthChecks, setHealthChecks] = useState<HealthCheck[]>([
     { name: 'Database Connection', status: 'checking', message: 'Checking...', icon: Database },
@@ -49,154 +87,141 @@ export default function SystemHealth() {
     { name: 'Storage Buckets', status: 'checking', message: 'Checking...', icon: HardDrive },
   ]);
 
+  const normalizeSeverity = (value: unknown): 'info' | 'warning' | 'critical' => {
+    const v = String(value || '').toLowerCase();
+    if (v === 'warn' || v === 'warning') return 'warning';
+    if (v === 'critical' || v === 'error' || v === 'fail' || v === 'failed') return 'critical';
+    return 'info';
+  };
+
+  const loadHealthDashboard = useCallback(async (silent = false) => {
+    if (!silent) {
+      setLoading(true);
+    }
+
+    try {
+      const res = await systemApi.healthDashboard();
+      const checks = (res?.checks || []).map((c: any) => ({
+        name: String(c.module || 'module').replace(/_/g, ' ').toUpperCase(),
+        status: c.status === 'healthy' ? 'ok' : c.status === 'warning' ? 'warning' : 'error',
+        message: c.message || '-',
+        icon: iconByModule[c.module] || Activity,
+        count: Number(c.records || 0),
+        latencyMs: Number(c.latency_ms || 0),
+        uptimePct: Number(c.uptime_pct || 0),
+        activity1h: Number(c.activity_1h || 0),
+        autoAction: c.auto_action || null,
+      })) as HealthCheck[];
+
+      setHealthChecks(checks);
+      setLastCheck(res?.checked_at ? new Date(res.checked_at) : new Date());
+      setHistoryCount((res?.history || []).length);
+      setActiveAlerts((res?.alerts || []).filter((a: any) => !a.acknowledged).length);
+      setQueuePending(Number(res?.queue_stats?.queued || 0));
+      setAutoActions(Number(res?.auto_actions || 0));
+
+      let auditAlertRes: any = { data: [] };
+      try {
+        auditAlertRes = await systemApi.auditAlerts({ unresolved: true });
+      } catch {
+        // audit_anomaly_alerts may not exist yet; degrade gracefully
+      }
+
+      try {
+        const historyRows = Array.isArray(res?.history) ? res.history : [];
+        const alertRows = Array.isArray(res?.alerts) ? res.alerts : [];
+        const auditRows = Array.isArray(auditAlertRes?.data) ? auditAlertRes.data : [];
+
+        const historyEvents = historyRows.slice(0, 120).map((h: any) => ({
+          id: `h-${h.id}`,
+          source: 'health' as const,
+          severity: normalizeSeverity(h.status),
+          module: String(h.service_name || 'module'),
+          message: `${h.probe_type || 'probe'} ${h.status || 'pass'}${h.latency_ms ? ` • ${h.latency_ms}ms` : ''}`,
+          timestamp: String(h.created_at || new Date().toISOString()),
+        }));
+
+        const alertEvents = alertRows.slice(0, 120).map((a: any) => ({
+          id: `a-${a.id}`,
+          source: 'alert' as const,
+          severity: normalizeSeverity(a.severity),
+          module: String(a.source_module || 'system'),
+          message: String(a.alert_type || 'alert'),
+          timestamp: String(a.created_at || new Date().toISOString()),
+        }));
+
+        const auditEvents = auditRows.slice(0, 120).map((a: any) => ({
+          id: `au-${a.id}`,
+          source: 'audit' as const,
+          severity: normalizeSeverity(a.severity),
+          module: String(a.alert_type || 'audit'),
+          message: String(a.alert_message || 'audit anomaly'),
+          timestamp: String(a.created_at || new Date().toISOString()),
+        }));
+
+        const severityPriority: Record<'info' | 'warning' | 'critical', number> = {
+          critical: 3,
+          warning: 2,
+          info: 1,
+        };
+
+        const sourcePriority: Record<'health' | 'alert' | 'audit', number> = {
+          alert: 3,
+          audit: 2,
+          health: 1,
+        };
+
+        const merged = [...historyEvents, ...alertEvents, ...auditEvents]
+          .sort((x, y) => {
+            const severityDelta = severityPriority[y.severity] - severityPriority[x.severity];
+            if (severityDelta !== 0) return severityDelta;
+
+            const sourceDelta = sourcePriority[y.source] - sourcePriority[x.source];
+            if (sourceDelta !== 0) return sourceDelta;
+
+            return new Date(y.timestamp).getTime() - new Date(x.timestamp).getTime();
+          })
+          .slice(0, 250);
+
+        setTimelineEvents(merged);
+      } catch (timelineError) {
+        console.warn('Failed to build timeline events', timelineError);
+        setTimelineEvents([]);
+      }
+    } catch (error: any) {
+      if (!silent) {
+        toast.error(error?.message || 'Failed to load system health dashboard');
+      }
+    } finally {
+      if (!silent) {
+        setLoading(false);
+      }
+    }
+  }, [iconByModule]);
+
   const runHealthCheck = async () => {
     setLoading(true);
-    const checks: HealthCheck[] = [];
-
-    // Check Database Connection
     try {
-      const { error } = await supabase.from('products').select('id').limit(1);
-      checks.push({
-        name: 'Database Connection',
-        status: error ? 'error' : 'ok',
-        message: error ? error.message : 'Connected successfully',
-        icon: Database,
-      });
-    } catch {
-      checks.push({ name: 'Database Connection', status: 'error', message: 'Connection failed', icon: Database });
+      const res = await systemApi.runHealthCheck({ auto_fix: true, persist: true, snapshot: true });
+      toast.success(`Health check completed (${res?.health_score || 0}%)`);
+      await loadHealthDashboard();
+    } catch (error: any) {
+      toast.error(error?.message || 'Health check failed');
+      setLoading(false);
     }
-
-    // Check Auth Service
-    try {
-      const { data } = await supabase.auth.getSession();
-      checks.push({
-        name: 'Authentication Service',
-        status: 'ok',
-        message: data.session ? 'Authenticated' : 'Service active',
-        icon: Shield,
-      });
-    } catch {
-      checks.push({ name: 'Authentication Service', status: 'error', message: 'Auth service error', icon: Shield });
-    }
-
-    // Check Products
-    try {
-      const { data, error } = await supabase.from('products').select('id', { count: 'exact' });
-      checks.push({
-        name: 'Products Table',
-        status: error ? 'error' : 'ok',
-        message: error ? error.message : `${data?.length || 0} products`,
-        icon: Package,
-        count: data?.length || 0,
-      });
-    } catch {
-      checks.push({ name: 'Products Table', status: 'error', message: 'Query failed', icon: Package });
-    }
-
-    // Check License Keys
-    try {
-      const { data, error } = await supabase.from('license_keys').select('id', { count: 'exact' });
-      checks.push({
-        name: 'License Keys',
-        status: error ? 'error' : 'ok',
-        message: error ? error.message : `${data?.length || 0} keys`,
-        icon: Key,
-        count: data?.length || 0,
-      });
-    } catch {
-      checks.push({ name: 'License Keys', status: 'error', message: 'Query failed', icon: Key });
-    }
-
-    // Check Profiles
-    try {
-      const { data, error } = await supabase.from('profiles').select('id', { count: 'exact' });
-      checks.push({
-        name: 'User Profiles',
-        status: error ? 'error' : 'ok',
-        message: error ? error.message : `${data?.length || 0} profiles`,
-        icon: Users,
-        count: data?.length || 0,
-      });
-    } catch {
-      checks.push({ name: 'User Profiles', status: 'error', message: 'Query failed', icon: Users });
-    }
-
-    // Check Servers
-    try {
-      const { data, error } = await supabase.from('servers').select('id, status');
-      const liveCount = data?.filter(s => s.status === 'live').length || 0;
-      checks.push({
-        name: 'Servers Table',
-        status: error ? 'error' : liveCount > 0 ? 'ok' : 'warning',
-        message: error ? error.message : `${liveCount} live / ${data?.length || 0} total`,
-        icon: Server,
-        count: data?.length || 0,
-      });
-    } catch {
-      checks.push({ name: 'Servers Table', status: 'error', message: 'Query failed', icon: Server });
-    }
-
-    // Check Wallets
-    try {
-      const { data, error } = await supabase.from('wallets').select('id, balance');
-      const totalBalance = data?.reduce((sum, w) => sum + (Number(w.balance) || 0), 0) || 0;
-      checks.push({
-        name: 'Wallets & Transactions',
-        status: error ? 'error' : 'ok',
-        message: error ? error.message : `${data?.length || 0} wallets, ₹${totalBalance.toLocaleString()} total`,
-        icon: CreditCard,
-        count: data?.length || 0,
-      });
-    } catch {
-      checks.push({ name: 'Wallets & Transactions', status: 'error', message: 'Query failed', icon: CreditCard });
-    }
-
-    // Check Audit Logs
-    try {
-      const { data, error } = await supabase.from('audit_logs').select('id').limit(100);
-      checks.push({
-        name: 'Audit Logs',
-        status: error ? 'error' : 'ok',
-        message: error ? error.message : `${data?.length || 0}+ entries`,
-        icon: Activity,
-        count: data?.length || 0,
-      });
-    } catch {
-      checks.push({ name: 'Audit Logs', status: 'error', message: 'Query failed', icon: Activity });
-    }
-
-    // Check AI Usage
-    try {
-      const { data, error } = await supabase.from('ai_usage').select('id').limit(100);
-      checks.push({
-        name: 'AI Usage Tracking',
-        status: error ? 'error' : 'ok',
-        message: error ? error.message : `${data?.length || 0}+ records`,
-        icon: Cpu,
-        count: data?.length || 0,
-      });
-    } catch {
-      checks.push({ name: 'AI Usage Tracking', status: 'error', message: 'Query failed', icon: Cpu });
-    }
-
-    // Storage check (simulated)
-    checks.push({
-      name: 'Storage Buckets',
-      status: 'ok',
-      message: '2 buckets active',
-      icon: HardDrive,
-      count: 2,
-    });
-
-    setHealthChecks(checks);
-    setLastCheck(new Date());
-    setLoading(false);
-    toast.success('Health check completed');
   };
 
   useEffect(() => {
-    runHealthCheck();
-  }, []);
+    loadHealthDashboard();
+  }, [loadHealthDashboard]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      loadHealthDashboard(true);
+    }, 15000);
+
+    return () => window.clearInterval(intervalId);
+  }, [loadHealthDashboard]);
 
   const overallStatus = healthChecks.every(c => c.status === 'ok') 
     ? 'ok' 
@@ -212,6 +237,18 @@ export default function SystemHealth() {
     warning: { icon: AlertTriangle, color: 'text-amber-400', bg: 'bg-amber-500/20' },
     error: { icon: XCircle, color: 'text-red-400', bg: 'bg-red-500/20' },
     checking: { icon: Loader2, color: 'text-muted-foreground', bg: 'bg-muted' },
+  };
+
+  const filteredTimeline = timelineEvents.filter((event) => {
+    const severityMatch = severityFilter === 'all' || event.severity === severityFilter;
+    const sourceMatch = sourceFilter === 'all' || event.source === sourceFilter;
+    return severityMatch && sourceMatch;
+  });
+
+  const severityStyles: Record<'info' | 'warning' | 'critical', string> = {
+    info: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+    warning: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+    critical: 'bg-red-500/20 text-red-300 border-red-500/30',
   };
 
   return (
@@ -273,6 +310,25 @@ export default function SystemHealth() {
           </div>
         </div>
 
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="glass-card rounded-xl p-4 text-center">
+            <p className="text-2xl font-bold text-foreground">{historyCount}</p>
+            <p className="text-sm text-muted-foreground">History Events</p>
+          </div>
+          <div className="glass-card rounded-xl p-4 text-center">
+            <p className="text-2xl font-bold text-amber-400">{activeAlerts}</p>
+            <p className="text-sm text-muted-foreground">Active Alerts</p>
+          </div>
+          <div className="glass-card rounded-xl p-4 text-center">
+            <p className="text-2xl font-bold text-primary">{queuePending}</p>
+            <p className="text-sm text-muted-foreground">Queue Pending</p>
+          </div>
+          <div className="glass-card rounded-xl p-4 text-center">
+            <p className="text-2xl font-bold text-emerald-400">{autoActions}</p>
+            <p className="text-sm text-muted-foreground">Auto Actions</p>
+          </div>
+        </div>
+
         {/* Health Checks Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {healthChecks.map((check) => {
@@ -298,6 +354,18 @@ export default function SystemHealth() {
                 </div>
                 <h4 className="font-semibold text-foreground mb-1">{check.name}</h4>
                 <p className="text-sm text-muted-foreground">{check.message}</p>
+                {check.latencyMs !== undefined && (
+                  <p className="text-xs text-muted-foreground mt-1">Latency: {check.latencyMs}ms</p>
+                )}
+                {check.uptimePct !== undefined && (
+                  <p className="text-xs text-muted-foreground mt-1">Uptime: {check.uptimePct.toFixed(2)}%</p>
+                )}
+                {check.activity1h !== undefined && (
+                  <p className="text-xs text-muted-foreground mt-1">Activity (1h): {check.activity1h}</p>
+                )}
+                {check.autoAction && (
+                  <Badge variant="secondary" className="mt-2 text-xs">Auto: {check.autoAction}</Badge>
+                )}
                 {check.count !== undefined && (
                   <Badge variant="outline" className="mt-2 text-xs">
                     {check.count} records
@@ -312,15 +380,102 @@ export default function SystemHealth() {
         <div className="glass-card rounded-xl p-6">
           <h3 className="font-semibold text-foreground mb-4">Quick Actions</h3>
           <div className="flex flex-wrap gap-3">
-            <Button variant="outline" onClick={() => window.location.href = '/audit-logs'}>
+            <Button variant="outline" onClick={() => navigate('/audit-logs')}>
               View Audit Logs
             </Button>
-            <Button variant="outline" onClick={() => window.location.href = '/settings'}>
+            <Button variant="outline" onClick={() => navigate('/settings')}>
               System Settings
             </Button>
             <Button variant="outline" onClick={() => runHealthCheck()}>
               Refresh All Checks
             </Button>
+          </div>
+        </div>
+
+        {/* Timeline Panel */}
+        <div className="glass-card rounded-xl p-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+            <h3 className="font-semibold text-foreground">Health Timeline + Audit Integration</h3>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant={severityFilter === 'all' ? 'default' : 'outline'}
+                onClick={() => setSeverityFilter('all')}
+              >
+                All
+              </Button>
+              <Button
+                size="sm"
+                variant={severityFilter === 'info' ? 'default' : 'outline'}
+                onClick={() => setSeverityFilter('info')}
+              >
+                Info
+              </Button>
+              <Button
+                size="sm"
+                variant={severityFilter === 'warning' ? 'default' : 'outline'}
+                onClick={() => setSeverityFilter('warning')}
+              >
+                Warning
+              </Button>
+              <Button
+                size="sm"
+                variant={severityFilter === 'critical' ? 'default' : 'outline'}
+                onClick={() => setSeverityFilter('critical')}
+              >
+                Critical
+              </Button>
+              <Button
+                size="sm"
+                variant={sourceFilter === 'health' ? 'default' : 'outline'}
+                onClick={() => setSourceFilter('health')}
+              >
+                Health
+              </Button>
+              <Button
+                size="sm"
+                variant={sourceFilter === 'alert' ? 'default' : 'outline'}
+                onClick={() => setSourceFilter('alert')}
+              >
+                Alerts
+              </Button>
+              <Button
+                size="sm"
+                variant={sourceFilter === 'audit' ? 'default' : 'outline'}
+                onClick={() => setSourceFilter('audit')}
+              >
+                Audit
+              </Button>
+              <Button
+                size="sm"
+                variant={sourceFilter === 'all' ? 'default' : 'outline'}
+                onClick={() => setSourceFilter('all')}
+              >
+                Sources
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => navigate('/audit-logs')}>
+                Open Audit Logs
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+            {filteredTimeline.length === 0 && (
+              <p className="text-sm text-muted-foreground">No timeline events for selected filters.</p>
+            )}
+            {filteredTimeline.map((event) => (
+              <div key={event.id} className="rounded-lg border border-border p-3 flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="outline" className={severityStyles[event.severity]}>{event.severity.toUpperCase()}</Badge>
+                    <Badge variant="secondary">{event.source}</Badge>
+                    <span className="text-xs text-muted-foreground">{event.module}</span>
+                  </div>
+                  <p className="text-sm text-foreground">{event.message}</p>
+                </div>
+                <span className="text-xs text-muted-foreground whitespace-nowrap">{new Date(event.timestamp).toLocaleString()}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>

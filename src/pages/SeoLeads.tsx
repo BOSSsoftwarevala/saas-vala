@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
    Settings,
    Zap,
   Brain,
+  Store,
  } from 'lucide-react';
 import { SeoDashboard } from '@/components/seo-leads/SeoDashboard';
 import { AutoSeoEngine } from '@/components/seo-leads/AutoSeoEngine';
@@ -25,6 +26,7 @@ import { SeoAnalytics } from '@/components/seo-leads/SeoAnalytics';
 import { SeoSettings } from '@/components/seo-leads/SeoSettings';
  import { EnterpriseSeoEngine } from '@/components/seo-leads/EnterpriseSeoEngine';
 import { WorldClassSeoEngine } from '@/components/seo-leads/WorldClassSeoEngine';
+import { MarketplaceSeoControl } from '@/components/seo-leads/MarketplaceSeoControl';
 
 export default function SeoLeads() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -44,7 +46,7 @@ export default function SeoLeads() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-           <TabsList className="w-full grid grid-cols-6 md:grid-cols-11 h-auto gap-1 bg-muted/30 p-1.5 rounded-xl">
+           <TabsList className="w-full grid grid-cols-6 md:grid-cols-12 h-auto gap-1 bg-muted/30 p-1.5 rounded-xl">
             <TabsTrigger value="dashboard" className="gap-1 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <LayoutDashboard className="h-3 w-3" />
               <span className="hidden sm:inline">Dashboard</span>
@@ -80,6 +82,10 @@ export default function SeoLeads() {
             <TabsTrigger value="sources" className="gap-1 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Link2 className="h-3 w-3" />
               <span className="hidden sm:inline">Sources</span>
+            </TabsTrigger>
+            <TabsTrigger value="marketplace" className="gap-1 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Store className="h-3 w-3" />
+              <span className="hidden sm:inline">Marketplace</span>
             </TabsTrigger>
             <TabsTrigger value="analytics" className="gap-1 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <BarChart3 className="h-3 w-3" />
@@ -125,6 +131,10 @@ export default function SeoLeads() {
 
           <TabsContent value="sources" className="mt-6">
             <LeadSources />
+          </TabsContent>
+
+          <TabsContent value="marketplace" className="mt-6">
+            <MarketplaceSeoControl />
           </TabsContent>
 
           <TabsContent value="analytics" className="mt-6">

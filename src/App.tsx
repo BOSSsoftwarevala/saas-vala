@@ -92,15 +92,17 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { isSuperAdmin, loading } = useAuth();
+  const { isAdmin, isReseller, homePath, loading } = useAuth();
   if (loading) return <PageLoader />;
-  if (!isSuperAdmin) return <Navigate to="/" replace />;
+  if (!isAdmin) return <Navigate to={isReseller ? '/reseller/dashboard' : homePath} replace />;
   return <>{children}</>;
 }
 
 function FallbackRedirect() {
-  const { isReseller } = useAuth();
-  return <Navigate to={isReseller ? '/reseller/dashboard' : '/dashboard'} replace />;
+  const { user, homePath, loading } = useAuth();
+  if (loading) return <PageLoader />;
+  if (!user) return <Navigate to="/auth" replace />;
+  return <Navigate to={homePath} replace />;
 }
 
 function AppRoutes() {
@@ -198,13 +200,10 @@ function AppRoutes() {
         <Route path="/saas-ai" element={<ProtectedRoute><SaasAiDashboard /></ProtectedRoute>} />
         <Route path="/ai-apis" element={<ProtectedRoute><AiApis /></ProtectedRoute>} />
         <Route path="/wallet" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
-        <Route path="/seo-leads" element={<ProtectedRoute><SeoLeads /></ProtectedRoute>} />
         <Route path="/reseller/dashboard" element={<ProtectedRoute><ResellerDashboard /></ProtectedRoute>} />
         <Route path="/support" element={<ProtectedRoute><Support /></ProtectedRoute>} />
 
-        {/* Admin routes */}
-        <Route path="/reseller-manager" element={<ProtectedRoute><AdminRoute><Resellers /></AdminRoute></ProtectedRoute>} />
-        <Route path="/resellers" element={<ProtectedRoute><AdminRoute><Resellers /></AdminRoute></ProtectedRoute>} />
+        {/* Admin-only routes */}
         <Route path="/settings" element={<ProtectedRoute><AdminRoute><Settings /></AdminRoute></ProtectedRoute>} />
         <Route path="/audit-logs" element={<ProtectedRoute><AdminRoute><AuditLogs /></AdminRoute></ProtectedRoute>} />
         <Route path="/system-health" element={<ProtectedRoute><AdminRoute><SystemHealth /></AdminRoute></ProtectedRoute>} />

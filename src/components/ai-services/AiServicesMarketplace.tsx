@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +32,7 @@ import {
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useWallet } from '@/hooks/useWallet';
+
 
 interface AiService {
   id: string;
@@ -185,6 +187,7 @@ export function AiServicesMarketplace() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [payAllMode, setPayAllMode] = useState(false);
   const { wallet, deductBalance } = useWallet();
+  const navigate = useNavigate();
 
   const calculatePrice = (service: AiService) => {
     if (selectedPlan === '6months') {
@@ -236,7 +239,7 @@ export function AiServicesMarketplace() {
         if (wallet.balance < totalAmount) {
           toast.error(`Insufficient balance! Need $${totalAmount.toFixed(2)}, have $${wallet.balance.toFixed(2)}`, {
             description: 'Please add funds to your wallet first.',
-            action: { label: 'Go to Wallet', onClick: () => window.location.href = '/wallet' }
+            action: { label: 'Go to Wallet', onClick: () => navigate('/wallet') }
           });
           setIsProcessing(false);
           return;
@@ -260,7 +263,7 @@ export function AiServicesMarketplace() {
         if (wallet.balance < amount) {
           toast.error(`Insufficient balance! Need $${amount.toFixed(2)}, have $${wallet.balance.toFixed(2)}`, {
             description: 'Please add funds to your wallet first.',
-            action: { label: 'Go to Wallet', onClick: () => window.location.href = '/wallet' }
+            action: { label: 'Go to Wallet', onClick: () => navigate('/wallet') }
           });
           setIsProcessing(false);
           return;
@@ -327,7 +330,7 @@ export function AiServicesMarketplace() {
               variant="outline"
               size="sm"
               className="gap-2"
-              onClick={() => window.location.href = '/wallet'}
+              onClick={() => navigate('/wallet')}
             >
               <CreditCard className="h-3.5 w-3.5" />
               Add Funds
@@ -520,7 +523,7 @@ export function AiServicesMarketplace() {
                           size="sm" 
                           variant="outline"
                           className="h-7 text-xs gap-1"
-                          onClick={() => handlePayNow(service)}
+                            onClick={() => handlePayNow(service)}
                         >
                           <Wallet className="h-3 w-3" />
                           Renew
