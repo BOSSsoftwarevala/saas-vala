@@ -130,7 +130,7 @@ export default function Marketplace() {
     try {
       const { data: reseller, error: resellerError } = await supabase
         .from('resellers')
-        .select('id, credits')
+        .select('id')
         .eq('user_id', user.id)
         .single();
 
@@ -142,7 +142,13 @@ export default function Marketplace() {
       }
 
       setResellerId(reseller.id);
-      setResellerCredits(reseller.credits);
+
+      const { data: wallet } = await (supabase as any)
+        .from('wallets')
+        .select('balance')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      setResellerCredits(Number(wallet?.balance || 0));
 
       const { data: keys, error: keysError } = await supabase
         .from('license_keys')
@@ -221,7 +227,7 @@ export default function Marketplace() {
 
       const { data: reseller, error: resellerError } = await supabase
         .from('resellers')
-        .select('id, credits')
+        .select('id')
         .eq('user_id', user.id)
         .single();
 
@@ -230,8 +236,14 @@ export default function Marketplace() {
         return;
       }
 
-      if (reseller.credits < product.price) {
-        toast.error('Insufficient credits. Please add more credits.');
+      const { data: wallet } = await (supabase as any)
+        .from('wallets')
+        .select('balance')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (Number(wallet?.balance || 0) < Number(product.price || 0)) {
+        toast.error('Insufficient balance');
         return;
       }
 
@@ -239,8 +251,8 @@ export default function Marketplace() {
 
       if (result.success) {
         toast.success('🎉 Purchase successful! License key generated and saved.');
-        if (result.reseller && typeof result.reseller.credits === 'number') {
-          setResellerCredits(result.reseller.credits);
+        if (result.wallet && typeof result.wallet.balance === 'number') {
+          setResellerCredits(result.wallet.balance);
         }
         if (result.licenseKey) {
           setOwnedLicenseKeys((prev) => [...prev, result.licenseKey]);

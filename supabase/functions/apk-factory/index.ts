@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
       }
 
       case "trigger_build": {
-        const { slug, repo_url, product_id } = data || {};
+        const { slug, repo_url, product_id, conversion_type, output_platform, source_kind, source_bucket_path, source_repo_url, output_version } = data || {};
         if (!slug) return respond({ error: "slug required" }, 400);
 
         const targetRepo = repo_url || `https://github.com/saasvala/${slug}`;
@@ -147,6 +147,12 @@ Deno.serve(async (req) => {
               app_slug: slug,
               package_name: `com.saasvala.${slug.replace(/-/g, "_")}`,
               product_id: product_id || "",
+                  conversion_type: conversion_type || "web_to_apk",
+                  output_platform: output_platform || "android_apk",
+                  source_kind: source_kind || "github_repo",
+                  source_bucket_path: source_bucket_path || "",
+                  source_repo_url: source_repo_url || targetRepo,
+                  output_version: output_version || "1.0.0",
             },
           }),
         });
@@ -163,6 +169,12 @@ Deno.serve(async (req) => {
           slug,
           build_status: "building",
           product_id: product_id || null,
+          source_kind: source_kind || null,
+          source_bucket_path: source_bucket_path || null,
+          source_repo_url: source_repo_url || targetRepo,
+          conversion_type: conversion_type || "web_to_apk",
+          output_platform: output_platform || "android_apk",
+          output_version: output_version || "1.0.0",
           target_industry: "general",
           build_started_at: new Date().toISOString(),
           build_error: null,
@@ -195,31 +207,67 @@ Deno.serve(async (req) => {
       }
 
       case "build_complete": {
-        const { slug: completeSlug, apk_path, status: buildStatus, error: buildError, product_id: pid } = data || {};
+        const {
+          slug: completeSlug,
+          apk_path,
+          status: buildStatus,
+          error: buildError,
+          product_id: pid,
+          conversion_type,
+          output_platform,
+          output_version,
+          file_hash,
+          license_runtime_bundle,
+          build_meta,
+        } = data || {};
         if (!completeSlug) return respond({ error: "slug required" }, 400);
 
         const admin = createClient(supabaseUrl, serviceKey);
 
+        const { data: queueRow } = await admin
+          .from("apk_build_queue")
+          .select("id, product_id, conversion_type, output_platform, output_version")
+          .eq("slug", completeSlug)
+          .maybeSingle();
+
         if (buildStatus === "success" && apk_path) {
-          await admin.from("apk_build_queue").update({
-            build_status: "completed",
-            apk_file_path: apk_path,
-            build_completed_at: new Date().toISOString(),
-            build_error: null,
-            marketplace_listed: true,
-          }).eq("slug", completeSlug);
+          const effectiveProductId = pid || queueRow?.product_id || null;
+          const effectiveConversionType = conversion_type || queueRow?.conversion_type || "web_to_apk";
+          const effectivePlatform = output_platform || queueRow?.output_platform || "android_apk";
+          const effectiveVersion = output_version || queueRow?.output_version || "1.0.0";
+
+          if (effectiveProductId) {
+            await admin.rpc("finalize_offline_conversion_build", {
+              p_queue_id: queueRow?.id || null,
+              p_product_id: effectiveProductId,
+              p_platform: effectivePlatform,
+              p_version: effectiveVersion,
+              p_file_path: apk_path,
+              p_file_size: null,
+              p_file_hash: file_hash || null,
+              p_conversion_type: effectiveConversionType,
+              p_build_type: effectiveConversionType === "php_offline" ? "php_offline" : "web_apk",
+              p_license_runtime_bundle: license_runtime_bundle || {},
+              p_build_meta: build_meta || {},
+            });
+          } else {
+            await admin.from("apk_build_queue").update({
+              build_status: "completed",
+              apk_file_path: apk_path,
+              build_completed_at: new Date().toISOString(),
+              build_error: null,
+              marketplace_listed: true,
+            }).eq("slug", completeSlug);
+          }
 
           const { data: signedData } = await admin.storage.from("apks").createSignedUrl(apk_path, 31536000);
 
-          if (signedData?.signedUrl) {
-            if (pid) {
-              await admin.from("products").update({
-                apk_url: signedData.signedUrl, is_apk: true, apk_enabled: true,
-              }).eq("id", pid);
-            }
+          if (signedData?.signedUrl && effectiveProductId) {
             await admin.from("products").update({
-              apk_url: signedData.signedUrl, is_apk: true, apk_enabled: true,
-            }).eq("slug", completeSlug);
+              apk_url: signedData.signedUrl,
+              is_apk: true,
+              apk_enabled: true,
+            }).eq("id", effectiveProductId);
           }
 
           await admin.from("source_code_catalog").update({

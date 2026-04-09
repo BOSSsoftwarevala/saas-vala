@@ -1,11 +1,16 @@
 import { supabase } from '@/integrations/supabase/client';
 
 interface OfflineKeyPayload {
-  v: 1;
+  v: 1 | 2;
   p: string;
   t: number;
+  pd?: string | null;
+  e?: string | null;
+  dl?: number;
+  iat?: number;
   r?: string | null;
   a?: string | null;
+  c?: string;
   n: string;
 }
 
@@ -13,6 +18,7 @@ export interface SecureOfflineKeyBundle {
   key: string;
   signature: string;
   payload: OfflineKeyPayload;
+  displayCode: string;
 }
 
 function toBase64Url(input: string): string {
@@ -32,7 +38,8 @@ function decodePayload(payloadEncoded: string): OfflineKeyPayload | null {
   try {
     const raw = atob(fromBase64Url(payloadEncoded));
     const parsed = JSON.parse(raw) as OfflineKeyPayload;
-    if (!parsed || parsed.v !== 1 || !parsed.p || !parsed.t || !parsed.n) {
+    const validVersion = parsed?.v === 1 || parsed?.v === 2;
+    if (!parsed || !validVersion || !parsed.p || !parsed.t || !parsed.n) {
       return null;
     }
     return parsed;
@@ -115,30 +122,41 @@ export async function generateSecureOfflineLicenseKey(input: {
   productId: string;
   resellerId?: string | null;
   assignedTo?: string | null;
+  planDuration?: string | null;
+  expiresAt?: string | null;
+  deviceLimit?: number;
 }): Promise<SecureOfflineKeyBundle> {
+  const issuedAt = Date.now();
+  const displayCode = generateSecureLicenseKey();
   const payload: OfflineKeyPayload = {
-    v: 1,
+    v: 2,
     p: input.productId,
-    t: Date.now(),
+    t: issuedAt,
+    pd: input.planDuration || null,
+    e: input.expiresAt || null,
+    dl: Math.max(1, Number(input.deviceLimit || 1)),
+    iat: issuedAt,
     r: input.resellerId || null,
     a: input.assignedTo || null,
+    c: displayCode,
     n: randomNonce(16),
   };
 
   const payloadEncoded = encodePayload(payload);
   const signature = await generateKeySignature(payloadEncoded);
-  const key = `V1.${payloadEncoded}.${toBase64Url(signature)}`;
+  const key = `V2.${payloadEncoded}.${toBase64Url(signature)}`;
 
   return {
     key,
     signature,
     payload,
+    displayCode,
   };
 }
 
 export async function verifySecureOfflineLicenseKey(key: string): Promise<boolean> {
   try {
-    if (!key.startsWith('V1.')) return false;
+    if (!key.startsWith('V1.') && !key.startsWith('V2.')) return false;
     const parts = key.split('.');
     if (parts.length !== 3) return false;
 
@@ -154,7 +172,7 @@ export async function verifySecureOfflineLicenseKey(key: string): Promise<boolea
 }
 
 export function decodeSecureOfflineLicenseKey(key: string): OfflineKeyPayload | null {
-  if (!key.startsWith('V1.')) return null;
+  if (!key.startsWith('V1.') && !key.startsWith('V2.')) return null;
   const parts = key.split('.');
   if (parts.length !== 3) return null;
   return decodePayload(parts[1]);
@@ -197,6 +215,13 @@ interface LicenseValidationResult {
   valid: boolean;
   expiresAt?: string;
   error?: string;
+}
+
+interface ValidationRuntimeSignals {
+  isRooted?: boolean;
+  isEmulator?: boolean;
+  isDebuggerAttached?: boolean;
+  currentTimeMs?: number;
 }
 
 interface ClientBindingContext {
@@ -260,10 +285,97 @@ async function getClientBindingContext(): Promise<ClientBindingContext> {
   };
 }
 
+function getMonotonicClockStorageKey(productId?: string): string {
+  const suffix = productId ? String(productId) : 'global';
+  return `saasvala-license-last-validated:${suffix}`;
+}
+
+function detectClockRollback(productId: string | undefined, currentTimeMs?: number): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const now = Number(currentTimeMs || Date.now());
+    const key = getMonotonicClockStorageKey(productId);
+    const previous = Number(window.localStorage.getItem(key) || 0);
+    if (Number.isFinite(previous) && previous > 0 && now < previous) {
+      return true;
+    }
+    window.localStorage.setItem(key, String(now));
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+const LICENSE_AES_STORAGE_KEY = 'saasvala-license-aes-key-v1';
+const LICENSE_AES_DATA_PREFIX = 'saasvala-license-data-v1:';
+
+async function getOrCreateLocalAesKey(): Promise<CryptoKey | null> {
+  if (typeof window === 'undefined' || typeof crypto === 'undefined' || !crypto.subtle) {
+    return null;
+  }
+
+  try {
+    const existing = window.localStorage.getItem(LICENSE_AES_STORAGE_KEY);
+    if (existing) {
+      const raw = Uint8Array.from(atob(existing), (c) => c.charCodeAt(0));
+      return await crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+    }
+
+    const raw = crypto.getRandomValues(new Uint8Array(32));
+    window.localStorage.setItem(LICENSE_AES_STORAGE_KEY, btoa(String.fromCharCode(...raw)));
+    return await crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+  } catch {
+    return null;
+  }
+}
+
+export async function storeLicenseSecure(storageSlot: string, licenseData: Record<string, unknown>): Promise<boolean> {
+  const key = await getOrCreateLocalAesKey();
+  if (!key || typeof window === 'undefined') return false;
+
+  try {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encoded = new TextEncoder().encode(JSON.stringify(licenseData));
+    const cipherBuffer = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
+    const cipher = new Uint8Array(cipherBuffer);
+
+    const payload = `${btoa(String.fromCharCode(...iv))}.${btoa(String.fromCharCode(...cipher))}`;
+    window.localStorage.setItem(`${LICENSE_AES_DATA_PREFIX}${storageSlot}`, payload);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function loadLicenseSecure<T = Record<string, unknown>>(storageSlot: string): Promise<T | null> {
+  const key = await getOrCreateLocalAesKey();
+  if (!key || typeof window === 'undefined') return null;
+
+  try {
+    const raw = window.localStorage.getItem(`${LICENSE_AES_DATA_PREFIX}${storageSlot}`);
+    if (!raw) return null;
+    const [ivB64, cipherB64] = raw.split('.');
+    if (!ivB64 || !cipherB64) return null;
+
+    const iv = Uint8Array.from(atob(ivB64), (c) => c.charCodeAt(0));
+    const cipher = Uint8Array.from(atob(cipherB64), (c) => c.charCodeAt(0));
+    const plainBuffer = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipher);
+    const json = new TextDecoder().decode(plainBuffer);
+    return JSON.parse(json) as T;
+  } catch {
+    return null;
+  }
+}
+
 async function bindLicenseOnFirstUse(licenseRow: any, licenseKey: string): Promise<{ valid: boolean; error?: string }> {
   const context = await getClientBindingContext();
   const existingUserId = licenseRow.user_id || null;
   const existingDeviceId = licenseRow.device_id || null;
+
+  if (licenseRow.is_used === true && !existingUserId && !existingDeviceId) {
+    await safeWriteVerificationLog(licenseKey, 'invalid', 'used_key_without_binding');
+    return { valid: false, error: 'This license key is already used.' };
+  }
 
   if (existingUserId && context.userId && existingUserId !== context.userId) {
     await safeWriteVerificationLog(licenseKey, 'invalid', 'bound_to_different_user');
@@ -292,6 +404,7 @@ async function bindLicenseOnFirstUse(licenseRow: any, licenseKey: string): Promi
   const updatePayload = {
     key_status: 'active',
     status: 'active',
+    is_used: true,
     user_id: existingUserId || context.userId || null,
     device_id: existingDeviceId || context.deviceId,
     activated_at: licenseRow.activated_at || nowIso,
@@ -328,18 +441,28 @@ async function bindLicenseOnFirstUse(licenseRow: any, licenseKey: string): Promi
  * Validate a license key against the database.
  * Returns the license expiry date if valid so it can be cached locally.
  */
-export async function validateLicenseKeyInDb(key: string): Promise<LicenseValidationResult> {
+export async function validateLicenseKeyInDb(key: string, signals?: ValidationRuntimeSignals): Promise<LicenseValidationResult> {
   try {
     const trimmed = key.trim().toUpperCase();
     if (!trimmed) {
       return { valid: false, error: 'License key is required.' };
     }
 
-    if (trimmed.startsWith('V1.')) {
+    if (signals?.isRooted || signals?.isEmulator || signals?.isDebuggerAttached) {
+      return { valid: false, error: 'Security violation detected on device.' };
+    }
+
+    if (trimmed.startsWith('V1.') || trimmed.startsWith('V2.')) {
       const offlineValid = await verifySecureOfflineLicenseKey(trimmed);
       if (!offlineValid) {
         await safeWriteVerificationLog(trimmed, 'invalid', 'offline_signature_invalid');
         return { valid: false, error: 'License key signature is invalid.' };
+      }
+
+      const decoded = decodeSecureOfflineLicenseKey(trimmed);
+      if (detectClockRollback(decoded?.p, signals?.currentTimeMs)) {
+        await safeWriteVerificationLog(trimmed, 'blocked', 'clock_rollback_detected');
+        return { valid: false, error: 'Device time tampering detected.' };
       }
     }
 
@@ -358,7 +481,7 @@ export async function validateLicenseKeyInDb(key: string): Promise<LicenseValida
 
     const { data, error } = await (supabase as any)
       .from('license_keys')
-      .select('id, status, key_status, expires_at, meta, user_id, device_id, activated_at, activated_devices')
+      .select('id, status, key_status, is_used, expires_at, meta, user_id, device_id, activated_at, activated_devices')
       .eq('license_key', trimmed)
       .maybeSingle();
 
@@ -370,7 +493,7 @@ export async function validateLicenseKeyInDb(key: string): Promise<LicenseValida
 
     if (!data) {
       await safeWriteVerificationLog(trimmed, 'not_found', 'license_not_found');
-      return { valid: false, error: 'Invalid license key. Please purchase a valid license.' };
+      return { valid: false, error: 'Invalid or expired key' };
     }
 
     if (isBlacklistedLicenseRow(data)) {
@@ -385,7 +508,7 @@ export async function validateLicenseKeyInDb(key: string): Promise<LicenseValida
 
     if ((data as any).key_status === 'expired' || data.status === 'expired') {
       await safeWriteVerificationLog(trimmed, 'expired', 'license_status_expired');
-      return { valid: false, error: 'This license key has expired. Please contact your reseller to purchase a new key.' };
+      return { valid: false, error: 'License expired' };
     }
 
     if (data.status && data.status !== 'active') {
@@ -396,7 +519,7 @@ export async function validateLicenseKeyInDb(key: string): Promise<LicenseValida
     const now = new Date();
     if (data.expires_at && new Date(data.expires_at) < now) {
       await safeWriteVerificationLog(trimmed, 'expired', 'license_expired');
-      return { valid: false, error: 'This license key has expired. Please contact your reseller to purchase a new key.' };
+      return { valid: false, error: 'License expired' };
     }
 
     const bindingResult = await bindLicenseOnFirstUse(data, trimmed);
@@ -410,4 +533,131 @@ export async function validateLicenseKeyInDb(key: string): Promise<LicenseValida
   } catch {
     return { valid: false, error: 'Unable to verify license key. Please check your connection and try again.' };
   }
+}
+
+export interface OfflineEnvelopeValidation {
+  valid: boolean;
+  expired: boolean;
+  productId?: string;
+  expiresAt?: string | null;
+  reason?: string;
+}
+
+export async function validateOfflineLicenseEnvelope(key: string): Promise<OfflineEnvelopeValidation> {
+  const normalized = String(key || '').trim();
+  if (!normalized) {
+    return { valid: false, expired: false, reason: 'missing_key' };
+  }
+
+  if (!normalized.startsWith('V1.') && !normalized.startsWith('V2.')) {
+    return { valid: false, expired: false, reason: 'invalid_format' };
+  }
+
+  const signatureOk = await verifySecureOfflineLicenseKey(normalized);
+  if (!signatureOk) {
+    return { valid: false, expired: false, reason: 'invalid_signature' };
+  }
+
+  const payload = decodeSecureOfflineLicenseKey(normalized);
+  if (!payload?.p) {
+    return { valid: false, expired: false, reason: 'invalid_payload' };
+  }
+
+  const expiresAt = payload.e || null;
+  if (expiresAt && new Date(expiresAt).getTime() < Date.now()) {
+    return {
+      valid: false,
+      expired: true,
+      productId: payload.p,
+      expiresAt,
+      reason: 'expired',
+    };
+  }
+
+  return {
+    valid: true,
+    expired: false,
+    productId: payload.p,
+    expiresAt,
+  };
+}
+
+export interface PhpOfflineRuntimePack {
+  licenseKey: string;
+  signature: string;
+  bootstrap: {
+    version: string;
+    productId: string;
+    expiresAt: string | null;
+    deviceLimit: number;
+    messageExpired: string;
+    messageInvalid: string;
+  };
+  phpGuardSnippet: string;
+  jsGuardSnippet: string;
+}
+
+export async function createPhpOfflineRuntimePack(input: {
+  productId: string;
+  planDuration?: string | null;
+  expiresAt?: string | null;
+  resellerId?: string | null;
+  assignedTo?: string | null;
+  deviceLimit?: number;
+}): Promise<PhpOfflineRuntimePack> {
+  const bundle = await generateSecureOfflineLicenseKey({
+    productId: input.productId,
+    planDuration: input.planDuration || null,
+    expiresAt: input.expiresAt || null,
+    resellerId: input.resellerId || null,
+    assignedTo: input.assignedTo || null,
+    deviceLimit: input.deviceLimit || 1,
+  });
+
+  const bootstrap = {
+    version: 'php-offline-v1',
+    productId: input.productId,
+    expiresAt: input.expiresAt || null,
+    deviceLimit: Math.max(1, Number(input.deviceLimit || 1)),
+    messageExpired: 'License expired, contact reseller',
+    messageInvalid: 'Invalid license key',
+  };
+
+  const phpGuardSnippet = [
+    "<?php",
+    "$runtime = json_decode(file_get_contents(__DIR__ . '/license.runtime.json'), true);",
+    "$key = trim((string)($_POST['license_key'] ?? $_GET['license_key'] ?? ''));",
+    "if ($key === '') { http_response_code(403); exit('License required'); }",
+    "$parts = explode('.', $key);",
+    "if (count($parts) !== 3 || ($parts[0] !== 'V1' && $parts[0] !== 'V2')) { http_response_code(403); exit('Invalid license key'); }",
+    "$payloadRaw = base64_decode(strtr($parts[1], '-_', '+/'));",
+    "$payload = json_decode($payloadRaw, true);",
+    "if (!$payload || ($payload['p'] ?? '') !== ($runtime['productId'] ?? '')) { http_response_code(403); exit('Invalid license key'); }",
+    "if (!empty($payload['e']) && strtotime($payload['e']) < time()) { http_response_code(403); exit('License expired, contact reseller'); }",
+    "$secret = getenv('VALA_LICENSE_SECRET') ?: 'vala-secret-key';",
+    "$expected = rtrim(strtr(base64_encode(hash_hmac('sha256', $parts[1], $secret, true)), '+/', '-_'), '=');",
+    "if (!hash_equals($expected, $parts[2])) { http_response_code(403); exit('Invalid license key'); }",
+    "?>",
+  ].join('\n');
+
+  const jsGuardSnippet = [
+    "async function validateOfflineLicenseOrThrow(licenseKey) {",
+    "  const key = String(licenseKey || '').trim();",
+    "  if (!key) throw new Error('License required');",
+    "  const result = await window.ValaLicense.validateOfflineEnvelope(key);",
+    "  if (!result.valid && result.expired) throw new Error('License expired, contact reseller');",
+    "  if (!result.valid) throw new Error('Invalid license key');",
+    "  const stored = await window.ValaLicense.storeSecure('php-offline-license', { key, checkedAt: new Date().toISOString() });",
+    "  if (!stored) console.warn('Failed to persist encrypted license cache');",
+    "  return result;",
+    "}",
+  ].join('\n');
+
+  return {
+    licenseKey: bundle.key,
+    signature: bundle.signature,
+    bootstrap,
+    phpGuardSnippet,
+    jsGuardSnippet,
+  };
 }

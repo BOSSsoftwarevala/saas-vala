@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -46,6 +46,7 @@ interface ResellerClientOption {
 
 interface GeneratedKeyState {
   key: string;
+  resellerId: string;
   productName: string;
   planDuration: PlanDuration;
   chargedPrice: number;
@@ -70,6 +71,7 @@ export function KeyGeneratorPanel() {
   const [deliveryMethod, setDeliveryMethod] = useState<'none' | 'whatsapp' | 'email' | 'manual' | 'sms'>('none');
   const [deliveryTarget, setDeliveryTarget] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const generateLockRef = useRef(false);
   const [generatedKey, setGeneratedKey] = useState<GeneratedKeyState | null>(null);
 
   const balance = Number(wallet?.balance || 0);
@@ -136,6 +138,10 @@ export function KeyGeneratorPanel() {
   const hasEnoughBalance = balance >= planPrice && planPrice > 0;
 
   const handleGenerate = async () => {
+    if (generateLockRef.current || isGenerating) {
+      return;
+    }
+
     if (!user?.id) {
       toast.error('Please login to generate keys');
       return;
@@ -157,7 +163,7 @@ export function KeyGeneratorPanel() {
     }
 
     if (!hasEnoughBalance) {
-      toast.error(`Insufficient balance. Need $${planPrice.toFixed(2)}, have $${balance.toFixed(2)}`);
+      toast.error('Insufficient balance');
       return;
     }
 
@@ -172,10 +178,20 @@ export function KeyGeneratorPanel() {
       return;
     }
 
+    generateLockRef.current = true;
     setIsGenerating(true);
     try {
+      let idempotencyKey = `${Date.now()}-fallback`;
+      if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+        idempotencyKey = crypto.randomUUID();
+      } else if (typeof crypto !== 'undefined' && 'getRandomValues' in crypto) {
+        const bytes = crypto.getRandomValues(new Uint8Array(8));
+        idempotencyKey = `${Date.now()}-${Array.from(bytes).map((n) => n.toString(16).padStart(2, '0')).join('')}`;
+      }
+
       const result = await (dashboardApi as any).generateResellerLicenseKey({
         userId: user.id,
+        idempotencyKey,
         productId: selectedProductData.id,
         planDuration: selectedPlan,
         clientId: selectedClientId !== 'none' ? selectedClientId : undefined,
@@ -186,6 +202,7 @@ export function KeyGeneratorPanel() {
 
       setGeneratedKey({
         key: result.licenseKey.license_key,
+        resellerId: String(result.resellerId || result.licenseKey?.reseller_id || ''),
         productName: selectedProductData.name,
         planDuration: selectedPlan,
         chargedPrice: Number(result.planPrice || planPrice),
@@ -196,8 +213,16 @@ export function KeyGeneratorPanel() {
       toast.success('License key generated successfully');
     } catch (error: any) {
       console.error('Reseller key generation failed:', error);
-      toast.error(error.message || 'Failed to generate license key');
+      const message = String(error?.message || '').toLowerCase();
+      if (message.includes('insufficient')) {
+        toast.error('Insufficient balance');
+      } else if (message.includes('transaction')) {
+        toast.error('Transaction failed');
+      } else {
+        toast.error('Key generation failed');
+      }
     } finally {
+      generateLockRef.current = false;
       setIsGenerating(false);
     }
   };
@@ -450,6 +475,10 @@ export function KeyGeneratorPanel() {
                 <Button variant="ghost" size="sm" onClick={copyKey}>
                   <Copy className="h-4 w-4" />
                 </Button>
+              </div>
+
+              <div className="text-sm text-muted-foreground">
+                Reseller ID: {generatedKey.resellerId || 'N/A'}
               </div>
 
               <div className="text-sm text-muted-foreground">

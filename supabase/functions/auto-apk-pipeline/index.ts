@@ -382,6 +382,180 @@ Deno.serve(async (req) => {
       }
 
       // ═══════════════════════════════════════════
+      // Register PHP source for offline conversion
+      // ═══════════════════════════════════════════
+      case "register_php_offline_conversion": {
+        const {
+          product_id,
+          project_name,
+          source_kind,
+          source_bucket_path,
+          source_repo_url,
+          output_platform,
+          version,
+          notes,
+        } = data || {};
+
+        if (!product_id) return respond({ error: "product_id required" }, 400);
+
+        const normalizedSourceKind = String(source_kind || "github_repo").trim().toLowerCase();
+        if (!["github_repo", "zip_upload"].includes(normalizedSourceKind)) {
+          return respond({ error: "source_kind must be github_repo or zip_upload" }, 400);
+        }
+
+        if (normalizedSourceKind === "zip_upload" && !String(source_bucket_path || "").trim()) {
+          return respond({ error: "source_bucket_path required for zip_upload" }, 400);
+        }
+
+        if (normalizedSourceKind === "github_repo" && !String(source_repo_url || "").trim()) {
+          return respond({ error: "source_repo_url required for github_repo" }, 400);
+        }
+
+        const normalizedPlatform = String(output_platform || "android_apk").trim().toLowerCase();
+        const allowedPlatforms = ["android_apk", "windows_exe", "desktop_webview", "electron_exe", "ios_bundle"];
+        if (!allowedPlatforms.includes(normalizedPlatform)) {
+          return respond({ error: `output_platform must be one of: ${allowedPlatforms.join(", ")}` }, 400);
+        }
+
+        const normalizedVersion = String(version || "1.0.0").trim();
+
+        const { data: product, error: productError } = await admin
+          .from("products")
+          .select("id, name, slug, git_repo_url")
+          .eq("id", product_id)
+          .single();
+
+        if (productError || !product) {
+          return respond({ error: "Product not found" }, 404);
+        }
+
+        const slug = String(product.slug || slugify(project_name || product.name || "php-offline-app"));
+        const effectiveProjectName = String(project_name || product.name || slug);
+
+        const { data: catalogRow, error: catalogError } = await admin
+          .from("source_code_catalog")
+          .upsert({
+            project_name: effectiveProjectName,
+            slug,
+            source_kind: normalizedSourceKind,
+            source_language: "php",
+            source_bucket_path: normalizedSourceKind === "zip_upload" ? String(source_bucket_path || "").trim() : null,
+            source_repo_url: normalizedSourceKind === "github_repo"
+              ? String(source_repo_url || product.git_repo_url || "").trim()
+              : null,
+            file_path: normalizedSourceKind === "zip_upload" ? String(source_bucket_path || "").trim() : null,
+            github_repo_url: normalizedSourceKind === "github_repo"
+              ? String(source_repo_url || product.git_repo_url || "").trim()
+              : null,
+            source_visibility: "private",
+            conversion_mode: "php_offline",
+            target_industry: "general",
+            status: "pending_build",
+            ai_description: notes || `${effectiveProjectName} PHP offline conversion queued`,
+          }, { onConflict: "slug" })
+          .select("id")
+          .single();
+
+        if (catalogError || !catalogRow) {
+          return respond({ error: `Catalog update failed: ${catalogError?.message || "unknown"}` }, 500);
+        }
+
+        const queueUpsert = {
+          repo_name: effectiveProjectName,
+          repo_url: String(source_repo_url || product.git_repo_url || "private-zip-source"),
+          slug,
+          product_id: product_id,
+          source_catalog_id: catalogRow.id,
+          source_kind: normalizedSourceKind,
+          source_bucket_path: normalizedSourceKind === "zip_upload" ? String(source_bucket_path || "").trim() : null,
+          source_repo_url: normalizedSourceKind === "github_repo"
+            ? String(source_repo_url || product.git_repo_url || "").trim()
+            : null,
+          conversion_type: "php_offline",
+          output_platform: normalizedPlatform,
+          output_version: normalizedVersion,
+          build_status: "pending",
+          build_error: null,
+          marketplace_listed: false,
+          build_meta: {
+            notes: notes || null,
+            registered_at: new Date().toISOString(),
+            license_mode: "offline_hmac",
+            no_source_exposure: true,
+          },
+        } as any;
+
+        const { data: queueRow, error: queueError } = await admin
+          .from("apk_build_queue")
+          .upsert(queueUpsert, { onConflict: "slug" })
+          .select("id, slug, build_status, conversion_type, output_platform, output_version")
+          .single();
+
+        if (queueError || !queueRow) {
+          return respond({ error: `Build queue update failed: ${queueError?.message || "unknown"}` }, 500);
+        }
+
+        await admin.from("bulk_upload_queue").insert({
+          catalog_id: catalogRow.id,
+          upload_type: "apk_build",
+          status: "queued",
+          priority: 4,
+        });
+
+        return respond({
+          success: true,
+          queue: queueRow,
+          catalog_id: catalogRow.id,
+          message: `✅ PHP offline conversion queued for ${slug}`,
+        });
+      }
+
+      // ═══════════════════════════════════════════
+      // Finalize PHP conversion build output
+      // ═══════════════════════════════════════════
+      case "finalize_php_offline_conversion": {
+        const {
+          queue_id,
+          product_id,
+          output_platform,
+          version,
+          file_path,
+          file_size,
+          file_hash,
+          license_runtime_bundle,
+          build_meta,
+        } = data || {};
+
+        if (!queue_id || !product_id || !file_path) {
+          return respond({ error: "queue_id, product_id and file_path are required" }, 400);
+        }
+
+        const { data: finalized, error: finalizeError } = await admin.rpc("finalize_offline_conversion_build", {
+          p_queue_id: queue_id,
+          p_product_id: product_id,
+          p_platform: output_platform || "android_apk",
+          p_version: version || "1.0.0",
+          p_file_path: file_path,
+          p_file_size: file_size || null,
+          p_file_hash: file_hash || null,
+          p_conversion_type: "php_offline",
+          p_build_type: "php_offline",
+          p_license_runtime_bundle: license_runtime_bundle || {},
+          p_build_meta: build_meta || {},
+        });
+
+        if (finalizeError || !finalized) {
+          return respond({ error: `Finalize failed: ${finalizeError?.message || "unknown"}` }, 500);
+        }
+
+        return respond({
+          success: true,
+          result: finalized,
+          message: "✅ PHP offline build finalized and attached to product",
+        });
+      }
+
+      // ═══════════════════════════════════════════
       // FUNCTION 5: Check for repo updates & rebuild
       // ═══════════════════════════════════════════
       case "check_updates": {

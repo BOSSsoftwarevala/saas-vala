@@ -64,31 +64,8 @@ export function useLicenseKeys() {
       return created;
     } catch (e: any) {
       console.error('Key create error:', e);
-      // Fallback: direct insert
-      try {
-        const { supabase } = await import('@/integrations/supabase/client');
-        const { data: { user } } = await supabase.auth.getUser();
-        const licenseKey = key.license_key || generateKeyString();
-        const { data, error } = await supabase.from('license_keys').insert({
-          product_id: key.product_id || '',
-          license_key: licenseKey,
-          key_type: key.key_type || 'yearly',
-          status: 'active',
-          owner_email: key.owner_email,
-          owner_name: key.owner_name,
-          max_devices: key.max_devices || 1,
-          expires_at: key.expires_at,
-          notes: key.notes,
-          created_by: user?.id,
-        }).select().single();
-        if (error) throw error;
-        toast.success('License key created: ' + licenseKey);
-        await fetchKeys();
-        return data;
-      } catch (fallbackErr: any) {
-        toast.error('Failed to create license key: ' + (fallbackErr.message || ''));
-        throw fallbackErr;
-      }
+      toast.error('Key generation failed');
+      throw e;
     }
   };
 

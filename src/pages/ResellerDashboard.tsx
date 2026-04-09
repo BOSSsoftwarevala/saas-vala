@@ -110,7 +110,7 @@ export default function ResellerDashboard() {
       }
 
       const { reseller, keys, products } = resellerData;
-      const availableBalance = Number(reseller.wallet_balance ?? reseller.credits ?? 0);
+      const availableBalance = Number(reseller.wallet_balance ?? 0);
 
       return (
         <div className="space-y-6">

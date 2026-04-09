@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { withErrorHandling, withRetry, validators, security, rateLimiter, ValidationError, PermissionError } from './errorHandling';
-import { generateSecureLicenseKey, generateKeySignature, generateSecureOfflineLicenseKey, verifySecureOfflineLicenseKey, verifyKeySignature } from '@/lib/licenseUtils';
+import { createPhpOfflineRuntimePack, generateSecureLicenseKey, generateKeySignature, generateSecureOfflineLicenseKey, verifySecureOfflineLicenseKey, verifyKeySignature } from '@/lib/licenseUtils';
 
 // Generate unique license key
 const generateUniqueKey = (): string => {
@@ -164,7 +164,7 @@ function mapReseller(row: any): DashboardReseller {
   return {
     id: row.id,
     name: row.company_name ?? row.name ?? '',
-    credits: Number(row.credit_limit ?? row.credits ?? 0),
+    credits: Number(row.wallet_balance ?? row.credits ?? row.credit_limit ?? 0),
     created_at: row.created_at,
   };
 }
@@ -204,12 +204,14 @@ async function createLog(
   recordId?: string,
   details?: Record<string, unknown>
 ) {
+  const detailIp = typeof details?.ip_address === 'string' ? String(details.ip_address) : null;
   await (supabase as any).from('audit_logs').insert({
     action,
     user_id: performedBy,
     table_name: tableName || null,
     record_id: recordId || null,
     new_data: details || null,
+    ip_address: detailIp,
     user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : 'server',
     created_at: new Date().toISOString(),
   });
@@ -237,6 +239,62 @@ function randomId(prefix = 'id'): string {
   return `${prefix}-${timestamp}-${random}`;
 }
 
+async function requireSuperAdmin(userId: string) {
+  await security.validateSession(userId);
+  await security.requireAnyRole(userId, ['super_admin']);
+}
+
+async function enforceLicenseCompatibility(
+  productId: string,
+  apkVersionCode?: number,
+  appVersion?: string
+) {
+  const hasVersionSignals = Number.isFinite(Number(apkVersionCode)) || !!String(appVersion || '').trim();
+  if (!hasVersionSignals) return;
+
+  const { data, error } = await (supabase as any).rpc('validate_license_apk_compatibility', {
+    p_product_id: productId,
+    p_apk_version_code: Number.isFinite(Number(apkVersionCode)) ? Number(apkVersionCode) : null,
+    p_app_version: appVersion || null,
+  });
+
+  if (error) {
+    const message = String(error.message || '').toLowerCase();
+    if (!message.includes('does not exist')) {
+      throw error;
+    }
+    return;
+  }
+
+  if (data && data.compatible === false) {
+    throw new ValidationError(String(data.message || 'APK version is not compatible with this license'));
+  }
+}
+
+async function enforceRevocationSync(
+  licenseKey: string,
+  userId?: string,
+  deviceId?: string
+) {
+  const { data, error } = await (supabase as any).rpc('sync_license_revocation_status', {
+    p_license_key: licenseKey,
+    p_user_id: userId || null,
+    p_device_id: deviceId || null,
+  });
+
+  if (error) {
+    const message = String(error.message || '').toLowerCase();
+    if (!message.includes('does not exist')) {
+      throw error;
+    }
+    return;
+  }
+
+  if (data?.revoked === true) {
+    throw new ValidationError(String(data.reason || 'License key has been revoked'));
+  }
+}
+
 function computeResellerPrice(basePrice: number, marginPercent: number): number {
   const price = Number(basePrice || 0);
   const margin = Number(marginPercent || 0);
@@ -245,6 +303,9 @@ function computeResellerPrice(basePrice: number, marginPercent: number): number 
 }
 
 type ResellerPlanDuration = '1M' | '3M' | '6M' | '12M' | 'lifetime';
+
+type PhpSourceKind = 'zip_upload' | 'github_repo';
+type OfflineOutputPlatform = 'android_apk' | 'windows_exe' | 'desktop_webview' | 'electron_exe' | 'ios_bundle';
 
 const RESELLER_PLAN_MULTIPLIERS: Record<ResellerPlanDuration, number> = {
   '1M': 1,
@@ -286,9 +347,12 @@ function randomKey(): string {
 }
 
 async function resolveResellerAndWallet(userId: string) {
+  await security.validateSession(userId);
+  await security.requireAnyRole(userId, ['reseller']);
+
   const { data: reseller, error: resellerError } = await (supabase as any)
     .from('resellers')
-    .select('id, user_id, company_name, credit_limit, created_at')
+    .select('id, user_id, company_name, created_at')
     .eq('user_id', userId)
     .single();
   if (resellerError || !reseller) throw resellerError || new ValidationError('Reseller account not found');
@@ -355,6 +419,68 @@ async function updateWalletAtomic(
   if (error) throw error;
   if (!data) throw new ValidationError('Wallet was updated by another request. Please retry.');
   return data;
+}
+
+async function generateResellerLicenseKeyAtomic(params: {
+  requestId: string;
+  userId: string;
+  resellerId: string;
+  walletId: string;
+  productId: string;
+  planDuration: ResellerPlanDuration;
+  amount: number;
+  licenseKey: string;
+  keySignature: string;
+  keyType: 'monthly' | 'yearly' | 'lifetime';
+  expiresAt: string | null;
+  deviceLimit: number;
+  clientId?: string | null;
+  sellPrice?: number | null;
+  deliveryStatus: 'pending' | 'sent' | 'failed';
+  notes: string;
+  meta: Record<string, unknown>;
+}) {
+  const { data, error } = await (supabase as any).rpc('reseller_generate_license_key_atomic_locked', {
+    p_request_id: params.requestId,
+    p_user_id: params.userId,
+    p_reseller_id: params.resellerId,
+    p_wallet_id: params.walletId,
+    p_product_id: params.productId,
+    p_amount: params.amount,
+    p_plan_duration: params.planDuration,
+    p_license_key: params.licenseKey,
+    p_key_signature: params.keySignature,
+    p_key_type: params.keyType,
+    p_expires_at: params.expiresAt,
+    p_device_limit: params.deviceLimit,
+    p_client_id: params.clientId || null,
+    p_sell_price: params.sellPrice ?? null,
+    p_delivery_status: params.deliveryStatus,
+    p_notes: params.notes,
+    p_meta: params.meta,
+  });
+
+  if (error) {
+    const msg = String(error.message || '').toLowerCase();
+    if (msg.includes('insufficient')) {
+      throw new ValidationError('Insufficient balance');
+    }
+    throw new ValidationError('Transaction failed');
+  }
+
+  const payload = data || {};
+  if (!payload.transaction_id || !payload.license_key_id || payload.balance_after === undefined || payload.version === undefined) {
+    throw new ValidationError('Transaction failed');
+  }
+
+  return {
+    transactionId: String(payload.transaction_id),
+    licenseKeyId: String(payload.license_key_id),
+    balanceAfter: Number(payload.balance_after || 0),
+    walletVersion: Number(payload.version || 0),
+    totalSpent: Number(payload.total_spent || 0),
+    idempotent: payload.idempotent === true,
+  };
 }
 
 async function ensureUniqueKey(keyValue: string): Promise<string> {
@@ -598,6 +724,12 @@ export const dashboardApi = {
       meta: { reseller_id: reseller.id },
     });
 
+    await createLog('balance_added', reseller.user_id, 'wallets', wallet.id, {
+      reseller_id: reseller.id,
+      amount: safeAmount,
+      balance_after: Number(nextWallet.balance || 0),
+    });
+
     return {
       ...mapReseller(reseller),
       credits: Number(nextWallet.balance || 0),
@@ -690,6 +822,234 @@ export const dashboardApi = {
       environment: 'production',
       lastSync: new Date().toISOString(),
     };
+  },
+
+  queuePhpOfflineConversion: async (payload: {
+    productId: string;
+    sourceKind: PhpSourceKind;
+    sourceBucketPath?: string;
+    sourceRepoUrl?: string;
+    outputPlatform?: OfflineOutputPlatform;
+    version?: string;
+    notes?: string;
+  }) => {
+    return withErrorHandling(async () => {
+      validators.uuid(payload.productId, 'productId');
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new PermissionError('Not authenticated');
+      await requireSuperAdmin(user.id);
+
+      validators.oneOf(payload.sourceKind, ['zip_upload', 'github_repo'], 'sourceKind');
+      if (payload.sourceKind === 'zip_upload') {
+        validators.required(payload.sourceBucketPath, 'sourceBucketPath');
+      }
+      if (payload.sourceKind === 'github_repo') {
+        validators.required(payload.sourceRepoUrl, 'sourceRepoUrl');
+      }
+
+      const outputPlatform = payload.outputPlatform || 'android_apk';
+      validators.oneOf(outputPlatform, ['android_apk', 'windows_exe', 'desktop_webview', 'electron_exe', 'ios_bundle'], 'outputPlatform');
+
+      const { data: product, error: productError } = await (supabase as any)
+        .from('products')
+        .select('id, name, slug')
+        .eq('id', payload.productId)
+        .single();
+      if (productError || !product) throw productError || new ValidationError('Product not found');
+
+      const { data: result, error: invokeError } = await supabase.functions.invoke('auto-apk-pipeline', {
+        body: {
+          action: 'register_php_offline_conversion',
+          data: {
+            product_id: payload.productId,
+            project_name: product.name,
+            source_kind: payload.sourceKind,
+            source_bucket_path: payload.sourceBucketPath || null,
+            source_repo_url: payload.sourceRepoUrl || null,
+            output_platform: outputPlatform,
+            version: payload.version || '1.0.0',
+            notes: payload.notes || null,
+          },
+        },
+      });
+
+      if (invokeError) throw invokeError;
+      if (!result?.success) throw new ValidationError(result?.error || 'Unable to queue PHP offline conversion');
+
+      await createLog('php_offline_conversion_queued', user.id, 'products', payload.productId, {
+        source_kind: payload.sourceKind,
+        output_platform: outputPlatform,
+        version: payload.version || '1.0.0',
+      });
+
+      return result;
+    }, 'Queue PHP offline conversion');
+  },
+
+  triggerPhpOfflineBuild: async (payload: {
+    slug: string;
+    productId: string;
+    repoUrl?: string;
+    sourceKind?: PhpSourceKind;
+    sourceBucketPath?: string;
+    outputPlatform?: OfflineOutputPlatform;
+    version?: string;
+  }) => {
+    return withErrorHandling(async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new PermissionError('Not authenticated');
+      await requireSuperAdmin(user.id);
+
+      validators.required(payload.slug, 'slug');
+      validators.uuid(payload.productId, 'productId');
+
+      const { data: result, error: invokeError } = await supabase.functions.invoke('apk-factory', {
+        body: {
+          action: 'trigger_build',
+          data: {
+            slug: payload.slug,
+            repo_url: payload.repoUrl || null,
+            product_id: payload.productId,
+            conversion_type: 'php_offline',
+            output_platform: payload.outputPlatform || 'android_apk',
+            source_kind: payload.sourceKind || (payload.sourceBucketPath ? 'zip_upload' : 'github_repo'),
+            source_bucket_path: payload.sourceBucketPath || null,
+            source_repo_url: payload.repoUrl || null,
+            output_version: payload.version || '1.0.0',
+          },
+        },
+      });
+
+      if (invokeError) throw invokeError;
+      if (!result?.success) throw new ValidationError(result?.error || 'Unable to trigger PHP offline build');
+
+      await createLog('php_offline_build_triggered', user.id, 'products', payload.productId, {
+        slug: payload.slug,
+        output_platform: payload.outputPlatform || 'android_apk',
+      });
+
+      return result;
+    }, 'Trigger PHP offline build');
+  },
+
+  finalizePhpOfflineBuild: async (payload: {
+    queueId: string;
+    productId: string;
+    outputPlatform: OfflineOutputPlatform;
+    version: string;
+    filePath: string;
+    fileSize?: number;
+    fileHash?: string;
+    expiresAt?: string | null;
+    deviceLimit?: number;
+    note?: string;
+  }) => {
+    return withErrorHandling(async () => {
+      validators.uuid(payload.queueId, 'queueId');
+      validators.uuid(payload.productId, 'productId');
+      validators.required(payload.filePath, 'filePath');
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new PermissionError('Not authenticated');
+      await requireSuperAdmin(user.id);
+
+      const runtimePack = await createPhpOfflineRuntimePack({
+        productId: payload.productId,
+        expiresAt: payload.expiresAt || null,
+        deviceLimit: Math.max(1, Number(payload.deviceLimit || 1)),
+      });
+
+      const { data: result, error: invokeError } = await supabase.functions.invoke('auto-apk-pipeline', {
+        body: {
+          action: 'finalize_php_offline_conversion',
+          data: {
+            queue_id: payload.queueId,
+            product_id: payload.productId,
+            output_platform: payload.outputPlatform,
+            version: payload.version,
+            file_path: payload.filePath,
+            file_size: payload.fileSize || null,
+            file_hash: payload.fileHash || null,
+            license_runtime_bundle: {
+              bootstrap: runtimePack.bootstrap,
+              php_guard: runtimePack.phpGuardSnippet,
+              js_guard: runtimePack.jsGuardSnippet,
+              note: payload.note || null,
+            },
+            build_meta: {
+              finalized_by: user.id,
+              finalized_at: new Date().toISOString(),
+            },
+          },
+        },
+      });
+
+      if (invokeError) throw invokeError;
+      if (!result?.success) throw new ValidationError(result?.error || 'Unable to finalize PHP offline build');
+
+      await createLog('php_offline_build_finalized', user.id, 'products', payload.productId, {
+        queue_id: payload.queueId,
+        output_platform: payload.outputPlatform,
+        version: payload.version,
+        file_path: payload.filePath,
+      });
+
+      return {
+        ...result,
+        runtimePack,
+      };
+    }, 'Finalize PHP offline build');
+  },
+
+  getPhpOfflineBuildQueue: async (productId?: string) => {
+    return withErrorHandling(async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new PermissionError('Not authenticated');
+      await requireSuperAdmin(user.id);
+
+      let query = (supabase as any)
+        .from('apk_build_queue')
+        .select('*')
+        .eq('conversion_type', 'php_offline')
+        .order('created_at', { ascending: false })
+        .limit(200);
+
+      if (productId) {
+        validators.uuid(productId, 'productId');
+        query = query.eq('product_id', productId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    }, 'Get PHP offline build queue');
+  },
+
+  generatePhpOfflineLicenseRuntime: async (payload: {
+    productId: string;
+    expiresAt?: string | null;
+    deviceLimit?: number;
+    resellerId?: string | null;
+    assignedTo?: string | null;
+  }) => {
+    return withErrorHandling(async () => {
+      validators.uuid(payload.productId, 'productId');
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new PermissionError('Not authenticated');
+      await security.validateSession(user.id);
+
+      const runtimePack = await createPhpOfflineRuntimePack({
+        productId: payload.productId,
+        expiresAt: payload.expiresAt || null,
+        deviceLimit: Math.max(1, Number(payload.deviceLimit || 1)),
+        resellerId: payload.resellerId || null,
+        assignedTo: payload.assignedTo || null,
+      });
+
+      return runtimePack;
+    }, 'Generate PHP offline runtime bundle');
   },
 
   // Cloud Deployment Functions
@@ -1129,10 +1489,10 @@ export const dashboardApi = {
 
       const [{ count: activeClientCount, error: clientCountError }, { data: completedTx, error: txError }] = await Promise.all([
         (supabase as any)
-          .from('reseller_clients')
+          .from('license_keys')
           .select('id', { count: 'exact', head: true })
           .eq('reseller_id', reseller.id)
-          .eq('status', 'active'),
+          .eq('is_used', true),
         (supabase as any)
           .from('transactions')
           .select('amount, reference_type, type, status')
@@ -1280,7 +1640,7 @@ export const dashboardApi = {
       const currentDailySpent = isNewDay ? 0 : Number(r.daily_spent || 0);
       const dailyLimit = Number(r.daily_credit_limit || 0);
       if (dailyLimit > 0 && currentDailySpent + finalPrice > dailyLimit) {
-        throw new ValidationError('Daily credit purchase limit exceeded for reseller account');
+        throw new ValidationError('Daily wallet purchase limit exceeded for reseller account');
       }
 
       const walletBalance = Number(wallet.balance || 0);
@@ -1295,18 +1655,15 @@ export const dashboardApi = {
         total_spent: Number((walletTotalSpent + finalPrice).toFixed(2)),
       });
 
-      const { data: updatedReseller, error: creditError } = await (supabase as any)
+      const { error: dailySpendError } = await (supabase as any)
         .from('resellers')
         .update({
-          credit_limit: Number(updatedWallet.balance || 0),
           daily_spent: Number((currentDailySpent + finalPrice).toFixed(2)),
           last_spent_reset_at: now.toISOString(),
         })
-        .eq('id', reseller.id)
-        .select()
-        .single();
+        .eq('id', reseller.id);
 
-      if (creditError) throw creditError;
+      if (dailySpendError) throw dailySpendError;
 
       // Create transaction record
       const { data: transaction, error: transactionError } = await (supabase as any).from('transactions').insert({
@@ -1360,6 +1717,7 @@ export const dashboardApi = {
           .update({
             key_status: 'unused',
             status: 'active',
+            is_used: false,
             assigned_to: reseller.id,
             expires_at: expiresAt.toISOString(),
             activated_devices: 0,
@@ -1390,6 +1748,7 @@ export const dashboardApi = {
             key_type: 'monthly',
             key_status: 'unused',
             status: 'active',
+            is_used: false,
             max_devices: 1,
             activated_devices: 0,
             activated_at: null,
@@ -1421,7 +1780,7 @@ export const dashboardApi = {
       });
       await createNotification('success', 'Purchase Successful', `You purchased ${product.name} for $${finalPrice.toFixed(2)}`, userId);
 
-      return { success: true, licenseKey, reseller: updatedReseller, wallet: updatedWallet };
+      return { success: true, licenseKey, reseller, wallet: updatedWallet };
     }, 'Reseller product purchase');
   },
 
@@ -1429,6 +1788,7 @@ export const dashboardApi = {
     productId: string;
     planDuration: ResellerPlanDuration;
     userId: string;
+    idempotencyKey?: string;
     clientId?: string;
     sellPrice?: number;
     deliveryMethod?: 'whatsapp' | 'email' | 'manual' | 'sms';
@@ -1485,96 +1845,82 @@ export const dashboardApi = {
       if (sellPrice !== null && (!Number.isFinite(sellPrice) || sellPrice < 0)) {
         throw new ValidationError('Sell price must be zero or greater');
       }
+      if (sellPrice !== null && sellPrice < planPrice) {
+        throw new ValidationError('Sell price cannot be below reseller minimum price');
+      }
       const profitAmount = sellPrice !== null ? Number((sellPrice - planPrice).toFixed(2)) : null;
 
       const walletVersion = Number((wallet as any).version || 0);
       const walletSpent = Number((wallet as any).total_spent || 0);
-      const nextBalance = Number((currentBalance - planPrice).toFixed(2));
-      const updatedWallet = await updateWalletAtomic(wallet.id, walletVersion, {
-        balance: nextBalance,
-        total_spent: Number((walletSpent + planPrice).toFixed(2)),
-      });
+      const effectiveExpiresAt = getExpiryForPlan(planDuration);
 
-      const { data: transaction, error: transactionError } = await (supabase as any)
-        .from('transactions')
-        .insert({
-          wallet_id: wallet.id,
+      const keyBundle = await generateSecureOfflineLicenseKey({
+        productId,
+        resellerId: reseller.id,
+        assignedTo: reseller.id,
+        planDuration,
+        expiresAt: effectiveExpiresAt,
+        deviceLimit: 1,
+      });
+      const uniqueKey = await ensureUniqueKey(keyBundle.key);
+      const idempotencyKey = String(payload.idempotencyKey || '').trim() ||
+        (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${randomId('req')}`);
+
+      const debitResult = await generateResellerLicenseKeyAtomic({
+        requestId: idempotencyKey,
+        userId,
+        resellerId: reseller.id,
+        walletId: wallet.id,
+        productId,
+        planDuration,
+        amount: planPrice,
+        licenseKey: uniqueKey,
+        keySignature: keyBundle.signature,
+        keyType: getKeyTypeForPlan(planDuration),
+        expiresAt: effectiveExpiresAt,
+        deviceLimit: 1,
+        clientId: payload.clientId || null,
+        sellPrice,
+        deliveryStatus: payload.deliveryMethod ? 'sent' : 'pending',
+        notes: `Reseller generated key (${planDuration}) for ${product.name}`,
+        meta: {
           reseller_id: reseller.id,
           product_id: productId,
-          amount: planPrice,
-          balance_after: nextBalance,
-          type: 'debit',
-          status: 'completed',
-          description: `Reseller key generation (${planDuration}) for ${product.name}`,
-          reference_type: 'reseller_key_generation',
-          created_by: userId,
-          meta: {
-            product_id: productId,
-            reseller_id: reseller.id,
-            plan_duration: planDuration,
-            base_monthly_price: baseMonthlyPrice,
-            charged_price: planPrice,
-          },
-        })
-        .select('*')
-        .single();
+          plan_duration: planDuration,
+          base_monthly_price: baseMonthlyPrice,
+          charged_price: planPrice,
+          offline_payload: keyBundle.payload,
+          generated_mode: 'reseller_wallet_plan',
+          idempotency_key: idempotencyKey,
+        },
+      });
 
-      if (transactionError || !transaction) {
-        await updateWalletAtomic(wallet.id, Number(updatedWallet.version || walletVersion + 1), {
-          balance: currentBalance,
-          total_spent: Number(walletSpent.toFixed(2)),
-        }).catch(() => null);
-        throw transactionError || new ValidationError('Failed to create wallet transaction');
-      }
+      const nextBalance = Number(debitResult.balanceAfter || 0);
+      const updatedWallet = {
+        ...wallet,
+        balance: nextBalance,
+        total_spent: Number(debitResult.totalSpent || walletSpent + planPrice),
+        version: Number(debitResult.walletVersion || walletVersion + 1),
+      };
+      const transaction = {
+        id: debitResult.transactionId,
+        wallet_id: wallet.id,
+        reseller_id: reseller.id,
+        product_id: productId,
+        amount: planPrice,
+        balance_after: nextBalance,
+        type: 'debit',
+        status: 'completed',
+      };
 
       try {
-        const keyBundle = await generateSecureOfflineLicenseKey({
-          productId,
-          resellerId: reseller.id,
-          assignedTo: reseller.id,
-        });
-        const uniqueKey = await ensureUniqueKey(keyBundle.key);
-        const expiresAt = getExpiryForPlan(planDuration);
-
         const { data: createdKey, error: keyError } = await (supabase as any)
           .from('license_keys')
-          .insert({
-            id: randomId('key'),
-            reseller_id: reseller.id,
-            product_id: productId,
-            plan_duration: planDuration,
-            license_key: uniqueKey,
-            key_signature: keyBundle.signature,
-            key_type: getKeyTypeForPlan(planDuration),
-            key_status: 'unused',
-            status: 'active',
-            assigned_to: reseller.id,
-            client_id: payload.clientId || null,
-            cost_price: planPrice,
-            sell_price: sellPrice,
-            profit_amount: profitAmount,
-            delivery_status: payload.deliveryMethod ? 'sent' : 'pending',
-            expires_at: expiresAt,
-            created_by: userId,
-            purchase_transaction_id: transaction.id,
-            activated_devices: 0,
-            max_devices: 1,
-            notes: `Reseller generated key (${planDuration}) for ${product.name}`,
-            meta: {
-              reseller_id: reseller.id,
-              product_id: productId,
-              plan_duration: planDuration,
-              base_monthly_price: baseMonthlyPrice,
-              charged_price: planPrice,
-              transaction_id: transaction.id,
-              offline_payload: keyBundle.payload,
-              generated_mode: 'reseller_wallet_plan',
-            },
-          })
           .select('*')
+          .eq('id', debitResult.licenseKeyId)
           .single();
 
-        if (keyError || !createdKey) throw keyError || new ValidationError('Failed to create license key');
+        if (keyError || !createdKey) throw keyError || new ValidationError('Key generation failed');
 
         if (sellPrice !== null) {
           const earnedNow = Number((Number((updatedWallet as any).total_earned || 0) + sellPrice).toFixed(2));
@@ -1603,7 +1949,9 @@ export const dashboardApi = {
                 profit_amount: profitAmount,
               },
             });
-          if (saleTxError) throw saleTxError;
+          if (saleTxError) {
+            console.warn('Sale transaction log failed', saleTxError);
+          }
         }
 
         if (payload.deliveryMethod) {
@@ -1622,7 +1970,9 @@ export const dashboardApi = {
               cost_price: planPrice,
             },
           });
-          if (deliveryError) throw deliveryError;
+          if (deliveryError) {
+            console.warn('Delivery log failed', deliveryError);
+          }
         }
 
         try {
@@ -1632,6 +1982,12 @@ export const dashboardApi = {
             plan_duration: planDuration,
             price: planPrice,
             transaction_id: transaction.id,
+          });
+
+          await createLog('key_generated', userId, 'license_keys', createdKey.id, {
+            reseller_id: reseller.id,
+            transaction_id: transaction.id,
+            idempotency_key: idempotencyKey,
           });
 
           await createNotification('success', 'License Key Generated', `${product.name} key generated for ${planDuration}`, userId);
@@ -1644,34 +2000,142 @@ export const dashboardApi = {
           licenseKey: createdKey,
           transaction,
           planPrice,
-          expiresAt,
+          expiresAt: effectiveExpiresAt,
+          resellerId: reseller.id,
           walletBalance: Number(updatedWallet.balance || nextBalance),
         };
       } catch (error) {
-        await updateWalletAtomic(wallet.id, Number(updatedWallet.version || 0), {
-          balance: currentBalance,
-          total_spent: Number(walletSpent.toFixed(2)),
-        }).catch(() => null);
-
-        await (supabase as any).from('transactions').insert({
-          wallet_id: wallet.id,
-          reseller_id: reseller.id,
-          amount: planPrice,
-          balance_after: currentBalance,
-          type: 'credit',
-          status: 'completed',
-          description: `Refund: failed reseller key generation for ${product.name}`,
-          reference_type: 'refund',
-          created_by: userId,
-          meta: {
-            original_transaction_id: transaction.id,
-            product_id: productId,
-            plan_duration: planDuration,
-          },
-        }).catch(() => { /* best effort */ });
-        throw error;
+        const message = String((error as any)?.message || '').toLowerCase();
+        if (message.includes('insufficient')) {
+          throw new ValidationError('Insufficient balance');
+        }
+        if (message.includes('transaction')) {
+          throw new ValidationError('Transaction failed');
+        }
+        throw new ValidationError('Key generation failed');
       }
     }, 'Reseller generate license key');
+  },
+
+  generateResellerLicenseKeysBulk: async (payload: {
+    productId: string;
+    planDuration: ResellerPlanDuration;
+    userId: string;
+    quantity: number;
+    idempotencyKey?: string;
+    clientId?: string;
+  }) => {
+    return withErrorHandling(async () => {
+      const safeQty = Math.max(1, Math.min(500, Math.floor(Number(payload.quantity || 0))));
+      if (!Number.isFinite(safeQty) || safeQty <= 0) {
+        throw new ValidationError('Invalid bulk quantity');
+      }
+
+      const { reseller, wallet } = await resolveResellerAndWallet(payload.userId);
+      if ((wallet as any).is_locked) throw new ValidationError('Wallet is locked. Please contact support.');
+
+      const { data: product, error: productError } = await (supabase as any)
+        .from('products')
+        .select('id, name, price, status, license_enabled')
+        .eq('id', payload.productId)
+        .single();
+      if (productError || !product) throw productError || new ValidationError('Product not found');
+      if (product.status !== 'active') throw new ValidationError('Selected product is not active');
+      if (product.license_enabled === false) throw new ValidationError('License generation is disabled for this product');
+
+      const baseMonthlyPrice = Number(product.price || 0);
+      const planPrice = getResellerPlanPrice(baseMonthlyPrice, payload.planDuration);
+      if (planPrice <= 0) throw new ValidationError('Invalid plan price for this product');
+
+      const totalCost = Number((planPrice * safeQty).toFixed(2));
+      const currentBalance = Number(wallet.balance || 0);
+      if (currentBalance < totalCost) {
+        throw new ValidationError('Insufficient balance');
+      }
+
+      const expiresAt = getExpiryForPlan(payload.planDuration);
+      const keyType = getKeyTypeForPlan(payload.planDuration);
+
+      const generatedKeys: string[] = [];
+      const generatedSignatures: string[] = [];
+      for (let i = 0; i < safeQty; i += 1) {
+        const keyBundle = await generateSecureOfflineLicenseKey({
+          productId: payload.productId,
+          resellerId: reseller.id,
+          assignedTo: reseller.id,
+          planDuration: payload.planDuration,
+          expiresAt,
+          deviceLimit: 1,
+        });
+        const uniqueKey = await ensureUniqueKey(keyBundle.key);
+        generatedKeys.push(uniqueKey);
+        generatedSignatures.push(keyBundle.signature);
+      }
+
+      const idempotencyKey = String(payload.idempotencyKey || '').trim() ||
+        (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${randomId('bulk')}`);
+
+      const { data: bulkResult, error: bulkError } = await (supabase as any).rpc('reseller_generate_license_keys_bulk_atomic', {
+        p_request_id: idempotencyKey,
+        p_user_id: payload.userId,
+        p_reseller_id: reseller.id,
+        p_wallet_id: wallet.id,
+        p_product_id: payload.productId,
+        p_plan_duration: payload.planDuration,
+        p_amount_per_key: planPrice,
+        p_key_type: keyType,
+        p_expires_at: expiresAt,
+        p_license_keys: generatedKeys,
+        p_key_signatures: generatedSignatures,
+        p_device_limit: 1,
+        p_client_id: payload.clientId || null,
+        p_delivery_status: payload.clientId ? 'sent' : 'pending',
+        p_meta: {
+          reseller_id: reseller.id,
+          product_id: payload.productId,
+          plan_duration: payload.planDuration,
+          amount_per_key: planPrice,
+          quantity: safeQty,
+          idempotency_key: idempotencyKey,
+          generated_mode: 'reseller_bulk_atomic',
+        },
+      });
+
+      if (bulkError || !bulkResult) {
+        const message = String((bulkError as any)?.message || '').toLowerCase();
+        if (message.includes('insufficient')) throw new ValidationError('Insufficient balance');
+        if (message.includes('transaction') || message.includes('daily limit')) throw new ValidationError('Transaction failed');
+        throw bulkError || new ValidationError('Key generation failed');
+      }
+
+      const keyIds = ((bulkResult.results || []) as any[])
+        .map((item: any) => String(item.license_key_id || ''))
+        .filter((id: string) => id.length > 0);
+
+      const { data: createdKeys, error: keysFetchError } = await (supabase as any)
+        .from('license_keys')
+        .select('*')
+        .in('id', keyIds)
+        .order('created_at', { ascending: false });
+      if (keysFetchError) throw keysFetchError;
+
+      await createLog('key_generated', payload.userId, 'license_keys', `${reseller.id}:${payload.productId}`, {
+        reseller_id: reseller.id,
+        product_id: payload.productId,
+        quantity: safeQty,
+        total_cost: totalCost,
+        idempotency_key: idempotencyKey,
+      });
+
+      return {
+        success: true,
+        quantity: safeQty,
+        totalCost,
+        planPrice,
+        keys: createdKeys || [],
+        resellerId: reseller.id,
+      };
+    }, 'Reseller generate license keys bulk');
   },
 
   getResellerClients: async (userId: string) => {
@@ -2027,19 +2491,9 @@ export const dashboardApi = {
    */
   toggleDemoEnabled: async (productId: string, enabled: boolean) => {
     return withErrorHandling(async () => {
-      // Verify super admin
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new PermissionError('Not authenticated');
-
-      const { data: profile } = await (supabase as any)
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-
-      if ((profile as any)?.role !== 'super_admin') {
-        throw new PermissionError('Only super admin can control marketplace products');
-      }
+      await requireSuperAdmin(user.id);
 
       // Get product to validate it exists and has demoUrl
       const { data: product, error: productError } = await supabase
@@ -2076,16 +2530,7 @@ export const dashboardApi = {
     return withErrorHandling(async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new PermissionError('Not authenticated');
-
-      const { data: profile } = await (supabase as any)
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-
-      if ((profile as any)?.role !== 'super_admin') {
-        throw new PermissionError('Only super admin can control marketplace products');
-      }
+      await requireSuperAdmin(user.id);
 
       const { error } = await (supabase as any)
         .from('products')
@@ -2106,16 +2551,7 @@ export const dashboardApi = {
     return withErrorHandling(async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new PermissionError('Not authenticated');
-
-      const { data: profile } = await (supabase as any)
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-
-      if ((profile as any)?.role !== 'super_admin') {
-        throw new PermissionError('Only super admin can control marketplace products');
-      }
+      await requireSuperAdmin(user.id);
 
       // Get product to validate
       const { data: product, error: productError } = await supabase
@@ -2189,16 +2625,7 @@ export const dashboardApi = {
     return withErrorHandling(async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new PermissionError('Not authenticated');
-
-      const { data: profile } = await (supabase as any)
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-
-      if ((profile as any)?.role !== 'super_admin') {
-        throw new PermissionError('Only super admin can control marketplace products');
-      }
+      await requireSuperAdmin(user.id);
 
       const { error } = await (supabase as any)
         .from('products')
@@ -2219,6 +2646,7 @@ export const dashboardApi = {
     return withErrorHandling(async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new PermissionError('Not authenticated');
+      await requireSuperAdmin(user.id);
 
       const { data: product, error: productError } = await supabase
         .from('products')
@@ -2259,6 +2687,7 @@ export const dashboardApi = {
     return withErrorHandling(async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new PermissionError('Not authenticated');
+      await requireSuperAdmin(user.id);
 
       const { error } = await (supabase as any)
         .from('products')
@@ -2298,15 +2727,7 @@ export const dashboardApi = {
 
   blacklistLicenseKey: async (licenseKeyId: string, reason: string, adminUserId: string) => {
     return withErrorHandling(async () => {
-      const { data: adminProfile, error: adminError } = await (supabase as any)
-        .from('profiles')
-        .select('role')
-        .eq('id', adminUserId)
-        .single();
-      if (adminError) throw adminError;
-      if ((adminProfile as any)?.role !== 'super_admin') {
-        throw new PermissionError('Only super admin can blacklist license keys');
-      }
+      await requireSuperAdmin(adminUserId);
 
       const { data: existingKey, error: keyError } = await (supabase as any)
         .from('license_keys')
@@ -2349,15 +2770,7 @@ export const dashboardApi = {
 
   unblacklistLicenseKey: async (licenseKeyId: string, adminUserId: string, note?: string) => {
     return withErrorHandling(async () => {
-      const { data: adminProfile, error: adminError } = await (supabase as any)
-        .from('profiles')
-        .select('role')
-        .eq('id', adminUserId)
-        .single();
-      if (adminError) throw adminError;
-      if ((adminProfile as any)?.role !== 'super_admin') {
-        throw new PermissionError('Only super admin can unblacklist license keys');
-      }
+      await requireSuperAdmin(adminUserId);
 
       const { data: existingKey, error: keyError } = await (supabase as any)
         .from('license_keys')
@@ -2433,15 +2846,7 @@ export const dashboardApi = {
 
   approveManualPaymentAndGenerateKey: async (transactionId: string, adminUserId: string) => {
     return withErrorHandling(async () => {
-      const { data: adminProfile, error: adminError } = await (supabase as any)
-        .from('profiles')
-        .select('role')
-        .eq('id', adminUserId)
-        .single();
-      if (adminError) throw adminError;
-      if ((adminProfile as any)?.role !== 'super_admin') {
-        throw new PermissionError('Only super admin can approve manual payments');
-      }
+      await requireSuperAdmin(adminUserId);
 
       const { data: tx, error: txError } = await (supabase as any)
         .from('transactions')
@@ -2540,15 +2945,7 @@ export const dashboardApi = {
 
   expireLicenseKey: async (licenseKeyId: string, adminUserId: string, reason?: string) => {
     return withErrorHandling(async () => {
-      const { data: adminProfile, error: adminError } = await (supabase as any)
-        .from('profiles')
-        .select('role')
-        .eq('id', adminUserId)
-        .single();
-      if (adminError) throw adminError;
-      if ((adminProfile as any)?.role !== 'super_admin') {
-        throw new PermissionError('Only super admin can expire license keys');
-      }
+      await requireSuperAdmin(adminUserId);
 
       const { data: existingKey, error: keyError } = await (supabase as any)
         .from('license_keys')
@@ -2585,7 +2982,17 @@ export const dashboardApi = {
   },
 
   // Activate license key
-  activateLicenseKey: async (licenseKey: string, deviceId: string, userId: string) => {
+  activateLicenseKey: async (
+    licenseKey: string,
+    deviceId: string,
+    userId: string,
+    context?: {
+      apkVersionCode?: number;
+      appVersion?: string;
+      ipAddress?: string;
+      deviceFingerprint?: string;
+    }
+  ) => {
     return withErrorHandling(async () => {
       const normalizedLicenseKey = normalizeLicenseKey(licenseKey);
       const normalizedDeviceId = String(deviceId || '').trim();
@@ -2635,6 +3042,13 @@ export const dashboardApi = {
         throw new ValidationError('License key not found');
       }
 
+      await enforceRevocationSync(normalizedLicenseKey, userId, normalizedDeviceId);
+      await enforceLicenseCompatibility(
+        String((key as any).product_id || ''),
+        context?.apkVersionCode,
+        context?.appVersion
+      );
+
       if (normalizedLicenseKey.startsWith('V1.')) {
         const offlineVerified = await verifySecureOfflineLicenseKey(normalizedLicenseKey);
         if (!offlineVerified) {
@@ -2671,11 +3085,11 @@ export const dashboardApi = {
       }
       if ((key as any).key_status === 'expired' || key.status === 'expired') {
         await logLicenseVerificationAttempt(normalizedLicenseKey, 'expired', 'license_status_expired', userId, normalizedDeviceId);
-        throw new ValidationError('License key has expired. Please contact your reseller to purchase a new key.');
+        throw new ValidationError('License expired');
       }
       if (key.expires_at && new Date(key.expires_at) < new Date()) {
         await logLicenseVerificationAttempt(normalizedLicenseKey, 'expired', 'license_expired', userId, normalizedDeviceId);
-        throw new ValidationError('License key has expired. Please contact your reseller to purchase a new key.');
+        throw new ValidationError('License expired');
       }
       if ((key as any).user_id && (key as any).user_id !== userId) {
         await logLicenseVerificationAttempt(normalizedLicenseKey, 'invalid', 'bound_to_different_user', userId, normalizedDeviceId);
@@ -2684,6 +3098,10 @@ export const dashboardApi = {
       if ((key as any).device_id && (key as any).device_id !== normalizedDeviceId) {
         await logLicenseVerificationAttempt(normalizedLicenseKey, 'invalid', 'bound_to_different_device', userId, normalizedDeviceId);
         throw new ValidationError('License key is already activated on a different device');
+      }
+      if ((key as any).is_used === true && !(key as any).device_id && !(key as any).user_id) {
+        await logLicenseVerificationAttempt(normalizedLicenseKey, 'invalid', 'used_key_without_binding', userId, normalizedDeviceId);
+        throw new ValidationError('License key is already used');
       }
       if (key.activated_devices >= key.max_devices) {
         await logLicenseVerificationAttempt(normalizedLicenseKey, 'revoked', 'device_limit_reached', userId, normalizedDeviceId);
@@ -2715,6 +3133,7 @@ export const dashboardApi = {
         .from('license_keys')
         .update({
           key_status: 'active',
+          is_used: true,
           activated_devices: Math.max(1, Number(key.activated_devices || 0) + 1),
           user_id: (key as any).user_id || userId,
           device_id: normalizedDeviceId,
@@ -2727,6 +3146,16 @@ export const dashboardApi = {
       await createLog('activate', userId, 'license_keys', key.id, {
         security_event: 'license_activated',
         device_id: normalizedDeviceId,
+        app_version: context?.appVersion || null,
+        apk_version_code: context?.apkVersionCode ?? null,
+        device_fingerprint: context?.deviceFingerprint || null,
+        ip_address: context?.ipAddress || null,
+      });
+      await createLog('key_used', userId, 'license_keys', key.id, {
+        reseller_id: (key as any).reseller_id || null,
+        device_id: normalizedDeviceId,
+        app_version: context?.appVersion || null,
+        ip_address: context?.ipAddress || null,
       });
 
       return { success: true, key: key.license_key };

@@ -103,6 +103,56 @@ export function useAutoApkPipeline() {
     return result;
   }, [invoke]);
 
+  const registerPhpOfflineConversion = useCallback(async (payload: {
+    productId: string;
+    projectName?: string;
+    sourceKind: 'zip_upload' | 'github_repo';
+    sourceBucketPath?: string;
+    sourceRepoUrl?: string;
+    outputPlatform?: 'android_apk' | 'windows_exe' | 'desktop_webview' | 'electron_exe' | 'ios_bundle';
+    version?: string;
+    notes?: string;
+  }) => {
+    const result = await invoke('auto-apk-pipeline', 'register_php_offline_conversion', {
+      product_id: payload.productId,
+      project_name: payload.projectName,
+      source_kind: payload.sourceKind,
+      source_bucket_path: payload.sourceBucketPath,
+      source_repo_url: payload.sourceRepoUrl,
+      output_platform: payload.outputPlatform || 'android_apk',
+      version: payload.version || '1.0.0',
+      notes: payload.notes,
+    });
+    if (result?.success) toast.success(result.message || 'PHP offline conversion queued');
+    return result;
+  }, [invoke]);
+
+  const finalizePhpOfflineConversion = useCallback(async (payload: {
+    queueId: string;
+    productId: string;
+    outputPlatform: 'android_apk' | 'windows_exe' | 'desktop_webview' | 'electron_exe' | 'ios_bundle';
+    version: string;
+    filePath: string;
+    fileSize?: number;
+    fileHash?: string;
+    licenseRuntimeBundle?: Record<string, unknown>;
+    buildMeta?: Record<string, unknown>;
+  }) => {
+    const result = await invoke('auto-apk-pipeline', 'finalize_php_offline_conversion', {
+      queue_id: payload.queueId,
+      product_id: payload.productId,
+      output_platform: payload.outputPlatform,
+      version: payload.version,
+      file_path: payload.filePath,
+      file_size: payload.fileSize,
+      file_hash: payload.fileHash,
+      license_runtime_bundle: payload.licenseRuntimeBundle || {},
+      build_meta: payload.buildMeta || {},
+    });
+    if (result?.success) toast.success(result.message || 'PHP offline build finalized');
+    return result;
+  }, [invoke]);
+
   return {
     loading,
     stats,
@@ -116,5 +166,7 @@ export function useAutoApkPipeline() {
     setupFactory,
     triggerFactoryBuild,
     checkBuildStatus,
+    registerPhpOfflineConversion,
+    finalizePhpOfflineConversion,
   };
 }

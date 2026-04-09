@@ -40,6 +40,22 @@ export class RateLimitError extends DashboardError {
   }
 }
 
+type AppRole = 'super_admin' | 'admin' | 'master_reseller' | 'reseller' | 'user';
+
+const ROLE_PRIORITY: Record<AppRole, number> = {
+  user: 1,
+  reseller: 2,
+  master_reseller: 3,
+  admin: 4,
+  super_admin: 5,
+};
+
+function normalizeRole(role: unknown): AppRole | null {
+  if (typeof role !== 'string') return null;
+  const value = role.trim().toLowerCase() as AppRole;
+  return value in ROLE_PRIORITY ? value : null;
+}
+
 // Rate limiting utility
 class RateLimiter {
   private attempts = new Map<string, { count: number; resetTime: number }>();
@@ -122,9 +138,86 @@ export const security = {
     return input.replace(/[<>]/g, '').trim();
   },
 
-  checkPermission: (userRole?: string, requiredRole: string = 'admin') => {
-    if (!userRole || userRole !== requiredRole) {
+  checkPermission: (userRole?: string, requiredRole: AppRole = 'admin') => {
+    const normalizedUserRole = normalizeRole(userRole);
+    const normalizedRequiredRole = normalizeRole(requiredRole);
+    if (!normalizedUserRole || !normalizedRequiredRole) {
       throw new PermissionError();
+    }
+
+    if (ROLE_PRIORITY[normalizedUserRole] < ROLE_PRIORITY[normalizedRequiredRole]) {
+      throw new PermissionError();
+    }
+  },
+
+  getUserRoles: async (userId: string): Promise<AppRole[]> => {
+    const { data: roleRows, error: roleError } = await (supabase as any)
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId);
+
+    if (roleError) {
+      throw new PermissionError('Failed to verify user role');
+    }
+
+    const roles = Array.from(
+      new Set((roleRows || []).map((row: any) => normalizeRole(row?.role)).filter(Boolean) as AppRole[])
+    );
+
+    if (roles.length === 0) {
+      const { data: profile } = await (supabase as any)
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .maybeSingle();
+
+      const profileRole = normalizeRole((profile as any)?.role);
+      if (profileRole) {
+        roles.push(profileRole);
+      }
+    }
+
+    if (roles.length === 0) {
+      roles.push('user');
+    }
+
+    return roles;
+  },
+
+  requireAnyRole: async (userId: string, requiredRoles: AppRole[]) => {
+    const roles = await security.getUserRoles(userId);
+    const allowed = new Set(requiredRoles);
+
+    const hasRequired = roles.some((role) => {
+      return Array.from(allowed).some((requiredRole) => ROLE_PRIORITY[role] >= ROLE_PRIORITY[requiredRole]);
+    });
+
+    if (!hasRequired) {
+      throw new PermissionError('Insufficient role permissions');
+    }
+
+    return roles;
+  },
+
+  hasPermission: async (userId: string, permissionName: string): Promise<boolean> => {
+    try {
+      const { data, error } = await (supabase as any).rpc('has_permission_name', {
+        p_user_id: userId,
+        p_permission_name: permissionName,
+      });
+
+      if (error) {
+        const message = String(error?.message || '').toLowerCase();
+        if (message.includes('does not exist') || message.includes('function')) {
+          return false;
+        }
+        throw error;
+      }
+
+      return data === true;
+    } catch (error) {
+      console.warn('Permission check failed', { permissionName, error });
+      return false;
     }
   },
 
@@ -144,7 +237,15 @@ export const security = {
       throw new PermissionError('User account not found');
     }
 
-    return user;
+    const roles = await security.getUserRoles(userId);
+
+    const safeUser = (user as any) || { id: userId, role: null };
+
+    return {
+      ...safeUser,
+      roles,
+      primaryRole: roles[0] || 'user',
+    };
   }
 };
 
