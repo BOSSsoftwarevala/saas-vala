@@ -312,7 +312,7 @@ export function SupportChatWindow({ channel, messages, members, typingUsers, onS
               <div className="flex items-center justify-between px-[6px] py-[4px]">
                 <div className="flex items-center gap-0">
                   {[
-                    { icon: Plus, tip: 'Attach' },
+                    { icon: Paperclip, tip: 'Attach' },
                     { icon: Smile, tip: 'Emoji' },
                     { icon: AtSign, tip: 'Mention' },
                     { icon: Video, tip: 'Record video' },

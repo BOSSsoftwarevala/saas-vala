@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Hash, Lock, Plus, ChevronDown, ChevronRight, Search, PenSquare, Bookmark, MessageCircle, Headphones, MoreHorizontal, Bell, ArrowDown } from 'lucide-react';
+import { Hash, Lock, Plus, ChevronDown, ChevronRight, Search, PenSquare, Bookmark, MessageCircle, Headphones, MoreHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';

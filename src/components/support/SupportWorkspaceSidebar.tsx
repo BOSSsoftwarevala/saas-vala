@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Home, MessageSquare, Bell, MoreHorizontal, Plus, Compass, Search } from 'lucide-react';
+import { Home, MessageSquare, Bell, MoreHorizontal, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/hooks/useAuth';
