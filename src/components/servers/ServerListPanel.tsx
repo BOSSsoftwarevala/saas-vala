@@ -34,7 +34,6 @@ interface ServerItem {
   status: string | null;
   server_type: string | null;
   agent_url: string | null;
-  agent_token: string | null;
   ip_address: string | null;
   created_at: string | null;
 }
@@ -98,7 +97,7 @@ export function ServerListPanel() {
     try {
       const { data, error } = await supabase
         .from('servers')
-        .select('id, name, subdomain, status, server_type, agent_url, agent_token, ip_address, created_at')
+        .select('id, name, subdomain, status, server_type, agent_url, ip_address, created_at')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -151,6 +150,7 @@ export function ServerListPanel() {
               ip_address: newServer.ip_address || null,
               agent_url: newServer.agent_url,
               agent_token: newServer.agent_token,
+              created_by: userData.user?.id,
             },
           },
         });
@@ -198,7 +198,7 @@ export function ServerListPanel() {
       name: server.name,
       server_type: server.server_type || 'self',
       agent_url: server.agent_url || '',
-      agent_token: server.agent_token || '',
+      agent_token: '',
       ip_address: server.ip_address || '',
       status: (server.status as 'live' | 'stopped' | 'deploying' | 'failed' | 'suspended') || 'stopped',
     });
@@ -209,19 +209,40 @@ export function ServerListPanel() {
     if (!selectedServer) return;
     setSaving(true);
     try {
+      const updates: Record<string, any> = {
+        name: editServer.name,
+        server_type: editServer.server_type,
+        agent_url: editServer.agent_url || null,
+        ip_address: editServer.ip_address || null,
+        status: editServer.status,
+      };
+
       const { error } = await supabase
         .from('servers')
-        .update({
-          name: editServer.name,
-          server_type: editServer.server_type,
-          agent_url: editServer.agent_url || null,
-          agent_token: editServer.agent_token || null,
-          ip_address: editServer.ip_address || null,
-          status: editServer.status,
-        })
+        .update(updates)
         .eq('id', selectedServer.id);
 
       if (error) throw error;
+
+      if (editServer.agent_token.trim()) {
+        const { data: userData } = await supabase.auth.getUser();
+        const { data, error: registerError } = await supabase.functions.invoke('server-agent', {
+          body: {
+            action: 'register',
+            params: {
+              name: editServer.name,
+              ip_address: editServer.ip_address || null,
+              agent_url: editServer.agent_url || null,
+              agent_token: editServer.agent_token.trim(),
+              created_by: userData.user?.id,
+            },
+          },
+        });
+
+        if (registerError || !data?.success) {
+          throw new Error(registerError?.message || data?.error || 'Token update failed');
+        }
+      }
       toast.success('Server updated');
       setShowManageModal(false);
       await fetchServers();
@@ -251,6 +272,25 @@ export function ServerListPanel() {
   const toggleServerStatus = async (server: ServerItem) => {
     try {
       const nextStatus = server.status === 'live' ? 'stopped' : 'live';
+
+      const command = nextStatus === 'live' ? 'restart' : 'exec';
+      const params = nextStatus === 'live'
+        ? { service: 'app' }
+        : { command: 'pm2 stop all || true' };
+
+      const { data: agentResult, error: agentError } = await supabase.functions.invoke('server-agent', {
+        body: {
+          action: 'execute',
+          serverId: server.id,
+          command,
+          params,
+        },
+      });
+
+      if (agentError || !agentResult?.success) {
+        throw new Error(agentError?.message || agentResult?.error || 'Agent command failed');
+      }
+
       const { error } = await supabase.from('servers').update({ status: nextStatus }).eq('id', server.id);
       if (error) throw error;
       toast.success(`${server.name} set to ${nextStatus.toUpperCase()}`);
@@ -395,7 +435,7 @@ export function ServerListPanel() {
                         size="sm"
                         className="h-8 text-xs gap-1.5 bg-gradient-to-r from-primary to-cyan hover:from-primary/90 hover:to-cyan/90"
                         onClick={() => verifyServer(server)}
-                        disabled={verifyingId === server.id || !server.agent_url || !server.agent_token}
+                        disabled={verifyingId === server.id || !server.agent_url}
                       >
                         {verifyingId === server.id ? (
                           <Loader2 className="h-3 w-3 animate-spin" />

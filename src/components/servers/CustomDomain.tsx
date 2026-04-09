@@ -1,15 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Globe2, Plus, CheckCircle2, Clock, AlertCircle,
   Copy, Check, RefreshCw, Trash2, Shield, Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { serversApi } from '@/lib/api';
 
 interface DomainRow {
   id: string;
@@ -21,88 +23,139 @@ interface DomainRow {
   server_id: string | null;
 }
 
-const dnsRecords = [
-  { type: 'A', host: '@', value: '76.76.21.21' },
-  { type: 'CNAME', host: 'www', value: 'cname.vercel-dns.com' },
-];
+interface DnsRecordRow {
+  id: string;
+  record_type: string;
+  name: string;
+  value: string;
+  ttl?: number | null;
+}
+
+interface ServerOption {
+  id: string;
+  name: string;
+}
+
+async function copyText(value: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = value;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand('copy');
+  document.body.removeChild(textarea);
+}
 
 export function CustomDomain() {
   const [domains, setDomains] = useState<DomainRow[]>([]);
+  const [servers, setServers] = useState<ServerOption[]>([]);
+  const [selectedServerId, setSelectedServerId] = useState('');
   const [newDomain, setNewDomain] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+  const [verifyingId, setVerifyingId] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const [copiedRecord, setCopiedRecord] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dnsRecordsByDomain, setDnsRecordsByDomain] = useState<Record<string, DnsRecordRow[]>>({});
 
   useEffect(() => {
-    fetchDomains();
+    void fetchData();
   }, []);
 
-  const fetchDomains = async () => {
+  const fetchData = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('domains')
-      .select('id, domain_name, domain_type, status, ssl_status, dns_verified, server_id')
-      .order('created_at', { ascending: false });
-    if (!error) setDomains(data || []);
-    setLoading(false);
+    try {
+      const [domainsResp, serversResp] = await Promise.all([
+        serversApi.listDomains() as Promise<{ data: DomainRow[] }>,
+        serversApi.list() as Promise<{ data: ServerOption[] }>,
+      ]);
+
+      const domainRows = domainsResp?.data || [];
+      const serverRows = serversResp?.data || [];
+      setDomains(domainRows);
+      setServers(serverRows);
+      setSelectedServerId((prev) => prev || serverRows[0]?.id || '');
+
+      const pending = domainRows.filter((item) => item.status === 'pending');
+      const dnsPairs = await Promise.all(
+        pending.map(async (item) => {
+          const response = await serversApi.domainRecords(item.id) as { data: DnsRecordRow[] };
+          return [item.id, response?.data || []] as const;
+        })
+      );
+
+      setDnsRecordsByDomain(Object.fromEntries(dnsPairs));
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to load domains');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAddDomain = async () => {
-    if (!newDomain.trim()) return;
+    if (!newDomain.trim() || !selectedServerId) return;
     setIsAdding(true);
-    
-    const { data: userData } = await supabase.auth.getUser();
-    const { error } = await supabase.from('domains').insert([{
-      domain_name: newDomain.trim(),
-      domain_type: 'custom',
-      status: 'pending' as const,
-      ssl_status: 'pending',
-      dns_verified: false,
-      created_by: userData.user?.id,
-    }]);
 
-    if (error) {
-      toast.error('Failed to add domain: ' + error.message);
-    } else {
+    try {
+      await serversApi.addDomain({
+        domain_name: newDomain.trim(),
+        server_id: selectedServerId,
+        domain_type: 'custom',
+      });
       toast.success('Domain added! Add DNS records below to verify.');
       setNewDomain('');
-      await fetchDomains();
+      await fetchData();
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to add domain');
     }
     setIsAdding(false);
   };
 
   const handleVerify = async (domainId: string) => {
-    toast.info('Checking DNS records...');
-    // In production, this would call an edge function to verify DNS
-    const { error } = await supabase.from('domains').update({
-      dns_verified: true,
-      status: 'active',
-      ssl_status: 'active',
-    }).eq('id', domainId);
-
-    if (!error) {
+    setVerifyingId(domainId);
+    try {
+      await serversApi.verifyDomain(domainId);
       toast.success('Domain verified and live!');
-      await fetchDomains();
-    } else {
-      toast.error('Verification failed');
+      await fetchData();
+    } catch (error: any) {
+      toast.error(error?.message || 'Verification failed');
+    } finally {
+      setVerifyingId(null);
     }
   };
 
   const handleRemove = async (domainId: string) => {
-    const { error } = await supabase.from('domains').delete().eq('id', domainId);
-    if (!error) {
+    setRemovingId(domainId);
+    try {
+      const result = await serversApi.removeDomain(domainId) as { success: boolean; cleanup?: { attempted?: boolean; removed?: number; reason?: string } };
       toast.success('Domain removed');
-      await fetchDomains();
-    } else {
-      toast.error('Failed to remove domain');
+      if (result?.cleanup?.attempted) {
+        const removed = Number(result.cleanup.removed || 0);
+        toast.info(removed > 0 ? `Provider cleanup removed ${removed} DNS record(s)` : `Provider cleanup attempted${result.cleanup.reason ? `: ${result.cleanup.reason}` : ''}`);
+      }
+      await fetchData();
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to remove domain');
+    } finally {
+      setRemovingId(null);
     }
   };
 
-  const copyValue = (value: string, label: string) => {
-    navigator.clipboard.writeText(value);
-    setCopiedRecord(label);
-    toast.success(`${label} copied!`);
-    setTimeout(() => setCopiedRecord(null), 2000);
+  const copyValue = async (value: string, label: string) => {
+    try {
+      await copyText(value);
+      setCopiedRecord(label);
+      toast.success(`${label} copied!`);
+      setTimeout(() => setCopiedRecord(null), 2000);
+    } catch {
+      toast.error('Copy failed');
+    }
   };
 
   const statusConfig: Record<string, { icon: typeof CheckCircle2; color: string; bg: string; border: string; label: string }> = {
@@ -128,6 +181,20 @@ export function CustomDomain() {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Add Domain Input */}
+        <div className="space-y-2">
+          <Label className="text-foreground">Server</Label>
+          <Select value={selectedServerId} onValueChange={setSelectedServerId}>
+            <SelectTrigger className="bg-muted/50 border-border">
+              <SelectValue placeholder="Select server" />
+            </SelectTrigger>
+            <SelectContent className="bg-popover border-border">
+              {servers.map((server) => (
+                <SelectItem key={server.id} value={server.id}>{server.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         <div className="flex flex-col sm:flex-row gap-2">
           <Input
             placeholder="Enter your domain (e.g., example.com)"
@@ -137,7 +204,7 @@ export function CustomDomain() {
           />
           <Button 
             onClick={handleAddDomain}
-            disabled={!newDomain.trim() || isAdding}
+            disabled={!newDomain.trim() || !selectedServerId || isAdding}
             className="bg-orange-gradient hover:opacity-90 text-white gap-2 shrink-0"
           >
             {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
@@ -175,13 +242,13 @@ export function CustomDomain() {
                       <div className="flex items-center gap-2 shrink-0">
                         <Badge variant="outline" className={cn(s.bg, s.color, s.border)}>{s.label}</Badge>
                         {isPending && (
-                          <Button variant="outline" size="sm" className="border-border gap-1" onClick={() => handleVerify(domain.id)}>
-                            <RefreshCw className="h-3 w-3" />
-                            <span className="hidden sm:inline">Verify</span>
+                          <Button variant="outline" size="sm" className="border-border gap-1" onClick={() => handleVerify(domain.id)} disabled={verifyingId === domain.id}>
+                            {verifyingId === domain.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                            <span className="hidden sm:inline">{verifyingId === domain.id ? 'Checking' : 'Verify'}</span>
                           </Button>
                         )}
-                        <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive" onClick={() => handleRemove(domain.id)}>
-                          <Trash2 className="h-4 w-4" />
+                        <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive" onClick={() => handleRemove(domain.id)} disabled={removingId === domain.id}>
+                          {removingId === domain.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                         </Button>
                       </div>
                     </div>
@@ -194,15 +261,15 @@ export function CustomDomain() {
                         Add these DNS records at your domain provider:
                       </div>
                       <div className="space-y-2">
-                        {dnsRecords.map((record) => (
-                          <div key={`${record.type}-${record.host}`} className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 rounded-lg bg-muted/50">
+                        {(dnsRecordsByDomain[domain.id] || []).map((record) => (
+                          <div key={`${record.record_type}-${record.name}`} className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 rounded-lg bg-muted/50">
                             <div className="flex items-center gap-2 flex-1 min-w-0">
-                              <Badge variant="outline" className="border-border shrink-0">{record.type}</Badge>
-                              <span className="text-sm text-muted-foreground shrink-0">{record.host}</span>
+                              <Badge variant="outline" className="border-border shrink-0">{record.record_type}</Badge>
+                              <span className="text-sm text-muted-foreground shrink-0">{record.name}</span>
                               <span className="text-sm font-mono text-foreground truncate">{record.value}</span>
                             </div>
-                            <Button variant="ghost" size="sm" className="shrink-0 gap-1" onClick={() => copyValue(record.value, `${record.type} record`)}>
-                              {copiedRecord === `${record.type} record` ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                            <Button variant="ghost" size="sm" className="shrink-0 gap-1" onClick={() => copyValue(record.value, `${record.record_type} record`)}>
+                              {copiedRecord === `${record.record_type} record` ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                               Copy
                             </Button>
                           </div>

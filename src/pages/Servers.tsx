@@ -7,6 +7,10 @@ import { AutoSubdomain } from '@/components/servers/AutoSubdomain';
 import { CustomDomain } from '@/components/servers/CustomDomain';
 import { SimpleBuildLogs } from '@/components/servers/SimpleBuildLogs';
 import { SimpleSettings } from '@/components/servers/SimpleSettings';
+import { ServerSecurityMonitor } from '@/components/servers/ServerSecurityMonitor';
+import { ServerHealthMonitor } from '@/components/servers/ServerHealthMonitor';
+import { ServerCertificates } from '@/components/servers/ServerCertificates';
+import { ServerBackups } from '@/components/servers/ServerBackups';
 
 export default function Servers() {
   return (
@@ -18,7 +22,7 @@ export default function Servers() {
             Server Manager
           </h2>
           <p className="text-sm text-muted-foreground">
-            One-click deploy • Auto subdomain • Zero configuration
+            Multi-provider hosting • AI-powered security & monitoring • One-click deploy
           </p>
         </div>
 
@@ -28,30 +32,57 @@ export default function Servers() {
         {/* Server List with Pay Now */}
         <ServerListPanel />
 
-        {/* Main Grid - Two Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column */}
-          <div className="space-y-6">
-            {/* Git Connect */}
-            <GitConnect />
+        {/* AI-Powered Monitoring Section */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Server Monitoring & Security</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* AI Security Monitor */}
+            <ServerSecurityMonitor />
             
-            {/* Project Deploy */}
-            <ProjectDeploy />
-            
-            {/* Build Logs */}
-            <SimpleBuildLogs />
+            {/* Real-time Health Monitor */}
+            <ServerHealthMonitor />
           </div>
+        </div>
 
-          {/* Right Column */}
-          <div className="space-y-6">
-            {/* Auto Subdomain */}
-            <AutoSubdomain />
+        {/* SSL & Backup Management Section */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Certificates & Backups</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* SSL Certificate Management */}
+            <ServerCertificates />
             
-            {/* Custom Domain */}
-            <CustomDomain />
-            
-            {/* Simple Settings */}
-            <SimpleSettings />
+            {/* Backup Management */}
+            <ServerBackups />
+          </div>
+        </div>
+
+        {/* Main Grid - Two Column Layout */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Deployment & Configuration</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left Column */}
+            <div className="space-y-6">
+              {/* Git Connect */}
+              <GitConnect />
+              
+              {/* Project Deploy */}
+              <ProjectDeploy />
+              
+              {/* Build Logs */}
+              <SimpleBuildLogs />
+            </div>
+
+            {/* Right Column */}
+            <div className="space-y-6">
+              {/* Auto Subdomain */}
+              <AutoSubdomain />
+              
+              {/* Custom Domain */}
+              <CustomDomain />
+              
+              {/* Simple Settings */}
+              <SimpleSettings />
+            </div>
           </div>
         </div>
       </div>

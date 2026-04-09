@@ -11,6 +11,7 @@ interface LogEntry {
   id: string;
   deployment_id: string | null;
   message: string;
+  level?: string | null;
   log_level: string | null;
   timestamp: string | null;
 }
@@ -58,6 +59,18 @@ export function SimpleBuildLogs() {
   useEffect(() => {
     fetchLogs();
   }, []);
+
+  useEffect(() => {
+    if (!latestDeploy || !['queued', 'building'].includes(String(latestDeploy.status || '').toLowerCase())) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      fetchLogs();
+    }, 5000);
+
+    return () => window.clearInterval(interval);
+  }, [latestDeploy?.id, latestDeploy?.status]);
 
   const timeAgo = (dateStr: string | null) => {
     if (!dateStr) return 'N/A';
@@ -150,13 +163,13 @@ export function SimpleBuildLogs() {
               logs.map((log) => (
                 <div key={log.id} className={cn(
                   'flex items-start gap-3 p-3 rounded-lg',
-                  log.log_level === 'error' ? 'bg-destructive/10' : 'bg-muted/30'
+                  (log.level || log.log_level) === 'error' ? 'bg-destructive/10' : 'bg-muted/30'
                 )}>
-                  <div className="shrink-0 mt-0.5">{levelIcon(log.log_level)}</div>
+                  <div className="shrink-0 mt-0.5">{levelIcon(log.level || log.log_level)}</div>
                   <div className="flex-1 min-w-0">
                     <p className={cn(
                       'text-sm font-medium',
-                      log.log_level === 'error' ? 'text-destructive' : 'text-foreground'
+                      (log.level || log.log_level) === 'error' ? 'text-destructive' : 'text-foreground'
                     )}>
                       {log.message}
                     </p>

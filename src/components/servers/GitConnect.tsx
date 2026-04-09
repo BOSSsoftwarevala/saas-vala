@@ -1,8 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { 
   Github, 
   CheckCircle2, 
@@ -28,6 +39,9 @@ interface GitHubAccount {
   avatar_url: string | null;
   public_repos: number;
   total_private_repos: number;
+  token_status?: 'active' | 'invalid';
+  token_error?: string | null;
+  rate_limit_remaining?: number | null;
 }
 
 interface GitHubRepo {
@@ -56,6 +70,10 @@ export function GitConnect() {
   const [connected, setConnected] = useState(false);
   const [selectedRepo, setSelectedRepo] = useState<GitHubRepo | null>(null);
   const [repoSearch, setRepoSearch] = useState('');
+  const [repoPage, setRepoPage] = useState(1);
+  const [hasMoreRepos, setHasMoreRepos] = useState(false);
+  const [activeAccountName, setActiveAccountName] = useState<string | undefined>(undefined);
+  const [brokenAvatars, setBrokenAvatars] = useState<Record<string, boolean>>({});
 
   // Load saved state
   useEffect(() => {
@@ -90,7 +108,9 @@ export function GitConnect() {
       const connectedAccounts = (data.accounts || []).filter((a: GitHubAccount) => a.connected);
       if (connectedAccounts.length === 0) {
         toast.error('No GitHub accounts configured', {
-          description: 'Contact admin to set up GitHub tokens.',
+          description: (data.accounts || []).some((a: GitHubAccount) => a.token_status === 'invalid')
+            ? 'Configured GitHub token is invalid or expired.'
+            : 'Contact admin to set up GitHub tokens.',
         });
         return;
       }
@@ -107,7 +127,7 @@ export function GitConnect() {
       });
 
       // Auto-fetch repos
-      await fetchRepos();
+      await fetchRepos(undefined, '', 1);
     } catch (error) {
       console.error('Connection failed:', error);
       toast.error('Connection failed', {
@@ -118,18 +138,25 @@ export function GitConnect() {
     }
   };
 
-  const fetchRepos = async (accountName?: string) => {
+  const fetchRepos = async (accountName?: string, search = repoSearch, page = 1) => {
     setLoadingRepos(true);
     try {
       const { data, error } = await supabase.functions.invoke('github-connect', {
-        body: { action: 'repos', accountName },
+        body: { action: 'repos', accountName, query: search, page, pageSize: 25 },
       });
 
       if (error) throw error;
 
       setRepos(data.repos || []);
       setShowRepos(true);
-      toast.success(`📂 ${data.totalRepos} repositories loaded`);
+      setRepoPage(Number(data.page || page));
+      setHasMoreRepos(Boolean(data.hasMore));
+      setActiveAccountName(accountName);
+      if (Array.isArray(data.invalidAccounts) && data.invalidAccounts.length > 0) {
+        toast.error(`Invalid GitHub token for: ${data.invalidAccounts.join(', ')}`);
+      } else {
+        toast.success(`📂 ${data.totalRepos} repositories loaded`);
+      }
     } catch (error) {
       console.error('Failed to fetch repos:', error);
       toast.error('Failed to fetch repositories');
@@ -156,10 +183,14 @@ export function GitConnect() {
     toast.success('GitHub disconnected');
   };
 
-  const filteredRepos = repos.filter((repo) =>
-    repo.name.toLowerCase().includes(repoSearch.toLowerCase()) ||
-    repo.full_name.toLowerCase().includes(repoSearch.toLowerCase())
-  );
+  const avatarFallback = (account: GitHubAccount) => {
+    const initial = String(account.login || account.name || 'G').charAt(0).toUpperCase();
+    return (
+      <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-foreground">
+        {initial}
+      </div>
+    );
+  };
 
   return (
     <Card className="glass-card">
@@ -192,18 +223,31 @@ export function GitConnect() {
               {accounts.map((acc) => (
                 <div key={acc.name} className="glass-card rounded-lg p-3">
                   <div className="flex items-center gap-3">
-                    {acc.avatar_url && (
-                      <img src={acc.avatar_url} alt={acc.login || acc.name} className="h-10 w-10 rounded-full" />
-                    )}
+                    {acc.avatar_url && !brokenAvatars[acc.name] ? (
+                      <img
+                        src={acc.avatar_url}
+                        alt={acc.login || acc.name}
+                        className="h-10 w-10 rounded-full"
+                        onError={() => setBrokenAvatars((prev) => ({ ...prev, [acc.name]: true }))}
+                      />
+                    ) : avatarFallback(acc)}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="font-medium text-foreground text-sm">{acc.name}</p>
-                        <Badge variant="outline" className="text-[10px] bg-success/10 text-success border-success/20">
+                        <Badge variant="outline" className={cn(
+                          'text-[10px] border-success/20',
+                          acc.token_status === 'active' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive border-destructive/20'
+                        )}>
                           <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
-                          Live
+                          {acc.token_status === 'active' ? 'Live' : 'Invalid'}
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground">@{acc.login} • {acc.public_repos + acc.total_private_repos} repos</p>
+                      {acc.token_error ? (
+                        <p className="text-[10px] text-destructive mt-0.5 truncate">{acc.token_error}</p>
+                      ) : (
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Rate limit remaining: {acc.rate_limit_remaining ?? 'unknown'}</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -239,7 +283,7 @@ export function GitConnect() {
                 <div className="p-3 border-b border-border space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium text-foreground">
-                      {filteredRepos.length} Repositories
+                      {repos.length} Repositories
                     </p>
                     <div className="flex gap-1">
                       {accounts.map((acc) => (
@@ -248,7 +292,7 @@ export function GitConnect() {
                           variant="ghost"
                           size="sm"
                           className="h-6 text-[10px] px-2"
-                          onClick={() => fetchRepos(acc.name)}
+                          onClick={() => fetchRepos(acc.name, repoSearch, 1)}
                         >
                           {acc.name}
                         </Button>
@@ -261,11 +305,24 @@ export function GitConnect() {
                     className="w-full h-8 px-3 text-sm rounded-md bg-muted/50 border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                     value={repoSearch}
                     onChange={(e) => setRepoSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        void fetchRepos(activeAccountName, repoSearch, 1);
+                      }
+                    }}
                   />
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[10px] text-muted-foreground">
+                      Server-side search and pagination enabled
+                    </p>
+                    <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={() => fetchRepos(activeAccountName, repoSearch, 1)}>
+                      Search
+                    </Button>
+                  </div>
                 </div>
                 <ScrollArea className="h-[300px]">
                   <div className="divide-y divide-border">
-                    {filteredRepos.map((repo) => (
+                    {repos.map((repo) => (
                       <button
                         key={repo.id}
                         onClick={() => selectRepo(repo)}
@@ -304,6 +361,25 @@ export function GitConnect() {
                     ))}
                   </div>
                 </ScrollArea>
+                <div className="flex items-center justify-between p-3 border-t border-border">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={loadingRepos || repoPage <= 1}
+                    onClick={() => fetchRepos(activeAccountName, repoSearch, repoPage - 1)}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-xs text-muted-foreground">Page {repoPage}</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={loadingRepos || !hasMoreRepos}
+                    onClick={() => fetchRepos(activeAccountName, repoSearch, repoPage + 1)}
+                  >
+                    Next
+                  </Button>
+                </div>
               </div>
             )}
 
@@ -312,19 +388,36 @@ export function GitConnect() {
               <Button
                 variant="outline"
                 className="border-border gap-2 flex-1"
-                onClick={() => fetchRepos()}
+                onClick={() => fetchRepos(activeAccountName, repoSearch, 1)}
                 disabled={loadingRepos}
               >
                 {loadingRepos ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                 {showRepos ? 'Refresh Repos' : 'Browse Repos'}
               </Button>
-              <Button
-                variant="outline"
-                className="border-destructive/30 text-destructive hover:bg-destructive/10 gap-2"
-                onClick={handleDisconnect}
-              >
-                Disconnect
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="border-destructive/30 text-destructive hover:bg-destructive/10 gap-2"
+                  >
+                    Disconnect
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="glass-card border-border">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Disconnect GitHub?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This only clears local connection state in the app. Server-side tokens remain configured by admin.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDisconnect} className="bg-destructive text-destructive-foreground">
+                      Disconnect
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </>
         ) : (

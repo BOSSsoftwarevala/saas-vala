@@ -10,6 +10,7 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { serversApi } from '@/lib/api';
 
 interface DeploymentRow {
   id: string;
@@ -55,49 +56,74 @@ export function ProjectDeploy() {
       return;
     }
     setDeploying(true);
-    setProgress(0);
+    setProgress(10);
 
     const serverId = servers[0].id;
-    const { data: userData } = await supabase.auth.getUser();
 
-    // Create deployment record
-    const { data: dep, error } = await supabase.from('deployments').insert({
-      server_id: serverId,
-      status: 'building',
-      branch: 'main',
-      commit_message: '🚀 Manual deploy via Server Manager',
-      triggered_by: userData.user?.id,
-    }).select().single();
+    try {
+      await serversApi.triggerDeploy(serverId);
+      toast.success('Deployment triggered');
 
-    if (error) {
-      toast.error('Failed to trigger deployment');
+      const startedAt = Date.now();
+      const timeoutMs = 30 * 60 * 1000;
+      let completed = false;
+
+      while (!completed) {
+        const statusResp: any = await serversApi.deployStatus(serverId);
+        const deployment = statusResp?.data;
+        const status = String(deployment?.status || '').toLowerCase();
+
+        if (status === 'queued') {
+          setProgress((prev) => Math.max(prev, 20));
+        } else if (status === 'building') {
+          setProgress((prev) => Math.min(95, Math.max(prev + 8, 40)));
+        } else if (status === 'success') {
+          setProgress(100);
+          await fetchDeployments();
+          toast.success('Deployment successful!');
+          completed = true;
+          break;
+        } else if (status === 'failed' || status === 'cancelled') {
+          setProgress(100);
+          await fetchDeployments();
+          toast.error('Deployment failed');
+          completed = true;
+          break;
+        }
+
+        if (Date.now() - startedAt > timeoutMs) {
+          toast.error('Deployment timed out after 30 minutes');
+          completed = true;
+          break;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+      }
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to trigger deployment');
+    } finally {
       setDeploying(false);
+    }
+  };
+
+  const handleRedeploy = async () => {
+    const latest = deployments[0];
+    if (!latest?.server_id) {
+      toast.error('No deployment available to redeploy');
       return;
     }
 
-    // Update server status
-    await supabase.from('servers').update({ status: 'deploying', last_deploy_at: new Date().toISOString() }).eq('id', serverId);
-
-    // Simulate progress (real progress would come from agent)
-    let p = 0;
-    const interval = setInterval(() => {
-      p += 10;
-      setProgress(p);
-      if (p >= 100) {
-        clearInterval(interval);
-        // Mark deployment as success
-        supabase.from('deployments').update({ 
-          status: 'success', 
-          completed_at: new Date().toISOString(),
-          duration_seconds: Math.round(p / 10),
-        }).eq('id', dep.id).then(() => {
-          supabase.from('servers').update({ status: 'live' }).eq('id', serverId);
-          fetchDeployments();
-        });
-        setDeploying(false);
-        toast.success('Deployment successful!');
-      }
-    }, 300);
+    setDeploying(true);
+    setProgress(10);
+    try {
+      await serversApi.triggerDeploy(latest.server_id);
+      toast.success('Redeploy queued');
+      await fetchDeployments();
+    } catch (error: any) {
+      toast.error(error?.message || 'Redeploy failed');
+    } finally {
+      setDeploying(false);
+    }
   };
 
   const handleRollback = async () => {
@@ -106,9 +132,19 @@ export function ProjectDeploy() {
       toast.error('No successful deployment to rollback to');
       return;
     }
-    await supabase.from('deployments').update({ status: 'rolled_back' }).eq('id', lastSuccess.id);
-    toast.success('Rolled back to previous version');
-    fetchDeployments();
+
+    setDeploying(true);
+    setProgress(10);
+    try {
+      await serversApi.triggerDeploy(lastSuccess.server_id);
+      await supabase.from('deployments').update({ status: 'rolled_back' }).eq('id', deployments[0]?.id);
+      toast.success('Rollback deployment queued');
+      await fetchDeployments();
+    } catch (error: any) {
+      toast.error(error?.message || 'Rollback failed');
+    } finally {
+      setDeploying(false);
+    }
   };
 
   const latestDeploy = deployments[0];
@@ -203,7 +239,7 @@ export function ProjectDeploy() {
             {deploying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
             Deploy Now
           </Button>
-          <Button variant="outline" className="border-border gap-2 h-11 sm:h-12" onClick={handleDeploy} disabled={deploying}>
+          <Button variant="outline" className="border-border gap-2 h-11 sm:h-12" onClick={handleRedeploy} disabled={deploying}>
             <RotateCcw className="h-4 w-4" />
             Redeploy
           </Button>

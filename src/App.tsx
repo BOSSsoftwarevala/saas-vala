@@ -10,9 +10,9 @@ import { DashboardProvider } from '@/hooks/useDashboardStore';
 import { Loader2 } from 'lucide-react';
 import React, { Suspense } from 'react';
 
-// Only eagerly load the landing page (Marketplace) and Auth
-import Marketplace from "./pages/Marketplace";
+// Only eagerly load Auth
 import Auth from "./pages/Auth";
+const Marketplace = React.lazy(() => import("./pages/Marketplace"));
 const DemoPage = React.lazy(() => import("./pages/DemoPage"));
 
 // Lazy load everything else

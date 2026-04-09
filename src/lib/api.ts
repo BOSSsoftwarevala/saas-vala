@@ -91,8 +91,11 @@ export const serversApi = {
   triggerDeploy: (serverId: string) => apiCall('POST', 'deploy/trigger', { server_id: serverId }),
   deployStatus: (serverId: string) => apiCall('GET', `deploy/status/${serverId}`),
   deployLogs: (deploymentId: string) => apiCall('GET', `deploy/logs/${deploymentId}`),
+  listDomains: () => apiCall('GET', 'domain/list'),
   addDomain: (data: any) => apiCall('POST', 'domain/add', data),
+  domainRecords: (domainId: string) => apiCall('GET', `domain/records/${domainId}`),
   verifyDomain: (domainId: string) => apiCall('POST', 'domain/verify', { domain_id: domainId }),
+  removeDomain: (domainId: string) => apiCall('DELETE', `domain/remove/${domainId}`),
   health: () => apiCall('GET', 'server/health'),
 };
 

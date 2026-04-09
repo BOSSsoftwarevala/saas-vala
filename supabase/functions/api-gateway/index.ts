@@ -6,12 +6,59 @@ const corsHeaders = {
   'Content-Type': 'application/json',
 }
 
+const rateLimitStore = new Map<string, { count: number; resetAt: number }>()
+const RATE_LIMIT_MAX_KEYS = 5000
+
+function pruneRateLimitStore(now: number) {
+  for (const [key, value] of rateLimitStore.entries()) {
+    if (value.resetAt <= now) {
+      rateLimitStore.delete(key)
+    }
+  }
+
+  if (rateLimitStore.size <= RATE_LIMIT_MAX_KEYS) return
+
+  const overflow = rateLimitStore.size - RATE_LIMIT_MAX_KEYS
+  let removed = 0
+  for (const key of rateLimitStore.keys()) {
+    rateLimitStore.delete(key)
+    removed += 1
+    if (removed >= overflow) break
+  }
+}
+
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: corsHeaders })
 }
 
 function err(message: string, status = 400) {
   return json({ error: message }, status)
+}
+
+function enforceRateLimit(key: string, limit: number, windowMs: number) {
+  const now = Date.now()
+  if (rateLimitStore.size >= RATE_LIMIT_MAX_KEYS) {
+    pruneRateLimitStore(now)
+  }
+
+  const existing = rateLimitStore.get(key)
+
+  if (!existing || existing.resetAt <= now) {
+    rateLimitStore.set(key, { count: 1, resetAt: now + windowMs })
+    return null
+  }
+
+  if (existing.count >= limit) {
+    return Math.ceil((existing.resetAt - now) / 1000)
+  }
+
+  existing.count += 1
+  rateLimitStore.set(key, existing)
+  return null
+}
+
+function isUuid(value: unknown): boolean {
+  return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
 }
 
 async function authenticate(req: Request) {
@@ -50,6 +97,157 @@ async function logActivity(admin: any, entityType: string, entityId: string, act
   } catch (e) {
     console.error('Activity log failed:', e)
   }
+}
+
+async function getOwnedServer(sb: any, serverId: string, userId: string) {
+  return await sb
+    .from('servers')
+    .select('*')
+    .eq('id', serverId)
+    .eq('created_by', userId)
+    .maybeSingle()
+}
+
+async function appendDeploymentLog(sb: any, deploymentId: string, level: 'info' | 'warn' | 'error', message: string, meta: Record<string, unknown> = {}) {
+  // Best effort logging: prefer deployment_logs table if available, fallback to deployments.build_logs.
+  const payload = {
+    deployment_id: deploymentId,
+    level,
+    message,
+    meta,
+    timestamp: new Date().toISOString(),
+  }
+
+  const insertResult = await sb.from('deployment_logs').insert(payload)
+  if (!insertResult.error) return
+
+  const { data: existing } = await sb.from('deployments').select('build_logs').eq('id', deploymentId).maybeSingle()
+  const line = `[${new Date().toISOString()}] [${level.toUpperCase()}] ${message}`
+  const current = String(existing?.build_logs || '').trim()
+  const next = current ? `${current}\n${line}` : line
+  await sb.from('deployments').update({ build_logs: next }).eq('id', deploymentId)
+}
+
+async function deleteCloudflareDnsRecords(domainName: string) {
+  const apiToken = Deno.env.get('CLOUDFLARE_API_TOKEN')
+  const zoneId = Deno.env.get('CLOUDFLARE_ZONE_ID')
+  if (!apiToken || !zoneId) {
+    return { attempted: false, removed: 0, provider: 'cloudflare', reason: 'not_configured' }
+  }
+
+  const headers = {
+    Authorization: `Bearer ${apiToken}`,
+    'Content-Type': 'application/json',
+  }
+
+  const targets = [domainName, `www.${domainName}`]
+  let removed = 0
+
+  for (const target of targets) {
+    const listResp = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records?name=${encodeURIComponent(target)}`, {
+      headers,
+    })
+
+    if (!listResp.ok) continue
+    const listPayload = await listResp.json().catch(() => ({}))
+    const records = Array.isArray((listPayload as any).result) ? (listPayload as any).result : []
+
+    for (const record of records) {
+      const recordId = String(record?.id || '')
+      if (!recordId) continue
+      const deleteResp = await fetch(`https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records/${recordId}`, {
+        method: 'DELETE',
+        headers,
+      })
+      if (deleteResp.ok) removed += 1
+    }
+  }
+
+  return { attempted: true, removed, provider: 'cloudflare' }
+}
+
+async function queueDeploymentForServer(
+  sb: any,
+  server: any,
+  triggeredBy: string | null,
+  commitMessage?: string,
+  commitSha?: string,
+  branchOverride?: string,
+) {
+  const serverId = String(server?.id || '')
+  if (!isUuid(serverId)) throw new Error('Invalid server id')
+
+  const { data: activeDeployment } = await sb
+    .from('deployments')
+    .select('id, status')
+    .eq('server_id', serverId)
+    .in('status', ['queued', 'building'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (activeDeployment?.id) {
+    throw new Error('Deployment already in progress for this server')
+  }
+
+  const branch = String(branchOverride || server?.git_branch || 'main')
+  const { data: deployment, error: deploymentError } = await sb.from('deployments').insert({
+    server_id: serverId,
+    status: 'queued',
+    triggered_by: triggeredBy,
+    branch,
+    commit_sha: commitSha || null,
+    commit_message: commitMessage || 'Deployment queued',
+  }).select().single()
+
+  if (deploymentError || !deployment) {
+    throw new Error(deploymentError?.message || 'Failed to queue deployment')
+  }
+
+  await sb
+    .from('servers')
+    .update({ status: 'deploying', last_deploy_at: new Date().toISOString() })
+    .eq('id', serverId)
+
+  await appendDeploymentLog(sb, deployment.id, 'info', 'Deployment queued', {
+    server_id: serverId,
+    branch,
+    repo: server?.git_repo || null,
+  })
+
+  // Kick the worker (best-effort) so queue processing starts quickly.
+  await adminClient().functions.invoke('deployment-worker', {
+    body: {
+      action: 'process_queue',
+      limit: 3,
+    },
+  }).catch(() => null)
+
+  return deployment
+}
+
+function toBytes(value: string): Uint8Array {
+  return new TextEncoder().encode(value)
+}
+
+function toHex(bytes: Uint8Array): string {
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+async function verifyGithubSignature(rawBody: string, signatureHeader: string | null): Promise<boolean> {
+  const secret = Deno.env.get('GITHUB_WEBHOOK_SECRET')
+  if (!secret || !signatureHeader || !signatureHeader.startsWith('sha256=')) return false
+
+  const key = await crypto.subtle.importKey(
+    'raw',
+    toBytes(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  )
+  const sig = await crypto.subtle.sign('HMAC', key, toBytes(rawBody))
+  const expected = `sha256=${toHex(new Uint8Array(sig))}`
+  return expected === signatureHeader
 }
 
 // ===================== 1. AUTH =====================
@@ -384,14 +582,40 @@ async function handleServers(method: string, pathParts: string[], body: any, use
 
   // GET /projects
   if (method === 'GET' && segment === 'projects' && !id) {
-    const { data, error } = await sb.from('servers').select('*').order('created_at', { ascending: false })
+    const page = Math.max(1, Number(body?.page || 1))
+    const limit = Math.min(100, Math.max(1, Number(body?.limit || 50)))
+    const { data, error } = await sb
+      .from('servers')
+      .select('*')
+      .eq('created_by', userId)
+      .order('created_at', { ascending: false })
+      .range((page - 1) * limit, page * limit - 1)
     if (error) return err(error.message)
     return json({ data })
   }
 
   // POST /projects
   if (method === 'POST' && segment === 'projects') {
-    const subdomain = body.name?.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.random().toString(36).substring(2, 6)
+    const base = String(body.name || 'project').toLowerCase().replace(/[^a-z0-9]/g, '-') || 'project'
+    let subdomain: string | null = null
+
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const candidate = `${base}-${Math.random().toString(36).substring(2, 8)}`
+      const { data: existing, error: lookupError } = await sb
+        .from('servers')
+        .select('id')
+        .eq('subdomain', candidate)
+        .maybeSingle()
+
+      if (lookupError) return err(lookupError.message)
+      if (!existing) {
+        subdomain = candidate
+        break
+      }
+    }
+
+    if (!subdomain) return err('Unable to allocate unique subdomain. Please retry.', 409)
+
     const { data, error } = await sb.from('servers').insert({
       name: body.name || '', subdomain,
       git_repo: body.git_repo, git_branch: body.git_branch || 'main',
@@ -405,7 +629,11 @@ async function handleServers(method: string, pathParts: string[], body: any, use
 
   // GET /deploy-targets
   if (method === 'GET' && segment === 'deploy-targets') {
-    const { data, error } = await sb.from('servers').select('id, name, subdomain, status').eq('status', 'live')
+    const { data, error } = await sb
+      .from('servers')
+      .select('id, name, subdomain, status')
+      .eq('status', 'live')
+      .eq('created_by', userId)
     if (error) return err(error.message)
     return json({ data })
   }
@@ -424,55 +652,251 @@ async function handleServers(method: string, pathParts: string[], body: any, use
 
   // POST /deploy/trigger
   if (method === 'POST' && segment === 'deploy' && id === 'trigger') {
-    const serverId = body.server_id
-    const { data, error } = await sb.from('deployments').insert({
-      server_id: serverId, status: 'building', triggered_by: userId,
-    }).select().single()
-    if (error) return err(error.message)
-    await sb.from('servers').update({ status: 'deploying', last_deploy_at: new Date().toISOString() }).eq('id', serverId)
-    await logActivity(admin, 'deployment', data.id, 'triggered', userId, { server_id: serverId })
-    return json({ data, success: true })
+    const serverId = String(body.server_id || '')
+    if (!isUuid(serverId)) return err('Invalid server_id', 400)
+
+    const { data: server, error: serverError } = await getOwnedServer(sb, serverId, userId)
+    if (serverError) return err(serverError.message)
+    if (!server) return err('Server not found', 404)
+
+    try {
+      const deployment = await queueDeploymentForServer(
+        sb,
+        server,
+        userId,
+        body.commit_message || 'Manual deployment trigger',
+        body.commit_sha || null,
+        body.branch || server.git_branch || 'main',
+      )
+
+      await logActivity(admin, 'deployment', deployment.id, 'triggered', userId, {
+        server_id: serverId,
+        mode: 'queued',
+      })
+
+      return json({ data: deployment, success: true, queued: true })
+    } catch (e: any) {
+      const message = String(e?.message || 'Failed to queue deployment')
+      if (message.toLowerCase().includes('already in progress')) {
+        return err(message, 409)
+      }
+      return err(message, 500)
+    }
   }
 
   // GET /deploy/status/:id
   if (method === 'GET' && segment === 'deploy' && pathParts[1] === 'status' && pathParts[2]) {
-    const { data, error } = await sb.from('deployments').select('*').eq('server_id', pathParts[2])
+    const serverId = String(pathParts[2] || '')
+    if (!isUuid(serverId)) return err('Invalid server_id', 400)
+
+    const { data: ownedServer, error: ownedServerError } = await getOwnedServer(sb, serverId, userId)
+    if (ownedServerError) return err(ownedServerError.message)
+    if (!ownedServer) return err('Server not found', 404)
+
+    const { data, error } = await sb.from('deployments').select('*').eq('server_id', serverId)
       .order('created_at', { ascending: false }).limit(1).maybeSingle()
     if (error) return err(error.message)
-    return json({ data })
+
+    const { data: liveStatus, error: liveStatusError } = await admin.functions.invoke('server-agent', {
+      body: { action: 'status', serverId },
+    })
+
+    if (liveStatusError && data?.id) {
+      await appendDeploymentLog(sb, data.id, 'warn', 'Live status check failed', { error: liveStatusError.message })
+    }
+
+    return json({
+      data,
+      live_agent_status: liveStatus?.server || null,
+      diagnostics: liveStatus?.diagnostics || null,
+    })
   }
 
   // GET /deploy/logs/:id
   if (method === 'GET' && segment === 'deploy' && pathParts[1] === 'logs' && pathParts[2]) {
-    const { data, error } = await sb.from('deployment_logs').select('*').eq('deployment_id', pathParts[2])
+    const deploymentId = String(pathParts[2] || '')
+    if (!isUuid(deploymentId)) return err('Invalid deployment_id', 400)
+
+    const { data: deployment, error: deploymentErr } = await sb
+      .from('deployments')
+      .select('id, server_id, servers!inner(created_by)')
+      .eq('id', deploymentId)
+      .eq('servers.created_by', userId)
+      .maybeSingle()
+
+    if (deploymentErr) return err(deploymentErr.message)
+    if (!deployment) return err('Deployment not found', 404)
+
+    const { data, error } = await sb.from('deployment_logs').select('*').eq('deployment_id', deploymentId)
       .order('timestamp', { ascending: true })
-    if (error) return err(error.message)
-    return json({ data })
+
+    if (!error) return json({ data })
+
+    const { data: fallback } = await sb.from('deployments').select('build_logs').eq('id', deploymentId).maybeSingle()
+    const lines = String(fallback?.build_logs || '')
+      .split('\n')
+      .filter(Boolean)
+      .map((line: string, idx: number) => ({
+        id: `${deploymentId}:${idx}`,
+        deployment_id: deploymentId,
+        level: 'info',
+        message: line,
+        timestamp: null,
+      }))
+    return json({ data: lines })
   }
 
   // POST /domain/add
   if (method === 'POST' && segment === 'domain' && id === 'add') {
+    const serverId = String(body.server_id || '')
+    const domainName = String(body.domain_name || '').trim().toLowerCase()
+
+    if (!isUuid(serverId)) return err('Invalid server_id', 400)
+    if (!/^(?=.{4,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(domainName)) {
+      return err('Invalid domain format', 400)
+    }
+
+    const { data: ownedServer, error: ownedServerError } = await getOwnedServer(sb, serverId, userId)
+    if (ownedServerError) return err(ownedServerError.message)
+    if (!ownedServer) return err('Server not found', 404)
+
+    const { data: duplicateDomain } = await sb
+      .from('domains')
+      .select('id')
+      .eq('server_id', serverId)
+      .eq('domain_name', domainName)
+      .maybeSingle()
+
+    if (duplicateDomain?.id) {
+      return err('Domain already added to this server', 409)
+    }
+
     const { data, error } = await sb.from('domains').insert({
-      domain_name: body.domain_name, server_id: body.server_id,
+      domain_name: domainName, server_id: serverId,
       domain_type: body.domain_type || 'custom', created_by: userId,
     }).select().single()
     if (error) return err(error.message)
-    await logActivity(admin, 'domain', data.id, 'added', userId, { domain: body.domain_name })
+    await logActivity(admin, 'domain', data.id, 'added', userId, { domain: domainName })
     return json({ data }, 201)
+  }
+
+  // GET /domain/list
+  if (method === 'GET' && segment === 'domain' && id === 'list') {
+    const { data, error } = await sb
+      .from('domains')
+      .select('id, domain_name, domain_type, status, ssl_status, dns_verified, server_id, created_at')
+      .eq('created_by', userId)
+      .order('created_at', { ascending: false })
+    if (error) return err(error.message)
+    return json({ data })
+  }
+
+  // GET /domain/records/:id
+  if (method === 'GET' && segment === 'domain' && pathParts[1] === 'records' && pathParts[2]) {
+    const domainId = String(pathParts[2] || '')
+    if (!isUuid(domainId)) return err('Invalid domain_id', 400)
+
+    const { data: domain, error: domainError } = await sb
+      .from('domains')
+      .select('id, domain_name, created_by')
+      .eq('id', domainId)
+      .eq('created_by', userId)
+      .maybeSingle()
+
+    if (domainError) return err(domainError.message)
+    if (!domain) return err('Domain not found', 404)
+
+    const { data: records, error: recordsError } = await sb
+      .from('dns_records')
+      .select('id, record_type, name, value, ttl, verified, priority')
+      .eq('domain_id', domainId)
+      .order('created_at', { ascending: true })
+
+    if (recordsError) return err(recordsError.message)
+
+    const fallback = [
+      { id: `${domainId}:A`, record_type: 'A', name: '@', value: '76.76.21.21', ttl: 3600, verified: false, priority: null },
+      { id: `${domainId}:CNAME`, record_type: 'CNAME', name: 'www', value: 'cname.vercel-dns.com', ttl: 3600, verified: false, priority: null },
+    ]
+
+    return json({ data: records && records.length > 0 ? records : fallback })
   }
 
   // POST /domain/verify
   if (method === 'POST' && segment === 'domain' && id === 'verify') {
+    const domainId = String(body.domain_id || '')
+    if (!isUuid(domainId)) return err('Invalid domain_id', 400)
+
+    const { data: domain, error: domainLookupError } = await sb
+      .from('domains')
+      .select('id, domain_name, server_id, servers!inner(created_by)')
+      .eq('id', domainId)
+      .eq('servers.created_by', userId)
+      .maybeSingle()
+
+    if (domainLookupError) return err(domainLookupError.message)
+    if (!domain) return err('Domain not found', 404)
+
+    const dnsCheckHost = String((domain as any).domain_name || '').trim()
+    if (!dnsCheckHost) return err('Domain not found', 404)
+
+    let dnsOk = false
+    try {
+      const dnsResp = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(dnsCheckHost)}&type=A`)
+      const dnsPayload = await dnsResp.json().catch(() => ({}))
+      dnsOk = Array.isArray((dnsPayload as any).Answer) && (dnsPayload as any).Answer.length > 0
+    } catch {
+      dnsOk = false
+    }
+
+    if (!dnsOk) {
+      await logActivity(admin, 'domain', domainId, 'verify_failed', userId, { reason: 'dns_not_resolved', domain: dnsCheckHost })
+      return err('DNS verification failed. Please wait for DNS propagation and retry.', 409)
+    }
+
     const { error } = await sb.from('domains').update({ dns_verified: true, dns_verified_at: new Date().toISOString() })
-      .eq('id', body.domain_id)
+      .eq('id', domainId)
     if (error) return err(error.message)
-    await logActivity(admin, 'domain', body.domain_id, 'verified', userId)
+    await logActivity(admin, 'domain', domainId, 'verified', userId, { domain: dnsCheckHost })
     return json({ success: true })
+  }
+
+  // DELETE /domain/remove/:id
+  if (method === 'DELETE' && segment === 'domain' && pathParts[1] === 'remove' && pathParts[2]) {
+    const domainId = String(pathParts[2] || '')
+    if (!isUuid(domainId)) return err('Invalid domain_id', 400)
+
+    const { data: domain, error: lookupError } = await sb
+      .from('domains')
+      .select('id, domain_name, created_by')
+      .eq('id', domainId)
+      .eq('created_by', userId)
+      .maybeSingle()
+
+    if (lookupError) return err(lookupError.message)
+    if (!domain) return err('Domain not found', 404)
+
+    const cleanup = await deleteCloudflareDnsRecords(String((domain as any).domain_name || '').trim()).catch((cleanupError) => ({
+      attempted: true,
+      removed: 0,
+      provider: 'cloudflare',
+      reason: String((cleanupError as any)?.message || cleanupError),
+    }))
+
+    await sb.from('dns_records').delete().eq('domain_id', domainId)
+    const { error: deleteError } = await sb.from('domains').delete().eq('id', domainId)
+    if (deleteError) return err(deleteError.message)
+
+    await logActivity(admin, 'domain', domainId, 'removed', userId, { cleanup })
+    return json({ success: true, cleanup })
   }
 
   // GET /server/health
   if (method === 'GET' && segment === 'server' && id === 'health') {
-    const { data, error } = await sb.from('servers').select('id, name, status, subdomain, custom_domain, health_status, uptime_percent')
+    const { data, error } = await sb
+      .from('servers')
+      .select('id, name, status, subdomain, custom_domain, health_status, uptime_percent')
+      .eq('created_by', userId)
     if (error) return err(error.message)
     const stats = {
       total: data?.length || 0,
@@ -487,7 +911,7 @@ async function handleServers(method: string, pathParts: string[], body: any, use
 }
 
 // ===================== 7. GITHUB =====================
-async function handleGithub(method: string, pathParts: string[], body: any, userId: string, sb: any) {
+async function handleGithub(method: string, pathParts: string[], body: any, userId: string, sb: any, req?: Request, rawBody?: string) {
   const action = pathParts[0]
 
   // GET /github/install-url
@@ -509,25 +933,100 @@ async function handleGithub(method: string, pathParts: string[], body: any, user
     return json({ data: tokenData })
   }
 
+  // POST /github/webhook
+  if (method === 'POST' && action === 'webhook') {
+    const payloadRaw = rawBody || JSON.stringify(body || {})
+    const signature = req?.headers.get('X-Hub-Signature-256') || null
+    const verified = await verifyGithubSignature(payloadRaw, signature)
+    if (!verified) return err('Invalid webhook signature', 401)
+
+    const event = req?.headers.get('X-GitHub-Event') || 'unknown'
+    if (event === 'ping') {
+      return json({ success: true, message: 'pong' })
+    }
+
+    if (event !== 'push') {
+      return json({ success: true, ignored: true, reason: `unsupported_event:${event}` })
+    }
+
+    const repoFullName = String(body?.repository?.full_name || '').trim().toLowerCase()
+    const pushedRef = String(body?.ref || '').trim()
+    const branch = pushedRef.replace('refs/heads/', '')
+    const commitSha = String(body?.after || '').trim() || null
+    const commitMessage = String(body?.head_commit?.message || `Webhook deploy for ${repoFullName}`).slice(0, 500)
+
+    if (!repoFullName || !branch) {
+      return err('Invalid webhook payload', 400)
+    }
+
+    const { data: servers, error: serversError } = await sb
+      .from('servers')
+      .select('id, name, git_repo, git_branch, auto_deploy, status')
+      .eq('auto_deploy', true)
+      .eq('git_branch', branch)
+
+    if (serversError) return err(serversError.message)
+
+    const matchingServers = (servers || []).filter((s: any) => {
+      const repo = String(s.git_repo || '').trim().toLowerCase()
+      return repo === repoFullName || repo.endsWith(`/${repoFullName}`) || repo.includes(`github.com/${repoFullName}`)
+    })
+
+    const queued: Array<{ server_id: string; deployment_id?: string; error?: string }> = []
+    for (const server of matchingServers) {
+      try {
+        const deployment = await queueDeploymentForServer(
+          sb,
+          server,
+          null,
+          commitMessage,
+          commitSha,
+          branch,
+        )
+        queued.push({ server_id: server.id, deployment_id: deployment.id })
+      } catch (e: any) {
+        queued.push({ server_id: server.id, error: String(e?.message || 'failed') })
+      }
+    }
+
+    return json({
+      success: true,
+      event,
+      repo: repoFullName,
+      branch,
+      matched_servers: matchingServers.length,
+      queued,
+    })
+  }
+
   // GET /github/repos
   if (method === 'GET' && action === 'repos') {
     const token = Deno.env.get('SAASVALA_GITHUB_TOKEN')
     if (!token) return err('GitHub token not configured', 500)
-    
-    // Paginate to get all repos
+
+    // Cap pagination to avoid unbounded memory/time usage on very large accounts.
+    const perPage = Math.min(100, Math.max(1, Number(body?.per_page || 50)))
+    const maxPages = Math.min(10, Math.max(1, Number(body?.max_pages || 5)))
     let allRepos: any[] = []
     let page = 1
-    while (true) {
-      const res = await fetch(`https://api.github.com/user/repos?per_page=100&sort=updated&page=${page}`, {
+    while (page <= maxPages) {
+      const res = await fetch(`https://api.github.com/user/repos?per_page=${perPage}&sort=updated&page=${page}`, {
         headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' },
       })
+
+      if (!res.ok) {
+        const msg = await res.text()
+        return err(`GitHub API error: ${msg.slice(0, 200)}`, res.status)
+      }
+
       const repos = await res.json()
       if (!Array.isArray(repos) || repos.length === 0) break
       allRepos = allRepos.concat(repos)
-      if (repos.length < 100) break
+      if (repos.length < perPage) break
       page++
     }
-    return json({ data: allRepos })
+
+    return json({ data: allRepos, meta: { per_page: perPage, pages_fetched: page - 1, truncated: page > maxPages } })
   }
 
   return err('Not found', 404)
@@ -909,13 +1408,28 @@ Deno.serve(async (req) => {
     const parts = fullPath.split('/').filter(Boolean)
     const module = parts[0]
     const subParts = parts.slice(1)
+    const isGithubWebhook = module === 'github' && subParts[0] === 'webhook' && req.method === 'POST'
 
     // Parse body for POST/PUT/DELETE, query params for GET
     let body: any = {}
+    let rawBody = ''
     if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
-      try { body = await req.json() } catch { body = {} }
+      if (isGithubWebhook) {
+        rawBody = await req.text()
+        try { body = rawBody ? JSON.parse(rawBody) : {} } catch { body = {} }
+      } else {
+        try { body = await req.json() } catch { body = {} }
+      }
     } else {
       url.searchParams.forEach((v, k) => { body[k] = v })
+    }
+
+    if (isGithubWebhook) {
+      const retryAfter = enforceRateLimit(`webhook:${req.headers.get('x-forwarded-for') || 'unknown'}`, 120, 60_000)
+      if (retryAfter !== null) return err(`Rate limit exceeded. Retry in ${retryAfter}s`, 429)
+
+      const admin = adminClient()
+      return await handleGithub(req.method, subParts, body, 'webhook', admin, req, rawBody)
     }
 
     // Auth endpoints don't require JWT
@@ -928,6 +1442,8 @@ Deno.serve(async (req) => {
     if (!auth) return err('Unauthorized', 401)
 
     const { userId, supabase: sb } = auth
+    const retryAfter = enforceRateLimit(`user:${userId}:${module}`, 120, 60_000)
+    if (retryAfter !== null) return err(`Rate limit exceeded. Retry in ${retryAfter}s`, 429)
 
     switch (module) {
       case 'products': return await handleProducts(req.method, subParts, body, userId, sb)
@@ -940,7 +1456,7 @@ Deno.serve(async (req) => {
       case 'domain':
       case 'server':
         return await handleServers(req.method, [module, ...subParts], body, userId, sb)
-      case 'github': return await handleGithub(req.method, subParts, body, userId, sb)
+      case 'github': return await handleGithub(req.method, subParts, body, userId, sb, req)
       case 'ai': return await handleAi(req.method, subParts, body, userId, sb)
       case 'chat': return await handleChat(req.method, subParts, body, userId, sb)
       case 'api-keys': return await handleApiKeys(req.method, subParts, body, userId, sb)

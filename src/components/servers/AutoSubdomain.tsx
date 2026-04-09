@@ -23,11 +23,29 @@ export function AutoSubdomain() {
   const [appName, setAppName] = useState('');
   const [lastResult, setLastResult] = useState<any>(null);
   const [bulkResults, setBulkResults] = useState<SubdomainResult[]>([]);
+  const [repoCount, setRepoCount] = useState<number | null>(null);
+  const [processedCount, setProcessedCount] = useState(0);
 
   const domainSuffix = 'saasvala.com';
 
-  const copyUrl = (url: string) => {
-    navigator.clipboard.writeText(url);
+  const copyUrl = async (url: string) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = url;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+    } catch {
+      toast.error('Copy failed');
+      return;
+    }
     setCopied(true);
     toast.success('URL copied!');
     setTimeout(() => setCopied(false), 2000);
@@ -67,11 +85,19 @@ export function AutoSubdomain() {
   const handleBulkSubdomain = async () => {
     setBulkLoading(true);
     setBulkResults([]);
+    setProcessedCount(0);
     toast.info('🚀 Bulk subdomain creation started... This may take a few minutes.');
 
     try {
       // Import repo mapping dynamically
-      const { allRepos } = await import('@/data/saasvalaRepoMapping');
+      let allRepos: Array<{ slug: string }> = [];
+      try {
+        const repoMapping = await import('@/data/saasvalaRepoMapping');
+        allRepos = repoMapping.allRepos || [];
+      } catch (error: any) {
+        throw new Error(error?.message || 'Failed to load repository mapping');
+      }
+      setRepoCount(allRepos.length);
       
       // Process in batches of 10
       const batchSize = 10;
@@ -80,21 +106,31 @@ export function AutoSubdomain() {
       for (let i = 0; i < allRepos.length; i += batchSize) {
         const batch = allRepos.slice(i, i + batchSize).map(r => ({ slug: r.slug, owner: 'saasvala' }));
 
-        const { data, error } = await supabase.functions.invoke('factory-deploy', {
-          body: {
-            action: 'bulk-subdomain',
-            repos: batch,
-            domain_suffix: domainSuffix,
-          },
-        });
+        let attempt = 0;
+        let batchCompleted = false;
+        while (attempt < 2 && !batchCompleted) {
+          attempt += 1;
+          const { data, error } = await supabase.functions.invoke('factory-deploy', {
+            body: {
+              action: 'bulk-subdomain',
+              repos: batch,
+              domain_suffix: domainSuffix,
+            },
+          });
 
-        if (error) {
-          batch.forEach(r => allResults.push({ slug: r.slug, success: false, error: 'API error' }));
-        } else if (data?.results) {
-          allResults.push(...data.results);
+          if (!error && data?.results) {
+            allResults.push(...data.results);
+            batchCompleted = true;
+            break;
+          }
+
+          if (attempt >= 2) {
+            batch.forEach(r => allResults.push({ slug: r.slug, success: false, error: error?.message || 'API error after retry' }));
+          }
         }
 
         setBulkResults([...allResults]);
+        setProcessedCount(Math.min(i + batchSize, allRepos.length));
         toast.info(`📦 Processed ${Math.min(i + batchSize, allRepos.length)}/${allRepos.length} repos...`);
       }
 
@@ -181,10 +217,10 @@ export function AutoSubdomain() {
         <div className="glass-card rounded-lg p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-foreground">Bulk Deploy All 284 Repos</p>
+              <p className="text-sm font-medium text-foreground">Bulk Deploy All Repos</p>
               <p className="text-xs text-muted-foreground">Auto-create all *.saasvala.com subdomains</p>
             </div>
-            <Badge variant="outline" className="text-xs">284 repos</Badge>
+            <Badge variant="outline" className="text-xs">{repoCount ?? '...'} repos</Badge>
           </div>
           <Button
             onClick={handleBulkSubdomain}
@@ -196,6 +232,10 @@ export function AutoSubdomain() {
             {bulkLoading ? 'Processing...' : 'Deploy All with Subdomains'}
           </Button>
 
+          {(bulkLoading || processedCount > 0) && (
+            <p className="text-xs text-muted-foreground">Progress: {processedCount}/{repoCount ?? processedCount}</p>
+          )}
+
           {bulkResults.length > 0 && (
             <div className="space-y-2 max-h-60 overflow-y-auto">
               <div className="flex gap-2 text-xs">
@@ -206,7 +246,7 @@ export function AutoSubdomain() {
                   ❌ {bulkResults.filter(r => !r.success).length}
                 </Badge>
               </div>
-              {bulkResults.slice(-20).map((r, i) => (
+              {bulkResults.map((r, i) => (
                 <div key={i} className="flex items-center justify-between p-2 rounded bg-muted/30 text-xs">
                   <span className="font-mono truncate flex-1">{r.slug}.saasvala.com</span>
                   {r.success ? (

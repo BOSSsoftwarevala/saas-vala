@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,10 +35,34 @@ import {
   Globe,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+
+interface ServerSettingsRow {
+  id: string;
+  name: string;
+  git_branch: string | null;
+  runtime: string | null;
+  auto_deploy: boolean | null;
+  env_vars: Record<string, any> | null;
+}
+
+function isSafeRelativePath(value: string): boolean {
+  const normalized = String(value || '').trim();
+  if (!normalized) return false;
+  if (normalized.startsWith('/')) return false;
+  if (/^[a-zA-Z]:[\\/]/.test(normalized)) return false;
+  if (normalized.includes('..')) return false;
+  return true;
+}
 
 export function ServerSettings() {
   const [activeTab, setActiveTab] = useState('general');
   const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [servers, setServers] = useState<ServerSettingsRow[]>([]);
+  const [selectedServerId, setSelectedServerId] = useState('');
 
   // Settings state
   const [projectName, setProjectName] = useState('saas-vala-web');
@@ -51,12 +75,167 @@ export function ServerSettings() {
   const [autoDeployEnabled, setAutoDeployEnabled] = useState(true);
   const [previewDeploymentsEnabled, setPreviewDeploymentsEnabled] = useState(true);
   const [productionBranch, setProductionBranch] = useState('main');
+  const [passwordProtectionEnabled, setPasswordProtectionEnabled] = useState(false);
+  const [maintenanceModeEnabled, setMaintenanceModeEnabled] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
-  const handleSave = () => {
-    toast({
-      title: 'Settings saved',
-      description: 'Your project settings have been updated.',
-    });
+  const selectedServer = useMemo(
+    () => servers.find((item) => item.id === selectedServerId) || null,
+    [servers, selectedServerId]
+  );
+
+  const fetchServers = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('servers')
+        .select('id, name, git_branch, runtime, auto_deploy, env_vars')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      const rows = (data || []) as ServerSettingsRow[];
+      setServers(rows);
+
+      if (!rows.length) {
+        setSelectedServerId('');
+        return;
+      }
+
+      setSelectedServerId((prev) => (rows.some((r) => r.id === prev) ? prev : rows[0].id));
+    } catch (error: any) {
+      toast({
+        title: 'Failed to load servers',
+        description: error?.message || 'Unable to fetch server settings.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchServers();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedServer) return;
+    const env = selectedServer.env_vars || {};
+
+    setProjectName(String(selectedServer.name || ''));
+    setProductionBranch(String(selectedServer.git_branch || 'main'));
+    setAutoDeployEnabled(selectedServer.auto_deploy !== false);
+
+    const runtime = String(selectedServer.runtime || 'nodejs18');
+    setNodeVersion(runtime === 'nodejs20' ? '20.x' : '18.x');
+
+    setFramework(String(env.framework || 'nextjs'));
+    setRootDirectory(String(env.rootDirectory || './'));
+    setBuildCommand(String(env.buildCommand || 'npm run build'));
+    setOutputDirectory(String(env.outputDirectory || '.next'));
+    setInstallCommand(String(env.installCommand || 'npm install'));
+    setPreviewDeploymentsEnabled(Boolean(env.previewDeploymentsEnabled ?? true));
+    setPasswordProtectionEnabled(Boolean(env.passwordProtectionEnabled ?? false));
+    setMaintenanceModeEnabled(Boolean(env.maintenanceModeEnabled ?? false));
+    setNotificationsEnabled(Boolean(env.notificationsEnabled ?? true));
+  }, [selectedServer]);
+
+  const handleSave = async () => {
+    if (!selectedServerId) {
+      toast({
+        title: 'No server selected',
+        description: 'Select a server first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!isSafeRelativePath(rootDirectory)) {
+      toast({
+        title: 'Invalid root directory',
+        description: 'Use a safe relative path without absolute prefixes or .. segments.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!isSafeRelativePath(outputDirectory)) {
+      toast({
+        title: 'Invalid output directory',
+        description: 'Use a safe relative path without absolute prefixes or .. segments.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const nextRuntime = nodeVersion === '20.x' ? 'nodejs20' : 'nodejs18';
+      const mergedEnv = {
+        ...(selectedServer?.env_vars || {}),
+        framework,
+        rootDirectory,
+        buildCommand,
+        outputDirectory,
+        installCommand,
+        nodeVersion,
+        previewDeploymentsEnabled,
+        passwordProtectionEnabled,
+        maintenanceModeEnabled,
+        notificationsEnabled,
+      };
+
+      const { error } = await supabase
+        .from('servers')
+        .update({
+          name: projectName,
+          git_branch: productionBranch,
+          runtime: nextRuntime,
+          auto_deploy: autoDeployEnabled,
+          env_vars: mergedEnv,
+        })
+        .eq('id', selectedServerId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Settings saved',
+        description: 'Project settings were persisted to backend.',
+      });
+
+      await fetchServers();
+    } catch (error: any) {
+      toast({
+        title: 'Save failed',
+        description: error?.message || 'Unable to save project settings.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    if (!selectedServerId) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase.from('servers').delete().eq('id', selectedServerId);
+      if (error) throw error;
+
+      toast({
+        title: 'Project deleted',
+        description: 'Server project was removed from backend.',
+      });
+
+      await fetchServers();
+    } catch (error: any) {
+      toast({
+        title: 'Delete failed',
+        description: error?.message || 'Unable to delete project.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -67,6 +246,19 @@ export function ServerSettings() {
         <p className="text-sm text-muted-foreground">
           Configure your project's build, deployment, and security settings
         </p>
+        <div className="mt-3">
+          <Label className="text-foreground">Server</Label>
+          <Select value={selectedServerId} onValueChange={setSelectedServerId}>
+            <SelectTrigger className="bg-muted/50 border-border mt-1 max-w-md">
+              <SelectValue placeholder={loading ? 'Loading servers...' : 'Select server'} />
+            </SelectTrigger>
+            <SelectContent className="bg-popover border-border">
+              {servers.map((server) => (
+                <SelectItem key={server.id} value={server.id}>{server.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -137,7 +329,7 @@ export function ServerSettings() {
               </div>
               <Button onClick={handleSave} className="bg-orange-gradient hover:opacity-90 text-white gap-2">
                 <Save className="h-4 w-4" />
-                Save Changes
+                {saving ? 'Saving...' : 'Save Changes'}
               </Button>
             </CardContent>
           </Card>
@@ -180,8 +372,12 @@ export function ServerSettings() {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel className="border-border">Cancel</AlertDialogCancel>
-                      <AlertDialogAction className="bg-destructive text-destructive-foreground">
-                        Delete Project
+                      <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground"
+                        onClick={handleDeleteProject}
+                        disabled={deleting || !selectedServerId}
+                      >
+                        {deleting ? 'Deleting...' : 'Delete Project'}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -249,7 +445,7 @@ export function ServerSettings() {
 
               <Button onClick={handleSave} className="bg-orange-gradient hover:opacity-90 text-white gap-2">
                 <Save className="h-4 w-4" />
-                Save Changes
+                {saving ? 'Saving...' : 'Save Changes'}
               </Button>
             </CardContent>
           </Card>
@@ -308,7 +504,7 @@ export function ServerSettings() {
               </div>
               <Button onClick={handleSave} className="bg-orange-gradient hover:opacity-90 text-white gap-2">
                 <Save className="h-4 w-4" />
-                Save Changes
+                {saving ? 'Saving...' : 'Save Changes'}
               </Button>
             </CardContent>
           </Card>
@@ -340,18 +536,32 @@ export function ServerSettings() {
                     <p className="text-sm text-muted-foreground">Require password to access preview deployments</p>
                   </div>
                 </div>
-                <Switch />
+                <Switch checked={passwordProtectionEnabled} onCheckedChange={setPasswordProtectionEnabled} />
               </div>
               <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
                 <div className="flex items-center gap-3">
                   <Shield className="h-5 w-5 text-muted-foreground" />
                   <div>
-                    <p className="font-medium text-foreground">DDoS Protection</p>
-                    <p className="text-sm text-muted-foreground">Automatic protection against DDoS attacks</p>
+                    <p className="font-medium text-foreground">Maintenance Mode</p>
+                    <p className="text-sm text-muted-foreground">Temporarily pause user traffic during maintenance</p>
                   </div>
                 </div>
-                <Switch checked disabled />
+                <Switch checked={maintenanceModeEnabled} onCheckedChange={setMaintenanceModeEnabled} />
               </div>
+              <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Globe className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium text-foreground">Deployment Notifications</p>
+                    <p className="text-sm text-muted-foreground">Send notifications for deployment status changes</p>
+                  </div>
+                </div>
+                <Switch checked={notificationsEnabled} onCheckedChange={setNotificationsEnabled} />
+              </div>
+              <Button onClick={handleSave} className="bg-orange-gradient hover:opacity-90 text-white gap-2">
+                <Save className="h-4 w-4" />
+                {saving ? 'Saving...' : 'Save Changes'}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
