@@ -140,6 +140,46 @@ interface DashboardStoreContextType extends DashboardState {
 }
 
 const DashboardStoreContext = createContext<DashboardStoreContextType | undefined>(undefined);
+let hasWarnedMissingDashboardProvider = false;
+
+const fallbackDashboardStore: DashboardStoreContextType = {
+  ...initialState,
+  refreshDashboard: async () => {},
+  createProduct: async () => null,
+  generateKey: async () => null,
+  deployServer: async () => null,
+  restartServer: async () => null,
+  markServerOffline: async () => null,
+  deployProductToServer: async () => false,
+  createLead: async () => null,
+  updateLeadStatus: async () => null,
+  addCredits: async () => null,
+  markAllNotificationsRead: async () => {},
+  searchGlobal: () => {},
+  getSystemMetrics: () => ({
+    version: '1.0.0',
+    uptime: 99.9,
+    environment: 'production',
+    lastSync: new Date().toISOString(),
+  }),
+  deployToCloud: async () => ({
+    deploymentId: '',
+    serverId: '',
+    region: 'Unknown',
+  }),
+  getCloudDeployments: async () => [],
+  failoverDeployment: async () => ({ success: false }),
+  createBackup: async () => ({ backupId: '' }),
+  getBackups: async () => [],
+  restoreBackup: async () => ({ success: false }),
+  scheduleAutoBackup: async () => ({ success: false }),
+  submitResellerApplication: async () => ({} as ResellerApplication),
+  getResellerApplications: async () => [],
+  approveResellerApplication: async () => ({ success: false, reseller: null }),
+  rejectResellerApplication: async () => ({ success: false }),
+  getResellerData: async () => ({ reseller: null, keys: [], products: [] }),
+  resellerPurchaseProduct: async () => ({ success: false, licenseKey: null }),
+};
 
 export function DashboardProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -758,7 +798,11 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 export function useDashboardStore() {
   const context = useContext(DashboardStoreContext);
   if (context === undefined) {
-    throw new Error('useDashboardStore must be used within a DashboardProvider');
+    if (!hasWarnedMissingDashboardProvider) {
+      hasWarnedMissingDashboardProvider = true;
+      console.error('useDashboardStore used outside DashboardProvider. Returning fallback store to avoid app crash.');
+    }
+    return fallbackDashboardStore;
   }
   return context;
 }
