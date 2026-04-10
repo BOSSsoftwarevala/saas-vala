@@ -42,6 +42,14 @@ export interface DashboardReseller {
   created_at: string;
 }
 
+export interface ResellerExportSummary {
+  name: string;
+  sales: number;
+  keys: number;
+  earnings: number;
+  orders: number;
+}
+
 export interface ResellerApplication {
   id: string;
   name: string;
@@ -2538,6 +2546,67 @@ export const dashboardApi = {
         transactions: txRows || [],
       };
     }, 'Get reseller report');
+  },
+
+  exportCurrentResellerSummary: async (): Promise<ResellerExportSummary> => {
+    return withErrorHandling(async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new PermissionError('Not authenticated');
+
+      await security.validateSession(user.id);
+      const roles = await security.getUserRoles(user.id);
+      const isReseller = roles.includes('reseller') || roles.includes('master_reseller');
+
+      if (!isReseller) {
+        throw new PermissionError('Unauthorized export: reseller access required');
+      }
+
+      const { data: reseller, error: resellerError } = await (supabase as any)
+        .from('resellers')
+        .select('id, company_name, total_sales, total_commission, user_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (resellerError || !reseller) {
+        throw resellerError || new PermissionError('Unauthorized export: reseller profile not found');
+      }
+
+      const { count: keyCount, error: keyError } = await (supabase as any)
+        .from('license_keys')
+        .select('id', { count: 'exact', head: true })
+        .eq('reseller_id', reseller.id);
+
+      if (keyError) throw keyError;
+
+      const { data: wallet, error: walletError } = await (supabase as any)
+        .from('wallets')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (walletError) throw walletError;
+
+      let orderCount = 0;
+      if (wallet?.id) {
+        const { count: orders, error: orderError } = await (supabase as any)
+          .from('transactions')
+          .select('id', { count: 'exact', head: true })
+          .eq('wallet_id', wallet.id)
+          .eq('type', 'debit')
+          .in('status', ['success', 'completed']);
+
+        if (orderError) throw orderError;
+        orderCount = Number(orders || 0);
+      }
+
+      return {
+        name: String(reseller.company_name || 'Unknown'),
+        sales: Number(reseller.total_sales || 0),
+        keys: Number(keyCount || 0),
+        earnings: Number(reseller.total_commission || 0),
+        orders: orderCount,
+      };
+    }, 'Export current reseller summary');
   },
 
   // ═══════════════════════════════════════════════════════════════

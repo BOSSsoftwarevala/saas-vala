@@ -63,7 +63,9 @@ import { Switch } from '@/components/ui/switch';
  import { ResellerActivityPanel } from '@/components/reseller/ResellerActivityPanel';
  import { ResellerQuickActions } from '@/components/reseller/ResellerQuickActions';
 import { useDashboardStore } from '@/hooks/useDashboardStore';
-import { type ResellerApplication } from '@/lib/dashboardApi';
+import { dashboardApi, type ResellerApplication } from '@/lib/dashboardApi';
+import { toast } from 'sonner';
+import { PermissionError } from '@/lib/errorHandling';
 
 const ITEMS_PER_PAGE = 25;
 
@@ -83,6 +85,7 @@ export default function Resellers() {
   const [rejectApplicationId, setRejectApplicationId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [mainTab, setMainTab] = useState('resellers');
+  const [exporting, setExporting] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -202,6 +205,74 @@ export default function Resellers() {
     setRejectDialogOpen(true);
   };
 
+  const downloadCsv = (row: { name: string; sales: number; keys: number; earnings: number; orders: number }) => {
+    const header = ['Name', 'Sales', 'Keys', 'Earnings', 'Orders'];
+    const values = [
+      row.name,
+      row.sales.toFixed(2),
+      String(row.keys),
+      row.earnings.toFixed(2),
+      String(row.orders),
+    ];
+
+    const csv = [header.join(','), values.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(',')].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `reseller-summary-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadExcel = (row: { name: string; sales: number; keys: number; earnings: number; orders: number }) => {
+    const table = `
+      <table>
+        <tr><th>Name</th><th>Sales</th><th>Keys</th><th>Earnings</th><th>Orders</th></tr>
+        <tr>
+          <td>${String(row.name)}</td>
+          <td>${row.sales.toFixed(2)}</td>
+          <td>${row.keys}</td>
+          <td>${row.earnings.toFixed(2)}</td>
+          <td>${row.orders}</td>
+        </tr>
+      </table>
+    `;
+
+    const blob = new Blob([table], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `reseller-summary-${new Date().toISOString().slice(0, 10)}.xls`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExport = async (format: 'csv' | 'excel') => {
+    setExporting(true);
+    try {
+      const summary = await dashboardApi.exportCurrentResellerSummary();
+      if (format === 'csv') {
+        downloadCsv(summary);
+      } else {
+        downloadExcel(summary);
+      }
+      toast.success(`Exported reseller summary as ${format.toUpperCase()}`);
+    } catch (error: any) {
+      if (error instanceof PermissionError || String(error?.message || '').toLowerCase().includes('unauthorized')) {
+        toast.error('Export blocked: You are not authorized to export this data.');
+      } else {
+        toast.error(error?.message || 'Failed to export reseller data');
+      }
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -224,10 +295,22 @@ export default function Resellers() {
               <Users className="h-4 w-4" />
               Reseller Dashboard
             </Button>
-            <Button variant="outline" className="gap-2 border-border">
-              <Download className="h-4 w-4" />
-              Export
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2 border-border" disabled={exporting}>
+                  {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-popover border-border">
+                <DropdownMenuItem className="cursor-pointer" onClick={() => handleExport('csv')}>
+                  Export CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer" onClick={() => handleExport('excel')}>
+                  Export Excel
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button onClick={openCreateDialog} className="bg-orange-gradient hover:opacity-90 text-white gap-2">
               <Plus className="h-4 w-4" />
               Add Reseller
