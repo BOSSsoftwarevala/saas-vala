@@ -1,16 +1,14 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { MarketplaceHeader } from '@/components/marketplace/MarketplaceHeader';
-import { LazySection } from '@/components/marketplace/LazySection';
-import { MarketplaceCategoryRow } from '@/components/marketplace/MarketplaceCategoryRow';
-import { MARKETPLACE_CATEGORIES } from '@/data/marketplaceCategories';
+import { MarketplaceProductCard } from '@/components/marketplace/MarketplaceProductCard';
+import { HeroBannerSlider } from '@/components/marketplace/HeroBannerSlider';
 import { useMarketplaceProducts, mapDbProduct, type MarketplaceProduct } from '@/hooks/useMarketplaceProducts';
 import { toast } from 'sonner';
 import { useFraudDetection } from '@/hooks/useFraudDetection';
 import { useAuth } from '@/hooks/useAuth';
 import { dashboardApi } from '@/lib/dashboardApi';
 import { publicMarketplaceApi } from '@/lib/api';
-import { HeroBannerSlider } from '@/components/marketplace/HeroBannerSlider';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -76,19 +74,6 @@ export default function Marketplace() {
   const activeProducts = useMemo(
     () => (serverSearchProducts && searchQuery.trim() ? serverSearchProducts : products),
     [products, serverSearchProducts, searchQuery]
-  );
-
-  const getProductsForCategory = useMemo(
-    () => (categoryKeywords: string[]) => {
-      const lowered = categoryKeywords.map((keyword) => keyword.toLowerCase());
-      return activeProducts
-        .filter((product) => {
-          const category = (product.category || '').toLowerCase();
-          const businessType = (product.businessType || '').toLowerCase();
-          return lowered.some((keyword) => category.includes(keyword) || businessType.includes(keyword));
-        });
-    },
-    [activeProducts]
   );
 
   const loadResellerData = async () => {
@@ -601,22 +586,35 @@ export default function Marketplace() {
         <main className="pb-8">
           <HeroBannerSlider slides={bannerSlides} onBannerClick={handleBannerClick} />
 
-        <div id="marketplace-healthcare-section" className="px-4 md:px-8 mt-4 mb-4 text-sm text-muted-foreground">
-          {searchQuery.trim()
-            ? `${activeProducts.length} products matching “${searchQuery.trim()}”`
-            : `${products.length} products available`}
+        <div id="marketplace-healthcare-section" className="px-4 md:px-8 mt-4 mb-6">
+          <h2 className="text-2xl font-bold text-foreground mb-2">All Products</h2>
+          <p className="text-sm text-muted-foreground">
+            {searchQuery.trim()
+              ? `${activeProducts.length} products matching "${searchQuery.trim()}"`
+              : `${products.length} products available`}
+          </p>
         </div>
 
-        {MARKETPLACE_CATEGORIES.map((cat) => (
-          <LazySection key={cat.id} height={280}>
-            <MarketplaceCategoryRow
-              category={cat}
-              onBuyNow={handleBuyNow}
-              onDemo={handleDemo}
-              productsOverride={getProductsForCategory(cat.keywords)}
-            />
-          </LazySection>
-        ))}
+        {/* Multi-row Grid Display */}
+        <div className="px-4 md:px-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {activeProducts.map((product, i) => (
+              <MarketplaceProductCard
+                key={product.id}
+                product={product}
+                index={i}
+                onBuyNow={handleBuyNow}
+                onDemo={handleDemo}
+                rank={i + 1}
+              />
+            ))}
+          </div>
+          {activeProducts.length === 0 && (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">No products found matching your search.</p>
+            </div>
+          )}
+        </div>
       </main>
 
       {/* Payment Dialog */}

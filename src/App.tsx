@@ -1,3 +1,24 @@
+import React from 'react';
+// Global error boundary for critical failures
+class GlobalErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: any}> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: any, info: any) {
+    // eslint-disable-next-line no-console
+    console.error('Global error boundary caught:', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return <div style={{padding: 32, color: 'red', fontWeight: 'bold'}}>Critical error: {String(this.state.error)}<br/>Check your environment variables and API connectivity.<br/>See console for details.</div>;
+    }
+    return this.props.children;
+  }
+}
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,70 +29,67 @@ import { CartProvider } from '@/hooks/useCart';
 import { Loader2 } from 'lucide-react';
 import React, { Suspense, useEffect } from 'react';
 
-// Only eagerly load Auth
-import Auth from "./pages/Auth";
-const Marketplace = React.lazy(() => import("./pages/Marketplace"));
-const DemoPage = React.lazy(() => import("./pages/DemoPage"));
-const ProductDetail = React.lazy(() => import("./pages/ProductDetail"));
-const Favorites = React.lazy(() => import("./pages/Favorites"));
-const Orders = React.lazy(() => import("./pages/Orders"));
 
-// Lazy load everything else
-const Dashboard = React.lazy(() => import("./pages/Dashboard"));
-const Products = React.lazy(() => import("./pages/Products"));
-const RoleDetail = React.lazy(() => import("./pages/RoleDetail"));
-const TransportRoleDetail = React.lazy(() => import("./pages/TransportRoleDetail"));
-const ManufacturingRoleDetail = React.lazy(() => import("./pages/ManufacturingRoleDetail"));
-const EducationCategory = React.lazy(() => import("./pages/EducationCategory"));
-const Keys = React.lazy(() => import("./pages/Keys"));
-const Servers = React.lazy(() => import("./pages/Servers"));
-const AiChat = React.lazy(() => import("./pages/AiChat"));
-const ValaBuilder = React.lazy(() => import("./pages/ValaBuilder"));
-const SaasAiDashboard = React.lazy(() => import("./pages/SaasAiDashboard"));
-const AiApis = React.lazy(() => import("./pages/AiApis"));
-const Wallet = React.lazy(() => import("./pages/Wallet"));
-const SeoLeads = React.lazy(() => import("./pages/SeoLeads"));
-const Resellers = React.lazy(() => import("./pages/Resellers"));
-const Settings = React.lazy(() => import("./pages/Settings"));
-const AuditLogs = React.lazy(() => import("./pages/AuditLogs"));
-const SystemHealth = React.lazy(() => import("./pages/SystemHealth"));
-// NotFound removed - 404 redirects to /dashboard
-const ResellerDashboard = React.lazy(() => import("./pages/ResellerDashboard"));
-const Automation = React.lazy(() => import("./pages/Automation"));
-const AddProduct = React.lazy(() => import("./pages/AddProduct"));
-const EduPwa = React.lazy(() => import("./pages/EduPwa"));
-const Install = React.lazy(() => import("./pages/Install"));
-const HealthPwa = React.lazy(() => import("./pages/HealthPwa"));
-const RealEstatePwa = React.lazy(() => import("./pages/RealEstatePwa"));
-const EcomPwa = React.lazy(() => import("./pages/EcomPwa"));
-const RetailPwa = React.lazy(() => import("./pages/RetailPwa"));
-const FoodPwa = React.lazy(() => import("./pages/FoodPwa"));
-const HospitalityPwa = React.lazy(() => import("./pages/HospitalityPwa"));
-const TransportPwa = React.lazy(() => import("./pages/TransportPwa"));
-const LogisticsPwa = React.lazy(() => import("./pages/LogisticsPwa"));
-const FinancePwa = React.lazy(() => import("./pages/FinancePwa"));
-const MediaPwa = React.lazy(() => import("./pages/MediaPwa"));
-const SocialPwa = React.lazy(() => import("./pages/SocialPwa"));
-const AiToolsPwa = React.lazy(() => import("./pages/AiToolsPwa"));
-const DevToolsPwa = React.lazy(() => import("./pages/DevToolsPwa"));
-const ProductivityPwa = React.lazy(() => import("./pages/ProductivityPwa"));
-const CyberSecurityPwa = React.lazy(() => import("./pages/CyberSecurityPwa"));
-const InvestPwa = React.lazy(() => import("./pages/InvestPwa"));
-const ManufacturingPwa = React.lazy(() => import("./pages/ManufacturingPwa"));
-const ConstructionPwa = React.lazy(() => import("./pages/ConstructionPwa"));
-const AutomotivePwa = React.lazy(() => import("./pages/AutomotivePwa"));
-const AgriculturePwa = React.lazy(() => import("./pages/AgriculturePwa"));
-const EnergyPwa = React.lazy(() => import("./pages/EnergyPwa"));
-const TelecomPwa = React.lazy(() => import("./pages/TelecomPwa"));
-const ItSoftwarePwa = React.lazy(() => import("./pages/ItSoftwarePwa"));
-const CloudDevopsPwa = React.lazy(() => import("./pages/CloudDevopsPwa"));
-const AnalyticsPwa = React.lazy(() => import("./pages/AnalyticsPwa"));
-const Cart = React.lazy(() => import("./pages/Cart"));
-const ApkPipeline = React.lazy(() => import("./pages/ApkPipeline"));
-const OfflineAppTemplate = React.lazy(() => import("./pages/OfflineAppTemplate"));
-const MarketplaceAdmin = React.lazy(() => import("./pages/MarketplaceAdmin"));
-const Support = React.lazy(() => import("./pages/Support"));
-const ProtectedShellProviders = React.lazy(() => import('./components/layout/ProtectedShellProviders'));
+import Auth from "./pages/Auth";
+import Marketplace from "./pages/Marketplace";
+import DemoPage from "./pages/DemoPage";
+import ProductDetail from "./pages/ProductDetail";
+import Favorites from "./pages/Favorites";
+import Orders from "./pages/Orders";
+import Dashboard from "./pages/Dashboard";
+import Products from "./pages/Products";
+import RoleDetail from "./pages/RoleDetail";
+import TransportRoleDetail from "./pages/TransportRoleDetail";
+import ManufacturingRoleDetail from "./pages/ManufacturingRoleDetail";
+import EducationCategory from "./pages/EducationCategory";
+import Keys from "./pages/Keys";
+import Servers from "./pages/Servers";
+import AiChat from "./pages/AiChat";
+import ValaBuilder from "./pages/ValaBuilder";
+import SaasAiDashboard from "./pages/SaasAiDashboard";
+import AiApis from "./pages/AiApis";
+import Wallet from "./pages/Wallet";
+import SeoLeads from "./pages/SeoLeads";
+import Resellers from "./pages/Resellers";
+import Settings from "./pages/Settings";
+import AuditLogs from "./pages/AuditLogs";
+import SystemHealth from "./pages/SystemHealth";
+import ResellerDashboard from "./pages/ResellerDashboard";
+import Automation from "./pages/Automation";
+import AddProduct from "./pages/AddProduct";
+import EduPwa from "./pages/EduPwa";
+import Install from "./pages/Install";
+import HealthPwa from "./pages/HealthPwa";
+import RealEstatePwa from "./pages/RealEstatePwa";
+import EcomPwa from "./pages/EcomPwa";
+import RetailPwa from "./pages/RetailPwa";
+import FoodPwa from "./pages/FoodPwa";
+import HospitalityPwa from "./pages/HospitalityPwa";
+import TransportPwa from "./pages/TransportPwa";
+import LogisticsPwa from "./pages/LogisticsPwa";
+import FinancePwa from "./pages/FinancePwa";
+import MediaPwa from "./pages/MediaPwa";
+import SocialPwa from "./pages/SocialPwa";
+import AiToolsPwa from "./pages/AiToolsPwa";
+import DevToolsPwa from "./pages/DevToolsPwa";
+import ProductivityPwa from "./pages/ProductivityPwa";
+import CyberSecurityPwa from "./pages/CyberSecurityPwa";
+import InvestPwa from "./pages/InvestPwa";
+import ManufacturingPwa from "./pages/ManufacturingPwa";
+import ConstructionPwa from "./pages/ConstructionPwa";
+import AutomotivePwa from "./pages/AutomotivePwa";
+import AgriculturePwa from "./pages/AgriculturePwa";
+import EnergyPwa from "./pages/EnergyPwa";
+import TelecomPwa from "./pages/TelecomPwa";
+import ItSoftwarePwa from "./pages/ItSoftwarePwa";
+import CloudDevopsPwa from "./pages/CloudDevopsPwa";
+import AnalyticsPwa from "./pages/AnalyticsPwa";
+import Cart from "./pages/Cart";
+import ApkPipeline from "./pages/ApkPipeline";
+import OfflineAppTemplate from "./pages/OfflineAppTemplate";
+import MarketplaceAdmin from "./pages/MarketplaceAdmin";
+import Support from "./pages/Support";
+import ProtectedShellProviders from './components/layout/ProtectedShellProviders';
 
 function preloadCriticalRoutes() {
   return Promise.allSettled([
@@ -249,37 +267,46 @@ function AppRoutes() {
   );
 }
 
+
 const App = () => {
-  useEffect(() => {
+  React.useEffect(() => {
+    // Debug: confirm App root renders
+    // eslint-disable-next-line no-console
+    console.log('App root mounted');
+    // Log env variables
+    // eslint-disable-next-line no-console
+    console.log('VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL);
+    // eslint-disable-next-line no-console
+    console.log('VITE_SUPABASE_PUBLISHABLE_KEY:', import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
     const runner = () => {
       void preloadCriticalRoutes();
     };
-
     const idleId = (window as any).requestIdleCallback?.(runner, { timeout: 1500 });
     if (typeof idleId === 'number') {
       return () => {
         (window as any).cancelIdleCallback?.(idleId);
       };
     }
-
     const timeoutId = window.setTimeout(runner, 1200);
     return () => window.clearTimeout(timeoutId);
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AuthProvider>
-            <CartProvider>
-              <AppRoutes />
-            </CartProvider>
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <GlobalErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <AuthProvider>
+              <CartProvider>
+                <AppRoutes />
+              </CartProvider>
+            </AuthProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </GlobalErrorBoundary>
   );
 };
 

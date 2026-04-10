@@ -1385,20 +1385,30 @@ export const dashboardApi = {
   },
 
   getResellerApplications: async (status?: 'pending' | 'approved' | 'rejected') => {
-    return withErrorHandling(async () => {
-      let query = (supabase as any)
-        .from('reseller_applications')
-        .select('*')
-        .order('created_at', { ascending: false });
+    try {
+      return await withErrorHandling(async () => {
+        let query = (supabase as any)
+          .from('reseller_applications')
+          .select('*')
+          .order('created_at', { ascending: false });
 
-      if (status) {
-        query = query.eq('status', status);
+        if (status) {
+          query = query.eq('status', status);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        return data as ResellerApplication[];
+      }, 'Fetch reseller applications');
+    } catch (err: any) {
+      // Table not yet migrated – silently return empty list so the UI
+      // renders the "no applications" empty state instead of crashing.
+      if (err?.code === 'TABLE_NOT_FOUND') {
+        console.warn('[dashboardApi] reseller_applications table not found – run migration 20260410090000_missing_tables_backfill.sql in Supabase SQL editor');
+        return [] as ResellerApplication[];
       }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as ResellerApplication[];
-    }, 'Fetch reseller applications');
+      throw err;
+    }
   },
 
   approveResellerApplication: async (applicationId: string, adminUserId: string) => {

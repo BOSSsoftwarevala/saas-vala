@@ -294,13 +294,35 @@ Deno.serve(async (req) => {
 
         let targetSlugs = slugs || [];
         if (!targetSlugs.length) {
-          const { data: pending } = await admin
-            .from("apk_build_queue")
-            .select("slug, repo_url, product_id, output_version")
-            .eq("build_status", "pending")
-            .order("created_at", { ascending: true })
-            .limit(limit || 5);
-          targetSlugs = (pending || []).map((p: any) => ({ slug: p.slug, repo_url: p.repo_url, product_id: p.product_id }));
+          const requestedLimit = Number(limit ?? 0);
+          if (requestedLimit > 0) {
+            const { data: pending } = await admin
+              .from("apk_build_queue")
+              .select("slug, repo_url, product_id, output_version")
+              .eq("build_status", "pending")
+              .order("created_at", { ascending: true })
+              .limit(requestedLimit);
+            targetSlugs = (pending || []).map((p: any) => ({ slug: p.slug, repo_url: p.repo_url, product_id: p.product_id, output_version: p.output_version }));
+          } else {
+            const pageSize = 200;
+            let from = 0;
+            const allPending: any[] = [];
+            while (true) {
+              const to = from + pageSize - 1;
+              const { data: page } = await admin
+                .from("apk_build_queue")
+                .select("slug, repo_url, product_id, output_version")
+                .eq("build_status", "pending")
+                .order("created_at", { ascending: true })
+                .range(from, to);
+
+              const rows = page || [];
+              allPending.push(...rows);
+              if (rows.length < pageSize) break;
+              from += pageSize;
+            }
+            targetSlugs = allPending.map((p: any) => ({ slug: p.slug, repo_url: p.repo_url, product_id: p.product_id, output_version: p.output_version }));
+          }
         }
 
         const results: any[] = [];

@@ -42,6 +42,10 @@ export default function Dashboard() {
     getSystemMetrics,
   } = useDashboardStore();
 
+  const safeProducts = Array.isArray(products) ? products : [];
+  const safeServers = Array.isArray(servers) ? servers : [];
+  const safeLogs = Array.isArray(logs) ? logs : [];
+
   const [searchQuery, setSearchQuery] = useState('');
   const [aiMode, setAiMode] = useState<'fast' | 'balanced' | 'quality' | 'cheap'>('balanced');
   const [aiSaving, setAiSaving] = useState(false);
@@ -163,11 +167,21 @@ export default function Dashboard() {
 
   // Map audit logs to activity feed format
   const activities = useMemo(() => {
-    return logs.slice(0, 10).map(log => {
+    return safeLogs.slice(0, 10).map((log, index) => {
+      const safeAction = typeof log?.action === 'string' && log.action.trim().length > 0
+        ? log.action
+        : 'unknown_action';
+      const safeTableName = typeof log?.table_name === 'string' && log.table_name.trim().length > 0
+        ? log.table_name
+        : '';
+      const safeTimestamp = typeof log?.timestamp === 'string' && log.timestamp.trim().length > 0
+        ? log.timestamp
+        : new Date().toISOString();
+
       let type: 'key' | 'product' | 'server' | 'payment' | 'user' | 'security' = 'user';
       let iconType: string = 'user';
 
-      switch (log.table_name) {
+      switch (safeTableName) {
         case 'license_keys':
           type = 'key';
           iconType = 'key';
@@ -190,7 +204,7 @@ export default function Dashboard() {
           iconType = 'user';
           break;
         default:
-          if (log.action.includes('security') || log.table_name === 'security') {
+          if (safeAction.includes('security') || safeTableName === 'security') {
             type = 'security';
             iconType = 'security';
           }
@@ -198,14 +212,14 @@ export default function Dashboard() {
       }
 
       return {
-        id: log.id,
+        id: log?.id || `activity-${index}`,
         type,
-        message: `${log.action.replace(/_/g, ' ')} ${log.table_name ? `on ${log.table_name}` : ''}`,
-        time: new Date(log.timestamp).toLocaleString(),
+        message: `${safeAction.replace(/_/g, ' ')} ${safeTableName ? `on ${safeTableName}` : ''}`,
+        time: new Date(safeTimestamp).toLocaleString(),
         iconType,
       };
     });
-  }, [logs]);
+  }, [safeLogs]);
 
   // Memoized system metrics
   const systemMetrics = useMemo(() => getSystemMetrics(), [getSystemMetrics]);
@@ -268,16 +282,16 @@ export default function Dashboard() {
             <div className="flex items-center justify-center p-8">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
-          ) : products.length === 0 ? (
+          ) : safeProducts.length === 0 ? (
             <div className="text-center p-8 text-muted-foreground">
               No products yet. Click "Add Product" to create one.
             </div>
           ) : (
-            products.slice(0, 5).map((product) => (
+            safeProducts.slice(0, 5).map((product) => (
               <ProductCard
                 key={product.id}
                 product={product}
-                servers={servers}
+                servers={safeServers}
                 onClick={() => navigate('/products')}
               />
             ))
@@ -293,12 +307,12 @@ export default function Dashboard() {
             <div className="flex items-center justify-center p-8">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
-          ) : servers.length === 0 ? (
+          ) : safeServers.length === 0 ? (
             <div className="text-center p-8 text-muted-foreground">
               No servers yet. Deploy your first project.
             </div>
           ) : (
-            servers.slice(0, 5).map((server) => (
+            safeServers.slice(0, 5).map((server) => (
               <ServerCard
                 key={server.id}
                 server={server}
@@ -311,8 +325,8 @@ export default function Dashboard() {
                 onDeployProduct={async (serverId, productId) => {
                   await deployProductToServer(serverId, productId);
                 }}
-                logs={logs}
-                products={products}
+                logs={safeLogs}
+                products={safeProducts}
                 onClick={() => navigate('/servers')}
               />
             ))

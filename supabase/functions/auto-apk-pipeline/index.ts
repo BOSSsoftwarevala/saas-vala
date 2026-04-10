@@ -921,21 +921,44 @@ Deno.serve(async (req) => {
       // ═══════════════════════════════════════════
       case "auto_marketplace_workflow": {
         const githubToken = Deno.env.get("SAASVALA_GITHUB_TOKEN");
-        const batchLimit = data?.limit || 20;
+        const requestedLimit = Number(data?.limit ?? 0);
+        const processAll = data?.process_all === true || requestedLimit <= 0;
+        const pageSize = Math.max(50, Math.min(500, Number(data?.page_size || 200)));
 
         const results: any[] = [];
         let processed = 0, verified = 0, attached = 0, queued = 0, skipped = 0;
 
-        // Step 1: Get all marketplace products missing APK
-        const { data: products } = await admin
-          .from("products")
-          .select("id, name, slug, git_repo_url, apk_url, status, marketplace_visible, is_apk, demo_url")
-          .eq("marketplace_visible", true)
-          .is("apk_url", null)
-          .order("created_at", { ascending: true })
-          .limit(batchLimit);
+        // Step 1: Get marketplace products missing APK (full scan when processAll=true)
+        const products: any[] = [];
+        if (processAll) {
+          let from = 0;
+          while (true) {
+            const to = from + pageSize - 1;
+            const { data: page } = await admin
+              .from("products")
+              .select("id, name, slug, git_repo_url, apk_url, status, marketplace_visible, is_apk, demo_url")
+              .eq("marketplace_visible", true)
+              .is("apk_url", null)
+              .order("created_at", { ascending: true })
+              .range(from, to);
 
-        if (!products?.length) {
+            const rows = page || [];
+            products.push(...rows);
+            if (rows.length < pageSize) break;
+            from += pageSize;
+          }
+        } else {
+          const { data: limited } = await admin
+            .from("products")
+            .select("id, name, slug, git_repo_url, apk_url, status, marketplace_visible, is_apk, demo_url")
+            .eq("marketplace_visible", true)
+            .is("apk_url", null)
+            .order("created_at", { ascending: true })
+            .limit(Math.max(1, requestedLimit));
+          products.push(...(limited || []));
+        }
+
+        if (!products.length) {
           return respond({
             success: true,
             message: "✅ All marketplace products already have APK URLs attached",

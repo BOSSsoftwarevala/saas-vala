@@ -4,11 +4,31 @@ import type { Database } from './types';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const normalizeEnv = (value: string | undefined): string => (value ?? '').trim().replace(/^['"]|['"]$/g, '');
+
+const normalizedSupabaseUrl = normalizeEnv(SUPABASE_URL);
+const normalizedSupabasePublishableKey = normalizeEnv(SUPABASE_PUBLISHABLE_KEY);
+
+export const hasSupabaseEnv = Boolean(normalizedSupabaseUrl && normalizedSupabasePublishableKey);
+
+const safeSupabaseUrl = normalizedSupabaseUrl.length > 0
+  ? normalizedSupabaseUrl
+  : 'https://invalid.supabase.local';
+
+const safeSupabasePublishableKey = normalizedSupabasePublishableKey.length > 0
+  ? normalizedSupabasePublishableKey
+  : 'invalid-publishable-key';
+
+if (!hasSupabaseEnv) {
+  // Keep the app renderable and surface a clear runtime diagnostic instead of a blank crash.
+  // eslint-disable-next-line no-console
+  console.error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY. Supabase requests will fail until env is configured.');
+}
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+export const supabase = createClient<Database>(safeSupabaseUrl, safeSupabasePublishableKey, {
   auth: {
     storage: localStorage,
     persistSession: true,

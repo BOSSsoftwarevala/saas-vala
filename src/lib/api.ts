@@ -1,6 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
 
-const API_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/api-gateway`;
+const normalizeEnv = (value: string | undefined): string => (value ?? '').trim().replace(/^['"]|['"]$/g, '');
+const normalizedSupabaseUrl = normalizeEnv(import.meta.env.VITE_SUPABASE_URL);
+const API_BASE = `${normalizedSupabaseUrl || 'https://invalid.supabase.local'}/functions/v1/api-gateway`;
 
 /** Timeout for all API requests (ms). */
 const API_TIMEOUT_MS = 30_000;

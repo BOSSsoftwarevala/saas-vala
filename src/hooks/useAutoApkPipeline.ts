@@ -53,7 +53,7 @@ export function useAutoApkPipeline() {
     return result;
   }, [invoke]);
 
-  const bulkBuild = useCallback(async (limit = 10) => {
+  const bulkBuild = useCallback(async (limit = 0) => {
     const result = await invoke('auto-apk-pipeline', 'bulk_build', { limit });
     if (result?.success) toast.success(result.message);
     return result;
@@ -72,9 +72,13 @@ export function useAutoApkPipeline() {
     return result;
   }, [invoke]);
 
-  const autoMarketplaceWorkflow = useCallback(async (limit = 20) => {
+  const autoMarketplaceWorkflow = useCallback(async (limit = 0, processAll = true) => {
     toast.info('🤖 Running auto marketplace workflow...');
-    const result = await invoke('auto-apk-pipeline', 'auto_marketplace_workflow', { limit });
+    const result = await invoke('auto-apk-pipeline', 'auto_marketplace_workflow', {
+      limit,
+      process_all: processAll,
+      page_size: 200,
+    });
     if (result?.success) toast.success(result.message);
     return result;
   }, [invoke]);

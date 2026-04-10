@@ -267,6 +267,22 @@ export const withErrorHandling = async <T>(
     // Handle Supabase errors
     if (error && typeof error === 'object' && 'code' in error) {
       const supabaseError = error as any;
+      const errMsg: string = supabaseError.message ?? '';
+
+      // Table not yet created (migration pending) – surface a typed error
+      // so callers can return safe fallbacks instead of crashing the UI.
+      if (
+        errMsg.includes('schema cache') ||
+        errMsg.includes('not found in the schema') ||
+        errMsg.includes('Could not find the table')
+      ) {
+        throw new DashboardError(
+          `Table missing from database (migration pending): ${errMsg}`,
+          'TABLE_NOT_FOUND',
+          404,
+          { originalError: supabaseError }
+        );
+      }
 
       switch (supabaseError.code) {
         case 'PGRST116':

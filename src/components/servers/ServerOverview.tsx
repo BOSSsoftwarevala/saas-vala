@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
+  PauseCircle,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -24,59 +25,32 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { useServers } from '@/hooks/useServers';
 
 interface ServerOverviewProps {
   onSelectProject: (id: string) => void;
   onNewProject: () => void;
 }
 
-// Mock projects data
-const mockProjects = [
-  {
-    id: '1',
-    name: 'saas-vala-api',
-    framework: 'Node.js',
-    repo: 'saas-vala/api',
-    branch: 'main',
-    domain: 'api.saas-vala.com',
-    status: 'ready',
-    lastDeployment: '2 hours ago',
-    lastCommit: 'feat: add user authentication',
-  },
-  {
-    id: '2',
-    name: 'saas-vala-web',
-    framework: 'Next.js',
-    repo: 'saas-vala/web',
-    branch: 'main',
-    domain: 'saas-vala.com',
-    status: 'building',
-    lastDeployment: 'Just now',
-    lastCommit: 'fix: resolve dashboard layout issue',
-  },
-  {
-    id: '3',
-    name: 'analytics-dashboard',
-    framework: 'React',
-    repo: 'saas-vala/analytics',
-    branch: 'develop',
-    domain: 'analytics.saas-vala.com',
-    status: 'ready',
-    lastDeployment: '1 day ago',
-    lastCommit: 'chore: update dependencies',
-  },
-  {
-    id: '4',
-    name: 'mobile-backend',
-    framework: 'Express',
-    repo: 'saas-vala/mobile-api',
-    branch: 'main',
-    domain: null,
-    status: 'error',
-    lastDeployment: '3 days ago',
-    lastCommit: 'fix: cors headers',
-  },
-];
+const runtimeLabels: Record<string, string> = {
+  nodejs18: 'Node.js 18',
+  nodejs20: 'Node.js 20',
+  php82: 'PHP 8.2',
+  php83: 'PHP 8.3',
+  python311: 'Python 3.11',
+  python312: 'Python 3.12',
+};
+
+function relativeTime(dateStr: string | null): string {
+  if (!dateStr) return 'Never';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
 
 const statusConfig: Record<string, {
   icon: typeof CheckCircle2;
@@ -86,47 +60,59 @@ const statusConfig: Record<string, {
   borderColor: string;
   animate?: boolean;
 }> = {
-  ready: {
+  live: {
     icon: CheckCircle2,
-    label: 'Ready',
+    label: 'Live',
     color: 'text-success',
     bgColor: 'bg-success/20',
     borderColor: 'border-success/30',
   },
-  building: {
+  deploying: {
     icon: Loader2,
-    label: 'Building',
+    label: 'Deploying',
     color: 'text-warning',
     bgColor: 'bg-warning/20',
     borderColor: 'border-warning/30',
     animate: true,
   },
-  error: {
+  failed: {
     icon: XCircle,
-    label: 'Error',
+    label: 'Failed',
     color: 'text-destructive',
     bgColor: 'bg-destructive/20',
     borderColor: 'border-destructive/30',
   },
-};
-
-const frameworkIcons: Record<string, string> = {
-  'Next.js': '▲',
-  'React': '⚛️',
-  'Node.js': '🟢',
-  'Express': '⚡',
-  'Vue': '💚',
-  'Nuxt': '💚',
+  stopped: {
+    icon: PauseCircle,
+    label: 'Stopped',
+    color: 'text-muted-foreground',
+    bgColor: 'bg-muted',
+    borderColor: 'border-muted-foreground/30',
+  },
+  suspended: {
+    icon: PauseCircle,
+    label: 'Suspended',
+    color: 'text-muted-foreground',
+    bgColor: 'bg-muted',
+    borderColor: 'border-muted-foreground/30',
+  },
 };
 
 export function ServerOverview({ onSelectProject, onNewProject }: ServerOverviewProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const { servers, deployments, loading } = useServers();
 
-  const filteredProjects = mockProjects.filter(
-    (project) =>
-      project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.repo.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredServers = servers.filter(
+    (s) =>
+      s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (s.git_repo || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const activeCount = servers.filter((s) => s.status === 'live').length;
+  const buildingCount = servers.filter((s) => s.status === 'deploying').length;
+  const avgUptime = servers.length
+    ? Math.round(servers.reduce((sum, s) => sum + (s.uptime_percent || 0), 0) / servers.length * 10) / 10
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -136,7 +122,7 @@ export function ServerOverview({ onSelectProject, onNewProject }: ServerOverview
           <CardContent className="p-4 text-center">
             <div className="flex items-center justify-center gap-2 mb-1">
               <span className="status-dot status-online" />
-              <p className="text-2xl font-bold text-success">3</p>
+              <p className="text-2xl font-bold text-success">{activeCount}</p>
             </div>
             <p className="text-sm text-muted-foreground">Active</p>
           </CardContent>
@@ -145,21 +131,21 @@ export function ServerOverview({ onSelectProject, onNewProject }: ServerOverview
           <CardContent className="p-4 text-center">
             <div className="flex items-center justify-center gap-2 mb-1">
               <Loader2 className="h-4 w-4 text-warning animate-spin" />
-              <p className="text-2xl font-bold text-warning">1</p>
+              <p className="text-2xl font-bold text-warning">{buildingCount}</p>
             </div>
-            <p className="text-sm text-muted-foreground">Building</p>
+            <p className="text-sm text-muted-foreground">Deploying</p>
           </CardContent>
         </Card>
         <Card className="glass-card">
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-foreground">247</p>
+            <p className="text-2xl font-bold text-foreground">{deployments.length}</p>
             <p className="text-sm text-muted-foreground">Deployments</p>
           </CardContent>
         </Card>
         <Card className="glass-card">
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-foreground">99.9%</p>
-            <p className="text-sm text-muted-foreground">Uptime</p>
+            <p className="text-2xl font-bold text-foreground">{avgUptime > 0 ? `${avgUptime}%` : '—'}</p>
+            <p className="text-sm text-muted-foreground">Avg Uptime</p>
           </CardContent>
         </Card>
       </div>
@@ -184,31 +170,38 @@ export function ServerOverview({ onSelectProject, onNewProject }: ServerOverview
       </div>
 
       {/* Projects Grid */}
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {filteredProjects.map((project) => {
-          const status = statusConfig[project.status as keyof typeof statusConfig];
+        {filteredServers.map((server) => {
+          const statusKey = server.status in statusConfig ? server.status : 'stopped';
+          const status = statusConfig[statusKey];
           const StatusIcon = status.icon;
+          const domain = server.custom_domain || (server.subdomain ? `${server.subdomain}.saasvala.com` : null);
 
           return (
             <Card
-              key={project.id}
+              key={server.id}
               className="glass-card-hover cursor-pointer group"
-              onClick={() => onSelectProject(project.id)}
+              onClick={() => onSelectProject(server.id)}
             >
               <CardContent className="p-5">
                 {/* Header */}
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center text-lg">
-                      {frameworkIcons[project.framework] || <Server className="h-5 w-5 text-muted-foreground" />}
+                    <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                      <Server className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <div>
                       <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
-                        {project.name}
+                        {server.name}
                       </h3>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <GitBranch className="h-3 w-3" />
-                        <span>{project.repo}</span>
+                        <span>{server.git_repo || runtimeLabels[server.runtime] || server.runtime}</span>
                       </div>
                     </div>
                   </div>
@@ -236,32 +229,29 @@ export function ServerOverview({ onSelectProject, onNewProject }: ServerOverview
                       {status.label}
                     </Badge>
                     <Badge variant="outline" className="border-border text-muted-foreground">
-                      {project.branch}
+                      {server.git_branch}
                     </Badge>
                   </div>
 
-                  {project.domain && (
+                  {domain && (
                     <a
-                      href={`https://${project.domain}`}
+                      href={`https://${domain}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-1.5 text-sm text-secondary hover:underline"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <Globe className="h-3.5 w-3.5" />
-                      {project.domain}
+                      {domain}
                       <ExternalLink className="h-3 w-3" />
                     </a>
                   )}
 
                   {/* Last Deployment */}
                   <div className="pt-3 border-t border-border">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {project.lastDeployment}
-                      </div>
-                      <span className="truncate ml-2 max-w-[150px]">{project.lastCommit}</span>
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      {relativeTime(server.last_deploy_at)}
                     </div>
                   </div>
                 </div>
@@ -269,6 +259,14 @@ export function ServerOverview({ onSelectProject, onNewProject }: ServerOverview
             </Card>
           );
         })}
+
+        {filteredServers.length === 0 && !loading && (
+          <div className="col-span-full flex flex-col items-center justify-center py-12 text-center">
+            <Server className="h-12 w-12 text-muted-foreground mb-3" />
+            <p className="font-medium text-foreground">No servers yet</p>
+            <p className="text-sm text-muted-foreground mt-1">Import a project to get started</p>
+          </div>
+        )}
 
         {/* Add Project Card */}
         <Card
@@ -286,6 +284,7 @@ export function ServerOverview({ onSelectProject, onNewProject }: ServerOverview
           </CardContent>
         </Card>
       </div>
+      )}
     </div>
   );
 }

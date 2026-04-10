@@ -175,10 +175,10 @@ export default function ApkPipeline() {
 
   const triggerBulkBuild = async () => {
     setTriggeringBulk(true);
-    toast.info('🔧 Triggering APK builds for pending repos...');
+    toast.info('🔧 Triggering APK builds for all pending repos (one by one)...');
     try {
       const { data: result, error } = await supabase.functions.invoke('apk-factory', {
-        body: { action: 'bulk_trigger', data: { limit: 5 } },
+        body: { action: 'bulk_trigger', data: { process_all: true } },
       });
       if (error) throw error;
       setWorkflowResult(result);
@@ -194,10 +194,18 @@ export default function ApkPipeline() {
   const runAutoWorkflow = async () => {
     setRunningWorkflow(true);
     setWorkflowResult(null);
-    toast.info('🤖 Starting Auto Marketplace Workflow: Scan → Build → Upload → Attach...');
+    toast.info('🤖 Starting full auto workflow for all repos: GitHub Scan → Queue Sync → Build Trigger → Attach...');
     try {
+      // 1) Scan full saasvala GitHub account into catalog
+      await supabase.functions.invoke('auto-apk-pipeline', {
+        body: { action: 'scan_and_register' },
+      });
+
+      // 2) Sync catalog repos into APK build queue
+      await scanRepos();
+
       const { data: result, error } = await supabase.functions.invoke('auto-apk-pipeline', {
-        body: { action: 'auto_marketplace_workflow', data: { limit: 50 } },
+        body: { action: 'auto_marketplace_workflow', data: { process_all: true, page_size: 200 } },
       });
       if (error) throw error;
       setWorkflowResult(result);
@@ -275,7 +283,7 @@ export default function ApkPipeline() {
             </Button>
             <Button onClick={triggerBulkBuild} disabled={triggeringBulk} variant="secondary" size="sm">
               <Package className="h-4 w-4 mr-1" />
-              {triggeringBulk ? 'Triggering...' : 'Build 5 APKs'}
+              {triggeringBulk ? 'Triggering...' : 'Build All Pending APKs'}
             </Button>
             <Button onClick={runAutoWorkflow} disabled={runningWorkflow} className="bg-green-600 hover:bg-green-700 text-white" size="sm">
               <Rocket className="h-4 w-4 mr-1" />

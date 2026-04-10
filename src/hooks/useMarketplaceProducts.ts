@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { cachedFetch } from '@/lib/cache';
 
 export interface MarketplaceProduct {
   id: string;
@@ -144,16 +143,10 @@ export function useMarketplaceProducts() {
     return all;
   };
 
-  const fetchProducts = async (forceLive = false) => {
+  const fetchProducts = async () => {
     setLoading(true);
     try {
-      const data = forceLive
-        ? await fetchAllVisibleProducts()
-        : await cachedFetch(
-            'marketplace:products:all',
-            () => fetchAllVisibleProducts(),
-            60_000,
-          );
+      const data = await fetchAllVisibleProducts();
       const mapped = (data as any[]).map((p: any, i: number) => mapDbProduct(p, i));
       setProducts(prioritizeProducts(mapped));
     } catch (e) {
@@ -164,8 +157,10 @@ export function useMarketplaceProducts() {
   };
 
   useEffect(() => {
-    fetchProducts();
-    const handler = () => fetchProducts(true);
+    void fetchProducts();
+    const handler = () => {
+      void fetchProducts();
+    };
     window.addEventListener('marketplaceRefresh', handler);
 
     const channel = supabase
@@ -174,25 +169,17 @@ export function useMarketplaceProducts() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'products' },
         () => {
-          void fetchProducts(true);
+          void fetchProducts();
         }
       )
       .subscribe();
-
     return () => {
       window.removeEventListener('marketplaceRefresh', handler);
       supabase.removeChannel(channel);
     };
   }, []);
 
-  const dbRow1 = products.slice(0, 30);
-  const remaining = products.slice(30);
-  const allRows = [dbRow1];
-  if (remaining.length > 0) {
-    for (let i = 0; i < remaining.length; i += 30) {
-      allRows.push(remaining.slice(i, i + 30));
-    }
-  }
+
 
   const getByCategory = (cats: string[]) =>
     prioritizeProducts(
@@ -203,7 +190,11 @@ export function useMarketplaceProducts() {
       })
     );
 
-  return { products, allRows: allRows.filter(r => r.length > 0), loading, totalCount: products.length, getByCategory };
+  const allRows = products.length > 0
+    ? Array.from({ length: Math.ceil(products.length / 30) }, (_, i) => products.slice(i * 30, i * 30 + 30))
+    : [];
+
+  return { products, allRows, loading, totalCount: products.length, getByCategory };
 }
 
 // Lightweight hook for category-specific fetching (still uses SDK for performance)

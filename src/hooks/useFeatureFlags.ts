@@ -14,10 +14,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { cache } from '@/lib/cache';
 
-const FLAG_CACHE_KEY = 'feature_flags';
-const FLAG_TTL_MS    = 5 * 60_000; // 5 minutes
 
 interface FeatureFlag {
   flag_key:    string;

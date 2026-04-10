@@ -38,9 +38,9 @@ export function AutoApkPipelinePanel() {
                 <Rocket className="h-4 w-4" />
                 {loading ? 'Running...' : 'Full Pipeline'}
               </Button>
-              <Button onClick={() => autoMarketplaceWorkflow(20)} disabled={loading} size="lg" variant="outline" className="gap-2">
+              <Button onClick={() => autoMarketplaceWorkflow(0, true)} disabled={loading} size="lg" variant="outline" className="gap-2">
                 <ShoppingCart className="h-4 w-4" />
-                {loading ? 'Running...' : 'Marketplace Sync'}
+                {loading ? 'Running...' : 'Marketplace Sync (All)'}
               </Button>
             </div>
           </div>
@@ -66,9 +66,9 @@ export function AutoApkPipelinePanel() {
         />
         <ActionCard
           icon={<Hammer className="h-5 w-5" />}
-          title="Bulk Build APKs"
-          description="Queue APK builds for all pending repos (verifies on GitHub)"
-          onClick={() => bulkBuild(20)}
+          title="Bulk Build APKs (All)"
+          description="Queue APK builds for all pending repos, one-by-one"
+          onClick={() => bulkBuild(0)}
           loading={loading}
         />
         <ActionCard

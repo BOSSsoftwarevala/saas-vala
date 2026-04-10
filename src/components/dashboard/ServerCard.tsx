@@ -46,6 +46,16 @@ const statusConfig = {
   },
 };
 
+function normalizeServerStatus(status?: string): 'online' | 'offline' | 'deploying' {
+  const normalized = String(status || '').toLowerCase();
+
+  if (normalized === 'deploying') return 'deploying';
+  if (normalized === 'online' || normalized === 'live' || normalized === 'active') return 'online';
+  if (normalized === 'offline' || normalized === 'down' || normalized === 'failed' || normalized === 'stopped' || normalized === 'suspended') return 'offline';
+
+  return 'offline';
+}
+
 export function ServerCard({
   server,
   name: legacyName,
@@ -74,7 +84,7 @@ export function ServerCard({
 
   const displayName = server?.name || legacyName || '';
   const displayDomain = server?.name || legacyDomain;
-  const displayStatus = (server?.status as 'online' | 'offline' | 'deploying') || legacyStatus || 'online';
+  const displayStatus = normalizeServerStatus(server?.status || legacyStatus);
   const config = statusConfig[displayStatus];
 
   const handleOpenModal = (action: 'logs' | 'deploy-product') => {

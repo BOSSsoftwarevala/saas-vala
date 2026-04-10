@@ -12,100 +12,43 @@ import {
   XCircle,
   Loader2,
   RotateCcw,
-  ExternalLink,
   Eye,
   ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useServers } from '@/hooks/useServers';
 
-// Mock deployments data
-const mockDeployments = [
-  {
-    id: 'd1',
-    status: 'ready',
-    environment: 'Production',
-    branch: 'main',
-    commit: 'a1b2c3d',
-    commitMessage: 'feat: add user authentication system',
-    author: 'Manoj Kumar',
-    timestamp: '2 hours ago',
-    duration: '45s',
-    url: 'https://saas-vala.com',
-  },
-  {
-    id: 'd2',
-    status: 'building',
-    environment: 'Preview',
-    branch: 'feature/dashboard',
-    commit: 'e4f5g6h',
-    commitMessage: 'fix: resolve dashboard layout issue',
-    author: 'Manoj Kumar',
-    timestamp: 'Just now',
-    duration: '...',
-    url: 'https://preview-dashboard.saasvala.com',
-  },
-  {
-    id: 'd3',
-    status: 'ready',
-    environment: 'Preview',
-    branch: 'feature/api',
-    commit: 'i7j8k9l',
-    commitMessage: 'chore: update API endpoints',
-    author: 'Dev Team',
-    timestamp: '5 hours ago',
-    duration: '38s',
-    url: 'https://preview-api.saasvala.com',
-  },
-  {
-    id: 'd4',
-    status: 'error',
-    environment: 'Preview',
-    branch: 'bugfix/cors',
-    commit: 'm0n1o2p',
-    commitMessage: 'fix: cors headers configuration',
-    author: 'Manoj Kumar',
-    timestamp: '1 day ago',
-    duration: '12s',
-    url: null,
-    error: 'Build failed: Module not found',
-  },
-  {
-    id: 'd5',
-    status: 'ready',
-    environment: 'Production',
-    branch: 'main',
-    commit: 'q3r4s5t',
-    commitMessage: 'refactor: optimize database queries',
-    author: 'Dev Team',
-    timestamp: '2 days ago',
-    duration: '52s',
-    url: 'https://saas-vala.com',
-  },
-  {
-    id: 'd6',
-    status: 'canceled',
-    environment: 'Preview',
-    branch: 'experiment/ai',
-    commit: 'u6v7w8x',
-    commitMessage: 'experiment: add AI chatbot',
-    author: 'Manoj Kumar',
-    timestamp: '3 days ago',
-    duration: '8s',
-    url: null,
-  },
-];
+function relativeTime(dateStr: string | null): string {
+  if (!dateStr) return '—';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
 
-const statusConfig: Record<string, {
-  icon: typeof CheckCircle2;
-  label: string;
-  color: string;
-  bgColor: string;
-  borderColor: string;
-  animate?: boolean;
-}> = {
-  ready: {
+function formatDuration(seconds: number | null): string {
+  if (!seconds) return '—';
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+
+const statusConfig: Record<
+  string,
+  {
+    icon: typeof CheckCircle2;
+    label: string;
+    color: string;
+    bgColor: string;
+    borderColor: string;
+    animate?: boolean;
+  }
+> = {
+  success: {
     icon: CheckCircle2,
-    label: 'Ready',
+    label: 'Success',
     color: 'text-success',
     bgColor: 'bg-success/20',
     borderColor: 'border-success/30',
@@ -118,16 +61,30 @@ const statusConfig: Record<string, {
     borderColor: 'border-warning/30',
     animate: true,
   },
-  error: {
+  queued: {
+    icon: Loader2,
+    label: 'Queued',
+    color: 'text-warning',
+    bgColor: 'bg-warning/20',
+    borderColor: 'border-warning/30',
+  },
+  failed: {
     icon: XCircle,
-    label: 'Error',
+    label: 'Failed',
     color: 'text-destructive',
     bgColor: 'bg-destructive/20',
     borderColor: 'border-destructive/30',
   },
-  canceled: {
+  cancelled: {
     icon: XCircle,
-    label: 'Canceled',
+    label: 'Cancelled',
+    color: 'text-muted-foreground',
+    bgColor: 'bg-muted',
+    borderColor: 'border-muted-foreground/30',
+  },
+  rolled_back: {
+    icon: XCircle,
+    label: 'Rolled back',
     color: 'text-muted-foreground',
     bgColor: 'bg-muted',
     borderColor: 'border-muted-foreground/30',
@@ -142,17 +99,17 @@ const envConfig = {
 export function ServerDeployments() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDeployment, setSelectedDeployment] = useState<string | null>(null);
+  const { deployments, loading, deployServer } = useServers();
 
-  const filteredDeployments = mockDeployments.filter(
+  const filteredDeployments = deployments.filter(
     (d) =>
-      d.commitMessage.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      d.branch.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      d.commit.toLowerCase().includes(searchQuery.toLowerCase())
+      (d.commit_message || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (d.branch || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (d.commit_sha || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -164,136 +121,136 @@ export function ServerDeployments() {
           />
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" className="border-border gap-2">
+          <Button variant="outline" className="border-border gap-2" disabled={loading}>
             <RotateCcw className="h-4 w-4" />
             Redeploy
           </Button>
         </div>
       </div>
 
-      {/* Deployments List */}
       <div className="glass-card rounded-xl overflow-hidden">
-        <ScrollArea className="h-[600px]">
-          <div className="divide-y divide-border">
-            {filteredDeployments.map((deployment) => {
-              const status = statusConfig[deployment.status as keyof typeof statusConfig];
-              const StatusIcon = status.icon;
-              const isExpanded = selectedDeployment === deployment.id;
-
-              return (
-                <div
-                  key={deployment.id}
-                  className={cn(
-                    'p-4 hover:bg-muted/30 cursor-pointer transition-colors',
-                    isExpanded && 'bg-muted/30'
-                  )}
-                  onClick={() => setSelectedDeployment(isExpanded ? null : deployment.id)}
-                >
-                  {/* Main Row */}
-                  <div className="flex items-center gap-4">
-                    {/* Status Icon */}
-                    <div className={cn('h-10 w-10 rounded-full flex items-center justify-center shrink-0', status.bgColor)}>
-                      <StatusIcon className={cn('h-5 w-5', status.color, status.animate && 'animate-spin')} />
-                    </div>
-
-                    {/* Main Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium text-foreground truncate">
-                          {deployment.commitMessage}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <GitBranch className="h-3 w-3" />
-                          {deployment.branch}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <GitCommit className="h-3 w-3" />
-                          {deployment.commit}
-                        </div>
-                        <span>{deployment.author}</span>
-                      </div>
-                    </div>
-
-                    {/* Right Side */}
-                    <div className="flex items-center gap-3 shrink-0">
-                      <Badge variant="outline" className={envConfig[deployment.environment as keyof typeof envConfig]}>
-                        {deployment.environment}
-                      </Badge>
-                      <div className="text-right text-sm hidden sm:block">
-                        <div className="text-muted-foreground">{deployment.timestamp}</div>
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          {deployment.duration}
-                        </div>
-                      </div>
-                      <ChevronRight className={cn(
-                        'h-4 w-4 text-muted-foreground transition-transform',
-                        isExpanded && 'rotate-90'
-                      )} />
-                    </div>
-                  </div>
-
-                  {/* Expanded Content */}
-                  {isExpanded && (
-                    <div className="mt-4 pt-4 border-t border-border animate-fade-in">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Left: Details */}
-                        <div className="space-y-3">
-                          <div>
-                            <span className="text-xs text-muted-foreground">Status</span>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Badge variant="outline" className={cn(status.bgColor, status.color, status.borderColor)}>
-                                <StatusIcon className={cn('h-3 w-3 mr-1', status.animate && 'animate-spin')} />
-                                {status.label}
-                              </Badge>
-                            </div>
-                          </div>
-                          {deployment.error && (
-                            <div>
-                              <span className="text-xs text-muted-foreground">Error</span>
-                              <p className="text-sm text-destructive mt-1">{deployment.error}</p>
-                            </div>
-                          )}
-                          <div>
-                            <span className="text-xs text-muted-foreground">Build Duration</span>
-                            <p className="text-sm text-foreground mt-1">{deployment.duration}</p>
-                          </div>
-                        </div>
-
-                        {/* Right: Actions */}
-                        <div className="flex flex-wrap gap-2 items-start justify-end">
-                          {deployment.url && (
-                            <Button variant="outline" size="sm" className="gap-2 border-border" asChild>
-                              <a href={deployment.url} target="_blank" rel="noopener noreferrer">
-                                <ExternalLink className="h-3 w-3" />
-                                Visit
-                              </a>
-                            </Button>
-                          )}
-                          <Button variant="outline" size="sm" className="gap-2 border-border">
-                            <Eye className="h-3 w-3" />
-                            View Logs
-                          </Button>
-                          <Button variant="outline" size="sm" className="gap-2 border-border">
-                            <RotateCcw className="h-3 w-3" />
-                            Redeploy
-                          </Button>
-                          {deployment.environment === 'Preview' && deployment.status === 'ready' && (
-                            <Button size="sm" className="bg-orange-gradient hover:opacity-90 text-white gap-2">
-                              Promote to Production
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
-        </ScrollArea>
+        ) : filteredDeployments.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <GitBranch className="h-12 w-12 text-muted-foreground mb-3" />
+            <p className="font-medium text-foreground">No deployments yet</p>
+            <p className="text-sm text-muted-foreground mt-1">Deploy a server to see build history</p>
+          </div>
+        ) : (
+          <ScrollArea className="h-[600px]">
+            <div className="divide-y divide-border">
+              {filteredDeployments.map((deployment) => {
+                const statusKey = deployment.status in statusConfig ? deployment.status : 'failed';
+                const status = statusConfig[statusKey];
+                const StatusIcon = status.icon;
+                const isExpanded = selectedDeployment === deployment.id;
+                const environment = deployment.branch === 'main' ? 'Production' : 'Preview';
+
+                return (
+                  <div
+                    key={deployment.id}
+                    className={cn(
+                      'p-4 hover:bg-muted/30 cursor-pointer transition-colors',
+                      isExpanded && 'bg-muted/30'
+                    )}
+                    onClick={() => setSelectedDeployment(isExpanded ? null : deployment.id)}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={cn('h-10 w-10 rounded-full flex items-center justify-center shrink-0', status.bgColor)}>
+                        <StatusIcon className={cn('h-5 w-5', status.color, status.animate && 'animate-spin')} />
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-foreground truncate">
+                            {deployment.commit_message || 'No commit message'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          {deployment.branch && (
+                            <div className="flex items-center gap-1">
+                              <GitBranch className="h-3 w-3" />
+                              {deployment.branch}
+                            </div>
+                          )}
+                          {deployment.commit_sha && (
+                            <div className="flex items-center gap-1">
+                              <GitCommit className="h-3 w-3" />
+                              {deployment.commit_sha.slice(0, 7)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        <Badge variant="outline" className={envConfig[environment as keyof typeof envConfig]}>
+                          {environment}
+                        </Badge>
+                        <div className="text-right text-sm hidden sm:block">
+                          <div className="text-muted-foreground">{relativeTime(deployment.created_at)}</div>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            {formatDuration(deployment.duration_seconds)}
+                          </div>
+                        </div>
+                        <ChevronRight
+                          className={cn(
+                            'h-4 w-4 text-muted-foreground transition-transform',
+                            isExpanded && 'rotate-90'
+                          )}
+                        />
+                      </div>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="mt-4 pt-4 border-t border-border animate-fade-in">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-3">
+                            <div>
+                              <span className="text-xs text-muted-foreground">Status</span>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Badge variant="outline" className={cn(status.bgColor, status.color, status.borderColor)}>
+                                  <StatusIcon className={cn('h-3 w-3 mr-1', status.animate && 'animate-spin')} />
+                                  {status.label}
+                                </Badge>
+                              </div>
+                            </div>
+                            <div>
+                              <span className="text-xs text-muted-foreground">Build Duration</span>
+                              <p className="text-sm text-foreground mt-1">{formatDuration(deployment.duration_seconds)}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2 items-start justify-end">
+                            <Button variant="outline" size="sm" className="gap-2 border-border">
+                              <Eye className="h-3 w-3" />
+                              View Logs
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-2 border-border"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deployServer(deployment.server_id);
+                              }}
+                            >
+                              <RotateCcw className="h-3 w-3" />
+                              Redeploy
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </ScrollArea>
+        )}
       </div>
     </div>
   );
