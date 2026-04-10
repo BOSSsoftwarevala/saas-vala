@@ -54,4 +54,26 @@ function setupClientGuards() {
 
 setupClientGuards();
 
+async function cleanupLegacyCaches() {
+  if (!('serviceWorker' in navigator)) return;
+
+  try {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map((registration) => registration.unregister()));
+  } catch {
+    // no-op
+  }
+
+  if ('caches' in window) {
+    try {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((key) => caches.delete(key)));
+    } catch {
+      // no-op
+    }
+  }
+}
+
+cleanupLegacyCaches();
+
 createRoot(document.getElementById("root")!).render(<App />);
