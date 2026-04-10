@@ -191,6 +191,10 @@ interface MarketplaceOrder {
   coupon_code: string | null;
   created_at: string;
   completed_at: string | null;
+  transaction_id: string | null;
+  buyer_name?: string;
+  reseller_name?: string;
+  gateway?: string;
 }
 
 const statusLabelMap: Record<ProductStatusDb, string> = {
@@ -300,14 +304,7 @@ const emptyDiscountRule = (): DiscountRule => ({
   sort_order: 1,
 });
 
-const emptyGateway = (): PaymentGateway => ({
-  id: `new-${Date.now()}`,
-  gateway_code: '',
-  gateway_name: '',
-  is_enabled: false,
-  sort_order: 1,
-  config: {},
-});
+const PAYMENT_SETTINGS_ID = '00000000-0000-0000-0000-000000000001';
 
 function slugify(value: string) {
   return value
@@ -405,8 +402,6 @@ export default function MarketplaceAdmin() {
   const [editTicker, setEditTicker] = useState<Ticker | null>(null);
   const [editCoupon, setEditCoupon] = useState<Coupon | null>(null);
   const [editDiscountRule, setEditDiscountRule] = useState<DiscountRule | null>(null);
-  const [editGateway, setEditGateway] = useState<PaymentGateway | null>(null);
-  const [gatewayConfigText, setGatewayConfigText] = useState('{}');
 
   const productMap = useMemo(() => {
     const map = new Map<string, { id: string; name: string; status: string; apk_enabled: boolean }>();
@@ -491,9 +486,52 @@ export default function MarketplaceAdmin() {
 
   const fetchGateways = async () => {
     setGatewaysLoading(true);
-    const { data } = await db.from('marketplace_payment_gateways').select('*').order('sort_order', { ascending: true });
-    setGateways((data || []) as PaymentGateway[]);
-    setGatewaysLoading(false);
+    try {
+      const { data } = await db
+        .from('payment_settings')
+        .select('*')
+        .eq('id', PAYMENT_SETTINGS_ID)
+        .maybeSingle();
+
+      const settings = (data || {}) as Record<string, any>;
+
+      const rows: PaymentGateway[] = [
+        {
+          id: 'gateway-razorpay',
+          gateway_code: 'razorpay',
+          gateway_name: 'Razorpay',
+          is_enabled: Boolean(settings.razorpay_enabled),
+          sort_order: 1,
+          config: {
+            key_id: settings.razorpay_key_id || '',
+            key_secret: settings.razorpay_key_secret || '',
+          },
+        },
+        {
+          id: 'gateway-stripe',
+          gateway_code: 'stripe',
+          gateway_name: 'Stripe',
+          is_enabled: Boolean(settings.stripe_enabled),
+          sort_order: 2,
+          config: {
+            publishable_key: settings.stripe_publishable_key || '',
+            secret_key: settings.stripe_secret_key || '',
+          },
+        },
+        {
+          id: 'gateway-wallet',
+          gateway_code: 'wallet',
+          gateway_name: 'Wallet',
+          is_enabled: settings.wallet_enabled !== false,
+          sort_order: 3,
+          config: {},
+        },
+      ];
+
+      setGateways(rows);
+    } finally {
+      setGatewaysLoading(false);
+    }
   };
 
   const fetchApks = async () => {
@@ -510,13 +548,92 @@ export default function MarketplaceAdmin() {
 
   const fetchOrders = async () => {
     setOrdersLoading(true);
-    const { data } = await db
-      .from('marketplace_orders')
-      .select('id, buyer_id, seller_id, product_id, product_name, amount, final_amount, status, payment_method, coupon_code, created_at, completed_at')
-      .order('created_at', { ascending: false })
-      .limit(300);
-    setOrders((data || []) as MarketplaceOrder[]);
-    setOrdersLoading(false);
+    try {
+      const { data } = await db
+        .from('marketplace_orders')
+        .select('id, buyer_id, seller_id, product_id, product_name, amount, final_amount, status, payment_method, coupon_code, created_at, completed_at, transaction_id')
+        .order('created_at', { ascending: false })
+        .limit(300);
+
+      const orderRows = (data || []) as MarketplaceOrder[];
+      if (orderRows.length === 0) {
+        setOrders([]);
+        return;
+      }
+
+      const buyerIds = Array.from(new Set(orderRows.map((o) => o.buyer_id).filter(Boolean)));
+      const sellerIds = Array.from(new Set(orderRows.map((o) => o.seller_id).filter(Boolean)));
+      const productIds = Array.from(new Set(orderRows.map((o) => o.product_id).filter(Boolean)));
+      const txIds = Array.from(new Set(orderRows.map((o) => o.transaction_id).filter(Boolean)));
+
+      const [
+        { data: buyers },
+        { data: sellerResellers },
+        { data: productsData },
+        { data: txData },
+      ] = await Promise.all([
+        buyerIds.length > 0
+          ? db.from('profiles').select('id, full_name, email').in('id', buyerIds)
+          : Promise.resolve({ data: [] }),
+        sellerIds.length > 0
+          ? db.from('resellers').select('user_id, company_name').in('user_id', sellerIds)
+          : Promise.resolve({ data: [] }),
+        productIds.length > 0
+          ? db.from('products').select('id, name').in('id', productIds)
+          : Promise.resolve({ data: [] }),
+        txIds.length > 0
+          ? db.from('transactions').select('id, status, reference_type, meta').in('id', txIds)
+          : Promise.resolve({ data: [] }),
+      ]);
+
+      const buyerMap = new Map((buyers || []).map((b: any) => [b.id, b]));
+      const resellerMap = new Map((sellerResellers || []).map((r: any) => [r.user_id, r.company_name]));
+      const productMapById = new Map((productsData || []).map((p: any) => [p.id, p.name]));
+      const txMap = new Map((txData || []).map((t: any) => [t.id, t]));
+
+      const statusUpdates: Promise<any>[] = [];
+
+      const normalizedOrders = orderRows.map((row) => {
+        const tx = row.transaction_id ? txMap.get(row.transaction_id) : null;
+        const txStatus = String(tx?.status || '').toLowerCase();
+        const orderStatus = String(row.status || 'pending').toLowerCase();
+
+        let computedStatus = orderStatus;
+        if (txStatus === 'completed' || txStatus === 'success') computedStatus = 'completed';
+        else if (txStatus === 'failed' || txStatus === 'cancelled') computedStatus = 'failed';
+        else if (txStatus === 'pending') computedStatus = 'pending';
+
+        if (computedStatus !== orderStatus) {
+          const payload: Record<string, unknown> = { status: computedStatus };
+          if (computedStatus === 'completed' && !row.completed_at) payload.completed_at = new Date().toISOString();
+          statusUpdates.push(db.from('marketplace_orders').update(payload).eq('id', row.id));
+        }
+
+        const buyer = buyerMap.get(row.buyer_id);
+        const buyerName = buyer?.full_name || buyer?.email || row.buyer_id;
+        const resellerName = resellerMap.get(row.seller_id) || row.seller_id || '—';
+        const productName = row.product_name || (row.product_id ? productMapById.get(row.product_id) : null) || '—';
+        const gatewayFromTx = String(tx?.reference_type || tx?.meta?.payment_method || '').toLowerCase();
+        const gateway = (row.payment_method || gatewayFromTx || 'wallet').toUpperCase();
+
+        return {
+          ...row,
+          product_name: productName,
+          status: computedStatus,
+          gateway,
+          buyer_name: buyerName,
+          reseller_name: resellerName,
+        } as MarketplaceOrder;
+      });
+
+      if (statusUpdates.length > 0) {
+        await Promise.all(statusUpdates);
+      }
+
+      setOrders(normalizedOrders);
+    } finally {
+      setOrdersLoading(false);
+    }
   };
 
   const fetchStats = async () => {
@@ -950,78 +1067,6 @@ export default function MarketplaceAdmin() {
     else {
       toast.success('Discount rule deleted');
       fetchDiscountRules();
-    }
-  };
-
-  const saveGateway = async () => {
-    if (!editGateway) return;
-    if (!editGateway.gateway_code.trim() || !editGateway.gateway_name.trim()) {
-      toast.error('Gateway code and name are required');
-      return;
-    }
-
-    let parsedConfig: Record<string, unknown> = {};
-    try {
-      parsedConfig = gatewayConfigText?.trim() ? JSON.parse(gatewayConfigText) : {};
-    } catch {
-      toast.error('Config JSON is invalid');
-      return;
-    }
-
-    const payload = {
-      gateway_code: editGateway.gateway_code.trim().toLowerCase(),
-      gateway_name: editGateway.gateway_name.trim(),
-      is_enabled: Boolean(editGateway.is_enabled),
-      sort_order: Number(editGateway.sort_order || 0),
-      config: parsedConfig,
-    };
-
-    setSaving(true);
-    const query = editGateway.id.startsWith('new-')
-      ? db.from('marketplace_payment_gateways').insert(payload)
-      : db.from('marketplace_payment_gateways').update(payload).eq('id', editGateway.id);
-
-    const { error } = await query;
-    setSaving(false);
-
-    if (error) toast.error(error.message);
-    else {
-      toast.success('Gateway saved');
-      setEditGateway(null);
-      setGatewayConfigText('{}');
-      fetchGateways();
-    }
-  };
-
-  const deleteGateway = async (id: string) => {
-    if (!confirm('Delete this payment gateway?')) return;
-    const { error } = await db.from('marketplace_payment_gateways').delete().eq('id', id);
-    if (error) toast.error(error.message);
-    else {
-      toast.success('Gateway deleted');
-      fetchGateways();
-    }
-  };
-
-  const updateOrderStatus = async (orderId: string, status: string) => {
-    const payload: Record<string, unknown> = { status };
-    if (status === 'completed') payload.completed_at = new Date().toISOString();
-
-    const { error } = await db.from('marketplace_orders').update(payload).eq('id', orderId);
-    if (error) toast.error(error.message);
-    else {
-      toast.success('Order updated');
-      Promise.all([fetchOrders(), fetchStats()]);
-    }
-  };
-
-  const deleteOrder = async (orderId: string) => {
-    if (!confirm('Delete this order?')) return;
-    const { error } = await db.from('marketplace_orders').delete().eq('id', orderId);
-    if (error) toast.error(error.message);
-    else {
-      toast.success('Order deleted');
-      Promise.all([fetchOrders(), fetchStats()]);
     }
   };
 
@@ -1541,8 +1586,8 @@ export default function MarketplaceAdmin() {
             <div className="rounded-lg border border-border bg-card p-3 space-y-3">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-bold text-foreground flex items-center gap-2"><CreditCard className="h-4 w-4 text-primary" />Payment Gateway Manager</h2>
-                <Button size="sm" className="h-7 text-xs gap-1" onClick={() => { setEditGateway(emptyGateway()); setGatewayConfigText('{}'); }}>
-                  <Plus className="h-3 w-3" /> Add Gateway
+                <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={fetchGateways}>
+                  <RefreshCw className="h-3 w-3" /> Refresh
                 </Button>
               </div>
 
@@ -1552,11 +1597,25 @@ export default function MarketplaceAdmin() {
                     <div key={g.id} className="rounded-md border border-border p-2 flex items-center gap-2">
                       <div className="min-w-0 flex-1">
                         <p className="text-xs font-semibold text-foreground">{g.gateway_name}</p>
-                        <p className="text-[10px] text-muted-foreground">{g.gateway_code}</p>
+                        <p className="text-[10px] text-muted-foreground">{g.gateway_code} · keys from Admin Settings</p>
                       </div>
                       <Badge variant="outline" className="text-[9px]">{g.is_enabled ? 'ENABLED' : 'DISABLED'}</Badge>
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setEditGateway(g); setGatewayConfigText(JSON.stringify(g.config || {}, null, 2)); }}><Edit2 className="h-3 w-3" /></Button>
-                      <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => deleteGateway(g.id)}><Trash2 className="h-3 w-3" /></Button>
+                      <Switch
+                        checked={g.is_enabled}
+                        onCheckedChange={async (checked) => {
+                          const updates: Record<string, unknown> = {};
+                          if (g.gateway_code === 'razorpay') updates.razorpay_enabled = checked;
+                          if (g.gateway_code === 'stripe') updates.stripe_enabled = checked;
+                          if (g.gateway_code === 'wallet') updates.wallet_enabled = checked;
+                          const { error } = await db.from('payment_settings').update(updates).eq('id', PAYMENT_SETTINGS_ID);
+                          if (error) {
+                            toast.error(error.message);
+                          } else {
+                            toast.success(`${g.gateway_name} ${checked ? 'enabled' : 'disabled'}`);
+                            fetchGateways();
+                          }
+                        }}
+                      />
                     </div>
                   ))}
                 </div>
@@ -1592,27 +1651,23 @@ export default function MarketplaceAdmin() {
                         <td className="p-2">
                           <p className="font-semibold text-foreground">{o.id.slice(0, 8)}...</p>
                           <p className="text-[10px] text-muted-foreground">{new Date(o.created_at).toLocaleString()}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">User: {o.buyer_name || o.buyer_id}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">Reseller: {o.reseller_name || o.seller_id}</p>
                         </td>
                         <td className="p-2">
                           <p className="text-foreground">{o.product_name || '—'}</p>
                           {o.coupon_code && <p className="text-[10px] text-muted-foreground">Coupon: {o.coupon_code}</p>}
                         </td>
                         <td className="p-2 text-center font-semibold">${Number(o.final_amount ?? o.amount ?? 0).toFixed(2)}</td>
-                        <td className="p-2 text-center">{o.payment_method || '—'}</td>
+                        <td className="p-2 text-center">{o.gateway || '—'}</td>
                         <td className="p-2 text-center">
-                          <Select value={o.status} onValueChange={(v) => updateOrderStatus(o.id, v)}>
-                            <SelectTrigger className="h-7 text-[11px] w-[120px] mx-auto"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pending">Pending</SelectItem>
-                              <SelectItem value="completed">Completed</SelectItem>
-                              <SelectItem value="failed">Failed</SelectItem>
-                              <SelectItem value="cancelled">Cancelled</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <Badge variant="outline" className="text-[10px]">
+                            {String(o.status || 'pending').toUpperCase()}
+                          </Badge>
                         </td>
                         <td className="p-2 text-right">
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => deleteOrder(o.id)}>
-                            <Trash2 className="h-3 w-3" />
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={fetchOrders}>
+                            <RefreshCw className="h-3 w-3" />
                           </Button>
                         </td>
                       </tr>
@@ -2019,34 +2074,6 @@ export default function MarketplaceAdmin() {
         </Dialog>
       )}
 
-      {/* Gateway Dialog */}
-      {editGateway && (
-        <Dialog open={!!editGateway} onOpenChange={() => setEditGateway(null)}>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle className="text-sm">{editGateway.id.startsWith('new-') ? 'Add' : 'Edit'} Payment Gateway</DialogTitle>
-              <DialogDescription className="text-xs">Razorpay / Stripe / Wallet toggles and config.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-3 mt-2">
-              <div className="grid grid-cols-2 gap-2">
-                <Field label="Gateway Code"><Input value={editGateway.gateway_code} onChange={(e) => setEditGateway({ ...editGateway, gateway_code: e.target.value.toLowerCase() })} className="h-9 text-sm" placeholder="razorpay" /></Field>
-                <Field label="Gateway Name"><Input value={editGateway.gateway_name} onChange={(e) => setEditGateway({ ...editGateway, gateway_name: e.target.value })} className="h-9 text-sm" placeholder="Razorpay" /></Field>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Field label="Sort"><Input type="number" value={editGateway.sort_order} onChange={(e) => setEditGateway({ ...editGateway, sort_order: Number(e.target.value || 0) })} className="h-9 text-sm" /></Field>
-                <div className="flex items-end gap-2 pb-1">
-                  <Switch checked={editGateway.is_enabled} onCheckedChange={(v) => setEditGateway({ ...editGateway, is_enabled: v })} />
-                  <span className="text-xs text-muted-foreground">{editGateway.is_enabled ? 'Enabled' : 'Disabled'}</span>
-                </div>
-              </div>
-              <Field label="Config JSON">
-                <Textarea value={gatewayConfigText} onChange={(e) => setGatewayConfigText(e.target.value)} className="min-h-[120px] font-mono text-xs" />
-              </Field>
-              <Button className="h-9 text-sm" onClick={saveGateway} disabled={saving}>Save Gateway</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
     </DashboardLayout>
   );
 }

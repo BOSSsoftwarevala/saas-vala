@@ -18,26 +18,40 @@ export interface PaymentSettings {
   wise_enabled: boolean;
   crypto_enabled: boolean;
   remitly_enabled: boolean;
+  razorpay_enabled: boolean;
+  razorpay_key_id: string;
+  razorpay_key_secret: string;
+  stripe_enabled: boolean;
+  stripe_publishable_key: string;
+  stripe_secret_key: string;
+  wallet_enabled: boolean;
   updated_at: string;
 }
 
 const DEFAULTS: PaymentSettings = {
   id: '00000000-0000-0000-0000-000000000001',
-  bank_name: 'INDIAN BANK',
-  account_name: 'SOFTWARE VALA',
-  account_number: '8045924772',
-  ifsc_code: 'IDIB000K196',
-  branch_name: 'KANKAR BAGH',
-  account_type: 'Current',
-  upi_id: 'softwarevala@indianbank',
-  wise_pay_link: 'https://wise.com/pay/business/manojkumar21?utm_source=quick_pay',
-  binance_pay_id: '1078928519',
-  remitly_note: 'Send to Indian Bank Account (same as Bank Transfer)',
+  bank_name: '',
+  account_name: '',
+  account_number: '',
+  ifsc_code: '',
+  branch_name: '',
+  account_type: '',
+  upi_id: '',
+  wise_pay_link: '',
+  binance_pay_id: '',
+  remitly_note: '',
   upi_enabled: true,
   bank_enabled: true,
   wise_enabled: true,
   crypto_enabled: true,
   remitly_enabled: true,
+  razorpay_enabled: false,
+  razorpay_key_id: '',
+  razorpay_key_secret: '',
+  stripe_enabled: false,
+  stripe_publishable_key: '',
+  stripe_secret_key: '',
+  wallet_enabled: true,
   updated_at: new Date().toISOString(),
 };
 

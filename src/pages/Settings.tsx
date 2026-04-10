@@ -108,6 +108,13 @@ export default function Settings() {
     wise_enabled: true,
     crypto_enabled: true,
     remitly_enabled: true,
+    razorpay_enabled: false,
+    razorpay_key_id: '',
+    razorpay_key_secret: '',
+    stripe_enabled: false,
+    stripe_publishable_key: '',
+    stripe_secret_key: '',
+    wallet_enabled: true,
   });
 
   // Load profile data into form
@@ -140,9 +147,16 @@ export default function Settings() {
         wise_enabled: ps.wise_enabled,
         crypto_enabled: ps.crypto_enabled,
         remitly_enabled: ps.remitly_enabled,
+        razorpay_enabled: Boolean((ps as any).razorpay_enabled),
+        razorpay_key_id: String((ps as any).razorpay_key_id || ''),
+        razorpay_key_secret: String((ps as any).razorpay_key_secret || ''),
+        stripe_enabled: Boolean((ps as any).stripe_enabled),
+        stripe_publishable_key: String((ps as any).stripe_publishable_key || ''),
+        stripe_secret_key: String((ps as any).stripe_secret_key || ''),
+        wallet_enabled: (ps as any).wallet_enabled !== false,
       });
     }
-  }, [psLoading]);
+  }, [psLoading, ps]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -157,7 +171,7 @@ export default function Settings() {
   };
 
   const handleSavePayment = async () => {
-    if (!payForm.account_number.trim() || !payForm.ifsc_code.trim()) {
+    if (payForm.bank_enabled && (!payForm.account_number.trim() || !payForm.ifsc_code.trim())) {
       toast.error('Account number and IFSC code are required');
       return;
     }
@@ -534,6 +548,52 @@ export default function Settings() {
                         <div className="space-y-1">
                           <Label>Instructions Note</Label>
                           <Input value={payForm.remitly_note} onChange={(e) => setPayForm(f => ({ ...f, remitly_note: e.target.value }))} className="bg-muted/50" />
+                        </div>
+                      </div>
+
+                      <hr className="border-border" />
+
+                      {/* Online Gateways */}
+                      <div className="space-y-4">
+                        <h4 className="font-semibold text-foreground">Online Gateways</h4>
+
+                        <div className="space-y-3 rounded-md border border-border p-3">
+                          <div className="flex items-center justify-between">
+                            <h5 className="font-medium text-foreground">Razorpay</h5>
+                            <Switch checked={payForm.razorpay_enabled} onCheckedChange={(v) => setPayForm(f => ({ ...f, razorpay_enabled: v }))} />
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label>Key ID</Label>
+                              <Input value={payForm.razorpay_key_id} onChange={(e) => setPayForm(f => ({ ...f, razorpay_key_id: e.target.value }))} className="bg-muted/50 font-mono" />
+                            </div>
+                            <div className="space-y-1">
+                              <Label>Key Secret</Label>
+                              <Input type="password" value={payForm.razorpay_key_secret} onChange={(e) => setPayForm(f => ({ ...f, razorpay_key_secret: e.target.value }))} className="bg-muted/50 font-mono" />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3 rounded-md border border-border p-3">
+                          <div className="flex items-center justify-between">
+                            <h5 className="font-medium text-foreground">Stripe</h5>
+                            <Switch checked={payForm.stripe_enabled} onCheckedChange={(v) => setPayForm(f => ({ ...f, stripe_enabled: v }))} />
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label>Publishable Key</Label>
+                              <Input value={payForm.stripe_publishable_key} onChange={(e) => setPayForm(f => ({ ...f, stripe_publishable_key: e.target.value }))} className="bg-muted/50 font-mono" />
+                            </div>
+                            <div className="space-y-1">
+                              <Label>Secret Key</Label>
+                              <Input type="password" value={payForm.stripe_secret_key} onChange={(e) => setPayForm(f => ({ ...f, stripe_secret_key: e.target.value }))} className="bg-muted/50 font-mono" />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between rounded-md border border-border p-3">
+                          <h5 className="font-medium text-foreground">Wallet Gateway</h5>
+                          <Switch checked={payForm.wallet_enabled} onCheckedChange={(v) => setPayForm(f => ({ ...f, wallet_enabled: v }))} />
                         </div>
                       </div>
 
