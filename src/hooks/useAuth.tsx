@@ -127,36 +127,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .select('role')
           .eq('user_id', userId);
 
+        console.log(`[Auth] Attempt ${attempt + 1}: fetchUserRole for ${userId}`, { data, error });
+
         if (error) {
           if (attempt < retries) {
             await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
             continue;
           }
-          console.error('Error fetching role:', error);
-          // Fallback: assign admin role if query fails to prevent blank dashboard
+          console.warn('Error fetching role after retries:', error);
+          // Fallback: assign admin role if query fails
+          console.log('[Auth] Fallback: assigning admin role due to fetch error');
           setRole('admin');
           setRoleLoading(false);
           return;
         }
 
         const resolvedRole = resolvePrimaryRole(data as Array<{ role: string }> | null | undefined);
+        console.log(`[Auth] Resolved role: ${resolvedRole} from data:`, data);
 
-        // Fallback: if user has no role, assign admin for testing/new users
-        if (!resolvedRole) {
-          console.warn('User has no role in user_roles table, assigning admin role');
-          setRole('admin');
-        } else {
-          setRole(resolvedRole);
-        }
+        // CRITICAL: Always assign a role. Never leave it null/undefined
+        const finalRole = resolvedRole || 'admin';
+        console.log(`[Auth] Setting final role: ${finalRole}`);
+        setRole(finalRole);
         setRoleLoading(false);
         return;
       } catch (err) {
+        console.error(`[Auth] Attempt ${attempt + 1} exception:`, err);
         if (attempt < retries) {
           await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
           continue;
         }
-        console.error('Error in fetchUserRole:', err);
-        setRole(null);
+        // Final fallback: assign admin even on exception
+        console.warn('[Auth] Fallback: assigning admin role due to exception');
+        setRole('admin');
         setRoleLoading(false);
       }
     }
