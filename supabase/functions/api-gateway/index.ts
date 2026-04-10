@@ -363,14 +363,12 @@ function deriveTenantScope(roleName: string, body: any, headers: Headers): strin
 function extractGeoHeaders(headers: Headers): { country: string | null; city: string | null } {
   const country = String(
     headers.get('cf-ipcountry')
-      || headers.get('x-vercel-ip-country')
       || headers.get('x-country')
       || ''
   ).trim() || null
 
   const city = String(
-    headers.get('x-vercel-ip-city')
-      || headers.get('x-city')
+    headers.get('x-city')
       || ''
   ).trim() || null
 
@@ -4853,9 +4851,86 @@ async function handleMarketplaceAdmin(
     const { error } = await admin.from('orders').update({
       payment_status: 'completed',
       completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
       notes: normalizeText(body?.notes, 500) || 'Manual verification by admin',
     }).eq('id', id)
     if (error) return err(error.message)
+
+    const { data: orderForLicense, error: orderFetchErr } = await admin
+      .from('orders')
+      .select('id,user_id,product_id,payment_status,subscription_duration_days,license_key_id')
+      .eq('id', id)
+      .maybeSingle()
+
+    if (orderFetchErr || !orderForLicense) {
+      return err(orderFetchErr?.message || 'Order not found', 404)
+    }
+
+    if (!orderForLicense.license_key_id) {
+      const parsedDuration = Number(orderForLicense.subscription_duration_days)
+      const durationDays = Number.isFinite(parsedDuration) && parsedDuration > 0 ? parsedDuration : 30
+      const expiresAt = new Date(Date.now() + durationDays * 86400_000).toISOString()
+      const keyType = durationDays <= 30 ? 'monthly' : 'yearly'
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+      let generatedKey = ''
+      for (let j = 0; j < 4; j++) {
+        if (j > 0) generatedKey += '-'
+        for (let i = 0; i < 4; i++) {
+          generatedKey += chars[Math.floor(Math.random() * chars.length)]
+        }
+      }
+
+      const { data: newLicense, error: licenseErr } = await admin
+        .from('license_keys')
+        .insert({
+          product_id: orderForLicense.product_id,
+          license_key: generatedKey,
+          key_type: keyType,
+          key_status: 'unused',
+          status: 'active',
+          max_devices: 1,
+          activated_devices: 0,
+          expires_at: expiresAt,
+          created_by: orderForLicense.user_id,
+          notes: `Order license: ${orderForLicense.id}`,
+        })
+        .select('id,license_key,expires_at')
+        .single()
+
+      if (licenseErr || !newLicense) {
+        return err(licenseErr?.message || 'Failed to issue license', 500)
+      }
+
+      try {
+        await admin
+          .from('orders')
+          .update({ license_key_id: newLicense.id, updated_at: new Date().toISOString() })
+          .eq('id', id)
+          .is('license_key_id', null)
+      } catch {
+        // Best effort: another request may have already bound a license.
+      }
+
+      try {
+        await admin.from('notifications').insert({
+          user_id: orderForLicense.user_id,
+          type: 'success',
+          title: 'License activated',
+          message: `Your order ${orderForLicense.id} has been manually verified and license issued.`,
+          related_order_id: orderForLicense.id,
+          related_product_id: orderForLicense.product_id,
+        })
+      } catch {
+        // Non-blocking notification side effect.
+      }
+    }
+
+    const { data: issuedLicense } = await admin
+      .from('orders')
+      .select('license_key_id,license_keys(license_key,expires_at)')
+      .eq('id', id)
+      .maybeSingle()
+
     await admin.from('manual_override_logs').insert({
       override_type: 'payment_success',
       entity_type: 'order',
@@ -4864,7 +4939,12 @@ async function handleMarketplaceAdmin(
       reason: normalizeText(body?.reason, 500) || null,
       metadata: { notes: body?.notes || null },
     })
-    return json({ success: true })
+    return json({
+      success: true,
+      order_id: id,
+      license_key: (issuedLicense as any)?.license_keys?.license_key || null,
+      expires_at: (issuedLicense as any)?.license_keys?.expires_at || null,
+    })
   }
 
   // POST /marketplace-admin/orders/:id/refund
@@ -5231,6 +5311,140 @@ async function handlePublicMarketplace(
   const pid    = pathParts[1]
   const sub    = pathParts[2]
 
+  const randomLicenseKey = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+    let key = ''
+    for (let j = 0; j < 4; j++) {
+      if (j > 0) key += '-'
+      for (let i = 0; i < 4; i++) {
+        key += chars[Math.floor(Math.random() * chars.length)]
+      }
+    }
+    return key
+  }
+
+  const ensureOrderLicenseIssued = async (
+    orderId: string,
+    actingUserId: string,
+    context: 'payment_verify' | 'manual_verify',
+  ) => {
+    const { data: order, error: orderErr } = await admin
+      .from('orders')
+      .select('id,user_id,product_id,payment_status,subscription_duration_days,license_key_id')
+      .eq('id', orderId)
+      .maybeSingle()
+
+    if (orderErr || !order) {
+      return { ok: false as const, error: 'Order not found' }
+    }
+
+    if (order.payment_status !== 'completed') {
+      return { ok: false as const, error: 'Order payment not completed' }
+    }
+
+    if (order.license_key_id) {
+      const { data: existingLicense } = await admin
+        .from('license_keys')
+        .select('id,license_key,expires_at,status')
+        .eq('id', order.license_key_id)
+        .maybeSingle()
+
+      return {
+        ok: true as const,
+        license: existingLicense || null,
+        idempotent: true,
+      }
+    }
+
+    const parsedDuration = Number(order.subscription_duration_days)
+    const durationDays = Number.isFinite(parsedDuration) && parsedDuration > 0 ? parsedDuration : 30
+    const expiresAt = new Date(Date.now() + durationDays * 86400_000).toISOString()
+    const keyType = durationDays <= 30 ? 'monthly' : 'yearly'
+
+    const { data: createdLicense, error: createErr } = await admin
+      .from('license_keys')
+      .insert({
+        product_id: order.product_id,
+        license_key: randomLicenseKey(),
+        key_type: keyType,
+        key_status: 'unused',
+        status: 'active',
+        max_devices: 1,
+        activated_devices: 0,
+        expires_at: expiresAt,
+        created_by: order.user_id,
+        notes: `Order license: ${order.id}`,
+      })
+      .select('id,license_key,expires_at,status')
+      .single()
+
+    if (createErr || !createdLicense) {
+      return { ok: false as const, error: createErr?.message || 'Failed to create license key' }
+    }
+
+    const { data: claimedOrder, error: claimErr } = await admin
+      .from('orders')
+      .update({
+        license_key_id: createdLicense.id,
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', order.id)
+      .is('license_key_id', null)
+      .select('id,license_key_id')
+      .maybeSingle()
+
+    if (claimErr) {
+      return { ok: false as const, error: claimErr.message }
+    }
+
+    if (!claimedOrder) {
+      await admin.from('license_keys').update({ status: 'revoked', notes: `Superseded duplicate for order ${order.id}` }).eq('id', createdLicense.id)
+      const { data: latestOrder } = await admin.from('orders').select('license_key_id').eq('id', order.id).maybeSingle()
+      if (latestOrder?.license_key_id) {
+        const { data: existingLicense } = await admin
+          .from('license_keys')
+          .select('id,license_key,expires_at,status')
+          .eq('id', latestOrder.license_key_id)
+          .maybeSingle()
+        return { ok: true as const, license: existingLicense || null, idempotent: true }
+      }
+      return { ok: false as const, error: 'Failed to bind license to order' }
+    }
+
+    try {
+      await admin.from('notifications').insert({
+        user_id: order.user_id,
+        type: 'success',
+        title: 'License activated',
+        message: `Your payment for order ${order.id} has been verified and license key issued.`,
+        related_order_id: order.id,
+        related_product_id: order.product_id,
+      })
+    } catch {
+      // Non-blocking notification side effect.
+    }
+
+    try {
+      await admin.from('audit_logs').insert({
+        user_id: actingUserId,
+        action: 'ORDER_LICENSE_ISSUED',
+        entity_type: 'order',
+        entity_id: order.id,
+        ip_address: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+        new_data: {
+          context,
+          license_id: createdLicense.id,
+          order_id: order.id,
+        },
+      })
+    } catch {
+      // Non-blocking audit side effect.
+    }
+
+    return { ok: true as const, license: createdLicense, idempotent: false }
+  }
+
   // ── GET /marketplace/products (paginated, search/filter) ──
   if (method === 'GET' && action === 'products' && !pid) {
     const limit    = Math.min(100, Math.max(1, Number(body?.limit  || 20)))
@@ -5462,7 +5676,7 @@ async function handlePublicMarketplace(
     if (!userId) return err('Unauthorized', 401)
     const { product_id, duration_days, payment_method, amount, idempotency_key } = body
     if (!isUuid(product_id))      return err('Invalid product_id')
-    if (!isUuid(idempotency_key)) return err('idempotency_key must be a UUID')
+    const effectiveIdempotencyKey = isUuid(idempotency_key) ? idempotency_key : crypto.randomUUID()
     const validDurs = new Set([30, 60, 90, 180, 365])
     if (!validDurs.has(Number(duration_days))) return err('Invalid duration_days')
     const numAmt = Number(amount)
@@ -5478,20 +5692,51 @@ async function handlePublicMarketplace(
       const { data: result, error: fnErr } = await admin.rpc('process_wallet_payment', {
         p_user_id: userId, p_product_id: product_id,
         p_duration_days: Number(duration_days), p_amount: numAmt,
-        p_idempotency_key: idempotency_key,
+        p_idempotency_key: effectiveIdempotencyKey,
       })
       if (fnErr) return err(fnErr.message, 500)
       if (!result?.success) return err(result?.error ?? 'Payment failed', 402)
       return json({ success: true, order_id: result.order_id, license_key: result.license_key, expires_at: result.expires_at })
     }
 
-    const { data: order, error: orderErr } = await admin.from('orders').insert({
+    let canUseOrderIdempotencyColumn = true
+    const { data: existingOrder, error: existingOrderErr } = await admin
+      .from('orders')
+      .select('id,payment_status')
+      .eq('user_id', userId)
+      .eq('idempotency_key', effectiveIdempotencyKey)
+      .maybeSingle()
+
+    if (existingOrderErr && String(existingOrderErr.message || '').toLowerCase().includes('idempotency_key')) {
+      canUseOrderIdempotencyColumn = false
+    } else if (existingOrderErr) {
+      return err(existingOrderErr.message)
+    } else if (existingOrder) {
+      return json({ success: true, order_id: existingOrder.id, status: existingOrder.payment_status, idempotent: true })
+    }
+
+    const baseOrderPayload: any = {
       user_id: userId, product_id, amount: numAmt, currency: 'USD',
       payment_method, payment_status: 'pending',
-      subscription_duration_days: Number(duration_days), idempotency_key,
+      subscription_duration_days: Number(duration_days),
       order_number: `ORD-${new Date().toISOString().slice(0,10).replace(/-/g,'')}` +
         `-${Math.random().toString(36).slice(2,10).toUpperCase()}`,
-    }).select().single()
+    }
+
+    if (canUseOrderIdempotencyColumn) {
+      baseOrderPayload.idempotency_key = effectiveIdempotencyKey
+    }
+
+    let { data: order, error: orderErr } = await admin.from('orders').insert(baseOrderPayload).select().single()
+
+    if (orderErr && String(orderErr.message || '').toLowerCase().includes('idempotency_key')) {
+      const fallbackPayload = { ...baseOrderPayload }
+      delete fallbackPayload.idempotency_key
+      const retry = await admin.from('orders').insert(fallbackPayload).select().single()
+      order = retry.data as any
+      orderErr = retry.error as any
+    }
+
     if (orderErr) return err(orderErr.message)
     return json({ success: true, order_id: order.id, status: 'pending' })
   }
@@ -5503,9 +5748,75 @@ async function handlePublicMarketplace(
     if (!isUuid(order_id)) return err('Invalid order_id')
     const { data: order } = await admin.from('orders').select('id,payment_status,payment_method').eq('id', order_id).eq('user_id', userId).maybeSingle()
     if (!order) return err('Order not found', 404)
+
+    try {
+
+    if (order.payment_method !== 'wallet' && !String(transaction_ref || '').trim()) {
+      return err('transaction_ref is required for manual/gateway verification', 400)
+    }
+
     if (order.payment_status === 'completed') return json({ success: true, message: 'Already verified', order_id })
-    await admin.from('payment_logs').insert({ order_id, provider: provider || order.payment_method, request_data: { transaction_ref }, status: 'verification_pending' })
-    return json({ success: true, status: 'pending_verification' })
+
+    if (String(transaction_ref || '').trim()) {
+      const { data: duplicateTxn } = await admin
+        .from('payment_logs')
+        .select('order_id,status')
+        .eq('provider', provider || order.payment_method)
+        .filter('request_data->>transaction_ref', 'eq', String(transaction_ref).trim())
+        .neq('order_id', order_id)
+        .in('status', ['verification_pending', 'verified'])
+        .maybeSingle()
+
+      if (duplicateTxn) {
+        return err('This transaction_ref is already linked with another order', 409)
+      }
+    }
+
+    const { error: verifyUpdateErr } = await admin
+      .from('orders')
+      .update({ payment_status: 'completed', completed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq('id', order_id)
+      .eq('user_id', userId)
+
+    if (verifyUpdateErr) return err(verifyUpdateErr.message)
+
+    try {
+      await admin.from('payment_logs').insert({
+        order_id,
+        provider: provider || order.payment_method,
+        request_data: { transaction_ref: String(transaction_ref || '').trim() || null },
+        status: 'verified',
+      })
+    } catch {
+      // Non-blocking payment log side effect.
+    }
+
+    const licenseResult = await ensureOrderLicenseIssued(order_id, userId, 'payment_verify')
+    if (!licenseResult.ok) return err(licenseResult.error, 500)
+
+    return json({
+      success: true,
+      status: 'verified',
+      order_id,
+      license_key: licenseResult.license?.license_key || null,
+      expires_at: licenseResult.license?.expires_at || null,
+      idempotent: !!licenseResult.idempotent,
+    })
+    } catch (e: any) {
+      try {
+        await admin.from('payment_logs').insert({
+          order_id,
+          provider: provider || order.payment_method,
+          request_data: { transaction_ref: String(transaction_ref || '').trim() || null },
+          status: 'verify_error',
+          error_message: String(e?.message || 'Unknown verify execution error'),
+        })
+      } catch {
+        // Non-blocking payment log side effect.
+      }
+
+      return err(`Verification execution failed: ${String(e?.message || 'unknown')}`, 500)
+    }
   }
 
   // ── GET /marketplace/payment-gateways ──
@@ -5565,7 +5876,11 @@ async function handlePublicMarketplace(
     if (device_id) {
       const { data: limitCheck } = await admin.rpc('check_device_limit', { p_license_key: cleanKey, p_device_id: device_id })
       if (limitCheck && !limitCheck.allowed) {
-        await admin.rpc('flag_license_sharing', { p_license_key: cleanKey }).catch(() => null)
+        try {
+          await admin.rpc('flag_license_sharing', { p_license_key: cleanKey })
+        } catch {
+          // Best effort signal only.
+        }
         return json({ valid: false, error: limitCheck.reason })
       }
       await admin.from('device_activations').upsert({ license_key: cleanKey, device_id, last_seen_at: new Date().toISOString() }, { onConflict: 'license_key,device_id' })
@@ -5578,16 +5893,78 @@ async function handlePublicMarketplace(
   // ── GET /marketplace/apk/:productId/download-link ──
   if (method === 'GET' && action === 'apk' && isUuid(pid) && sub === 'download-link') {
     if (!userId) return err('Unauthorized', 401)
-    const { data: lk } = await admin.from('license_keys').select('id').eq('product_id', pid).eq('created_by', userId).eq('status', 'active').maybeSingle()
+    const { data: lk } = await admin
+      .from('license_keys')
+      .select('id')
+      .eq('product_id', pid)
+      .eq('created_by', userId)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
     if (!lk) return err('No active license for this product', 403)
-    const { data: apk } = await admin.from('apk_versions').select('id,apk_url,version,sha256_checksum').eq('product_id', pid).eq('is_active', true).order('version_code', { ascending: false }).limit(1).maybeSingle()
-    if (!apk) return err('APK not yet available', 404)
-    const { data: token, error: tokErr } = await admin.from('download_tokens').insert({ user_id: userId, product_id: pid, apk_version_id: apk.id, expires_at: new Date(Date.now() + 3600_000).toISOString() }).select('token').single()
-    if (tokErr) return err(tokErr.message)
-    const { data: signed } = await admin.storage.from('apk-files').createSignedUrl(apk.apk_url, 3600)
+    let apkUrl: string | null = null
+    let apkVersionId: string | null = null
+    let apkVersionLabel = 'latest'
+    let apkSha: string | null = null
+
+    const { data: apkVersionRow, error: apkVersionErr } = await admin
+      .from('apk_versions')
+      .select('id,apk_url,version,sha256_checksum')
+      .eq('product_id', pid)
+      .eq('is_active', true)
+      .order('version_code', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (!apkVersionErr && apkVersionRow) {
+      apkUrl = apkVersionRow.apk_url
+      apkVersionId = apkVersionRow.id
+      apkVersionLabel = apkVersionRow.version || 'latest'
+      apkSha = apkVersionRow.sha256_checksum || null
+    }
+
+    if (!apkUrl) {
+      const { data: productFallback } = await admin
+        .from('products')
+        .select('id,apk_url')
+        .eq('id', pid)
+        .maybeSingle()
+      apkUrl = productFallback?.apk_url || null
+      apkVersionId = productFallback?.id || null
+    }
+
+    if (!apkUrl) return err('APK not yet available', 404)
+
+    let downloadToken: string | null = null
+    const { data: token, error: tokErr } = await admin
+      .from('download_tokens')
+      .insert({ user_id: userId, product_id: pid, apk_version_id: apkVersionId, expires_at: new Date(Date.now() + 3600_000).toISOString() })
+      .select('token')
+      .single()
+    if (tokErr) {
+      const tokenErrMsg = String(tokErr.message || '').toLowerCase()
+      if (!tokenErrMsg.includes('download_tokens')) return err(tokErr.message)
+    } else {
+      downloadToken = token?.token || null
+    }
+
+    let signedUrl: string | null = null
+    if (apkUrl.startsWith('http://') || apkUrl.startsWith('https://')) {
+      signedUrl = apkUrl
+    } else {
+      const { data: signedPrimary } = await admin.storage.from('apk-files').createSignedUrl(apkUrl, 3600)
+      if (signedPrimary?.signedUrl) {
+        signedUrl = signedPrimary.signedUrl
+      } else {
+        const { data: signedFallback } = await admin.storage.from('apks').createSignedUrl(apkUrl, 3600)
+        signedUrl = signedFallback?.signedUrl || apkUrl
+      }
+    }
+
     const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null
     await admin.from('audit_logs').insert({ user_id: userId, action: 'DOWNLOAD_LINK_GENERATED', entity_type: 'product', entity_id: pid, ip_address: clientIp })
-    return json({ download_url: signed?.signedUrl ?? apk.apk_url, token: token.token, version: apk.version, sha256: apk.sha256_checksum, expires_in: 3600 })
+    return json({ download_url: signedUrl, token: downloadToken, version: apkVersionLabel, sha256: apkSha, expires_in: 3600 })
   }
 
   // ── POST /marketplace/download-apk (compat wrapper) ──
@@ -5602,10 +5979,17 @@ async function handlePublicMarketplace(
       .eq('product_id', productId)
       .eq('created_by', userId)
       .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle()
     if (!lk) return err('No active license for this product', 403)
 
-    const { data: apk } = await admin
+    let apkUrl: string | null = null
+    let apkVersionId: string | null = null
+    let apkVersionLabel = 'latest'
+    let apkSha: string | null = null
+
+    const { data: apkVersionRow } = await admin
       .from('apk_versions')
       .select('id,apk_url,version,sha256_checksum')
       .eq('product_id', productId)
@@ -5613,27 +5997,63 @@ async function handlePublicMarketplace(
       .order('version_code', { ascending: false })
       .limit(1)
       .maybeSingle()
-    if (!apk) return err('APK not yet available', 404)
 
+    if (apkVersionRow) {
+      apkUrl = apkVersionRow.apk_url
+      apkVersionId = apkVersionRow.id
+      apkVersionLabel = apkVersionRow.version || 'latest'
+      apkSha = apkVersionRow.sha256_checksum || null
+    }
+
+    if (!apkUrl) {
+      const { data: productFallback } = await admin
+        .from('products')
+        .select('id,apk_url')
+        .eq('id', productId)
+        .maybeSingle()
+      apkUrl = productFallback?.apk_url || null
+      apkVersionId = productFallback?.id || null
+    }
+
+    if (!apkUrl) return err('APK not yet available', 404)
+
+    let downloadToken: string | null = null
     const { data: token, error: tokErr } = await admin
       .from('download_tokens')
       .insert({
         user_id: userId,
         product_id: productId,
-        apk_version_id: apk.id,
+        apk_version_id: apkVersionId,
         expires_at: new Date(Date.now() + 3600_000).toISOString(),
       })
       .select('token')
       .single()
-    if (tokErr) return err(tokErr.message)
+    if (tokErr) {
+      const tokenErrMsg = String(tokErr.message || '').toLowerCase()
+      if (!tokenErrMsg.includes('download_tokens')) return err(tokErr.message)
+    } else {
+      downloadToken = token?.token || null
+    }
 
-    const { data: signed } = await admin.storage.from('apk-files').createSignedUrl(apk.apk_url, 3600)
+    let signedUrl: string | null = null
+    if (apkUrl.startsWith('http://') || apkUrl.startsWith('https://')) {
+      signedUrl = apkUrl
+    } else {
+      const { data: signedPrimary } = await admin.storage.from('apk-files').createSignedUrl(apkUrl, 3600)
+      if (signedPrimary?.signedUrl) {
+        signedUrl = signedPrimary.signedUrl
+      } else {
+        const { data: signedFallback } = await admin.storage.from('apks').createSignedUrl(apkUrl, 3600)
+        signedUrl = signedFallback?.signedUrl || apkUrl
+      }
+    }
+
     return json({
       success: true,
-      download_url: signed?.signedUrl ?? apk.apk_url,
-      token: token.token,
-      version: apk.version,
-      sha256: apk.sha256_checksum,
+      download_url: signedUrl,
+      token: downloadToken,
+      version: apkVersionLabel,
+      sha256: apkSha,
       expires_in: 3600,
     })
   }
@@ -6387,7 +6807,13 @@ Deno.serve(async (req) => {
     const tableName = module
     const recordId = subParts.find((x) => isUuid(x)) || null
     const status = response.status
-    const responsePayload = await getResponsePayloadPreview(response)
+    let responsePayload: any = { status }
+    try {
+      responsePayload = await getResponsePayloadPreview(response)
+    } catch (previewError) {
+      console.warn('Audit response preview failed:', previewError)
+    }
+
     const tenantScope = deriveTenantScope(roleName, body, req.headers)
     const bulkGroupId = String(
       req.headers.get('x-bulk-group-id')
@@ -6395,42 +6821,46 @@ Deno.serve(async (req) => {
       || ''
     ).trim() || null
 
-    await appendAuditLogResilient(auditAdmin, {
-      user_id: userId,
-      role_name: roleName,
-      action_type: actionType,
-      action: actionType,
-      table_name: tableName,
-      entity_type: tableName,
-      record_id: recordId,
-      entity_id: recordId,
-      event_source: 'api',
-      system_generated: false,
-      is_sensitive_action: isSensitiveAction(actionType, req.method, fullPath),
-      occurred_at_utc: new Date().toISOString(),
-      timezone_name: timezoneName,
-      request_id: requestId,
-      trace_id: traceId,
-      session_id: sessionId,
-      tenant_scope: tenantScope,
-      api_path: `/${fullPath}`,
-      http_method: req.method,
-      response_status: status,
-      latency_ms: latencyMs,
-      request_payload: body,
-      response_payload: responsePayload,
-      ip_address: clientIp,
-      ip_country: geoHeaders.country,
-      ip_city: geoHeaders.city,
-      device_fingerprint: deviceFingerprint,
-      bulk_group_id: bulkGroupId,
-      snapshot_before: body?.snapshot_before || null,
-      snapshot_after: body?.snapshot_after || null,
-      replay_steps: body?.replay_steps || null,
-      anomaly_score: classifyAnomalyScore(status, latencyMs),
-      anomaly_reason: status >= 500 ? 'server_error' : latencyMs > 4000 ? 'high_latency' : null,
-      risk_score: isSensitiveAction(actionType, req.method, fullPath) ? 0.8 : status >= 500 ? 0.9 : 0.2,
-    })
+    try {
+      await appendAuditLogResilient(auditAdmin, {
+        user_id: userId,
+        role_name: roleName,
+        action_type: actionType,
+        action: actionType,
+        table_name: tableName,
+        entity_type: tableName,
+        record_id: recordId,
+        entity_id: recordId,
+        event_source: 'api',
+        system_generated: false,
+        is_sensitive_action: isSensitiveAction(actionType, req.method, fullPath),
+        occurred_at_utc: new Date().toISOString(),
+        timezone_name: timezoneName,
+        request_id: requestId,
+        trace_id: traceId,
+        session_id: sessionId,
+        tenant_scope: tenantScope,
+        api_path: `/${fullPath}`,
+        http_method: req.method,
+        response_status: status,
+        latency_ms: latencyMs,
+        request_payload: body,
+        response_payload: responsePayload,
+        ip_address: clientIp,
+        ip_country: geoHeaders.country,
+        ip_city: geoHeaders.city,
+        device_fingerprint: deviceFingerprint,
+        bulk_group_id: bulkGroupId,
+        snapshot_before: body?.snapshot_before || null,
+        snapshot_after: body?.snapshot_after || null,
+        replay_steps: body?.replay_steps || null,
+        anomaly_score: classifyAnomalyScore(status, latencyMs),
+        anomaly_reason: status >= 500 ? 'server_error' : latencyMs > 4000 ? 'high_latency' : null,
+        risk_score: isSensitiveAction(actionType, req.method, fullPath) ? 0.8 : status >= 500 ? 0.9 : 0.2,
+      })
+    } catch (auditError) {
+      console.warn('Audit append failed:', auditError)
+    }
 
     return response
   } catch (e) {

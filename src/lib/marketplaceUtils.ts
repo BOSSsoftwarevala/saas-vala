@@ -43,8 +43,18 @@ export function roundPrice(amount: number): number {
  * Generate a UUID v4 idempotency key for a single payment or mutation
  * request, ensuring the operation is safe to retry.
  */
+const REQUEST_ID_PATTERN = /^rs_[a-zA-Z0-9_-]{8,80}$/;
+
+export function normalizeRequestId(id?: string): string {
+  const candidate = String(id || '').trim();
+  if (candidate && !candidate.startsWith('thinking_') && REQUEST_ID_PATTERN.test(candidate)) {
+    return candidate;
+  }
+  return `rs_${crypto.randomUUID().replace(/-/g, '')}`;
+}
+
 export function generateIdempotencyKey(): string {
-  return crypto.randomUUID();
+  return normalizeRequestId();
 }
 
 /**

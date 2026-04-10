@@ -544,7 +544,7 @@ export default function ValaBuilder() {
             <CardContent className="pt-4">
               <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Infrastructure</p>
               <div className="flex flex-wrap gap-1">
-                {['GitHub', 'VPS Agent', 'Docker', 'Vercel(optional)'].map(m => (
+                {['GitHub', 'VPS Agent', 'Docker'].map(m => (
                   <Badge key={m} variant="secondary" className="text-xs">{m}</Badge>
                 ))}
               </div>

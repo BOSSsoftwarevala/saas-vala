@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -7,9 +7,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/hooks/useCart';
+import { publicMarketplaceApi } from '@/lib/api';
 import type { MarketplaceProduct } from '@/hooks/useMarketplaceProducts';
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
@@ -34,6 +34,7 @@ export const MarketplaceProductCard = React.memo(React.forwardRef<HTMLDivElement
   product, index = 0, onBuyNow, onDemo, rank,
 }, _ref) {
   const [favorited, setFavorited] = useState(false);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
   const [notified, setNotified] = useState(false);
   const [demoOpen, setDemoOpen] = useState(false);
   const [featuresOpen, setFeaturesOpen] = useState(false);
@@ -75,11 +76,62 @@ export const MarketplaceProductCard = React.memo(React.forwardRef<HTMLDivElement
   const isIframeable = (url: string | null) => url ? !url.includes('github.com') : false;
   const hasDemoAvailable = getDemoUrl() !== null;
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadFavoriteState = async () => {
+      if (!user) {
+        setFavorited(false);
+        return;
+      }
+
+      try {
+        const result = await publicMarketplaceApi.isFavorite(product.id);
+        if (!cancelled) {
+          setFavorited(Boolean(result?.is_favorite));
+        }
+      } catch {
+        if (!cancelled) {
+          setFavorited(false);
+        }
+      }
+    };
+
+    loadFavoriteState();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, product.id]);
+
   const handleFavorite = useCallback(() => {
-    if (!user) { toast.error('Sign in to add to favorites'); return; }
-    setFavorited(p => !p);
-    toast.success(favorited ? 'Removed from favorites' : `❤️ Added to favorites!`);
-  }, [user, favorited]);
+    if (!user) {
+      toast.error('Sign in to add to favorites');
+      return;
+    }
+    if (favoriteLoading) {
+      return;
+    }
+
+    const wasFavorited = favorited;
+    setFavorited(!wasFavorited);
+    setFavoriteLoading(true);
+
+    const request = wasFavorited
+      ? publicMarketplaceApi.removeFavorite(product.id)
+      : publicMarketplaceApi.addFavorite(product.id);
+
+    request
+      .then(() => {
+        toast.success(wasFavorited ? 'Removed from favorites' : 'Added to favorites');
+      })
+      .catch((error: any) => {
+        setFavorited(wasFavorited);
+        toast.error(error?.message || 'Failed to update favorites');
+      })
+      .finally(() => {
+        setFavoriteLoading(false);
+      });
+  }, [user, favorited, favoriteLoading, product.id]);
 
   const handleAddToCart = useCallback(() => {
     toggleItem({ id: product.id, title: product.title, subtitle: product.subtitle || '', image: product.image || '', price, category: product.category });
@@ -125,103 +177,18 @@ export const MarketplaceProductCard = React.memo(React.forwardRef<HTMLDivElement
 
     setDownloadChecking(true);
     try {
-      const { data: reseller, error: resellerError } = await supabase
-        .from('resellers')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
+      const downloadRes = await publicMarketplaceApi.downloadAPK(product.id);
+      const secureUrl = downloadRes?.download_url || downloadRes?.signed_url || downloadRes?.url;
 
-      if (resellerError || !reseller) {
-        toast.error('Unable to verify reseller account. Please sign in again.');
-        setDownloadChecking(false);
-        return;
+      if (!downloadRes?.success || !secureUrl) {
+        throw new Error(downloadRes?.error || 'No valid license found for this product');
       }
 
-      const { data: licenseKey, error: keyError } = await (supabase as any)
-        .from('license_keys')
-        .select('*')
-        .eq('assigned_to', reseller.id)
-        .eq('product_id', product.id)
-        .eq('status', 'active')
-        .single();
-
-      if (keyError || !licenseKey) {
-        toast.error('No active license key found for this product. Please purchase first.');
-        setDownloadChecking(false);
-        return;
-      }
-
-      // Block expired licenses
-      if (licenseKey.expires_at && new Date(licenseKey.expires_at).getTime() < Date.now()) {
-        toast.error('Your license key has expired. Please purchase a renewal.');
-        setDownloadChecking(false);
-        return;
-      }
-
-      // Block revoked / blocked keys
-      if (licenseKey?.key_status === 'blocked' || licenseKey?.key_status === 'revoked') {
-        toast.error('Your license key has been revoked. Contact support.');
-        setDownloadChecking(false);
-        return;
-      }
-
-      // Get APK storage path from apks table (preferred) or product's apk_url field
-      const { data: apkRecord } = await (supabase as any)
-        .from('apks')
-        .select('file_url')
-        .eq('product_id', product.id)
-        .eq('status', 'published')
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      const storagePath = apkRecord?.file_url
-        || (product as any).apkUrl
-        || (product as any).apk_url
-        || null;
-
-      if (!storagePath) {
-        toast.error('APK file is not yet available for this product. Contact support.');
-        setDownloadChecking(false);
-        return;
-      }
-
-      // Generate a real Supabase storage signed URL (15-minute TTL)
-      const { data: signedData, error: signError } = await supabase.storage
-        .from('apks')
-        .createSignedUrl(storagePath, 900);
-
-      if (signError || !signedData?.signedUrl) {
-        const msg = signError?.message || '';
-        if (msg.includes('404') || msg.toLowerCase().includes('not found')) {
-          toast.error('APK file not found in storage. Contact support.');
-        } else if (msg.toLowerCase().includes('timeout')) {
-          toast.error('Download timed out. Please try again.');
-        } else {
-          toast.error('Could not generate download link. Please try again.');
-        }
-        setDownloadChecking(false);
-        return;
-      }
-
-      // Log download with path and timestamp
-      await (supabase as any).from('apk_download_logs').insert({
-        user_id: user.id,
-        product_id: product.id,
-        license_key: licenseKey.license_key,
-        file_path: storagePath,
-        downloaded_at: new Date().toISOString(),
-        meta: {
-          reseller_id: reseller.id,
-          license_id: licenseKey.id,
-        },
-      }).catch(() => { /* best-effort logging */ });
-
-      window.open(signedData.signedUrl, '_blank', 'noopener,noreferrer');
-      toast.success('APK download started! Link valid for 15 minutes.');
+      window.open(secureUrl, '_blank', 'noopener,noreferrer');
+      toast.success('APK download started. Secure link is time-limited.');
     } catch (error: any) {
-      console.error('Error checking license:', error);
-      toast.error('Failed to verify license. Please try again.');
+      console.error('Error requesting APK download:', error);
+      toast.error(error?.message || 'Failed to verify license. Please try again.');
     } finally {
       setDownloadChecking(false);
     }

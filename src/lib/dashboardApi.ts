@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { withErrorHandling, withRetry, validators, security, rateLimiter, ValidationError, PermissionError } from './errorHandling';
+import { withErrorHandling, withRetry, validators, security, rateLimiter, ValidationError, PermissionError, DashboardError } from './errorHandling';
 import { createPhpOfflineRuntimePack, generateSecureLicenseKey, generateKeySignature, generateSecureOfflineLicenseKey, verifySecureOfflineLicenseKey, verifyKeySignature } from '@/lib/licenseUtils';
 
 // Generate unique license key
@@ -239,6 +239,23 @@ function randomId(prefix = 'id'): string {
   return `${prefix}-${timestamp}-${random}`;
 }
 
+const REQUEST_ID_PATTERN = /^rs_[a-zA-Z0-9_-]{8,80}$/;
+
+function generateRequestId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return `rs_${crypto.randomUUID().replace(/-/g, '')}`;
+  }
+  return `rs_${Date.now().toString(36)}${randomId('rs').replace(/[^a-zA-Z0-9]/g, '').slice(0, 16)}`;
+}
+
+function normalizeRequestId(raw?: unknown): string {
+  const candidate = String(raw || '').trim();
+  if (!candidate || candidate.startsWith('thinking_')) {
+    return generateRequestId();
+  }
+  return REQUEST_ID_PATTERN.test(candidate) ? candidate : generateRequestId();
+}
+
 async function requireSuperAdmin(userId: string) {
   await security.validateSession(userId);
   await security.requireAnyRole(userId, ['super_admin']);
@@ -440,25 +457,43 @@ async function generateResellerLicenseKeyAtomic(params: {
   notes: string;
   meta: Record<string, unknown>;
 }) {
-  const { data, error } = await (supabase as any).rpc('reseller_generate_license_key_atomic_locked', {
-    p_request_id: params.requestId,
-    p_user_id: params.userId,
-    p_reseller_id: params.resellerId,
-    p_wallet_id: params.walletId,
-    p_product_id: params.productId,
-    p_amount: params.amount,
-    p_plan_duration: params.planDuration,
-    p_license_key: params.licenseKey,
-    p_key_signature: params.keySignature,
-    p_key_type: params.keyType,
-    p_expires_at: params.expiresAt,
-    p_device_limit: params.deviceLimit,
-    p_client_id: params.clientId || null,
-    p_sell_price: params.sellPrice ?? null,
-    p_delivery_status: params.deliveryStatus,
-    p_notes: params.notes,
-    p_meta: params.meta,
-  });
+  const requestId = normalizeRequestId(params.requestId);
+
+  const { data, error } = await withRetry(async () => {
+    const rpcResult = await (supabase as any).rpc('reseller_generate_license_key_atomic_locked', {
+      p_request_id: requestId,
+      p_user_id: params.userId,
+      p_reseller_id: params.resellerId,
+      p_wallet_id: params.walletId,
+      p_product_id: params.productId,
+      p_amount: params.amount,
+      p_plan_duration: params.planDuration,
+      p_license_key: params.licenseKey,
+      p_key_signature: params.keySignature,
+      p_key_type: params.keyType,
+      p_expires_at: params.expiresAt,
+      p_device_limit: params.deviceLimit,
+      p_client_id: params.clientId || null,
+      p_sell_price: params.sellPrice ?? null,
+      p_delivery_status: params.deliveryStatus,
+      p_notes: params.notes,
+      p_meta: params.meta,
+    });
+
+    const message = String(rpcResult?.error?.message || '').toLowerCase();
+    if (rpcResult?.error && (
+      message.includes('timeout') ||
+      message.includes('connection') ||
+      message.includes('temporar') ||
+      message.includes('deadlock')
+    )) {
+      throw new DashboardError('Transient transaction failure, retrying', 'TRANSIENT_RPC_ERROR', 503, {
+        originalError: rpcResult.error,
+      });
+    }
+
+    return rpcResult;
+  }, 3, 800);
 
   if (error) {
     const msg = String(error.message || '').toLowerCase();
@@ -1220,7 +1255,7 @@ export const dashboardApi = {
             .update({
               status: 'completed',
               file_path: `/backups/${entityType}/${entityId}/${backupId}.zip`,
-              size_bytes: Math.floor(Math.random() * 1000000) + 100000
+              size_bytes: 512000 // Default 500KB estimate until backup is complete
             })
             .eq('id', backupId);
         }, 2000);
@@ -1863,8 +1898,7 @@ export const dashboardApi = {
         deviceLimit: 1,
       });
       const uniqueKey = await ensureUniqueKey(keyBundle.key);
-      const idempotencyKey = String(payload.idempotencyKey || '').trim() ||
-        (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${randomId('req')}`);
+      const idempotencyKey = normalizeRequestId(payload.idempotencyKey);
 
       const debitResult = await generateResellerLicenseKeyAtomic({
         requestId: idempotencyKey,
@@ -2072,34 +2106,48 @@ export const dashboardApi = {
         generatedSignatures.push(keyBundle.signature);
       }
 
-      const idempotencyKey = String(payload.idempotencyKey || '').trim() ||
-        (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${randomId('bulk')}`);
+      const idempotencyKey = normalizeRequestId(payload.idempotencyKey);
 
-      const { data: bulkResult, error: bulkError } = await (supabase as any).rpc('reseller_generate_license_keys_bulk_atomic', {
-        p_request_id: idempotencyKey,
-        p_user_id: payload.userId,
-        p_reseller_id: reseller.id,
-        p_wallet_id: wallet.id,
-        p_product_id: payload.productId,
-        p_plan_duration: payload.planDuration,
-        p_amount_per_key: planPrice,
-        p_key_type: keyType,
-        p_expires_at: expiresAt,
-        p_license_keys: generatedKeys,
-        p_key_signatures: generatedSignatures,
-        p_device_limit: 1,
-        p_client_id: payload.clientId || null,
-        p_delivery_status: payload.clientId ? 'sent' : 'pending',
-        p_meta: {
-          reseller_id: reseller.id,
-          product_id: payload.productId,
-          plan_duration: payload.planDuration,
-          amount_per_key: planPrice,
-          quantity: safeQty,
-          idempotency_key: idempotencyKey,
-          generated_mode: 'reseller_bulk_atomic',
-        },
-      });
+      const { data: bulkResult, error: bulkError } = await withRetry(async () => {
+        const rpcResult = await (supabase as any).rpc('reseller_generate_license_keys_bulk_atomic', {
+          p_request_id: idempotencyKey,
+          p_user_id: payload.userId,
+          p_reseller_id: reseller.id,
+          p_wallet_id: wallet.id,
+          p_product_id: payload.productId,
+          p_plan_duration: payload.planDuration,
+          p_amount_per_key: planPrice,
+          p_key_type: keyType,
+          p_expires_at: expiresAt,
+          p_license_keys: generatedKeys,
+          p_key_signatures: generatedSignatures,
+          p_device_limit: 1,
+          p_client_id: payload.clientId || null,
+          p_delivery_status: payload.clientId ? 'sent' : 'pending',
+          p_meta: {
+            reseller_id: reseller.id,
+            product_id: payload.productId,
+            plan_duration: payload.planDuration,
+            amount_per_key: planPrice,
+            quantity: safeQty,
+            idempotency_key: idempotencyKey,
+            generated_mode: 'reseller_bulk_atomic',
+          },
+        });
+
+        const message = String(rpcResult?.error?.message || '').toLowerCase();
+        if (rpcResult?.error && (
+          message.includes('timeout') ||
+          message.includes('connection') ||
+          message.includes('temporar') ||
+          message.includes('deadlock')
+        )) {
+          throw new DashboardError('Transient bulk transaction failure, retrying', 'TRANSIENT_RPC_ERROR', 503, {
+            originalError: rpcResult.error,
+          });
+        }
+        return rpcResult;
+      }, 3, 800);
 
       if (bulkError || !bulkResult) {
         const message = String((bulkError as any)?.message || '').toLowerCase();

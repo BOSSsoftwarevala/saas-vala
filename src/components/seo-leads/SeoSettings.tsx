@@ -29,6 +29,7 @@ import {
   Code,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 export function SeoSettings() {
   const [rescanInterval, setRescanInterval] = useState('daily');
@@ -61,11 +62,20 @@ export function SeoSettings() {
 
   const connectGoogle = async (type: string) => {
     setConnecting(type);
-    await new Promise(r => setTimeout(r, 2000));
-    if (type === 'gsc') setGscConnected(true);
-    if (type === 'ga') setGaConnected(true);
-    toast.success(`${type === 'gsc' ? 'Google Search Console' : 'Google Analytics'} connected successfully!`);
-    setConnecting(null);
+    try {
+      const { error } = await supabase.functions.invoke('seo-automation-engine', {
+        body: { run_type: type === 'gsc' ? 'gsc_connect_check' : 'ga_connect_check', trigger: 'manual', limit: 1 },
+      });
+      if (error) throw error;
+
+      if (type === 'gsc') setGscConnected(true);
+      if (type === 'ga') setGaConnected(true);
+      toast.success(`${type === 'gsc' ? 'Google Search Console' : 'Google Analytics'} connection verified!`);
+    } catch (error: any) {
+      toast.error(error?.message || 'Connection check failed');
+    } finally {
+      setConnecting(null);
+    }
   };
 
   const submitUrlToGoogle = async () => {
@@ -74,17 +84,33 @@ export function SeoSettings() {
       return;
     }
     setSubmittingUrl(true);
-    await new Promise(r => setTimeout(r, 1500));
-    toast.success(`URL submitted to Google Indexing API: ${indexingUrl}`);
-    setIndexingUrl('');
-    setSubmittingUrl(false);
+    try {
+      const { error } = await supabase.functions.invoke('seo-automation-engine', {
+        body: { run_type: 'index_submit', trigger: 'manual', limit: 1 },
+      });
+      if (error) throw error;
+      toast.success(`Indexing request queued for: ${indexingUrl}`);
+      setIndexingUrl('');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to submit indexing request');
+    } finally {
+      setSubmittingUrl(false);
+    }
   };
 
   const generateSitemap = async () => {
     setGeneratingSchema(true);
-    await new Promise(r => setTimeout(r, 2000));
-    toast.success('Sitemap generated and submitted to Google!');
-    setGeneratingSchema(false);
+    try {
+      const { error } = await supabase.functions.invoke('seo-automation-engine', {
+        body: { run_type: 'sitemap_submit', trigger: 'manual', limit: 200 },
+      });
+      if (error) throw error;
+      toast.success('Sitemap generation/submission queued!');
+    } catch (error: any) {
+      toast.error(error?.message || 'Sitemap generation failed');
+    } finally {
+      setGeneratingSchema(false);
+    }
   };
 
   const generateSchemaMarkup = () => {
@@ -141,6 +167,17 @@ export function SeoSettings() {
   };
 
   const saveSettings = () => {
+    localStorage.setItem('seo.settings', JSON.stringify({
+      rescanInterval,
+      aiModel,
+      autoIndex,
+      autoRescan,
+      sitemapUrl,
+      schemaType,
+      schemaMarkup,
+      gscConnected,
+      gaConnected,
+    }));
     toast.success('All SEO settings saved successfully!');
   };
 

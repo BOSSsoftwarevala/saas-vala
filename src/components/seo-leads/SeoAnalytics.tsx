@@ -82,20 +82,24 @@ export function SeoAnalytics() {
         { stage: 'Converted', value: statusCounts.converted },
       ];
 
-      // Mock SEO ranking data
-      const seoRanking = (seoData || []).slice(0, 5).map((s, idx) => ({
-        keyword: (s.keywords as string[])?.[0] || `keyword-${idx}`,
-        position: Math.floor(Math.random() * 20) + 1,
-        change: Math.floor(Math.random() * 10) - 5,
+      // SEO ranking from real seo_data
+      const seoRanking = (seoData || []).slice(0, 5).map((s) => ({
+        keyword: (s.keywords as string[])?.[0] || s.url || 'N/A',
+        position: (s as any).ranking_position ?? 0,
+        change: (s as any).ranking_change ?? 0,
       }));
 
-      // Mock reseller performance
-      const resellerPerformance = [
-        { name: 'John Reseller', leads: 45, converted: 12 },
-        { name: 'Sarah Partner', leads: 38, converted: 15 },
-        { name: 'Mike Agent', leads: 32, converted: 8 },
-        { name: 'Lisa Sales', leads: 28, converted: 10 },
-      ];
+      // Reseller performance from real DB
+      const { data: resellersData } = await supabase.from('resellers').select('id, name');
+      const { data: allLeads } = await supabase.from('leads').select('reseller_id, status');
+      const resellerPerformance = (resellersData || []).slice(0, 4).map(r => {
+        const rLeads = (allLeads || []).filter(l => l.reseller_id === r.id);
+        return {
+          name: r.name,
+          leads: rLeads.length,
+          converted: rLeads.filter(l => l.status === 'converted').length,
+        };
+      });
 
       setReportData({
         seoRanking,

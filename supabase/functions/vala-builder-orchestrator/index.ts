@@ -155,7 +155,7 @@ async function createRun(admin: any, userId: string, payload: any) {
       metadata: {
         requested_models: ['openai', 'gemini', 'claude'],
         voice_system: ['whisper-stt', 'elevenlabs-tts'],
-        infrastructure: ['github', 'vps-agent', 'docker', 'vercel'],
+        infrastructure: ['github', 'vps-agent', 'docker'],
         template_key: templateKey,
         template_modules: templateModules,
         plugin_keys: Array.isArray(payload?.plugin_keys) ? payload.plugin_keys : [],

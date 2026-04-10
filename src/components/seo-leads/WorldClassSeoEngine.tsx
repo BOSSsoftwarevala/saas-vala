@@ -131,7 +131,7 @@ import { motion } from 'framer-motion';
            setActivities(prev => prev.map((act, idx) => ({
              ...act,
              status: idx < current ? 'completed' : idx === current ? 'processing' : 'pending',
-             progress: idx === current ? Math.random() * 100 : undefined,
+             progress: idx === current ? Number(Math.min(99, Math.max(1, prog * 4)).toFixed(0)) : undefined,
              details: idx < current ? `Optimized ✓` : undefined,
            })));
          }
@@ -204,12 +204,12 @@ import { motion } from 'framer-motion';
          pageUrl: `/products/${p.productCode}`,
          pageName: p.productName,
          lastOptimized: null,
-         currentScore: Math.floor(Math.random() * 40) + 50,
+         currentScore: (p as any).seo_score ?? 60,
          targetScore: 85,
-         rankingPosition: Math.floor(Math.random() * 50) + 1,
-         traffic: Math.floor(Math.random() * 1000),
-         conversions: Math.floor(Math.random() * 50),
-         conversionRate: Math.random() * 5,
+         rankingPosition: (p as any).ranking_position ?? 10,
+         traffic: (p as any).monthly_traffic ?? 0,
+         conversions: (p as any).conversions ?? 0,
+         conversionRate: (p as any).conversion_rate ?? 0,
        }));
        setDecisions(aiDecisions);
  

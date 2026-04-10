@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -28,24 +28,29 @@ interface AutoPaySettingsModalProps {
 }
 
 export function AutoPaySettingsModal({ open, onOpenChange }: AutoPaySettingsModalProps) {
-  const [autoRenew, setAutoRenew] = useState(true);
-  const [lowBalanceAlert, setLowBalanceAlert] = useState(true);
-  const [lowBalanceThreshold, setLowBalanceThreshold] = useState('500');
-  const [gracePeriod, setGracePeriod] = useState(true);
+  const [autoRenew, setAutoRenew] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('autopay_autorenew') ?? 'true'); } catch { return true; }
+  });
+  const [lowBalanceAlert, setLowBalanceAlert] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('autopay_lowbalancealert') ?? 'true'); } catch { return true; }
+  });
+  const [lowBalanceThreshold, setLowBalanceThreshold] = useState(
+    () => localStorage.getItem('autopay_threshold') ?? '500'
+  );
+  const [gracePeriod, setGracePeriod] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('autopay_graceperiod') ?? 'true'); } catch { return true; }
+  });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const handleSave = async () => {
-    setSaving(true);
-    // Simulate save
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setSaving(false);
+  const handleSave = () => {
+    localStorage.setItem('autopay_autorenew', JSON.stringify(autoRenew));
+    localStorage.setItem('autopay_lowbalancealert', JSON.stringify(lowBalanceAlert));
+    localStorage.setItem('autopay_threshold', lowBalanceThreshold);
+    localStorage.setItem('autopay_graceperiod', JSON.stringify(gracePeriod));
     setSaved(true);
     toast.success('Auto-pay settings saved');
-    setTimeout(() => {
-      setSaved(false);
-      onOpenChange(false);
-    }, 1500);
+    setTimeout(() => { setSaved(false); onOpenChange(false); }, 1200);
   };
 
   return (

@@ -154,7 +154,7 @@ export function AutoSubdomain() {
             <div>
               <CardTitle className="text-base sm:text-lg">Auto Subdomain System</CardTitle>
               <CardDescription className="text-xs sm:text-sm">
-                Auto-create {'{repo}.saasvala.com'} via Cloudflare + Vercel
+                Auto-create {'{repo}.saasvala.com'} via Cloudflare DNS
               </CardDescription>
             </div>
           </div>
@@ -208,7 +208,9 @@ export function AutoSubdomain() {
                   </Button>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">Vercel: {lastResult.vercel_url}</p>
+              {lastResult.vercel_url && (
+                <p className="text-xs text-muted-foreground">Deploy URL: {lastResult.vercel_url}</p>
+              )}
             </div>
           )}
         </div>

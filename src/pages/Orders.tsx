@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { useMarketplaceOrders, useLicenseKeys } from '@/hooks/useMarketplace';
 import { toast } from 'sonner';
+import { publicMarketplaceApi } from '@/lib/api';
 import {
   Table,
   TableBody,
@@ -82,11 +83,24 @@ export default function OrdersPage() {
     toast.success('Order ID copied!');
   };
 
-  const handleDownload = (order: any) => {
-    if (order.apk_url) {
-      window.open(order.apk_url, '_blank');
-    } else {
-      toast.error('APK not available for download');
+  const handleDownload = async (order: any) => {
+    try {
+      const productId = order.product_id;
+      if (!productId) {
+        toast.error('Product mapping missing for this order');
+        return;
+      }
+
+      const result = await publicMarketplaceApi.downloadAPK(productId);
+      const secureUrl = result?.download_url || result?.signed_url || result?.url;
+      if (!result?.success || !secureUrl) {
+        throw new Error(result?.error || 'Unable to generate secure download link');
+      }
+
+      window.open(secureUrl, '_blank', 'noopener,noreferrer');
+      toast.success('Secure APK download started');
+    } catch (error: any) {
+      toast.error(error?.message || 'APK not available for download');
     }
   };
 

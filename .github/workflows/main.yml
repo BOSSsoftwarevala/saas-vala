@@ -208,5 +208,5 @@ jobs:
       - name: Deploy Confirmation
         run: |
           echo "✅ Build passed all checks"
-          echo "🚀 Vercel auto-deploy triggered from main branch"
-          echo "📡 Edge functions auto-deployed via Lovable Cloud"
+          echo "🚀 VPS auto-deploy triggered from main branch"
+          echo "📡 Edge functions auto-deployed via Supabase"

@@ -111,7 +111,7 @@ Format your response as:
       
       // Parse response
       let content = response;
-      let score = 75 + Math.floor(Math.random() * 20);
+      let score = 80;
       let keywords: string[] = ['seo', 'content', 'marketing', 'digital', 'growth'];
 
       if (response.includes('---CONTENT---')) {

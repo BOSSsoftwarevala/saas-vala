@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { useAuth } from './useAuth';
 import {
   generateIdempotencyKey,
+  normalizeRequestId,
   checkClientRateLimit,
   resetClientRateLimit,
   formatCurrency,
@@ -252,18 +253,22 @@ export function useMarketplacePayment() {
       setProcessing(true);
 
       // Per-call idempotency key — callers may supply their own
-      const idemKey = idempotencyKey ?? generateIdempotencyKey();
+      const idemKey = normalizeRequestId(idempotencyKey ?? generateIdempotencyKey());
 
       try {
-        const result = await publicMarketplaceApi.initiatePayment(
-          {
-            product_id: productId,
-            duration_days: durationDays,
-            payment_method: paymentMethod as any,
-            amount,
-            idempotency_key: idemKey,
-          },
-          { idempotencyKey: idemKey }
+        const result = await withRetry(() =>
+          publicMarketplaceApi.initiatePayment(
+            {
+              product_id: productId,
+              duration_days: durationDays,
+              payment_method: paymentMethod as any,
+              amount,
+              idempotency_key: idemKey,
+            },
+            { idempotencyKey: idemKey }
+          ),
+          3,
+          800
         );
 
         if (result?.success) {

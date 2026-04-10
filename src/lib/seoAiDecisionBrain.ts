@@ -141,21 +141,21 @@
        gaps.push({
          keyword,
          ourPosition: null, // Not ranking
-         competitorPosition: Math.floor(Math.random() * 10) + 1,
-         competitorUrl: 'competitor-' + Math.floor(Math.random() * 5) + '.com',
-         gap: Math.floor(Math.random() * 10) + 1,
+         competitorPosition: 1,
+         competitorUrl: 'competitor.com',
+         gap: 5,
          difficulty: 'easy',
-         estimatedTraffic: Math.floor(Math.random() * 500) + 100,
+         estimatedTraffic: 200,
        });
      } else if (isLongTail) {
        gaps.push({
          keyword,
-         ourPosition: Math.floor(Math.random() * 20) + 10,
-         competitorPosition: Math.floor(Math.random() * 5) + 1,
-         competitorUrl: 'competitor-' + Math.floor(Math.random() * 5) + '.com',
-         gap: Math.floor(Math.random() * 15) + 5,
+         ourPosition: 10,
+         competitorPosition: 3,
+         competitorUrl: 'competitor.com',
+         gap: 7,
          difficulty: 'medium',
-         estimatedTraffic: Math.floor(Math.random() * 300) + 50,
+         estimatedTraffic: 100,
        });
      }
    });

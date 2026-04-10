@@ -42,7 +42,7 @@ const mockDeployments = [
     author: 'Manoj Kumar',
     timestamp: 'Just now',
     duration: '...',
-    url: 'https://feature-dashboard-saas-vala.vercel.app',
+    url: 'https://preview-dashboard.saasvala.com',
   },
   {
     id: 'd3',
@@ -54,7 +54,7 @@ const mockDeployments = [
     author: 'Dev Team',
     timestamp: '5 hours ago',
     duration: '38s',
-    url: 'https://feature-api-saas-vala.vercel.app',
+    url: 'https://preview-api.saasvala.com',
   },
   {
     id: 'd4',

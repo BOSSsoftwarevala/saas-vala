@@ -203,6 +203,8 @@ export function generateProducts(categoryId: string, count: number = 8) {
   const statuses: ('upcoming' | 'live' | 'bestseller')[] = ['live', 'bestseller', 'upcoming', 'live', 'live', 'bestseller', 'live', 'upcoming'];
   
   // For special rows, set specific statuses
+  const FIXED_PRICES = [4999, 5999, 6999, 7999, 9999, 11999, 14999, 19999];
+
   if (categoryId === 'upcoming') {
     return Array.from({ length: count }, (_, i) => ({
       id: `${categoryId}-${i}`,
@@ -210,7 +212,7 @@ export function generateProducts(categoryId: string, count: number = 8) {
       subtitle: categories.find(c => c.id === categoryId)?.title || 'Business Software',
       image: images[i % images.length],
       status: 'upcoming' as const,
-      price: Math.floor(Math.random() * 50000) + 5000,
+      price: FIXED_PRICES[i % FIXED_PRICES.length],
       features: ['Feature 1', 'Feature 2', 'Feature 3', 'Feature 4', 'Feature 5'],
     }));
   }
@@ -222,7 +224,7 @@ export function generateProducts(categoryId: string, count: number = 8) {
       subtitle: categories.find(c => c.id === categoryId)?.title || 'Business Software',
       image: images[i % images.length],
       status: 'bestseller' as const,
-      price: Math.floor(Math.random() * 50000) + 5000,
+      price: FIXED_PRICES[i % FIXED_PRICES.length],
       features: ['Feature 1', 'Feature 2', 'Feature 3', 'Feature 4', 'Feature 5'],
     }));
   }
@@ -233,7 +235,7 @@ export function generateProducts(categoryId: string, count: number = 8) {
     subtitle: categories.find(c => c.id === categoryId)?.title || 'Business Software',
     image: images[i % images.length],
     status: statuses[i % statuses.length],
-    price: Math.floor(Math.random() * 50000) + 5000,
+    price: FIXED_PRICES[i % FIXED_PRICES.length],
     features: ['Feature 1', 'Feature 2', 'Feature 3', 'Feature 4', 'Feature 5'],
   }));
 }

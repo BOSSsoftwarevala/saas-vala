@@ -82,7 +82,7 @@ export function AutoSeoEngine() {
           description: d.meta_description,
           keywords: d.keywords || [],
           status: d.title && d.meta_description ? 'optimized' : 'pending',
-          score: d.title && d.meta_description ? 85 + Math.floor(Math.random() * 15) : 40 + Math.floor(Math.random() * 30),
+          score: d.title && d.meta_description ? (d as any).seo_score ?? 85 : (d as any).seo_score ?? 40,
         })));
       }
     } catch (error) {
@@ -102,26 +102,29 @@ export function AutoSeoEngine() {
   const runAutoSeo = async () => {
     setRunning(true);
     setProgress(0);
-    
-    const steps = ['Scanning pages...', 'Generating meta titles...', 'Creating descriptions...', 'Extracting keywords...', 'Building schema...', 'Generating sitemap...', 'Finalizing...'];
-    
-    for (let i = 0; i < steps.length; i++) {
-      toast.info(steps[i]);
-      setProgress(((i + 1) / steps.length) * 100);
-      await new Promise(r => setTimeout(r, 800));
+    setProgress(20);
+
+    try {
+      const { error } = await supabase.functions.invoke('seo-automation-engine', {
+        body: {
+          run_type: 'full_scan',
+          trigger: 'manual',
+          limit: 200,
+        },
+      });
+      if (error) throw error;
+
+      setProgress(85);
+      await fetchSeoData();
+      setProgress(100);
+      toast.success('Auto SEO completed!', {
+        description: 'SEO data refreshed from live optimization run.',
+      });
+    } catch (error: any) {
+      toast.error(error?.message || 'Auto SEO failed');
+    } finally {
+      setRunning(false);
     }
-    
-    // Update pages to show optimized
-    setPages(prev => prev.map(p => ({
-      ...p,
-      status: 'optimized',
-      score: 85 + Math.floor(Math.random() * 15),
-    })));
-    
-    toast.success('Auto SEO completed!', {
-      description: `${pages.length} pages optimized`,
-    });
-    setRunning(false);
   };
 
   const previewMeta = (page: PageSeo) => {
@@ -132,15 +135,30 @@ export function AutoSeoEngine() {
 
   const applyToAll = async () => {
     toast.info('Applying SEO settings to all pages...');
-    await new Promise(r => setTimeout(r, 1500));
-    toast.success('Applied to all pages!');
+    try {
+      const { error } = await supabase.functions.invoke('seo-automation-engine', {
+        body: {
+          run_type: 'apply_all',
+          trigger: 'manual',
+          limit: 200,
+        },
+      });
+      if (error) throw error;
+      await fetchSeoData();
+      toast.success('Applied to all pages!');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to apply SEO settings');
+    }
   };
 
   const rollbackChanges = async () => {
-    toast.info('Rolling back to previous SEO settings...');
-    await new Promise(r => setTimeout(r, 1000));
-    toast.success('Rollback complete!');
-    fetchSeoData();
+    toast.info('Refreshing latest persisted SEO state...');
+    try {
+      await fetchSeoData();
+      toast.success('SEO state restored from database');
+    } catch {
+      toast.error('Failed to restore SEO state');
+    }
   };
 
   const getStatusBadge = (status: PageSeo['status']) => {

@@ -10,7 +10,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAutomation } from '@/hooks/useAutoMation';
 import { GitHubMultiAccountPanel } from './GitHubMultiAccountPanel';
 import { SourceCodeCatalogPanel } from './SourceCodeCatalogPanel';
-import { BulkVercelDeployPanel } from './BulkVercelDeployPanel';
 import { 
   Bot, 
   Zap, 
@@ -136,14 +135,10 @@ export function AutoPilotDashboard() {
 
   return (
     <Tabs defaultValue="autopilot" className="space-y-6">
-      <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-flex">
+      <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-flex">
         <TabsTrigger value="autopilot" className="gap-2">
           <Bot className="h-4 w-4" />
           Auto-Pilot
-        </TabsTrigger>
-        <TabsTrigger value="vercel" className="gap-2">
-          <Rocket className="h-4 w-4" />
-          Vercel Deploy
         </TabsTrigger>
         <TabsTrigger value="github" className="gap-2">
           <GitBranch className="h-4 w-4" />
@@ -154,10 +149,6 @@ export function AutoPilotDashboard() {
           Source Catalog
         </TabsTrigger>
       </TabsList>
-
-      <TabsContent value="vercel">
-        <BulkVercelDeployPanel />
-      </TabsContent>
 
       <TabsContent value="github">
         <GitHubMultiAccountPanel />

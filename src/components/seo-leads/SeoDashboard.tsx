@@ -103,15 +103,24 @@ export function SeoDashboard() {
         .sort((a, b) => b.visits - a.visits)
         .slice(0, 6);
 
-      // Generate SEO growth data (mock for visualization)
+      // Build SEO growth chart from real leads by day
       const seoGrowth = Array.from({ length: 7 }, (_, i) => {
         const d = new Date();
         d.setDate(d.getDate() - (6 - i));
+        const dayStart = new Date(d); dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(d); dayEnd.setHours(23, 59, 59, 999);
+        const dayLeads = leads.filter(l => {
+          const t = new Date(l.created_at!);
+          return t >= dayStart && t <= dayEnd;
+        });
+        const organic = dayLeads.filter(l => l.source === 'organic').length;
+        const paid = dayLeads.filter(l => l.source === 'paid').length;
+        const direct = dayLeads.filter(l => !l.source || l.source === 'direct').length;
         return {
           date: d.toLocaleDateString('en-US', { weekday: 'short' }),
-          organic: Math.floor(Math.random() * 500) + 200,
-          paid: Math.floor(Math.random() * 200) + 50,
-          direct: Math.floor(Math.random() * 300) + 100,
+          organic: organic || 0,
+          paid: paid || 0,
+          direct: direct || 0,
         };
       });
 
@@ -146,33 +155,47 @@ export function SeoDashboard() {
   const runFullSeoScan = async () => {
     setScanning(true);
     toast.info('Starting full SEO scan...');
-    
-    // Simulate scan progress
-    await new Promise(r => setTimeout(r, 2000));
-    toast.success('SEO scan completed!', {
-      description: 'All pages analyzed and meta tags updated.',
-    });
-    setScanning(false);
-    fetchStats();
+    try {
+      const { error } = await supabase.functions.invoke('seo-automation-engine', {
+        body: { action: 'full-scan', market: 'india' },
+      });
+      if (error) throw error;
+      toast.success('SEO scan completed!', { description: 'All pages analyzed and meta tags updated.' });
+      await fetchStats();
+    } catch (err: any) {
+      toast.error('SEO scan failed: ' + (err.message || 'Unknown error'));
+    } finally {
+      setScanning(false);
+    }
   };
 
   const syncWithGoogle = async () => {
     setSyncing(true);
     toast.info('Syncing with Google Search Console...');
-    
-    await new Promise(r => setTimeout(r, 2000));
-    toast.success('Google sync complete!', {
-      description: 'Sitemap submitted and indexing requested.',
-    });
-    setSyncing(false);
+    try {
+      const { error } = await supabase.functions.invoke('seo-automation-engine', {
+        body: { action: 'submit-sitemap', siteUrl: 'https://saasvala.com' },
+      });
+      if (error) throw error;
+      toast.success('Google sync complete!', { description: 'Sitemap submitted and indexing requested.' });
+    } catch (err: any) {
+      toast.error('Google sync failed: ' + (err.message || 'Unknown error'));
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const generateMetaForAll = async () => {
     toast.info('Generating meta tags for all pages...');
-    await new Promise(r => setTimeout(r, 1500));
-    toast.success('Meta tags generated!', {
-      description: 'AI-powered meta tags applied to all pages.',
-    });
+    try {
+      const { error } = await supabase.functions.invoke('seo-optimize', {
+        body: { action: 'generate-meta-all' },
+      });
+      if (error) throw error;
+      toast.success('Meta tags generated!', { description: 'AI-powered meta tags applied to all pages.' });
+    } catch (err: any) {
+      toast.error('Meta generation failed: ' + (err.message || 'Unknown error'));
+    }
   };
 
   const exportLeads = async () => {

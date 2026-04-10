@@ -786,7 +786,15 @@ export const publicMarketplaceApi = {
       idempotency_key?: string;
     },
     options?: ApiCallOptions
-  ) => apiCall('POST', 'marketplace/payments/initiate', data, options),
+  ) => {
+    const effectiveIdempotencyKey = data.idempotency_key || options?.idempotencyKey || crypto.randomUUID();
+    return apiCall(
+      'POST',
+      'marketplace/payments/initiate',
+      { ...data, idempotency_key: effectiveIdempotencyKey },
+      { ...(options || {}), idempotencyKey: effectiveIdempotencyKey }
+    );
+  },
   
   verifyPayment: (data: { order_id: string; transaction_ref?: string; provider?: string }) =>
     apiCall('POST', 'marketplace/payments/verify', data),
