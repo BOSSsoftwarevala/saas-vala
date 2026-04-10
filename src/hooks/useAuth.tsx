@@ -71,13 +71,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
 
-        // Defer role fetching with setTimeout to avoid deadlock
+        // Defer role fetching to next microtask for event-loop safety.
         if (session?.user) {
-          setTimeout(() => {
+          queueMicrotask(() => {
             if (isMounted) {
               ensureUserRole(session.user.id);
             }
-          }, 0);
+          });
         } else {
           setRole(null);
           lastRoleUserIdRef.current = null;
@@ -184,7 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
       if (nextSession?.user) {
-        setTimeout(() => ensureUserRole(nextSession.user.id), 0);
+        queueMicrotask(() => ensureUserRole(nextSession.user.id));
       }
     }
 

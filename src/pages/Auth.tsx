@@ -110,15 +110,34 @@ export default function Auth() {
      }
  
      setIsSubmitting(true);
-     await new Promise((resolve) => setTimeout(resolve, 1000));
-     setIsSubmitting(false);
- 
-     toast({
-       title: 'Verified!',
-       description: 'Two-factor authentication successful.',
-     });
-     setShow2FA(false);
-     setOtpValue('');
+    try {
+      const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (error) throw error;
+
+      if (data?.currentLevel !== 'aal2') {
+        toast({
+          variant: 'destructive',
+          title: '2FA not enabled',
+          description: 'This account does not have an active verified second factor.',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Verified!',
+        description: 'Two-factor authentication session is active.',
+      });
+      setShow2FA(false);
+      setOtpValue('');
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: '2FA verification failed',
+        description: error?.message || 'Unable to verify second factor.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
    };
  
    const handleSignup = async (e: React.FormEvent) => {

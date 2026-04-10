@@ -538,6 +538,15 @@ export function useSupport() {
     }
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (typingTimeout.current) {
+        clearTimeout(typingTimeout.current);
+        typingTimeout.current = null;
+      }
+    };
+  }, []);
+
   return {
     channels, activeChannel, messages, members, typingUsers, unreadCounts, loading,
     selectChannel, sendMessage, sendFile, setTyping, createChannel, createDirectChannel, searchMessages, loadChannels,
