@@ -136,6 +136,13 @@ jobs:
           BUNDLE_ENTRY_JS_GZIP_BUDGET_KB: 180
           BUNDLE_CSS_GZIP_BUDGET_KB: 80
 
+      - name: Generate Bundle Analysis Report
+        run: npm run build:analyze
+        env:
+          BUNDLE_WARN_TOP_JS_GZIP_KB: 120
+          BUNDLE_WARN_TOTAL_JS_GZIP_KB: 1000
+          BUNDLE_WARN_TOTAL_CSS_GZIP_KB: 80
+
       - name: Check Build Output
         run: |
           echo "📦 Build output:"
@@ -148,6 +155,13 @@ jobs:
           name: build-artifact
           path: dist/
           retention-days: 7
+
+      - name: Upload Bundle Analysis Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-analysis
+          path: dist/perf/
+          retention-days: 14
 
   # ━━━ PHASE 6: AUTO-DETECT ISSUES ━━━
   auto_detect:

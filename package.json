@@ -11,6 +11,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:budget": "node scripts/check-bundle-budget.mjs",
+    "build:analyze": "node scripts/analyze-bundle.mjs",
     "build:ci": "npm run build && npm run build:budget",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
