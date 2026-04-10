@@ -20,7 +20,9 @@ import {
   Save,
   Loader2,
   Upload,
+  CreditCard,
 } from 'lucide-react';
+import { usePaymentSettings } from '@/hooks/usePaymentSettings';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { toast } from 'sonner';
@@ -73,6 +75,7 @@ function ChangePasswordForm() {
 export default function Settings() {
   const { user, isSuperAdmin, signOut } = useAuth();
   const { profile, loading, updateProfile } = useProfile();
+  const { settings: ps, loading: psLoading, saving: psSaving, saveSettings } = usePaymentSettings();
   const [activeTab, setActiveTab] = useState('profile');
   const [saving, setSaving] = useState(false);
 
@@ -88,6 +91,25 @@ export default function Settings() {
     phone: '',
   });
 
+  // Payment form state
+  const [payForm, setPayForm] = useState({
+    bank_name: '',
+    account_name: '',
+    account_number: '',
+    ifsc_code: '',
+    branch_name: '',
+    account_type: '',
+    upi_id: '',
+    wise_pay_link: '',
+    binance_pay_id: '',
+    remitly_note: '',
+    upi_enabled: true,
+    bank_enabled: true,
+    wise_enabled: true,
+    crypto_enabled: true,
+    remitly_enabled: true,
+  });
+
   // Load profile data into form
   useEffect(() => {
     if (profile) {
@@ -99,6 +121,29 @@ export default function Settings() {
     }
   }, [profile]);
 
+  // Sync payment settings from DB into form
+  useEffect(() => {
+    if (!psLoading) {
+      setPayForm({
+        bank_name: ps.bank_name,
+        account_name: ps.account_name,
+        account_number: ps.account_number,
+        ifsc_code: ps.ifsc_code,
+        branch_name: ps.branch_name,
+        account_type: ps.account_type,
+        upi_id: ps.upi_id,
+        wise_pay_link: ps.wise_pay_link,
+        binance_pay_id: ps.binance_pay_id,
+        remitly_note: ps.remitly_note,
+        upi_enabled: ps.upi_enabled,
+        bank_enabled: ps.bank_enabled,
+        wise_enabled: ps.wise_enabled,
+        crypto_enabled: ps.crypto_enabled,
+        remitly_enabled: ps.remitly_enabled,
+      });
+    }
+  }, [psLoading]);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -109,6 +154,16 @@ export default function Settings() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSavePayment = async () => {
+    if (!payForm.account_number.trim() || !payForm.ifsc_code.trim()) {
+      toast.error('Account number and IFSC code are required');
+      return;
+    }
+    const ok = await saveSettings(payForm);
+    if (ok) toast.success('Payment settings saved successfully');
+    else toast.error('Failed to save — check permissions');
   };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -162,7 +217,7 @@ export default function Settings() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="bg-muted">
+          <TabsList className="bg-muted flex-wrap">
             <TabsTrigger value="profile" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <User className="h-4 w-4" />
               Profile
@@ -175,6 +230,12 @@ export default function Settings() {
               <Bell className="h-4 w-4" />
               Notifications
             </TabsTrigger>
+            {isSuperAdmin && (
+              <TabsTrigger value="payment" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <CreditCard className="h-4 w-4" />
+                Payment Config
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* Profile Tab */}
@@ -224,12 +285,12 @@ export default function Settings() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="fullName" className="text-foreground">Full Name</Label>
-                        <Input 
-                          id="fullName" 
-                          placeholder="John Doe" 
+                        <Input
+                          id="fullName"
+                          placeholder="John Doe"
                           value={formData.full_name}
                           onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                          className="bg-muted/50 border-border" 
+                          className="bg-muted/50 border-border"
                         />
                       </div>
                       <div className="space-y-2">
@@ -238,22 +299,22 @@ export default function Settings() {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="company" className="text-foreground">Company Name</Label>
-                        <Input 
-                          id="company" 
-                          placeholder="Acme Corp" 
+                        <Input
+                          id="company"
+                          placeholder="Acme Corp"
                           value={formData.company_name}
                           onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
-                          className="bg-muted/50 border-border" 
+                          className="bg-muted/50 border-border"
                         />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="phone" className="text-foreground">Phone</Label>
-                        <Input 
-                          id="phone" 
-                          placeholder="+91 98765 43210" 
+                        <Input
+                          id="phone"
+                          placeholder="+91 98765 43210"
                           value={formData.phone}
                           onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                          className="bg-muted/50 border-border" 
+                          className="bg-muted/50 border-border"
                         />
                       </div>
                     </div>
@@ -269,7 +330,6 @@ export default function Settings() {
           </TabsContent>
 
           <TabsContent value="security" className="mt-6 space-y-6">
-            {/* Change Password */}
             <Card className="glass-card">
               <CardHeader>
                 <CardTitle className="text-foreground">Change Password</CardTitle>
@@ -366,6 +426,132 @@ export default function Settings() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Payment Config Tab - super admin only */}
+          {isSuperAdmin && (
+            <TabsContent value="payment" className="mt-6 space-y-6">
+              <Card className="glass-card">
+                <CardHeader>
+                  <CardTitle className="text-foreground flex items-center gap-2">
+                    <CreditCard className="h-5 w-5 text-primary" />
+                    Payment Configuration
+                  </CardTitle>
+                  <CardDescription>
+                    Shown to users in the Add Credits modal. Changes take effect immediately.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {psLoading ? (
+                    <div className="flex items-center justify-center py-10">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {/* Bank Transfer */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-semibold text-foreground">Bank Transfer (NEFT/IMPS)</h4>
+                          <Switch checked={payForm.bank_enabled} onCheckedChange={(v) => setPayForm(f => ({ ...f, bank_enabled: v }))} />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label>Bank Name</Label>
+                            <Input value={payForm.bank_name} onChange={(e) => setPayForm(f => ({ ...f, bank_name: e.target.value }))} className="bg-muted/50" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label>Account Name</Label>
+                            <Input value={payForm.account_name} onChange={(e) => setPayForm(f => ({ ...f, account_name: e.target.value }))} className="bg-muted/50" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label>Account Number</Label>
+                            <Input value={payForm.account_number} onChange={(e) => setPayForm(f => ({ ...f, account_number: e.target.value }))} className="bg-muted/50 font-mono" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label>IFSC Code</Label>
+                            <Input value={payForm.ifsc_code} onChange={(e) => setPayForm(f => ({ ...f, ifsc_code: e.target.value.toUpperCase() }))} className="bg-muted/50 font-mono" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label>Branch Name</Label>
+                            <Input value={payForm.branch_name} onChange={(e) => setPayForm(f => ({ ...f, branch_name: e.target.value }))} className="bg-muted/50" />
+                          </div>
+                          <div className="space-y-1">
+                            <Label>Account Type</Label>
+                            <Input value={payForm.account_type} onChange={(e) => setPayForm(f => ({ ...f, account_type: e.target.value }))} className="bg-muted/50" />
+                          </div>
+                        </div>
+                      </div>
+
+                      <hr className="border-border" />
+
+                      {/* UPI */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-semibold text-foreground">UPI Payment</h4>
+                          <Switch checked={payForm.upi_enabled} onCheckedChange={(v) => setPayForm(f => ({ ...f, upi_enabled: v }))} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>UPI ID</Label>
+                          <Input value={payForm.upi_id} onChange={(e) => setPayForm(f => ({ ...f, upi_id: e.target.value }))} className="bg-muted/50 font-mono" />
+                        </div>
+                      </div>
+
+                      <hr className="border-border" />
+
+                      {/* Wise */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-semibold text-foreground">Wise Payment</h4>
+                          <Switch checked={payForm.wise_enabled} onCheckedChange={(v) => setPayForm(f => ({ ...f, wise_enabled: v }))} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Wise Pay Link</Label>
+                          <Input value={payForm.wise_pay_link} onChange={(e) => setPayForm(f => ({ ...f, wise_pay_link: e.target.value }))} className="bg-muted/50" />
+                        </div>
+                      </div>
+
+                      <hr className="border-border" />
+
+                      {/* Crypto */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-semibold text-foreground">Crypto (Binance Pay)</h4>
+                          <Switch checked={payForm.crypto_enabled} onCheckedChange={(v) => setPayForm(f => ({ ...f, crypto_enabled: v }))} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Binance Pay ID</Label>
+                          <Input value={payForm.binance_pay_id} onChange={(e) => setPayForm(f => ({ ...f, binance_pay_id: e.target.value }))} className="bg-muted/50 font-mono" />
+                        </div>
+                      </div>
+
+                      <hr className="border-border" />
+
+                      {/* Remitly */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-semibold text-foreground">Remitly / Western Union</h4>
+                          <Switch checked={payForm.remitly_enabled} onCheckedChange={(v) => setPayForm(f => ({ ...f, remitly_enabled: v }))} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label>Instructions Note</Label>
+                          <Input value={payForm.remitly_note} onChange={(e) => setPayForm(f => ({ ...f, remitly_note: e.target.value }))} className="bg-muted/50" />
+                        </div>
+                      </div>
+
+                      <Button
+                        onClick={handleSavePayment}
+                        disabled={psSaving}
+                        className="bg-orange-gradient hover:opacity-90 text-white gap-2 w-full md:w-auto"
+                      >
+                        {psSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                        Save Payment Settings
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
         </Tabs>
       </div>
     </DashboardLayout>

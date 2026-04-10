@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { usePaymentSettings } from '@/hooks/usePaymentSettings';
 import {
   Dialog,
   DialogContent,
@@ -39,30 +40,10 @@ interface AddCreditsModalProps {
 
 const presetAmounts = [500, 1000, 2000, 5000, 10000];
 
-const bankDetails = {
-  accountName: 'SOFTWARE VALA',
-  bankName: 'INDIAN BANK',
-  accountType: 'Current',
-  accountNumber: '8045924772',
-  accountNumberMasked: '••••••4772',
-  ifsc: 'IDIB000K196',
-  ifscMasked: 'IDIB•••196',
-  branchName: 'KANKAR BAGH',
-  upiId: 'softwarevala@indianbank',
-};
-
-const cryptoDetails = {
-  binanceId: '1078928519',
-  binanceIdMasked: '•••••8519',
-};
-
-const wiseDetails = {
-  payLink: 'https://wise.com/pay/business/manojkumar21?utm_source=quick_pay',
-};
-
 type PayMethod = 'upi' | 'bank' | 'wise' | 'remit' | 'crypto';
 
 export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsModalProps) {
+  const { settings: ps, loading: psLoading, maskAccountNumber, maskIfsc, maskBinance } = usePaymentSettings();
   const [amount, setAmount] = useState<number>(1000);
   const [customAmount, setCustomAmount] = useState('');
   const [payMethod, setPayMethod] = useState<PayMethod>('wise');
@@ -77,6 +58,13 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
 
   const finalAmount = customAmount ? parseInt(customAmount) || 0 : amount;
   const isManualMethod = payMethod === 'bank' || payMethod === 'wise' || payMethod === 'remit' || payMethod === 'crypto';
+
+  const handleCopyField = (value: string, label: string) => (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!value.trim()) { toast.error(`${label} not configured`); return; }
+    navigator.clipboard.writeText(value);
+    toast.success(`${label} copied!`);
+  };
 
   /** Upload proof file to storage and return public URL, or null on failure. */
   const uploadProofFile = async (userId: string, txId: string): Promise<string | null> => {
@@ -129,13 +117,19 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
   };
 
   const handleCopy = (text: string, label: string) => {
+    if (!text.trim()) { toast.error(`${label} not configured`); return; }
     navigator.clipboard.writeText(text);
     toast.success(`${label} copied!`);
   };
 
   const submitManualPayment = async () => {
-    if (!transactionRef.trim()) {
-      toast.error('Please enter your transaction reference number');
+    const trimmedRef = transactionRef.trim();
+    if (!trimmedRef) {
+      toast.error('Transaction reference is required before submitting');
+      return;
+    }
+    if (trimmedRef.length < 5) {
+      toast.error('Transaction reference seems too short — please enter the full ID');
       return;
     }
     setStep('processing');
@@ -201,8 +195,13 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
   };
 
   const submitUpiPayment = async () => {
-    if (!transactionRef.trim()) {
-      toast.error('Please enter your UPI transaction ID');
+    const trimmedRef = transactionRef.trim();
+    if (!trimmedRef) {
+      toast.error('UPI Transaction ID is required before submitting');
+      return;
+    }
+    if (trimmedRef.length < 5) {
+      toast.error('UPI Transaction ID seems too short — please check and re-enter');
       return;
     }
     setStep('processing');
@@ -440,47 +439,49 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
 
                 {payMethod === 'wise' && (
                   <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
-                    <div className="flex items-start gap-3">
-                      <img
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(wiseDetails.payLink)}`}
-                        alt="Wise payment QR"
-                        className="h-28 w-28 rounded-lg border border-border bg-white p-1"
-                      />
-                      <div className="flex-1 space-y-2">
-                        <p className="text-xs text-muted-foreground">Scan QR or open the payment link in Wise to pay.</p>
-                        <div className="flex gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="gap-1.5"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              window.open(wiseDetails.payLink, '_blank', 'noopener,noreferrer');
-                            }}
-                          >
-                            Open Wise Link
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="gap-1.5"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCopy(wiseDetails.payLink, 'Wise payment link');
-                            }}
-                          >
-                            <Copy className="h-3 w-3" /> Copy Link
-                          </Button>
+                    {psLoading ? (
+                      <div className="flex items-center justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+                    ) : (
+                      <div className="flex items-start gap-3">
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(ps.wise_pay_link)}`}
+                          alt="Wise payment QR"
+                          className="h-28 w-28 rounded-lg border border-border bg-white p-1"
+                        />
+                        <div className="flex-1 space-y-2">
+                          <p className="text-xs text-muted-foreground">Scan QR or open the payment link in Wise to pay.</p>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="gap-1.5"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.open(ps.wise_pay_link, '_blank', 'noopener,noreferrer');
+                              }}
+                            >
+                              Open Wise Link
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="gap-1.5"
+                              onClick={handleCopyField(ps.wise_pay_link, 'Wise payment link')}
+                            >
+                              <Copy className="h-3 w-3" /> Copy Link
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    )}
                     <Input
-                      placeholder="Enter Wise transfer reference"
+                      placeholder="Enter Wise transfer reference (required)"
                       value={transactionRef}
                       onChange={(e) => setTransactionRef(e.target.value)}
                       onClick={(e) => e.stopPropagation()}
+                      className={!transactionRef.trim() && step === 'form' ? '' : ''}
                     />
                     <ProofUploadRow />
                   </div>
@@ -508,22 +509,25 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
 
                 {payMethod === 'upi' && (
                   <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
-                    {/* UPI ID */}
-                    <div className="bg-background rounded-lg p-3 flex items-center justify-between">
-                      <div>
-                        <p className="text-xs text-muted-foreground">UPI ID</p>
-                        <p className="font-mono font-semibold text-foreground">{bankDetails.upiId}</p>
+                    {psLoading ? (
+                      <div className="flex items-center justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+                    ) : (
+                      <div className="bg-background rounded-lg p-3 flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-muted-foreground">UPI ID</p>
+                          <p className="font-mono font-semibold text-foreground">{ps.upi_id}</p>
+                        </div>
+                        <Button variant="outline" size="sm" className="gap-1.5" onClick={handleCopyField(ps.upi_id, 'UPI ID')}>
+                          <Copy className="h-3 w-3" /> Copy
+                        </Button>
                       </div>
-                      <Button variant="outline" size="sm" className="gap-1.5" onClick={(e) => { e.stopPropagation(); handleCopy(bankDetails.upiId, 'UPI ID'); }}>
-                        <Copy className="h-3 w-3" /> Copy
-                      </Button>
-                    </div>
+                    )}
                     <p className="text-xs text-muted-foreground text-center">
                       1. Open any UPI app → Send ₹{finalAmount.toLocaleString()} to above UPI ID<br />
-                      2. Enter the Transaction ID below
+                      2. Enter the Transaction ID below (required)
                     </p>
                     <Input
-                      placeholder="Enter UPI Transaction ID"
+                      placeholder="UPI Transaction ID (required)"
                       value={transactionRef}
                       onChange={(e) => setTransactionRef(e.target.value)}
                       onClick={(e) => e.stopPropagation()}
@@ -563,27 +567,33 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
                     </div>
                     {payMethod === 'bank' && (
                       <div className="px-3 pb-3 space-y-2 border-t border-border pt-3">
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div className="bg-background rounded-lg p-2">
-                            <p className="text-muted-foreground">Account Number</p>
-                            <p className="font-mono font-semibold">{bankDetails.accountNumberMasked}</p>
-                            <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={(e) => { e.stopPropagation(); handleCopy(bankDetails.accountNumber, 'Account Number'); }}>
-                              Copy
-                            </Button>
-                          </div>
-                          <div className="bg-background rounded-lg p-2">
-                            <p className="text-muted-foreground">IFSC Code</p>
-                            <p className="font-mono font-semibold">{bankDetails.ifscMasked}</p>
-                            <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={(e) => { e.stopPropagation(); handleCopy(bankDetails.ifsc, 'IFSC Code'); }}>
-                              Copy
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="text-xs text-muted-foreground bg-muted/50 rounded p-2">
-                          <strong>Bank:</strong> {bankDetails.bankName} • <strong>Branch:</strong> {bankDetails.branchName}
-                        </div>
+                        {psLoading ? (
+                          <div className="flex items-center justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+                        ) : (
+                          <>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div className="bg-background rounded-lg p-2">
+                                <p className="text-muted-foreground">Account Number</p>
+                                <p className="font-mono font-semibold">{maskAccountNumber(ps.account_number)}</p>
+                                <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={handleCopyField(ps.account_number, 'Account Number')}>
+                                  Copy
+                                </Button>
+                              </div>
+                              <div className="bg-background rounded-lg p-2">
+                                <p className="text-muted-foreground">IFSC Code</p>
+                                <p className="font-mono font-semibold">{maskIfsc(ps.ifsc_code)}</p>
+                                <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={handleCopyField(ps.ifsc_code, 'IFSC Code')}>
+                                  Copy
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="text-xs text-muted-foreground bg-muted/50 rounded p-2">
+                              <strong>Bank:</strong> {ps.bank_name} • <strong>Branch:</strong> {ps.branch_name} • <strong>A/C Name:</strong> {ps.account_name}
+                            </div>
+                          </>
+                        )}
                         <Input
-                          placeholder="Enter UTR / Transaction Reference"
+                          placeholder="UTR / Transaction Reference (required)"
                           value={transactionRef}
                           onChange={(e) => setTransactionRef(e.target.value)}
                           onClick={(e) => e.stopPropagation()}
@@ -610,9 +620,14 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
                     </div>
                     {payMethod === 'remit' && (
                       <div className="px-3 pb-3 space-y-2 border-t border-border pt-3">
-                        <p className="text-xs text-muted-foreground">Send to Indian Bank Account (same details as Bank Transfer)</p>
+                        <p className="text-xs text-muted-foreground">{psLoading ? 'Loading...' : ps.remitly_note}</p>
+                        {!psLoading && (
+                          <div className="text-xs text-muted-foreground bg-muted/50 rounded p-2">
+                            <strong>Bank:</strong> {ps.bank_name} • <strong>A/C:</strong> {maskAccountNumber(ps.account_number)} • <strong>IFSC:</strong> {maskIfsc(ps.ifsc_code)}
+                          </div>
+                        )}
                         <Input
-                          placeholder="Enter Transfer Reference"
+                          placeholder="Transfer Reference (required)"
                           value={transactionRef}
                           onChange={(e) => setTransactionRef(e.target.value)}
                           onClick={(e) => e.stopPropagation()}
@@ -639,18 +654,22 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
                     </div>
                     {payMethod === 'crypto' && (
                       <div className="px-3 pb-3 space-y-2 border-t border-border pt-3">
-                        <div className="bg-background rounded-lg p-2 flex items-center justify-between">
-                          <div>
-                            <p className="text-xs text-muted-foreground">Binance Pay ID</p>
-                            <p className="font-mono font-semibold text-sm">{cryptoDetails.binanceIdMasked}</p>
+                        {psLoading ? (
+                          <div className="flex items-center justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+                        ) : (
+                          <div className="bg-background rounded-lg p-2 flex items-center justify-between">
+                            <div>
+                              <p className="text-xs text-muted-foreground">Binance Pay ID</p>
+                              <p className="font-mono font-semibold text-sm">{maskBinance(ps.binance_pay_id)}</p>
+                            </div>
+                            <Button variant="outline" size="sm" className="gap-1.5" onClick={handleCopyField(ps.binance_pay_id, 'Binance Pay ID')}>
+                              <Copy className="h-3 w-3" /> Copy
+                            </Button>
                           </div>
-                          <Button variant="outline" size="sm" className="gap-1.5" onClick={(e) => { e.stopPropagation(); handleCopy(cryptoDetails.binanceId, 'Binance Pay ID'); }}>
-                            <Copy className="h-3 w-3" /> Copy
-                          </Button>
-                        </div>
+                        )}
                         <p className="text-xs text-muted-foreground">Supported: USDT (TRC20 recommended), BTC, BEP20</p>
                         <Input
-                          placeholder="Enter Txn Hash / Binance Order ID"
+                          placeholder="Txn Hash / Binance Order ID (required)"
                           value={transactionRef}
                           onChange={(e) => setTransactionRef(e.target.value)}
                           onClick={(e) => e.stopPropagation()}
