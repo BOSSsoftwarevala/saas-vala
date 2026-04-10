@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react-swc";
 import path from "node:path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
+import { compression } from "vite-plugin-compression2";
 
 // SaaS VALA — Production Build Config (v4)
 export default defineConfig(({ mode }) => {
@@ -20,6 +21,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       ...(isDev ? [componentTagger()] : []),
+      compression({ algorithm: "gzip", exclude: [/\.map$/], threshold: 10 * 1024 }),
       VitePWA({
         registerType: "autoUpdate",
         includeAssets: ["favicon.png", "favicon.ico", "softwarevala-logo.png"],
@@ -28,6 +30,23 @@ export default defineConfig(({ mode }) => {
           globPatterns: ["**/*.{js,css,html,ico,png,svg,jpg,jpeg,woff,woff2}"],
           navigateFallbackDenylist: [/^\/~oauth/],
           runtimeCaching: [
+            {
+              urlPattern: /^https:\/\/[^/]+\/functions\/v1\/api-gateway\/.*/i,
+              handler: "NetworkFirst",
+              options: {
+                cacheName: "api-gateway-cache",
+                networkTimeoutSeconds: 4,
+                expiration: { maxEntries: 100, maxAgeSeconds: 60 * 5 },
+              },
+            },
+            {
+              urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
+              handler: "StaleWhileRevalidate",
+              options: {
+                cacheName: "google-fonts-cache",
+                expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              },
+            },
             {
               urlPattern: /^https:\/\/images\.unsplash\.com\/.*/i,
               handler: "CacheFirst",
@@ -64,6 +83,11 @@ export default defineConfig(({ mode }) => {
     },
 
     build: {
+      target: "es2020",
+      cssCodeSplit: true,
+      sourcemap: false,
+      minify: "esbuild",
+      reportCompressedSize: true,
       rollupOptions: {
         output: {
           manualChunks(id) {
@@ -75,6 +99,7 @@ export default defineConfig(({ mode }) => {
             if (id.includes("recharts") || id.includes("d3-")) return "vendor-charts";
             if (id.includes("date-fns")) return "vendor-date";
             if (id.includes("lucide-react")) return "vendor-icons";
+            if (id.includes("framer-motion")) return "vendor-motion";
           },
         },
       },

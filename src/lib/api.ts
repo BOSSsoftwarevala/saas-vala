@@ -8,7 +8,20 @@ const API_TIMEOUT_MS = 30_000;
 /** Maximum retry attempts for transient server errors (5xx). */
 const MAX_RETRIES = 3;
 
+/** Cache auth headers briefly to reduce frequent session lookups. */
+const AUTH_HEADERS_CACHE_MS = 10_000;
+let authHeadersCache: { expiresAt: number; headers: Record<string, string> } | null = null;
+
+/** Small in-memory GET cache to smooth rapid navigations/repeated reads. */
+const GET_RESPONSE_CACHE_MS = 5_000;
+const getResponseCache = new Map<string, { expiresAt: number; data: unknown }>();
+const inFlightGetRequests = new Map<string, Promise<unknown>>();
+
 async function getAuthHeaders(): Promise<Record<string, string>> {
+  if (authHeadersCache && Date.now() < authHeadersCache.expiresAt) {
+    return { ...authHeadersCache.headers };
+  }
+
   const { data: { session } } = await supabase.auth.getSession();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -17,6 +30,10 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   if (session?.access_token) {
     headers['Authorization'] = `Bearer ${session.access_token}`;
   }
+  authHeadersCache = {
+    expiresAt: Date.now() + AUTH_HEADERS_CACHE_MS,
+    headers,
+  };
   return headers;
 }
 
@@ -37,6 +54,22 @@ async function apiCall<T = any>(
   body?: any,
   options: ApiCallOptions = {}
 ): Promise<T> {
+  const isGet = method === 'GET';
+  const cacheKey = isGet ? `${path}::${JSON.stringify(body || {})}` : '';
+
+  if (isGet) {
+    const cached = getResponseCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data as T;
+    }
+
+    const inFlight = inFlightGetRequests.get(cacheKey);
+    if (inFlight) {
+      return inFlight as Promise<T>;
+    }
+  }
+
+  const exec = async (): Promise<T> => {
   const timeoutMs = options.timeoutMs ?? API_TIMEOUT_MS;
   const isMutation = method === 'POST' || method === 'PUT' || method === 'PATCH';
 
@@ -98,7 +131,12 @@ async function apiCall<T = any>(
 
         throw new Error(errMsg);
       }
-
+      if (isGet) {
+        getResponseCache.set(cacheKey, {
+          expiresAt: Date.now() + GET_RESPONSE_CACHE_MS,
+          data,
+        });
+      }
       return data as T;
     } catch (err: any) {
       clearTimeout(timeoutId);
@@ -120,6 +158,19 @@ async function apiCall<T = any>(
   }
 
   throw lastError;
+  };
+
+  if (isGet) {
+    const request = exec();
+    inFlightGetRequests.set(cacheKey, request);
+    try {
+      return await request;
+    } finally {
+      inFlightGetRequests.delete(cacheKey);
+    }
+  }
+
+  return exec();
 }
 
 // ===================== AUTH =====================

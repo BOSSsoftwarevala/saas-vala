@@ -74,7 +74,21 @@ const OfflineAppTemplate = React.lazy(() => import("./pages/OfflineAppTemplate")
 const MarketplaceAdmin = React.lazy(() => import("./pages/MarketplaceAdmin"));
 const Support = React.lazy(() => import("./pages/Support"));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      gcTime: 10 * 60_000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+      retry: 2,
+      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
+    },
+    mutations: {
+      retry: 1,
+    },
+  },
+});
 
 function PageLoader() {
   return (
