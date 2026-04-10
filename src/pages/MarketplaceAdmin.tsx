@@ -487,42 +487,54 @@ export default function MarketplaceAdmin() {
   const fetchGateways = async () => {
     setGatewaysLoading(true);
     try {
-      const { data } = await db
+      const [{ data }, { data: legacyRows }] = await Promise.all([
+        db
         .from('payment_settings')
         .select('*')
         .eq('id', PAYMENT_SETTINGS_ID)
-        .maybeSingle();
+        .maybeSingle(),
+        db
+          .from('marketplace_payment_gateways')
+          .select('gateway_code, gateway_name, is_enabled, sort_order, config')
+          .in('gateway_code', ['razorpay', 'stripe', 'wallet'])
+          .order('sort_order', { ascending: true }),
+      ]);
 
       const settings = (data || {}) as Record<string, any>;
+      const legacyMap = new Map((legacyRows || []).map((r: any) => [String(r.gateway_code || '').toLowerCase(), r]));
+
+      const razorLegacy = legacyMap.get('razorpay');
+      const stripeLegacy = legacyMap.get('stripe');
+      const walletLegacy = legacyMap.get('wallet');
 
       const rows: PaymentGateway[] = [
         {
           id: 'gateway-razorpay',
           gateway_code: 'razorpay',
           gateway_name: 'Razorpay',
-          is_enabled: Boolean(settings.razorpay_enabled),
+          is_enabled: settings.razorpay_enabled === undefined ? Boolean(razorLegacy?.is_enabled) : Boolean(settings.razorpay_enabled),
           sort_order: 1,
           config: {
-            key_id: settings.razorpay_key_id || '',
-            key_secret: settings.razorpay_key_secret || '',
+            key_id: settings.razorpay_key_id || String(razorLegacy?.config?.key_id || ''),
+            key_secret: settings.razorpay_key_secret || String(razorLegacy?.config?.key_secret || ''),
           },
         },
         {
           id: 'gateway-stripe',
           gateway_code: 'stripe',
           gateway_name: 'Stripe',
-          is_enabled: Boolean(settings.stripe_enabled),
+          is_enabled: settings.stripe_enabled === undefined ? Boolean(stripeLegacy?.is_enabled) : Boolean(settings.stripe_enabled),
           sort_order: 2,
           config: {
-            publishable_key: settings.stripe_publishable_key || '',
-            secret_key: settings.stripe_secret_key || '',
+            publishable_key: settings.stripe_publishable_key || String(stripeLegacy?.config?.publishable_key || ''),
+            secret_key: settings.stripe_secret_key || String(stripeLegacy?.config?.secret_key || ''),
           },
         },
         {
           id: 'gateway-wallet',
           gateway_code: 'wallet',
           gateway_name: 'Wallet',
-          is_enabled: settings.wallet_enabled !== false,
+          is_enabled: settings.wallet_enabled === undefined ? Boolean(walletLegacy?.is_enabled ?? true) : settings.wallet_enabled !== false,
           sort_order: 3,
           config: {},
         },
@@ -1609,7 +1621,16 @@ export default function MarketplaceAdmin() {
                           if (g.gateway_code === 'wallet') updates.wallet_enabled = checked;
                           const { error } = await db.from('payment_settings').update(updates).eq('id', PAYMENT_SETTINGS_ID);
                           if (error) {
-                            toast.error(error.message);
+                            const { error: legacyError } = await db
+                              .from('marketplace_payment_gateways')
+                              .update({ is_enabled: checked })
+                              .eq('gateway_code', g.gateway_code);
+                            if (legacyError) {
+                              toast.error(legacyError.message);
+                            } else {
+                              toast.success(`${g.gateway_name} ${checked ? 'enabled' : 'disabled'}`);
+                              fetchGateways();
+                            }
                           } else {
                             toast.success(`${g.gateway_name} ${checked ? 'enabled' : 'disabled'}`);
                             fetchGateways();
