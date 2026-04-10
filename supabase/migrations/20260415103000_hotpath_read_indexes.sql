@@ -8,9 +8,19 @@ CREATE INDEX IF NOT EXISTS idx_products_visible_status_created_at
   ON public.products (status, created_at DESC)
   WHERE marketplace_visible = true;
 
-CREATE INDEX IF NOT EXISTS idx_products_marketplace_business_type
-  ON public.products (business_type)
-  WHERE marketplace_visible = true;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'products'
+      AND column_name = 'business_type'
+  ) THEN
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_products_marketplace_business_type ON public.products (business_type) WHERE marketplace_visible = true';
+  END IF;
+END
+$$;
 
 CREATE INDEX IF NOT EXISTS idx_orders_user_created_at
   ON public.orders (user_id, created_at DESC);

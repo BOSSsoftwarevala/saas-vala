@@ -64,6 +64,10 @@ CREATE TABLE IF NOT EXISTS public.notifications (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+ALTER TABLE public.notifications
+  ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS read_at TIMESTAMPTZ;
+
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON public.notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON public.notifications(is_read);
 CREATE INDEX IF NOT EXISTS idx_notifications_type ON public.notifications(type);
