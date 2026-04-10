@@ -28,6 +28,12 @@ const ALLOWED_ACTIONS = new Set<RunAction>([
   'publish_marketplace',
 ])
 
+function hasAnyAiProvider(): boolean {
+  const openai = Boolean(String(Deno.env.get('OPENAI_API_KEY') || '').trim())
+  const openrouter = Boolean(String(Deno.env.get('OPENROUTER_API_KEY') || '').trim())
+  return openai || openrouter
+}
+
 function json(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), { status, headers: corsHeaders })
 }
@@ -90,6 +96,11 @@ async function checkRateLimit(admin: any, userId: string): Promise<{ ok: boolean
 async function createRun(admin: any, userId: string, payload: any) {
   const action = String(payload?.action || '').trim() as RunAction
   if (!ALLOWED_ACTIONS.has(action)) return { error: 'Invalid action' }
+
+  // Avoid queuing runs that are guaranteed to fail at planner/AI steps.
+  if (!hasAnyAiProvider()) {
+    return { error: 'No AI provider configured. Set OPENAI_API_KEY or OPENROUTER_API_KEY.' }
+  }
 
   const appNameRaw = String(payload?.app_name || '')
   const appName = sanitizeAppName(appNameRaw)
