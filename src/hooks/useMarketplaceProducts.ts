@@ -164,11 +164,17 @@ export function useMarketplaceProducts() {
 }
 
 // Lightweight hook for category-specific fetching (still uses SDK for performance)
-export function useProductsByCategory(categories: string[]) {
+export function useProductsByCategory(categories: string[], options?: { enabled?: boolean }) {
   const [products, setProducts] = useState<MarketplaceProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  const enabled = options?.enabled !== false;
 
   useEffect(() => {
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
+
     const fetchProducts = async () => {
       setLoading(true);
       const { data, error } = await supabase.from('products')
@@ -188,7 +194,7 @@ export function useProductsByCategory(categories: string[]) {
       setLoading(false);
     };
     fetchProducts();
-  }, [categories.join(',')]);
+  }, [categories.join(','), enabled]);
 
   return { products, loading };
 }

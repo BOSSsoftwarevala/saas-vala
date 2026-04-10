@@ -127,11 +127,14 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Build Project
-        run: npm run build
+      - name: Build Project + Bundle Budget Gate
+        run: npm run build:ci
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          BUNDLE_JS_GZIP_BUDGET_KB: 1100
+          BUNDLE_ENTRY_JS_GZIP_BUDGET_KB: 180
+          BUNDLE_CSS_GZIP_BUDGET_KB: 80
 
       - name: Check Build Output
         run: |

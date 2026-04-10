@@ -15,7 +15,8 @@ interface Props {
 }
 
 export const MarketplaceCategoryRow = React.forwardRef<HTMLElement, Props>(function MarketplaceCategoryRow({ category, onBuyNow, onDemo, filteredProducts, productsOverride }, ref) {
-  const { products, loading } = useProductsByCategory(category.keywords);
+  const shouldFetchCategoryProducts = productsOverride === undefined && filteredProducts === undefined;
+  const { products, loading } = useProductsByCategory(category.keywords, { enabled: shouldFetchCategoryProducts });
 
   const effectiveProducts = productsOverride !== undefined ? productsOverride : (filteredProducts !== undefined ? filteredProducts : products);
   const categoryLoading = productsOverride !== undefined ? false : loading;

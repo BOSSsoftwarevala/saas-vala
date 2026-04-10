@@ -8,7 +8,7 @@ import { SidebarProvider } from "@/hooks/useSidebarState";
 import { CartProvider } from '@/hooks/useCart';
 import { DashboardProvider } from '@/hooks/useDashboardStore';
 import { Loader2 } from 'lucide-react';
-import React, { Suspense } from 'react';
+import React, { Suspense, useEffect } from 'react';
 
 // Only eagerly load Auth
 import Auth from "./pages/Auth";
@@ -73,6 +73,17 @@ const ApkPipeline = React.lazy(() => import("./pages/ApkPipeline"));
 const OfflineAppTemplate = React.lazy(() => import("./pages/OfflineAppTemplate"));
 const MarketplaceAdmin = React.lazy(() => import("./pages/MarketplaceAdmin"));
 const Support = React.lazy(() => import("./pages/Support"));
+
+function preloadCriticalRoutes() {
+  return Promise.allSettled([
+    import('./pages/Marketplace'),
+    import('./pages/ProductDetail'),
+    import('./pages/Favorites'),
+    import('./pages/Orders'),
+    import('./pages/Dashboard'),
+    import('./pages/Support'),
+  ]);
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -235,24 +246,42 @@ function AppRoutes() {
   );
 }
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <DashboardProvider>
-            <CartProvider>
-              <SidebarProvider>
-                <AppRoutes />
-              </SidebarProvider>
-            </CartProvider>
-          </DashboardProvider>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  useEffect(() => {
+    const runner = () => {
+      void preloadCriticalRoutes();
+    };
+
+    const idleId = (window as any).requestIdleCallback?.(runner, { timeout: 1500 });
+    if (typeof idleId === 'number') {
+      return () => {
+        (window as any).cancelIdleCallback?.(idleId);
+      };
+    }
+
+    const timeoutId = window.setTimeout(runner, 1200);
+    return () => window.clearTimeout(timeoutId);
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <DashboardProvider>
+              <CartProvider>
+                <SidebarProvider>
+                  <AppRoutes />
+                </SidebarProvider>
+              </CartProvider>
+            </DashboardProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
