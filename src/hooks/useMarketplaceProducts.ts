@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { marketplaceApi } from '@/lib/api';
 import { supabase } from '@/integrations/supabase/client';
 import { cachedFetch } from '@/lib/cache';
 
@@ -118,14 +117,43 @@ export function useMarketplaceProducts() {
   const [products, setProducts] = useState<MarketplaceProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchProducts = async () => {
+  const fetchAllVisibleProducts = async () => {
+    const pageSize = 500;
+    let from = 0;
+    const all: any[] = [];
+
+    while (true) {
+      const to = from + pageSize - 1;
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, slug, description, short_description, price, status, features, thumbnail_url, git_repo_url, marketplace_visible, apk_url, demo_url, demo_login, demo_password, demo_enabled, featured, trending, business_type, deploy_status, discount_percent, rating, tags, apk_enabled, license_enabled, buy_enabled, created_at')
+        .eq('marketplace_visible', true)
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      if (error) {
+        throw error;
+      }
+
+      const rows = data || [];
+      all.push(...rows);
+      if (rows.length < pageSize) break;
+      from += pageSize;
+    }
+
+    return all;
+  };
+
+  const fetchProducts = async (forceLive = false) => {
     setLoading(true);
     try {
-      const data = await cachedFetch(
-        'marketplace:products:all',
-        () => marketplaceApi.products().then(r => r.data || []),
-        60_000,
-      );
+      const data = forceLive
+        ? await fetchAllVisibleProducts()
+        : await cachedFetch(
+            'marketplace:products:all',
+            () => fetchAllVisibleProducts(),
+            60_000,
+          );
       const mapped = (data as any[]).map((p: any, i: number) => mapDbProduct(p, i));
       setProducts(prioritizeProducts(mapped));
     } catch (e) {
@@ -137,9 +165,24 @@ export function useMarketplaceProducts() {
 
   useEffect(() => {
     fetchProducts();
-    const handler = () => fetchProducts();
+    const handler = () => fetchProducts(true);
     window.addEventListener('marketplaceRefresh', handler);
-    return () => window.removeEventListener('marketplaceRefresh', handler);
+
+    const channel = supabase
+      .channel('marketplace-products-live')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'products' },
+        () => {
+          void fetchProducts(true);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      window.removeEventListener('marketplaceRefresh', handler);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const dbRow1 = products.slice(0, 30);
@@ -177,11 +220,35 @@ export function useProductsByCategory(categories: string[], options?: { enabled?
 
     const fetchProducts = async () => {
       setLoading(true);
-      const { data, error } = await supabase.from('products')
-        .select('id, name, slug, description, short_description, price, status, features, thumbnail_url, git_repo_url, marketplace_visible, apk_url, demo_url, demo_login, demo_password, demo_enabled, featured, trending, business_type, deploy_status, discount_percent, rating, tags, apk_enabled, license_enabled')
-        .eq('marketplace_visible', true).order('created_at', { ascending: false }).limit(500);
-      if (error) { setProducts([]); } else {
-        const mapped = (data || []).map((p, i) => mapDbProduct(p, i));
+      const pageSize = 500;
+      let from = 0;
+      const allRows: any[] = [];
+      let error: any = null;
+
+      while (true) {
+        const to = from + pageSize - 1;
+        const res = await supabase
+          .from('products')
+          .select('id, name, slug, description, short_description, price, status, features, thumbnail_url, git_repo_url, marketplace_visible, apk_url, demo_url, demo_login, demo_password, demo_enabled, featured, trending, business_type, deploy_status, discount_percent, rating, tags, apk_enabled, license_enabled, buy_enabled, created_at')
+          .eq('marketplace_visible', true)
+          .order('created_at', { ascending: false })
+          .range(from, to);
+
+        if (res.error) {
+          error = res.error;
+          break;
+        }
+
+        const rows = res.data || [];
+        allRows.push(...rows);
+        if (rows.length < pageSize) break;
+        from += pageSize;
+      }
+
+      if (error) {
+        setProducts([]);
+      } else {
+        const mapped = allRows.map((p, i) => mapDbProduct(p, i));
         const filtered = prioritizeProducts(
           mapped.filter(p => {
             const bt = (p.businessType || '').toLowerCase();

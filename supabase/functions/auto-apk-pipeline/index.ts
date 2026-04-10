@@ -74,6 +74,15 @@ function extractRepoSlug(input: string): string {
   return parts[parts.length - 1] || "";
 }
 
+function versionCodeFromVersion(version: string): string {
+  const cleaned = String(version || '1.0.0').trim();
+  const parts = cleaned.split('.').map((p) => Number(p.replace(/[^0-9]/g, '') || 0));
+  const major = Math.min(999, parts[0] || 1);
+  const minor = Math.min(99, parts[1] || 0);
+  const patch = Math.min(99, parts[2] || 0);
+  return String(major * 10000 + minor * 100 + patch);
+}
+
 async function fetchLatestCommitSha(githubToken: string, slug: string): Promise<string> {
   const res = await fetch(`https://api.github.com/repos/saasvala/${slug}/commits?per_page=1`, {
     headers: { Authorization: `Bearer ${githubToken}`, "User-Agent": "SaaSVala-APK-Pipeline" },
@@ -242,7 +251,7 @@ Deno.serve(async (req) => {
       // FUNCTION 2: Trigger APK build via VPS factory
       // ═══════════════════════════════════════════
       case "trigger_apk_build": {
-        const { catalog_id, slug, repo_url, product_id } = data || {};
+        const { catalog_id, slug, repo_url, product_id, output_version } = data || {};
         if (!slug) return respond({ error: "slug required" }, 400);
 
         const githubToken = Deno.env.get("SAASVALA_GITHUB_TOKEN");
@@ -282,30 +291,20 @@ Deno.serve(async (req) => {
 
           const repoData = await repoCheck.json();
 
-          // Trigger GitHub Actions workflow dispatch via apk-factory repo
-          const dispatchRes = await fetch(
-            "https://api.github.com/repos/saasvala/apk-factory/actions/workflows/build-apk.yml/dispatches",
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${githubToken}`,
-                "User-Agent": "SaaSVala-APK-Pipeline",
-                "Content-Type": "application/json",
+          const { data: factoryResult, error: factoryError } = await admin.functions.invoke("apk-factory", {
+            body: {
+              action: "trigger_build",
+              data: {
+                slug,
+                repo_url: repoData.html_url || repoFullUrl,
+                product_id: product_id || "",
+                output_version: String(output_version || '1.0.0'),
+                version_code: versionCodeFromVersion(String(output_version || '1.0.0')),
               },
-              body: JSON.stringify({
-                ref: "main",
-                inputs: {
-                  repo_url: repoData.html_url || repoFullUrl,
-                  app_slug: slug,
-                  package_name: `com.saasvala.${slug.replace(/-/g, "_")}`,
-                  product_id: product_id || "",
-                  supabase_url: supabaseUrl,
-                },
-              }),
-            }
-          );
+            },
+          });
 
-          if (dispatchRes.ok || dispatchRes.status === 204) {
+          if (!factoryError && factoryResult?.success) {
             // Upsert to build queue
             await admin.from("apk_build_queue").upsert(
               {
@@ -325,7 +324,7 @@ Deno.serve(async (req) => {
             buildResult.repo_verified = true;
             buildResult.language = repoData.language;
           } else {
-            const errText = await dispatchRes.text();
+            const errText = String(factoryError?.message || factoryResult?.error || factoryResult?.message || '').trim();
             // Fallback: queue without Actions
             await admin.from("apk_build_queue").upsert(
               {
@@ -340,7 +339,7 @@ Deno.serve(async (req) => {
             );
 
             buildResult.status = "queued";
-            buildResult.message = `Repo verified, queued for build (Actions dispatch: ${dispatchRes.status})`;
+            buildResult.message = `Repo verified, queued for build${errText ? ` (${errText.slice(0, 160)})` : ''}`;
             buildResult.repo_verified = true;
           }
         } catch (e: any) {
@@ -977,7 +976,7 @@ Deno.serve(async (req) => {
           // Step 3: Check build queue for completed builds
           const { data: existingBuild } = await admin
             .from("apk_build_queue")
-            .select("id, build_status, apk_file_path")
+            .select("id, build_status, apk_file_path, output_version")
             .eq("slug", slug)
             .single();
 
@@ -1034,36 +1033,28 @@ Deno.serve(async (req) => {
                   }).eq("id", existingBuild.id);
                 }
 
-                // Actually trigger GitHub Actions build
+                // Trigger build through apk-factory for consistent dispatch handling
                 try {
-                  const dispatchRes = await fetch(
-                    "https://api.github.com/repos/saasvala/apk-factory/actions/workflows/build-apk.yml/dispatches",
-                    {
-                      method: "POST",
-                      headers: {
-                        Authorization: `Bearer ${githubToken}`,
-                        "User-Agent": "SaaSVala-APK-Pipeline",
-                        "Content-Type": "application/json",
+                  const outputVersion = String((existingBuild as any)?.output_version || '1.0.0');
+                  const { data: factoryResult, error: factoryError } = await admin.functions.invoke("apk-factory", {
+                    body: {
+                      action: "trigger_build",
+                      data: {
+                        slug,
+                        repo_url: repoUrl,
+                        product_id: product.id || "",
+                        output_version: outputVersion,
+                        version_code: versionCodeFromVersion(outputVersion),
                       },
-                      body: JSON.stringify({
-                        ref: "main",
-                        inputs: {
-                          repo_url: repoUrl,
-                          app_slug: slug,
-                          package_name: `com.saasvala.${slug.replace(/-/g, "_")}`,
-                          product_id: product.id || "",
-                          supabase_url: supabaseUrl,
-                        },
-                      }),
-                    }
-                  );
+                    },
+                  });
 
-                  if (dispatchRes.ok || dispatchRes.status === 204) {
+                  if (!factoryError && factoryResult?.success) {
                     results.push({ id: product.id, slug, status: "building", repo_verified: true });
                   } else {
-                    const errText = await dispatchRes.text();
-                    console.error(`[APK Pipeline] GitHub Actions dispatch failed for ${slug}: ${errText}`);
-                    results.push({ id: product.id, slug, status: "queued", reason: `dispatch failed: ${dispatchRes.status}` });
+                    const errText = String(factoryError?.message || factoryResult?.error || factoryResult?.message || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+                    console.error(`[APK Pipeline] build trigger failed for ${slug}: ${errText}`);
+                    results.push({ id: product.id, slug, status: "queued", reason: `trigger failed${errText ? ` - ${errText}` : ''}` });
                   }
                 } catch (dispatchErr: any) {
                   console.error(`[APK Pipeline] Dispatch error for ${slug}:`, dispatchErr.message);

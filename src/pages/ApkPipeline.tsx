@@ -43,13 +43,29 @@ export default function ApkPipeline() {
 
   const fetchBuilds = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from('apk_build_queue')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(100);
+    const pageSize = 500;
+    let from = 0;
+    const allRows: BuildItem[] = [];
 
-    const items = (data || []) as BuildItem[];
+    while (true) {
+      const to = from + pageSize - 1;
+      const { data, error } = await supabase
+        .from('apk_build_queue')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      if (error) {
+        break;
+      }
+
+      const rows = (data || []) as BuildItem[];
+      allRows.push(...rows);
+      if (rows.length < pageSize) break;
+      from += pageSize;
+    }
+
+    const items = allRows;
     setBuilds(items);
     setStats({
       total: items.length,
@@ -64,6 +80,19 @@ export default function ApkPipeline() {
 
   useEffect(() => { fetchBuilds(); }, [fetchBuilds]);
 
+  useEffect(() => {
+    const channel = supabase
+      .channel('apk-build-queue-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'apk_build_queue' }, () => {
+        void fetchBuilds();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchBuilds]);
+
   const scanRepos = async () => {
     setScanning(true);
     try {
@@ -72,7 +101,7 @@ export default function ApkPipeline() {
         .from('source_code_catalog')
         .select('slug, project_name, github_repo_url, target_industry')
         .not('slug', 'is', null)
-        .limit(500);
+        .order('created_at', { ascending: false });
 
       if (!catalog?.length) {
         toast.info('No repositories found in catalog');

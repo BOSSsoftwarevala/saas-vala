@@ -86,8 +86,7 @@ export default function Marketplace() {
           const category = (product.category || '').toLowerCase();
           const businessType = (product.businessType || '').toLowerCase();
           return lowered.some((keyword) => category.includes(keyword) || businessType.includes(keyword));
-        })
-        .slice(0, 10);
+        });
     },
     [activeProducts]
   );

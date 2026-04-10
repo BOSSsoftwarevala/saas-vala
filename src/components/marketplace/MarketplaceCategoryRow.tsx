@@ -17,10 +17,34 @@ interface Props {
 export const MarketplaceCategoryRow = React.forwardRef<HTMLElement, Props>(function MarketplaceCategoryRow({ category, onBuyNow, onDemo, filteredProducts, productsOverride }, ref) {
   const shouldFetchCategoryProducts = productsOverride === undefined && filteredProducts === undefined;
   const { products, loading } = useProductsByCategory(category.keywords, { enabled: shouldFetchCategoryProducts });
+  const [visibleCount, setVisibleCount] = React.useState(24);
+  const loadMoreRef = React.useRef<HTMLDivElement | null>(null);
 
   const effectiveProducts = productsOverride !== undefined ? productsOverride : (filteredProducts !== undefined ? filteredProducts : products);
   const categoryLoading = productsOverride !== undefined ? false : loading;
-  const displayProducts = effectiveProducts.slice(0, 10);
+  const displayProducts = effectiveProducts.slice(0, visibleCount);
+
+  React.useEffect(() => {
+    setVisibleCount(24);
+  }, [category.id, effectiveProducts.length]);
+
+  React.useEffect(() => {
+    const sentinel = loadMoreRef.current;
+    if (!sentinel) return;
+    if (visibleCount >= effectiveProducts.length) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisibleCount((prev) => Math.min(prev + 24, effectiveProducts.length));
+        }
+      },
+      { rootMargin: '240px' }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [visibleCount, effectiveProducts.length]);
 
   if (!categoryLoading && displayProducts.length === 0) {
     return (
@@ -62,6 +86,7 @@ export const MarketplaceCategoryRow = React.forwardRef<HTMLElement, Props>(funct
           />
         ))}
       </SectionSlider>
+      <div ref={loadMoreRef} className="h-2 w-full" aria-hidden="true" />
     </section>
   );
 });

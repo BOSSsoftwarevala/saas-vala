@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
       }
 
       case "trigger_build": {
-        const { slug, repo_url, product_id, conversion_type, output_platform, source_kind, source_bucket_path, source_repo_url, output_version } = data || {};
+        const { slug, repo_url, product_id, conversion_type, output_platform, source_kind, source_bucket_path, source_repo_url, output_version, version_code } = data || {};
         if (!slug) return respond({ error: "slug required" }, 400);
 
         const targetRepo = repo_url || `https://github.com/saasvala/${slug}`;
@@ -153,6 +153,7 @@ Deno.serve(async (req) => {
                   source_bucket_path: source_bucket_path || "",
                   source_repo_url: source_repo_url || targetRepo,
                   output_version: output_version || "1.0.0",
+                  version_code: version_code || "1",
             },
           }),
         });
@@ -295,7 +296,7 @@ Deno.serve(async (req) => {
         if (!targetSlugs.length) {
           const { data: pending } = await admin
             .from("apk_build_queue")
-            .select("slug, repo_url, product_id")
+            .select("slug, repo_url, product_id, output_version")
             .eq("build_status", "pending")
             .order("created_at", { ascending: true })
             .limit(limit || 5);
@@ -309,6 +310,9 @@ Deno.serve(async (req) => {
           const slug = typeof item === "string" ? item : item.slug;
           const repoUrl = typeof item === "string" ? `https://github.com/saasvala/${item}` : item.repo_url;
           const productId = typeof item === "string" ? "" : item.product_id || "";
+          const outputVersion = typeof item === "string" ? "1.0.0" : item.output_version || "1.0.0";
+          const parts = String(outputVersion).split('.').map((p: string) => Number(p.replace(/[^0-9]/g, '') || 0));
+          const versionCode = String((Math.min(999, parts[0] || 1) * 10000) + (Math.min(99, parts[1] || 0) * 100) + Math.min(99, parts[2] || 0));
 
           try {
             const dispatchRes = await gh("/repos/saasvala/apk-factory/actions/workflows/build-apk.yml/dispatches", {
@@ -320,6 +324,8 @@ Deno.serve(async (req) => {
                   app_slug: slug,
                   package_name: `com.saasvala.${slug.replace(/-/g, "_")}`,
                   product_id: productId,
+                  output_version: outputVersion,
+                  version_code: versionCode,
                 },
               }),
             });
@@ -421,6 +427,14 @@ function getWorkflowYaml(): string {
     "        description: 'Product ID in database'",
     '        required: false',
     "        default: ''",
+    '      output_version:',
+    "        description: 'Release version name (e.g. 1.2.3)'",
+    '        required: false',
+    "        default: '1.0.0'",
+    '      version_code:',
+    "        description: 'Android versionCode (integer)'",
+    '        required: false',
+    "        default: '1'",
     '',
     'jobs:',
     '  build:',
@@ -457,7 +471,10 @@ function getWorkflowYaml(): string {
     '          cd target-app',
     '          if [ -f "package.json" ]; then',
     '            npm install --legacy-peer-deps 2>/dev/null || npm install --force 2>/dev/null || echo "install done"',
-    '            npm run build 2>/dev/null || npx vite build 2>/dev/null || echo "no build step"',
+    '            npm run build 2>/dev/null || npx vite build 2>/dev/null',
+    '          else',
+    '            echo "package.json missing - cannot build real app"',
+    '            exit 1',
     '          fi',
     '          if [ -d "dist" ]; then',
     '            echo "WEBDIR=dist" >> $GITHUB_ENV',
@@ -466,9 +483,8 @@ function getWorkflowYaml(): string {
     '          elif [ -d "public" ]; then',
     '            echo "WEBDIR=public" >> $GITHUB_ENV',
     '          else',
-    '            mkdir -p dist',
-    '            echo "<!DOCTYPE html><html><head><title>${{ github.event.inputs.app_slug }}</title></head><body><h1>${{ github.event.inputs.app_slug }}</h1></body></html>" > dist/index.html',
-    '            echo "WEBDIR=dist" >> $GITHUB_ENV',
+    '            echo "No real web build output found (dist/build/public missing)"',
+    '            exit 1',
     '          fi',
     '',
     '      - name: Setup Capacitor',
@@ -484,13 +500,43 @@ function getWorkflowYaml(): string {
     '          cat capacitor.config.json',
     '          npx cap add android 2>/dev/null || true',
     '          npx cap sync android',
+
+    '      - name: Configure release signing and versioning',
+    '        env:',
+    '          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}',
+    '          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}',
+    '          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}',
+    '          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}',
+    '        run: |',
+    '          cd target-app/android',
+    '          if [ -z "${ANDROID_KEYSTORE_BASE64}" ] || [ -z "${ANDROID_KEYSTORE_PASSWORD}" ] || [ -z "${ANDROID_KEY_ALIAS}" ] || [ -z "${ANDROID_KEY_PASSWORD}" ]; then',
+    '            echo "Signing secrets missing. Configure ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD"',
+    '            exit 1',
+    '          fi',
+    '          echo "${ANDROID_KEYSTORE_BASE64}" | base64 -d > "$RUNNER_TEMP/release.keystore"',
+    '          echo "KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> $GITHUB_ENV',
+    '          echo "KEYSTORE_PASSWORD=${ANDROID_KEYSTORE_PASSWORD}" >> $GITHUB_ENV',
+    '          echo "KEY_ALIAS=${ANDROID_KEY_ALIAS}" >> $GITHUB_ENV',
+    '          echo "KEY_PASSWORD=${ANDROID_KEY_PASSWORD}" >> $GITHUB_ENV',
+    '          if [ -f "app/build.gradle" ]; then',
+    '            sed -i "s/versionCode [0-9]\+/versionCode ${{ github.event.inputs.version_code }}/" app/build.gradle || true',
+    '            sed -i "s/versionName \"[^\"]*\"/versionName \"${{ github.event.inputs.output_version }}\"/" app/build.gradle || true',
+    '          elif [ -f "app/build.gradle.kts" ]; then',
+    '            sed -i "s/versionCode = [0-9]\+/versionCode = ${{ github.event.inputs.version_code }}/" app/build.gradle.kts || true',
+    '            sed -i "s/versionName = \"[^\"]*\"/versionName = \"${{ github.event.inputs.output_version }}\"/" app/build.gradle.kts || true',
+    '          fi',
     '',
     '      - name: Build APK',
     '        run: |',
     '          cd target-app/android',
     '          chmod +x gradlew',
-    '          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tail -50',
-    '          APK_FILE=$(find . -name "*.apk" -type f | head -1)',
+    '          ./gradlew assembleRelease --no-daemon --stacktrace \\',
+    '            -Pandroid.injected.signing.store.file="$KEYSTORE_PATH" \\',
+    '            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \\',
+    '            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \\',
+    '            -Pandroid.injected.signing.key.password="$KEY_PASSWORD" \\',
+    '            2>&1 | tail -80',
+    '          APK_FILE=$(find app/build/outputs/apk/release -name "*.apk" -type f | head -1)',
     '          if [ -n "$APK_FILE" ]; then',
     '            mkdir -p /tmp/apk-out',
     '            cp "$APK_FILE" "/tmp/apk-out/${{ github.event.inputs.app_slug }}.apk"',
@@ -539,7 +585,7 @@ function getWorkflowYaml(): string {
     '          SB_URL: ${{ secrets.SUPABASE_URL }}',
     '          SB_ANON: ${{ secrets.SUPABASE_ANON_KEY }}',
     '        run: |',
-    '          if [ "${{ env.APK_BUILT }}" = "true" ]; then',
+    '          if [ "${{ env.APK_BUILT }}" = "true" ] && [ "${{ env.UPLOAD_OK }}" = "true" ]; then',
     '            STATUS="success"',
     '          else',
     '            STATUS="failed"',
