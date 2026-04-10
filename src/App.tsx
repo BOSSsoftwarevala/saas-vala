@@ -4,9 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
-import { SidebarProvider } from "@/hooks/useSidebarState";
 import { CartProvider } from '@/hooks/useCart';
-import { DashboardProvider } from '@/hooks/useDashboardStore';
 import { Loader2 } from 'lucide-react';
 import React, { Suspense, useEffect } from 'react';
 
@@ -73,6 +71,7 @@ const ApkPipeline = React.lazy(() => import("./pages/ApkPipeline"));
 const OfflineAppTemplate = React.lazy(() => import("./pages/OfflineAppTemplate"));
 const MarketplaceAdmin = React.lazy(() => import("./pages/MarketplaceAdmin"));
 const Support = React.lazy(() => import("./pages/Support"));
+const ProtectedShellProviders = React.lazy(() => import('./components/layout/ProtectedShellProviders'));
 
 function preloadCriticalRoutes() {
   return Promise.allSettled([
@@ -113,7 +112,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return <PageLoader />;
   if (!user) return <Navigate to="/auth" replace />;
-  return <>{children}</>;
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <ProtectedShellProviders>{children}</ProtectedShellProviders>
+    </Suspense>
+  );
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
@@ -270,13 +273,9 @@ const App = () => {
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
-            <DashboardProvider>
-              <CartProvider>
-                <SidebarProvider>
-                  <AppRoutes />
-                </SidebarProvider>
-              </CartProvider>
-            </DashboardProvider>
+            <CartProvider>
+              <AppRoutes />
+            </CartProvider>
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
