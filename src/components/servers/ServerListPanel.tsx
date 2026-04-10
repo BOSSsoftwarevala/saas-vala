@@ -93,6 +93,17 @@ export function ServerListPanel() {
     fetchServers();
   }, []);
 
+  useEffect(() => {
+    if (!showManageModal) return;
+
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [showManageModal]);
+
   const fetchServers = async () => {
     try {
       const { data, error } = await supabase
@@ -553,13 +564,14 @@ export function ServerListPanel() {
       </Dialog>
 
       <Dialog open={showManageModal} onOpenChange={setShowManageModal}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-hidden p-0 flex flex-col">
+          <DialogHeader className="shrink-0 px-6 pt-6 pb-3 border-b border-border bg-background">
             <DialogTitle>Manage Server</DialogTitle>
             <DialogDescription>Edit, save, verify, or delete this server.</DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
+          <div className="flex-1 overflow-y-auto scroll-smooth px-6 py-4 min-h-0">
+            <div className="space-y-4">
             <div className="space-y-2">
               <Label className="text-xs font-medium">Server Name</Label>
               <Input value={editServer.name} onChange={(e) => setEditServer((prev) => ({ ...prev, name: e.target.value }))} />
@@ -615,9 +627,10 @@ export function ServerListPanel() {
                 onChange={(e) => setEditServer((prev) => ({ ...prev, agent_token: e.target.value }))}
               />
             </div>
+            </div>
           </div>
 
-          <div className="flex gap-2 pt-2">
+          <div className="shrink-0 px-6 py-4 border-t border-border bg-background flex gap-2">
             <Button variant="destructive" onClick={handleDeleteServer} disabled={saving} className="gap-2">
               <Trash2 className="h-4 w-4" />
               Delete
