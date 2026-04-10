@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { useDashboardStore } from '@/hooks/useDashboardStore';
+import { dashboardApi } from '@/lib/dashboardApi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Loader2, User, Building, Phone, Mail } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface ResellerApplicationFormProps {
   open: boolean;
@@ -22,7 +23,6 @@ interface ResellerApplicationFormProps {
 
 export function ResellerApplicationForm({ open, onOpenChange }: ResellerApplicationFormProps) {
   const { user } = useAuth();
-  const { submitResellerApplication } = useDashboardStore();
 
   const [formData, setFormData] = useState({
     name: user?.user_metadata?.full_name || '',
@@ -35,10 +35,16 @@ export function ResellerApplicationForm({ open, onOpenChange }: ResellerApplicat
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user?.id) {
+      toast.error('Please login first to submit reseller application');
+      return;
+    }
+
     setSubmitting(true);
 
     try {
-      await submitResellerApplication(formData);
+      await dashboardApi.submitResellerApplication(formData, user.id);
+      toast.success('Reseller application submitted successfully');
       onOpenChange(false);
       // Reset form
       setFormData({
@@ -47,8 +53,8 @@ export function ResellerApplicationForm({ open, onOpenChange }: ResellerApplicat
         phone: '',
         business_name: '',
       });
-    } catch (error) {
-      // Error is handled in the store
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to submit application');
     } finally {
       setSubmitting(false);
     }
