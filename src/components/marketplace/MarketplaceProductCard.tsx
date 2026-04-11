@@ -31,18 +31,21 @@ const catColors: Record<string, string> = {
   Marketing: '#e879f9', HR: '#818cf8', Logistics: '#facc15',
 };
 
-export const MarketplaceProductCard = React.memo(React.forwardRef<HTMLDivElement, MarketplaceProductCardProps>(function MarketplaceProductCard({
-  product, index = 0, onBuyNow, onDemo, rank,
-}, _ref) {
+const MarketplaceProductCard: React.FC<MarketplaceProductCardProps> = memo(({ product, index = 0, onBuyNow, onDemo, rank }) => {
+  const { user } = useAuth();
+  const { isInCart, toggleItem } = useCart();
+  const inCart = isInCart(product.id);
+
+  const isAdmin = user?.role === 'admin';
+  const isReseller = user?.role === 'reseller';
+  const isUser = user?.role === 'user' || !user?.role;
+
   const [favorited, setFavorited] = useState(false);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
   const [notified, setNotified] = useState(false);
   const [demoOpen, setDemoOpen] = useState(false);
   const [featuresOpen, setFeaturesOpen] = useState(false);
   const [downloadChecking, setDownloadChecking] = useState(false);
-  const { user } = useAuth();
-  const { isInCart, toggleItem } = useCart();
-  const inCart = isInCart(product.id);
 
   const isPipeline = !product.isAvailable || product.status === 'draft' || product.status === 'upcoming';
   const iconColor = catColors[product.category] || '#f97316';
@@ -271,9 +274,12 @@ export const MarketplaceProductCard = React.memo(React.forwardRef<HTMLDivElement
               <Button size="sm" className={cn('flex-1 h-8 text-[10px] font-bold rounded-lg', notified ? 'bg-emerald-600' : 'bg-amber-500 text-black hover:bg-amber-400')} onClick={handleNotifyMe}>
                 <Bell style={{ width: 12, height: 12 }} className="mr-1" />{notified ? 'NOTIFIED' : 'NOTIFY ME'}
               </Button>
-              <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={handleFavorite}>
-                <Heart style={{ width: 14, height: 14 }} className={favorited ? 'fill-pink-400 text-pink-400' : 'text-muted-foreground'} />
-              </Button>
+              {/* Role-based: Show favorite for all logged-in users */}
+              {user && (
+                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={handleFavorite}>
+                  <Heart style={{ width: 14, height: 14 }} className={favorited ? 'fill-pink-400 text-pink-400' : 'text-muted-foreground'} />
+                </Button>
+              )}
             </div>
           ) : (
             <>
@@ -284,12 +290,18 @@ export const MarketplaceProductCard = React.memo(React.forwardRef<HTMLDivElement
                     <Play style={{ width: 11, height: 11 }} className="mr-1" />{hasDemoAvailable ? 'DEMO' : 'N/A'}
                   </Button>
                 )}
-                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={handleFavorite}>
-                  <Heart style={{ width: 14, height: 14 }} className={favorited ? 'fill-pink-400 text-pink-400' : 'text-muted-foreground'} />
-                </Button>
-                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={handleAddToCart} disabled={!buyEnabled}>
-                  <ShoppingCart style={{ width: 14, height: 14 }} className={inCart ? 'text-primary' : 'text-muted-foreground'} />
-                </Button>
+                {/* Role-based: Show favorite for all logged-in users */}
+                {user && (
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={handleFavorite}>
+                    <Heart style={{ width: 14, height: 14 }} className={favorited ? 'fill-pink-400 text-pink-400' : 'text-muted-foreground'} />
+                  </Button>
+                )}
+                {/* Role-based: Show cart for users and resellers */}
+                {(isUser || isReseller) && (
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={handleAddToCart} disabled={!buyEnabled}>
+                    <ShoppingCart style={{ width: 14, height: 14 }} className={inCart ? 'text-primary' : 'text-muted-foreground'} />
+                  </Button>
+                )}
               </div>
               {/* BUY NOW BUTTON - Show only if buy_enabled is true */}
               {buyEnabled && (
