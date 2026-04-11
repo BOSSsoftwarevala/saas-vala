@@ -54,6 +54,7 @@ const AISoftwareFactory = React.lazy(() => import("./components/AISoftwareFactor
 const UltraAISoftwareFactory = React.lazy(() => import("./components/UltraAISoftwareFactory"));
 const WorldClassFactory = React.lazy(() => import("./components/WorldClassFactory"));
 const APKPipelineAdmin = React.lazy(() => import("./components/APKPipelineAdmin"));
+const UltraAPKPipelineAdmin = React.lazy(() => import("./components/UltraAPKPipelineAdmin"));
 const SaasAiDashboard = React.lazy(() => import("./pages/SaasAiDashboard"));
 const AiApis = React.lazy(() => import("./pages/AiApis"));
 const Wallet = React.lazy(() => import("./pages/Wallet"));
@@ -291,6 +292,7 @@ function AppRoutes() {
         <Route path="/ultra-factory" element={<ProtectedRoute><LazyWrapper><UltraAISoftwareFactory /></LazyWrapper></ProtectedRoute>} />
         <Route path="/world-class-factory" element={<ProtectedRoute><LazyWrapper><WorldClassFactory /></LazyWrapper></ProtectedRoute>} />
         <Route path="/apk-pipeline" element={<ProtectedRoute><AdminRoute><LazyWrapper><APKPipelineAdmin /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/ultra-apk-pipeline" element={<ProtectedRoute><AdminRoute><LazyWrapper><UltraAPKPipelineAdmin /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         <Route path="/ai-chat" element={<ProtectedRoute><LazyWrapper><AiChat /></LazyWrapper></ProtectedRoute>} />
         <Route path="/saas-ai-dashboard" element={<ProtectedRoute><LazyWrapper><SaasAiDashboard /></LazyWrapper></ProtectedRoute>} />
         <Route path="/saas-ai" element={<ProtectedRoute><LazyWrapper><SaasAiDashboard /></LazyWrapper></ProtectedRoute>} />
