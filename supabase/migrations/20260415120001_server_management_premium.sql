@@ -24,8 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_server_metrics_server_time
   ON public.server_metrics(server_id, recorded_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_server_metrics_recent
-  ON public.server_metrics(recorded_at DESC)
-  WHERE recorded_at > now() - interval '24 hours';
+  ON public.server_metrics(recorded_at DESC);
 
 -- 2) Server SSH Credentials (Secure agent communication)
 CREATE TABLE IF NOT EXISTS public.server_ssh_keys (
