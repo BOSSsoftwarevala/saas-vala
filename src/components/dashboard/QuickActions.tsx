@@ -67,50 +67,138 @@ const itemVariants = {
 };
 
 export function QuickActions() {
-  const handleActionClick = (action: typeof actions[0]) => {
-    console.log('Quick action clicked:', action.label, 'navigating to:', action.href);
-    // Simple direct navigation
-    window.location.href = action.href;
+  const handleProductClick = () => {
+    console.log('Add Product clicked');
+    window.location.href = '/products/create';
   };
 
-  // Test function to verify all actions work
-  const testAllActions = () => {
-    console.log('Testing all quick actions...');
-    actions.forEach((action, index) => {
-      setTimeout(() => {
-        console.log(`Testing action ${index + 1}: ${action.label} -> ${action.href}`);
-        toast.info(`Test: ${action.label} -> ${action.href}`, { duration: 2000 });
-      }, index * 1000);
-    });
+  const handleKeyClick = () => {
+    console.log('Generate Key clicked');
+    window.location.href = '/keys';
+  };
+
+  const handleApkClick = () => {
+    console.log('Upload APK clicked');
+    window.location.href = '/apk-pipeline';
+  };
+
+  const handleServerClick = () => {
+    console.log('Deploy Server clicked');
+    window.location.href = '/servers';
+  };
+
+  const handleWalletClick = () => {
+    console.log('Add Credits clicked');
+    window.location.href = '/wallet';
+  };
+
+  const handleSupportClick = () => {
+    console.log('Support clicked');
+    window.location.href = '/support';
   };
 
   return (
     <div className="neon-card rounded-xl p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-display text-lg font-bold text-foreground flex items-center gap-2">
-          <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-          Quick Actions
-        </h3>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={testAllActions}
-          className="text-xs"
-        >
-          Test All
-        </Button>
-      </div>
+      <h3 className="font-display text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+        <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+        Quick Actions
+      </h3>
       <div className="flex flex-wrap gap-3">
-        {actions.map((action) => (
-          <Button
-            key={action.label}
-            onClick={() => handleActionClick(action)}
-            className={cn('gap-2 shadow-lg', action.color)}
-          >
-            <action.icon className="h-4 w-4" />
-            {action.label}
-          </Button>
-        ))}
+        <button
+          onClick={handleProductClick}
+          style={{
+            backgroundColor: '#3b82f6',
+            color: 'white',
+            padding: '8px 16px',
+            borderRadius: '6px',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '500'
+          }}
+        >
+          ➕ Add Product
+        </button>
+        
+        <button
+          onClick={handleKeyClick}
+          style={{
+            backgroundColor: '#06b6d4',
+            color: 'white',
+            padding: '8px 16px',
+            borderRadius: '6px',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '500'
+          }}
+        >
+          🔑 Generate Key
+        </button>
+        
+        <button
+          onClick={handleApkClick}
+          style={{
+            backgroundColor: '#9333ea',
+            color: 'white',
+            padding: '8px 16px',
+            borderRadius: '6px',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '500'
+          }}
+        >
+          📤 Upload APK
+        </button>
+        
+        <button
+          onClick={handleServerClick}
+          style={{
+            backgroundColor: '#6b7280',
+            color: 'white',
+            padding: '8px 16px',
+            borderRadius: '6px',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '500'
+          }}
+        >
+          🖥️ Deploy Server
+        </button>
+        
+        <button
+          onClick={handleWalletClick}
+          style={{
+            backgroundColor: '#10b981',
+            color: 'white',
+            padding: '8px 16px',
+            borderRadius: '6px',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '500'
+          }}
+        >
+          💳 Add Credits
+        </button>
+        
+        <button
+          onClick={handleSupportClick}
+          style={{
+            backgroundColor: '#3b82f6',
+            color: 'white',
+            padding: '8px 16px',
+            borderRadius: '6px',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '500'
+          }}
+        >
+          🎧 Support
+        </button>
       </div>
     </div>
   );
