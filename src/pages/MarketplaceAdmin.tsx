@@ -356,6 +356,13 @@ export default function MarketplaceAdmin() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkRunning, setBulkRunning] = useState(false);
 
+  // Advanced filter states
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+
   const [headerMenus, setHeaderMenus] = useState<HeaderMenu[]>([]);
   const [menusLoading, setMenusLoading] = useState(true);
 
@@ -437,6 +444,10 @@ export default function MarketplaceAdmin() {
         page: page + 1,
         limit: PAGE_SIZE,
         search: search.trim() || undefined,
+        category: selectedCategory || undefined,
+        status: selectedStatus || undefined,
+        min_price: minPrice || undefined,
+        max_price: maxPrice || undefined,
       }) as any;
       const normalized = ((res?.data || []) as any[]).map((p) => ({
         ...p,
@@ -1897,7 +1908,28 @@ export default function MarketplaceAdmin() {
 
               <div className="grid gap-2 md:grid-cols-2">
                 <Field label="Category / Business Type">
-                  <Input value={editProduct.business_type || editProduct.target_industry || ''} onChange={(e) => setEditProduct({ ...editProduct, business_type: e.target.value, target_industry: e.target.value })} className="h-9 text-sm" />
+                  <Select value={editProduct.business_type || editProduct.target_industry || ''} onValueChange={(value) => setEditProduct({ ...editProduct, business_type: value, target_industry: value })}>
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="software">Software</SelectItem>
+                      <SelectItem value="mobile">Mobile App</SelectItem>
+                      <SelectItem value="web">Web Application</SelectItem>
+                      <SelectItem value="game">Game</SelectItem>
+                      <SelectItem value="erp">ERP System</SelectItem>
+                      <SelectItem value="crm">CRM System</SelectItem>
+                      <SelectItem value="ecommerce">E-commerce</SelectItem>
+                      <SelectItem value="education">Education</SelectItem>
+                      <SelectItem value="healthcare">Healthcare</SelectItem>
+                      <SelectItem value="finance">Finance</SelectItem>
+                      <SelectItem value="productivity">Productivity</SelectItem>
+                      <SelectItem value="utilities">Utilities</SelectItem>
+                      <SelectItem value="entertainment">Entertainment</SelectItem>
+                      <SelectItem value="social">Social Media</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </Field>
                 <Field label="Tags (comma separated)">
                   <Input value={(editProduct.tags || []).join(', ')} onChange={(e) => setEditProduct({ ...editProduct, tags: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} className="h-9 text-sm" />
