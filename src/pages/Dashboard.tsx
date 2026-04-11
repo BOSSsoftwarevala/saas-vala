@@ -306,24 +306,54 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div style={{backgroundColor: 'orange', padding: '20px', margin: '20px 0', border: '3px solid red'}}>
-          <h2 style={{color: 'white', fontSize: '24px'}}>🚨 QUICK ACTIONS TEST SECTION 🚨</h2>
-          <p style={{color: 'white'}}>If you can see this orange section, the Dashboard is working here!</p>
-          <button onClick={() => alert('Dashboard button works!')} style={{
-            backgroundColor: 'blue', 
-            color: 'white', 
-            padding: '10px 20px', 
-            border: 'none', 
-            borderRadius: '5px',
-            cursor: 'pointer'
-          }}>
-            TEST DASHBOARD BUTTON
-          </button>
-        </div>
-        <QuickActions />
-        <div style={{backgroundColor: 'purple', padding: '20px', margin: '20px 0', border: '3px solid yellow'}}>
-          <h2 style={{color: 'white', fontSize: '24px'}}>🚨 AFTER QUICKACTIONS 🚨</h2>
-          <p style={{color: 'white'}}>This section appears after QuickActions component</p>
+        <div className="neon-card rounded-xl p-5">
+          <h3 className="font-display text-lg font-bold text-foreground mb-4 flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+            Quick Actions
+          </h3>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={() => window.location.href = '/products/create'}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-md gap-2 shadow-lg"
+            >
+              ➕ Add Product
+            </button>
+            
+            <button
+              onClick={() => window.location.href = '/keys'}
+              className="bg-cyan hover:opacity-90 text-primary-foreground px-4 py-2 rounded-md gap-2 shadow-lg"
+            >
+              🔑 Generate Key
+            </button>
+            
+            <button
+              onClick={() => window.location.href = '/apk-pipeline'}
+              className="bg-purple hover:opacity-90 text-white px-4 py-2 rounded-md gap-2 shadow-lg"
+            >
+              📤 Upload APK
+            </button>
+            
+            <button
+              onClick={() => window.location.href = '/servers'}
+              className="bg-muted hover:bg-muted/80 text-foreground px-4 py-2 rounded-md gap-2 shadow-lg"
+            >
+              🖥️ Deploy Server
+            </button>
+            
+            <button
+              onClick={() => window.location.href = '/wallet'}
+              className="bg-green hover:opacity-90 text-white px-4 py-2 rounded-md gap-2 shadow-lg"
+            >
+              � Add Credits
+            </button>
+            
+            <button
+              onClick={() => window.location.href = '/support'}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-md gap-2 shadow-lg"
+            >
+              🎧 Support
+            </button>
+          </div>
         </div>
 
         {/* Netflix Rows */}
