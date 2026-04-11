@@ -7,6 +7,7 @@ import { NetflixRow } from '@/components/dashboard/NetflixRow';
 import { ProductCard } from '@/components/dashboard/ProductCard';
 import { ServerCard } from '@/components/dashboard/ServerCard';
 import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
+import { DeadButtonDetector } from '@/components/debug/DeadButtonDetector';
 import { QuickActions } from '@/components/dashboard/QuickActions';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -512,5 +513,6 @@ export default function Dashboard() {
         )}
       </div>
     </DashboardLayout>
+    <DeadButtonDetector />
   );
 }
