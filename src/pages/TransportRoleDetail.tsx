@@ -299,13 +299,13 @@
                        <div className="bg-background border border-border rounded-xl p-4">
                          <h4 className="text-xs font-bold text-muted-foreground uppercase mb-3">ACTIONS</h4>
                          <div className="flex flex-wrap gap-2">
-                           <Button size="sm" variant="outline" className="text-xs gap-1">
+                           <Button size="sm" variant="outline" className="text-xs gap-1" onClick={() => alert(`View details for ${category.name}`)}>
                              <Eye className="h-3 w-3" /> VIEW DETAILS
                            </Button>
-                           <Button size="sm" variant="outline" className="text-xs gap-1">
+                           <Button size="sm" variant="outline" className="text-xs gap-1" onClick={() => alert(`Configure ${category.name}`)}>
                              <Settings className="h-3 w-3" /> CONFIGURE
                            </Button>
-                           <Button size="sm" variant="outline" className="text-xs gap-1">
+                           <Button size="sm" variant="outline" className="text-xs gap-1" onClick={() => alert(`View audit log for ${category.name}`)}>
                              <History className="h-3 w-3" /> AUDIT LOG
                            </Button>
                          </div>
