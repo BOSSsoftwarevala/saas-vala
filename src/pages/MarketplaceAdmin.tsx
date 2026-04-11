@@ -317,7 +317,48 @@ function slugify(value: string) {
     .trim()
     .replace(/[^a-z0-9\s-]/g, '')
     .replace(/\s+/g, '-')
-    .replace(/-+/g, '-');
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+}
+
+// Generate unique SEO-friendly slug with duplicate prevention
+function generateUniqueSlug(baseSlug: string, existingSlugs: string[] = [], suffix = ''): string {
+  let slug = baseSlug + (suffix ? `-${suffix}` : '');
+  
+  if (existingSlugs.includes(slug)) {
+    // Try with numbers
+    let counter = 1;
+    while (existingSlugs.includes(`${slug}-${counter}`)) {
+      counter++;
+    }
+    slug = `${slug}-${counter}`;
+  }
+  
+  return slug;
+}
+
+// Auto generate SEO meta tags
+function generateMetaTags(product: any) {
+  const title = product.name || 'Product';
+  const description = product.short_description || product.description || '';
+  const keywords = [
+    ...(product.tags || []),
+    product.business_type || product.target_industry || '',
+    'software',
+    'app',
+    'download'
+  ].filter(Boolean).join(', ');
+  
+  return {
+    title: `${title} - SaaS Marketplace`,
+    description: description.substring(0, 160),
+    keywords: keywords.substring(0, 255),
+    ogTitle: title,
+    ogDescription: description.substring(0, 160),
+    ogImage: product.thumbnail_url || '',
+    ogUrl: `/product/${product.slug}`,
+    canonical: `/product/${product.slug}`
+  };
 }
 
 function formatBytes(size?: number | null) {
