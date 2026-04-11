@@ -9,6 +9,12 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { valaBuilderApi } from '@/lib/api';
 import { useValaBuilderStateStore } from '@/hooks/useValaBuilderState';
+import { 
+  aiIntegrationManager, 
+  AIProvider, 
+  AIModel, 
+  AIConfig 
+} from '@/lib/ai-integrations';
 import {
   Rocket, GitBranch, Globe, Code, Database, Bug, Wrench, Package,
   Store, Loader2, CheckCircle2, Circle, ArrowDown,
@@ -153,6 +159,11 @@ export default function ValaBuilderOpenAI() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [servers, setServers] = useState<BuilderServer[]>([]);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['chat']));
+  const [selectedAIProvider, setSelectedAIProvider] = useState<AIProvider>('openai');
+  const [availableAIProviders, setAvailableAIProviders] = useState<AIProvider[]>([]);
+  const [aiModels, setAiModels] = useState<AIModel[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string>('gpt-4-turbo');
+  const [aiProviderStatuses, setAiProviderStatuses] = useState<Map<AIProvider, boolean>>(new Map());
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const appName = state.appName;
@@ -389,7 +400,50 @@ export default function ValaBuilderOpenAI() {
 
   useEffect(() => {
     resetPipelineState();
+    loadAIProviders();
   }, [resetPipelineState]);
+
+  const loadAIProviders = async () => {
+    try {
+      const providers: AIProvider[] = ['openai', 'anthropic', 'google', 'elevenlabs', 'stability', 'cohere', 'mistral', 'groq', 'deepseek', 'zhipu'];
+      const statuses = new Map<AIProvider, boolean>();
+      
+      for (const provider of providers) {
+        try {
+          const config = await aiIntegrationManager.getProviderConfig(provider);
+          const apiKey = await aiIntegrationManager.getApiKey(provider);
+          statuses.set(provider, !!(config && apiKey));
+        } catch (error) {
+          statuses.set(provider, false);
+        }
+      }
+      
+      setAiProviderStatuses(statuses);
+      setAvailableAIProviders(providers.filter(p => statuses.get(p)));
+      
+      // Load models for the first available provider
+      const firstAvailable = providers.find(p => statuses.get(p));
+      if (firstAvailable) {
+        setSelectedAIProvider(firstAvailable);
+        const models = aiIntegrationManager.getModelsByProvider(firstAvailable);
+        setAiModels(models);
+        if (models.length > 0) {
+          setSelectedModel(models[0].id);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load AI providers:', error);
+    }
+  };
+
+  const handleAIProviderChange = async (provider: AIProvider) => {
+    setSelectedAIProvider(provider);
+    const models = aiIntegrationManager.getModelsByProvider(provider);
+    setAiModels(models);
+    if (models.length > 0) {
+      setSelectedModel(models[0].id);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -470,10 +524,61 @@ export default function ValaBuilderOpenAI() {
           <div className="ml-auto flex items-center gap-2">
             {statusBadge}
             <Badge className="bg-gradient-to-r from-blue-500/20 to-purple-500/20 text-blue-400 border-blue-500/30">
-              🤖 GPT-Powered
+              🤖 {selectedAIProvider.toUpperCase()} Powered
             </Badge>
+            {availableAIProviders.length > 1 && (
+              <Badge variant="secondary">
+                {availableAIProviders.length} AI Providers
+              </Badge>
+            )}
           </div>
         </div>
+
+        {/* AI Provider Selection */}
+        {availableAIProviders.length > 1 && (
+          <Card className="border-border bg-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Bot className="h-4 w-4" />
+                AI Provider
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                {availableAIProviders.map(provider => (
+                  <Button
+                    key={provider}
+                    variant={selectedAIProvider === provider ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleAIProviderChange(provider)}
+                    className="justify-start"
+                  >
+                    <Bot className="h-3 w-3 mr-2" />
+                    {provider.charAt(0).toUpperCase() + provider.slice(1)}
+                  </Button>
+                ))}
+              </div>
+              
+              {/* Model Selection */}
+              {aiModels.length > 0 && (
+                <div>
+                  <label className="text-xs text-muted-foreground">Model</label>
+                  <select
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    className="w-full mt-1 h-8 rounded-md border border-border bg-background px-2 text-xs"
+                  >
+                    {aiModels.map(model => (
+                      <option key={model.id} value={model.id}>
+                        {model.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Main Chat Interface */}
@@ -485,16 +590,48 @@ export default function ValaBuilderOpenAI() {
                     <MessageSquare className="h-5 w-5" />
                     AI Development Chat
                   </CardTitle>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowTemplates(!showTemplates)}
-                    className="text-xs"
-                  >
-                    {showTemplates ? <Eye className="h-3 w-3 mr-1" /> : <Layers className="h-3 w-3 mr-1" />}
-                    {showTemplates ? 'Hide' : 'Show'} Templates
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowTemplates(!showTemplates)}
+                      className="text-xs"
+                    >
+                      {showTemplates ? <Eye className="h-3 w-3 mr-1" /> : <Layers className="h-3 w-3 mr-1" />}
+                      {showTemplates ? 'Hide' : 'Show'} Templates
+                    </Button>
+                  </div>
                 </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Templates */}
+                {showTemplates && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4 bg-muted/30 rounded-lg">
+                    {BUILDER_TEMPLATES.map(template => (
+                      <Button
+                        key={template.id}
+                        variant="outline"
+                        className="h-auto p-4 flex flex-col items-start gap-2 hover:bg-accent/50"
+                        onClick={() => applyTemplate(template)}
+                      >
+                        <div className="flex items-center gap-2 w-full">
+                          <div className="p-1 rounded bg-primary/10">
+                            {template.icon}
+                          </div>
+                          <span className="font-medium">{template.name}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground text-left">{template.description}</p>
+                        <div className="flex flex-wrap gap-1">
+                          {template.tags.map(tag => (
+                            <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
+                          ))}
+                        </div>
+                      </Button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Messages */}
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Templates */}
