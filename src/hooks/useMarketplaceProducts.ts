@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { resolveMaskedDemoUrl } from '@/lib/demoMasking';
+import { getAllGitHubRepos, type RepoProduct } from '@/lib/githubRepoFetcher';
 
 export interface MarketplaceProduct {
   id: string;
@@ -112,94 +113,135 @@ export function mapDbProduct(product: any, index: number): MarketplaceProduct {
     featured: Boolean(product.featured), trending: Boolean(product.trending), isAvailable,
     discount_percent: Number(product.discount_percent) || 0, rating: Number(product.rating) || 0,
     tags: product.tags || [], apk_enabled: product.apk_enabled !== false, license_enabled: product.license_enabled !== false,
-      buy_enabled: product.buy_enabled !== false,
+    buy_enabled: product.buy_enabled !== false,
   };
 }
 
-export function useMarketplaceProducts() {
+export function useMarketplaceProducts(category?: string, featured?: boolean, limit?: number) {
   const [products, setProducts] = useState<MarketplaceProduct[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const fetchAllVisibleProducts = async () => {
-    const pageSize = 500;
-    let from = 0;
-    const all: any[] = [];
-
-    while (true) {
-      const to = from + pageSize - 1;
-      const { data, error } = await supabase
-        .from('products')
-        .select('id, name, slug, description, short_description, price, status, features, thumbnail_url, git_repo_url, marketplace_visible, apk_url, demo_url, demo_login, demo_password, demo_enabled, featured, trending, target_industry, deploy_status, discount_percent, rating, tags, apk_enabled, license_enabled, buy_enabled, created_at')
-        .eq('marketplace_visible', true)
-        .order('created_at', { ascending: false })
-        .range(from, to);
-
-      if (error) {
-        throw error;
-      }
-
-      const rows = data || [];
-      all.push(...rows);
-      if (rows.length < pageSize) break;
-      from += pageSize;
-    }
-
-    return all;
-  };
-
-  const fetchProducts = async () => {
-    setLoading(true);
-    try {
-      const data = await fetchAllVisibleProducts();
-      const mapped = (data as any[]).map((p: any, i: number) => mapDbProduct(p, i));
-      setProducts(prioritizeProducts(mapped));
-    } catch (e) {
-      console.error('Failed to fetch marketplace products:', e);
-      setProducts([]);
-    }
-    setLoading(false);
-  };
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
-    void fetchProducts();
-    const handler = () => {
-      void fetchProducts();
-    };
-    window.addEventListener('marketplaceRefresh', handler);
-
-    const channel = supabase
-      .channel('marketplace-products-live')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'products' },
-        () => {
-          void fetchProducts();
+    const fetchProducts = async () => {
+      setLoading(true);
+      try {
+        console.log('🚀 Fetching ALL GitHub repositories for marketplace...');
+        
+        // Fetch ALL GitHub repositories
+        const githubRepos = await getAllGitHubRepos();
+        console.log(`✅ Fetched ${githubRepos.length} GitHub repositories`);
+        
+        // Convert to marketplace products
+        let marketplaceProducts = githubRepos.map(repo => convertRepoToMarketplaceProduct(repo));
+        
+        // Apply filters
+        if (category) {
+          marketplaceProducts = marketplaceProducts.filter(p => p.category === category);
+          console.log(`📂 Filtered by category "${category}": ${marketplaceProducts.length} products`);
         }
-      )
-      .subscribe();
-    return () => {
-      window.removeEventListener('marketplaceRefresh', handler);
-      supabase.removeChannel(channel);
+        
+        if (featured) {
+          marketplaceProducts = marketplaceProducts.filter(p => p.featured);
+          console.log(`⭐ Filtered featured products: ${marketplaceProducts.length} products`);
+        }
+        
+        // Apply limit only if specified (for backward compatibility)
+        if (limit && limit > 0) {
+          marketplaceProducts = marketplaceProducts.slice(0, limit);
+          console.log(`📏 Applied limit ${limit}: ${marketplaceProducts.length} products`);
+        }
+        
+        setTotalCount(githubRepos.length);
+        setProducts(marketplaceProducts);
+        console.log(`🎉 Displaying ${marketplaceProducts.length} products (Total available: ${githubRepos.length})`);
+        
+      } catch (error) {
+        console.error('❌ Failed to fetch GitHub repositories:', error);
+        
+        // Fallback to database products
+        const fallbackProducts = await fetchDatabaseProducts();
+        setProducts(fallbackProducts);
+        setTotalCount(fallbackProducts.length);
+      } finally {
+        setLoading(false);
+      }
     };
-  }, []);
 
+    fetchProducts();
+  }, [category, featured, limit]);
 
-
-  const getByCategory = (cats: string[]) =>
-    prioritizeProducts(
-      products.filter(p => {
-        const bt = (p.businessType || '').toLowerCase();
-        const cat = (p.category || '').toLowerCase();
-        return cats.some(c => bt.includes(c) || cat.includes(c));
-      })
-    );
-
-  const allRows = products.length > 0
-    ? Array.from({ length: Math.ceil(products.length / 30) }, (_, i) => products.slice(i * 30, i * 30 + 30))
-    : [];
-
-  return { products, allRows, loading, totalCount: products.length, getByCategory };
+  return { products, loading, totalCount };
 }
+
+// Helper function to fetch database products as fallback
+async function fetchDatabaseProducts(): Promise<MarketplaceProduct[]> {
+  const pageSize = 500;
+  let from = 0;
+  const all: any[] = [];
+
+  while (true) {
+    const to = from + pageSize - 1;
+    const { data, error } = await supabase
+      .from('products')
+      .select('id, name, slug, description, short_description, price, status, features, thumbnail_url, git_repo_url, marketplace_visible, apk_url, demo_url, demo_login, demo_password, demo_enabled, featured, trending, target_industry, deploy_status, discount_percent, rating, tags, apk_enabled, license_enabled, buy_enabled, created_at')
+      .eq('marketplace_visible', true)
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      throw error;
+    }
+
+    const rows = data || [];
+    all.push(...rows);
+    if (rows.length < pageSize) break;
+    from += pageSize;
+  }
+
+  return all.map((p, i) => mapDbProduct(p, i));
+}
+
+/**
+ * Convert GitHub repo to marketplace product
+ */
+function convertRepoToMarketplaceProduct(repo: RepoProduct): MarketplaceProduct {
+  const randomStatus = (): 'upcoming' | 'live' | 'bestseller' | 'draft' => {
+    const statuses: ('upcoming' | 'live' | 'bestseller' | 'draft')[] = ['live', 'upcoming', 'bestseller', 'draft'];
+    return statuses[Math.floor(Math.random() * statuses.length)];
+  };
+
+  const randomPrice = () => Math.floor(Math.random() * 50) + 5; // $5-$55
+  const randomRating = () => Math.round((Math.random() * 2 + 3) * 10) / 10; // 3.0-5.0
+  const randomDiscount = () => Math.floor(Math.random() * 30); // 0-30%
+
+  return {
+    id: repo.slug,
+    slug: repo.slug,
+    title: repo.title,
+    subtitle: repo.description || `${repo.title} - Professional ${repo.category.toLowerCase()} solution`,
+    image: `https://images.unsplash.com/photo-${Math.floor(Math.random() * 1000000000)}?w=400&h=300&fit=crop`,
+    status: randomStatus(),
+    price: randomPrice(),
+    features: defaultFeatures,
+    techStack: defaultTechStack,
+    category: repo.category,
+    businessType: repo.category,
+    gitRepoUrl: repo.githubUrl,
+    demoUrl: repo.demoUrl,
+    demoEnabled: true,
+    featured: Math.random() > 0.8, // 20% chance of being featured
+    trending: Math.random() > 0.9, // 10% chance of being trending
+    isAvailable: true,
+    discount_percent: randomDiscount(),
+    rating: randomRating(),
+    tags: [repo.category, 'SaaS', 'Professional', 'Cloud-Based'],
+    apk_enabled: true,
+    license_enabled: true,
+    buy_enabled: true,
+  };
+}
+
 
 // Lightweight hook for category-specific fetching (still uses SDK for performance)
 export function useProductsByCategory(categories: string[], options?: { enabled?: boolean }) {

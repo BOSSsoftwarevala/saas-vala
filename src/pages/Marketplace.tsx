@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { MarketplaceHeader } from '@/components/marketplace/MarketplaceHeader';
 import { MarketplaceProductCard } from '@/components/marketplace/MarketplaceProductCard';
 import { HeroBannerSlider } from '@/components/marketplace/HeroBannerSlider';
-import { useMarketplaceProducts, mapDbProduct, type MarketplaceProduct } from '@/hooks/useMarketplaceProducts';
+import { useMarketplaceProducts, type MarketplaceProduct } from '@/hooks/useMarketplaceProducts';
 import { toast } from 'sonner';
 import { useFraudDetection } from '@/hooks/useFraudDetection';
 import { useAuth } from '@/hooks/useAuth';
@@ -69,13 +69,37 @@ export default function Marketplace() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   
-  const { products, loading: productsLoading } = useMarketplaceProducts();
+  const { products, loading: productsLoading, totalCount } = useMarketplaceProducts();
   const [searchQuery, setSearchQuery] = useState('');
+  const [visibleCount, setVisibleCount] = useState(50); // Start with 50 visible items
 
   const activeProducts = useMemo(
     () => (serverSearchProducts && searchQuery.trim() ? serverSearchProducts : products),
     [products, serverSearchProducts, searchQuery]
   );
+
+  // Implement lazy loading - show more products as user scrolls
+  const visibleProducts = useMemo(
+    () => activeProducts.slice(0, visibleCount),
+    [activeProducts, visibleCount]
+  );
+
+  const loadMore = useCallback(() => {
+    setVisibleCount(prev => Math.min(prev + 50, activeProducts.length));
+  }, [activeProducts.length]);
+
+  // Auto-load more when scrolling near bottom
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.innerHeight + document.documentElement.scrollTop >= 
+          document.documentElement.offsetHeight - 1000) {
+        loadMore();
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [loadMore]);
 
   const loadResellerData = async () => {
     if (!user) {
@@ -595,10 +619,10 @@ export default function Marketplace() {
           <h2 className="text-2xl font-bold text-foreground mb-2">All Products</h2>
           <p className="text-sm text-muted-foreground">
             {searchQuery.trim()
-              ? `${activeProducts.length} products matching "${searchQuery.trim()}"`
+              ? `${visibleProducts.length} of ${activeProducts.length} products matching "${searchQuery.trim()}"`
               : productsLoading
                 ? 'Loading products...'
-                : `${products.length} products available`}
+                : `${visibleProducts.length} of ${totalCount} products available (${totalCount} total from GitHub)`}
           </p>
         </div>
 
@@ -609,7 +633,7 @@ export default function Marketplace() {
               ? Array.from({ length: 8 }).map((_, index) => (
                 <div key={`marketplace-skeleton-${index}`} className="h-[420px] rounded-2xl border border-border/40 bg-card/40 animate-pulse" />
               ))
-              : activeProducts.map((product, i) => (
+              : visibleProducts.map((product, i) => (
                 <MarketplaceProductCard
                   key={product.id}
                   product={product}
@@ -620,9 +644,30 @@ export default function Marketplace() {
                 />
               ))}
           </div>
-          {!productsLoading && activeProducts.length === 0 && (
+          {!productsLoading && visibleProducts.length === 0 && (
             <div className="text-center py-12">
               <p className="text-muted-foreground">No products found matching your search.</p>
+            </div>
+          )}
+
+          {/* Load More Button */}
+          {!productsLoading && visibleProducts.length < activeProducts.length && (
+            <div className="text-center mt-8">
+              <button
+                onClick={loadMore}
+                className="px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+              >
+                Load More Products ({visibleProducts.length} of {activeProducts.length})
+              </button>
+            </div>
+          )}
+
+          {/* Show All Loaded Message */}
+          {!productsLoading && visibleProducts.length === activeProducts.length && activeProducts.length > 0 && (
+            <div className="text-center mt-8 py-4 border-t border-border">
+              <p className="text-sm text-muted-foreground">
+                ✅ All {activeProducts.length} products loaded (Total: {totalCount} from GitHub)
+              </p>
             </div>
           )}
         </div>

@@ -11,13 +11,16 @@ const API_TIMEOUT_MS = 30_000;
 const MAX_RETRIES = 3;
 
 /** Cache auth headers briefly to reduce frequent session lookups. */
-const AUTH_HEADERS_CACHE_MS = 10_000;
+const AUTH_HEADERS_CACHE_MS = 15_000;
 let authHeadersCache: { expiresAt: number; headers: Record<string, string> } | null = null;
 
-/** Small in-memory GET cache to smooth rapid navigations/repeated reads. */
-const GET_RESPONSE_CACHE_MS = 5_000;
-const getResponseCache = new Map<string, { expiresAt: number; data: unknown }>();
+/** Enhanced in-memory GET cache with better TTL for performance. */
+const GET_RESPONSE_CACHE_MS = 30_000; // Increased for better performance
+const getResponseCache = new Map<string, { expiresAt: number; data: unknown; etag?: string }>();
 const inFlightGetRequests = new Map<string, Promise<unknown>>();
+
+/** Request deduplication cache to prevent duplicate API calls */
+const requestDeduplicationCache = new Map<string, Promise<unknown>>();
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   if (authHeadersCache && Date.now() < authHeadersCache.expiresAt) {

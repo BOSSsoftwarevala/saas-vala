@@ -31,75 +31,82 @@ import { Loader2 } from 'lucide-react';
 import React, { Suspense, useEffect } from 'react';
 
 
-import Auth from "./pages/Auth";
-import Marketplace from "./pages/Marketplace";
-import DemoPage from "./pages/DemoPage";
-import ProductDetail from "./pages/ProductDetail";
-import Favorites from "./pages/Favorites";
-import Orders from "./pages/Orders";
-import Dashboard from "./pages/Dashboard";
-import Products from "./pages/Products";
-import RoleDetail from "./pages/RoleDetail";
-import TransportRoleDetail from "./pages/TransportRoleDetail";
-import ManufacturingRoleDetail from "./pages/ManufacturingRoleDetail";
-import EducationCategory from "./pages/EducationCategory";
-import Keys from "./pages/Keys";
-import Servers from "./pages/Servers";
-import AiChat from "./pages/AiChat";
-import ValaBuilder from "./pages/ValaBuilder";
-import SaasAiDashboard from "./pages/SaasAiDashboard";
-import AiApis from "./pages/AiApis";
-import Wallet from "./pages/Wallet";
-import SeoLeads from "./pages/SeoLeads";
-import Resellers from "./pages/Resellers";
-import Settings from "./pages/Settings";
-import AuditLogs from "./pages/AuditLogs";
-import SystemHealth from "./pages/SystemHealth";
-import ResellerDashboard from "./pages/ResellerDashboard";
-import Automation from "./pages/Automation";
-import AddProduct from "./pages/AddProduct";
-import EduPwa from "./pages/EduPwa";
-import Install from "./pages/Install";
-import HealthPwa from "./pages/HealthPwa";
-import RealEstatePwa from "./pages/RealEstatePwa";
-import EcomPwa from "./pages/EcomPwa";
-import RetailPwa from "./pages/RetailPwa";
-import FoodPwa from "./pages/FoodPwa";
-import HospitalityPwa from "./pages/HospitalityPwa";
-import TransportPwa from "./pages/TransportPwa";
-import LogisticsPwa from "./pages/LogisticsPwa";
-import FinancePwa from "./pages/FinancePwa";
-import MediaPwa from "./pages/MediaPwa";
-import SocialPwa from "./pages/SocialPwa";
-import AiToolsPwa from "./pages/AiToolsPwa";
-import DevToolsPwa from "./pages/DevToolsPwa";
-import ProductivityPwa from "./pages/ProductivityPwa";
-import CyberSecurityPwa from "./pages/CyberSecurityPwa";
-import InvestPwa from "./pages/InvestPwa";
-import ManufacturingPwa from "./pages/ManufacturingPwa";
-import ConstructionPwa from "./pages/ConstructionPwa";
-import AutomotivePwa from "./pages/AutomotivePwa";
-import AgriculturePwa from "./pages/AgriculturePwa";
-import EnergyPwa from "./pages/EnergyPwa";
-import TelecomPwa from "./pages/TelecomPwa";
-import ItSoftwarePwa from "./pages/ItSoftwarePwa";
-import CloudDevopsPwa from "./pages/CloudDevopsPwa";
-import AnalyticsPwa from "./pages/AnalyticsPwa";
-import Cart from "./pages/Cart";
-import ApkPipeline from "./pages/ApkPipeline";
-import OfflineAppTemplate from "./pages/OfflineAppTemplate";
-import MarketplaceAdmin from "./pages/MarketplaceAdmin";
-import Support from "./pages/Support";
+// Lazy loaded components for better performance
+const Auth = React.lazy(() => import("./pages/Auth"));
+const Marketplace = React.lazy(() => import("./pages/Marketplace"));
+const DemoPage = React.lazy(() => import("./pages/DemoPage"));
+const ProductDetail = React.lazy(() => import("./pages/ProductDetail"));
+const Favorites = React.lazy(() => import("./pages/Favorites"));
+const Orders = React.lazy(() => import("./pages/Orders"));
+const Dashboard = React.lazy(() => import("./pages/Dashboard"));
+const Products = React.lazy(() => import("./pages/Products"));
+const AddProduct = React.lazy(() => import("./pages/AddProduct"));
+const Keys = React.lazy(() => import("./pages/Keys"));
+const Servers = React.lazy(() => import("./pages/Servers"));
+const AiChat = React.lazy(() => import("./pages/AiChat"));
+const ValaBuilder = React.lazy(() => import("./pages/ValaBuilder"));
+const SaasAiDashboard = React.lazy(() => import("./pages/SaasAiDashboard"));
+const AiApis = React.lazy(() => import("./pages/AiApis"));
+const Wallet = React.lazy(() => import("./pages/Wallet"));
+const SeoLeads = React.lazy(() => import("./pages/SeoLeads"));
+const Resellers = React.lazy(() => import("./pages/Resellers"));
+const Settings = React.lazy(() => import("./pages/Settings"));
+const AuditLogs = React.lazy(() => import("./pages/AuditLogs"));
+const SystemHealth = React.lazy(() => import("./pages/SystemHealth"));
+const ResellerDashboard = React.lazy(() => import("./pages/ResellerDashboard"));
+const Automation = React.lazy(() => import("./pages/Automation"));
+const Cart = React.lazy(() => import("./pages/Cart"));
+const ApkPipeline = React.lazy(() => import("./pages/ApkPipeline"));
+const OfflineAppTemplate = React.lazy(() => import("./pages/OfflineAppTemplate"));
+const MarketplaceAdmin = React.lazy(() => import("./pages/MarketplaceAdmin"));
+const Support = React.lazy(() => import("./pages/Support"));
+
+// PWA Components - grouped for better chunking
+const EduPwa = React.lazy(() => import("./pages/EduPwa"));
+const HealthPwa = React.lazy(() => import("./pages/HealthPwa"));
+const RealEstatePwa = React.lazy(() => import("./pages/RealEstatePwa"));
+const EcomPwa = React.lazy(() => import("./pages/EcomPwa"));
+const RetailPwa = React.lazy(() => import("./pages/RetailPwa"));
+const FoodPwa = React.lazy(() => import("./pages/FoodPwa"));
+const HospitalityPwa = React.lazy(() => import("./pages/HospitalityPwa"));
+const TransportPwa = React.lazy(() => import("./pages/TransportPwa"));
+const LogisticsPwa = React.lazy(() => import("./pages/LogisticsPwa"));
+const FinancePwa = React.lazy(() => import("./pages/FinancePwa"));
+const MediaPwa = React.lazy(() => import("./pages/MediaPwa"));
+const SocialPwa = React.lazy(() => import("./pages/SocialPwa"));
+const AiToolsPwa = React.lazy(() => import("./pages/AiToolsPwa"));
+const DevToolsPwa = React.lazy(() => import("./pages/DevToolsPwa"));
+const ProductivityPwa = React.lazy(() => import("./pages/ProductivityPwa"));
+const CyberSecurityPwa = React.lazy(() => import("./pages/CyberSecurityPwa"));
+const InvestPwa = React.lazy(() => import("./pages/InvestPwa"));
+const ManufacturingPwa = React.lazy(() => import("./pages/ManufacturingPwa"));
+const ConstructionPwa = React.lazy(() => import("./pages/ConstructionPwa"));
+const AutomotivePwa = React.lazy(() => import("./pages/AutomotivePwa"));
+const AgriculturePwa = React.lazy(() => import("./pages/AgriculturePwa"));
+const EnergyPwa = React.lazy(() => import("./pages/EnergyPwa"));
+const TelecomPwa = React.lazy(() => import("./pages/TelecomPwa"));
+const ItSoftwarePwa = React.lazy(() => import("./pages/ItSoftwarePwa"));
+const CloudDevopsPwa = React.lazy(() => import("./pages/CloudDevopsPwa"));
+const AnalyticsPwa = React.lazy(() => import("./pages/AnalyticsPwa"));
+
+// Role detail components
+const RoleDetail = React.lazy(() => import("./pages/RoleDetail"));
+const TransportRoleDetail = React.lazy(() => import("./pages/TransportRoleDetail"));
+const ManufacturingRoleDetail = React.lazy(() => import("./pages/ManufacturingRoleDetail"));
+const EducationCategory = React.lazy(() => import("./pages/EducationCategory"));
+
+// Install page (critical for PWA)
+const Install = React.lazy(() => import("./pages/Install"));
 import ProtectedShellProviders from './components/layout/ProtectedShellProviders';
 
 function preloadCriticalRoutes() {
   return Promise.allSettled([
-    import('./pages/Marketplace'),
-    import('./pages/ProductDetail'),
-    import('./pages/Favorites'),
-    import('./pages/Orders'),
-    import('./pages/Dashboard'),
-    import('./pages/Support'),
+    import("./pages/Marketplace"),
+    import("./pages/ProductDetail"),
+    import("./pages/Favorites"),
+    import("./pages/Orders"),
+    import("./pages/Dashboard"),
+    import("./pages/Support"),
   ]);
 }
 
@@ -121,9 +128,21 @@ const queryClient = new QueryClient({
 
 function PageLoader() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    <div className="flex items-center justify-center min-h-screen">
+      <Loader2 className="h-8 w-8 animate-spin" />
     </div>
+  );
+}
+
+function LazyWrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[200px]">
+        <Loader2 className="h-6 w-6 animate-spin" />
+      </div>
+    }>
+      {children}
+    </Suspense>
   );
 }
 
@@ -132,9 +151,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (loading) return <PageLoader />;
   if (!user) return <Navigate to="/auth" replace />;
   return (
-    <Suspense fallback={<PageLoader />}>
+    <LazyWrapper>
       <ProtectedShellProviders>{children}</ProtectedShellProviders>
-    </Suspense>
+    </LazyWrapper>
   );
 }
 
@@ -168,111 +187,111 @@ function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
-        <Route path="/auth" element={<Auth />} />
-        <Route path="/" element={<Marketplace />} />
-        <Route path="/marketplace" element={<Marketplace />} />
-        <Route path="/marketplace/product/:id" element={<ProductDetail />} />
-        <Route path="/demo/:slug" element={<DemoPage />} />
-        <Route path="/favorites" element={<ProtectedRoute><Favorites /></ProtectedRoute>} />
-        <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+        <Route path="/auth" element={<LazyWrapper><Auth /></LazyWrapper>} />
+        <Route path="/" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
+        <Route path="/marketplace" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
+        <Route path="/marketplace/product/:id" element={<LazyWrapper><ProductDetail /></LazyWrapper>} />
+        <Route path="/demo/:slug" element={<LazyWrapper><DemoPage /></LazyWrapper>} />
+        <Route path="/favorites" element={<ProtectedRoute><LazyWrapper><Favorites /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/orders" element={<ProtectedRoute><LazyWrapper><Orders /></LazyWrapper></ProtectedRoute>} />
 
         {/* Public lazy routes */}
-        <Route path="/edu-pwa" element={<EduPwa />} />
-        <Route path="/install" element={<Install />} />
-        <Route path="/health-pwa" element={<HealthPwa />} />
-        <Route path="/realestate-pwa" element={<RealEstatePwa />} />
-        <Route path="/ecom-pwa" element={<EcomPwa />} />
-        <Route path="/retail-pwa" element={<RetailPwa />} />
-        <Route path="/food-pwa" element={<FoodPwa />} />
-        <Route path="/hospitality-pwa" element={<HospitalityPwa />} />
-        <Route path="/transport-pwa" element={<TransportPwa />} />
-        <Route path="/logistics-pwa" element={<LogisticsPwa />} />
-        <Route path="/finance-pwa" element={<FinancePwa />} />
-        <Route path="/media-pwa" element={<MediaPwa />} />
-        <Route path="/social-pwa" element={<SocialPwa />} />
-        <Route path="/ai-tools-pwa" element={<AiToolsPwa />} />
-        <Route path="/devtools-pwa" element={<DevToolsPwa />} />
-        <Route path="/productivity-pwa" element={<ProductivityPwa />} />
-        <Route path="/cybersecurity-pwa" element={<CyberSecurityPwa />} />
-        <Route path="/invest-pwa" element={<InvestPwa />} />
-        <Route path="/manufacturing-pwa" element={<ManufacturingPwa />} />
-        <Route path="/construction-pwa" element={<ConstructionPwa />} />
-        <Route path="/automotive-pwa" element={<AutomotivePwa />} />
-        <Route path="/agriculture-pwa" element={<AgriculturePwa />} />
-        <Route path="/energy-pwa" element={<EnergyPwa />} />
-        <Route path="/telecom-pwa" element={<TelecomPwa />} />
-        <Route path="/it-software-pwa" element={<ItSoftwarePwa />} />
-        <Route path="/cloud-devops-pwa" element={<CloudDevopsPwa />} />
-        <Route path="/analytics-pwa" element={<AnalyticsPwa />} />
-        <Route path="/cart" element={<Cart />} />
-        <Route path="/offline-app" element={<OfflineAppTemplate />} />
+        <Route path="/edu-pwa" element={<LazyWrapper><EduPwa /></LazyWrapper>} />
+        <Route path="/install" element={<LazyWrapper><Install /></LazyWrapper>} />
+        <Route path="/health-pwa" element={<LazyWrapper><HealthPwa /></LazyWrapper>} />
+        <Route path="/realestate-pwa" element={<LazyWrapper><RealEstatePwa /></LazyWrapper>} />
+        <Route path="/ecom-pwa" element={<LazyWrapper><EcomPwa /></LazyWrapper>} />
+        <Route path="/retail-pwa" element={<LazyWrapper><RetailPwa /></LazyWrapper>} />
+        <Route path="/food-pwa" element={<LazyWrapper><FoodPwa /></LazyWrapper>} />
+        <Route path="/hospitality-pwa" element={<LazyWrapper><HospitalityPwa /></LazyWrapper>} />
+        <Route path="/transport-pwa" element={<LazyWrapper><TransportPwa /></LazyWrapper>} />
+        <Route path="/logistics-pwa" element={<LazyWrapper><LogisticsPwa /></LazyWrapper>} />
+        <Route path="/finance-pwa" element={<LazyWrapper><FinancePwa /></LazyWrapper>} />
+        <Route path="/media-pwa" element={<LazyWrapper><MediaPwa /></LazyWrapper>} />
+        <Route path="/social-pwa" element={<LazyWrapper><SocialPwa /></LazyWrapper>} />
+        <Route path="/ai-tools-pwa" element={<LazyWrapper><AiToolsPwa /></LazyWrapper>} />
+        <Route path="/devtools-pwa" element={<LazyWrapper><DevToolsPwa /></LazyWrapper>} />
+        <Route path="/productivity-pwa" element={<LazyWrapper><ProductivityPwa /></LazyWrapper>} />
+        <Route path="/cybersecurity-pwa" element={<LazyWrapper><CyberSecurityPwa /></LazyWrapper>} />
+        <Route path="/invest-pwa" element={<LazyWrapper><InvestPwa /></LazyWrapper>} />
+        <Route path="/manufacturing-pwa" element={<LazyWrapper><ManufacturingPwa /></LazyWrapper>} />
+        <Route path="/construction-pwa" element={<LazyWrapper><ConstructionPwa /></LazyWrapper>} />
+        <Route path="/automotive-pwa" element={<LazyWrapper><AutomotivePwa /></LazyWrapper>} />
+        <Route path="/agriculture-pwa" element={<LazyWrapper><AgriculturePwa /></LazyWrapper>} />
+        <Route path="/energy-pwa" element={<LazyWrapper><EnergyPwa /></LazyWrapper>} />
+        <Route path="/telecom-pwa" element={<LazyWrapper><TelecomPwa /></LazyWrapper>} />
+        <Route path="/it-software-pwa" element={<LazyWrapper><ItSoftwarePwa /></LazyWrapper>} />
+        <Route path="/cloud-devops-pwa" element={<LazyWrapper><CloudDevopsPwa /></LazyWrapper>} />
+        <Route path="/analytics-pwa" element={<LazyWrapper><AnalyticsPwa /></LazyWrapper>} />
+        <Route path="/cart" element={<LazyWrapper><Cart /></LazyWrapper>} />
+        <Route path="/offline-app" element={<LazyWrapper><OfflineAppTemplate /></LazyWrapper>} />
 
         {/* Protected routes */}
-        <Route path="/dashboard" element={<ProtectedRoute><AdminRoute><Dashboard /></AdminRoute></ProtectedRoute>} />
+        <Route path="/dashboard" element={<ProtectedRoute><AdminRoute><LazyWrapper><Dashboard /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         
         {/* Products module */}
-        <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
-        <Route path="/products/list" element={<ProtectedRoute><Products /></ProtectedRoute>} />
-        <Route path="/products/create" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
-        <Route path="/products/add" element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
-        <Route path="/products/edit/:id" element={<ProtectedRoute><Products /></ProtectedRoute>} />
-        <Route path="/products/view/:id" element={<ProtectedRoute><Products /></ProtectedRoute>} />
-        <Route path="/products/deploy/:id" element={<ProtectedRoute><AdminRoute><Products /></AdminRoute></ProtectedRoute>} />
+        <Route path="/products" element={<ProtectedRoute><LazyWrapper><Products /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/products/list" element={<ProtectedRoute><LazyWrapper><Products /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/products/create" element={<ProtectedRoute><LazyWrapper><AddProduct /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/products/add" element={<ProtectedRoute><LazyWrapper><AddProduct /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/products/edit/:id" element={<ProtectedRoute><LazyWrapper><Products /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/products/view/:id" element={<ProtectedRoute><LazyWrapper><Products /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/products/deploy/:id" element={<ProtectedRoute><AdminRoute><LazyWrapper><Products /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         
         {/* Keys module */}
-        <Route path="/keys" element={<ProtectedRoute><Keys /></ProtectedRoute>} />
-        <Route path="/keys/list" element={<ProtectedRoute><Keys /></ProtectedRoute>} />
-        <Route path="/keys/generate" element={<ProtectedRoute><AdminRoute><Keys /></AdminRoute></ProtectedRoute>} />
-        <Route path="/keys/assign" element={<ProtectedRoute><AdminRoute><Keys /></AdminRoute></ProtectedRoute>} />
+        <Route path="/keys" element={<ProtectedRoute><LazyWrapper><Keys /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/keys/list" element={<ProtectedRoute><LazyWrapper><Keys /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/keys/generate" element={<ProtectedRoute><AdminRoute><LazyWrapper><Keys /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/keys/assign" element={<ProtectedRoute><AdminRoute><LazyWrapper><Keys /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         
         {/* Servers module */}
-        <Route path="/servers" element={<ProtectedRoute><Servers /></ProtectedRoute>} />
-        <Route path="/servers/list" element={<ProtectedRoute><Servers /></ProtectedRoute>} />
-        <Route path="/servers/deploy" element={<ProtectedRoute><AdminRoute><Servers /></AdminRoute></ProtectedRoute>} />
-        <Route path="/servers/logs" element={<ProtectedRoute><AdminRoute><Servers /></AdminRoute></ProtectedRoute>} />
+        <Route path="/servers" element={<ProtectedRoute><LazyWrapper><Servers /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/servers/list" element={<ProtectedRoute><LazyWrapper><Servers /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/servers/deploy" element={<ProtectedRoute><AdminRoute><LazyWrapper><Servers /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/servers/logs" element={<ProtectedRoute><AdminRoute><LazyWrapper><Servers /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         
         {/* Resellers module */}
-        <Route path="/resellers" element={<ProtectedRoute><AdminRoute><Resellers /></AdminRoute></ProtectedRoute>} />
-        <Route path="/resellers/list" element={<ProtectedRoute><AdminRoute><Resellers /></AdminRoute></ProtectedRoute>} />
-        <Route path="/resellers/create" element={<ProtectedRoute><AdminRoute><Resellers /></AdminRoute></ProtectedRoute>} />
-        <Route path="/resellers/credits" element={<ProtectedRoute><AdminRoute><Resellers /></AdminRoute></ProtectedRoute>} />
-        <Route path="/reseller-manager" element={<ProtectedRoute><AdminRoute><Resellers /></AdminRoute></ProtectedRoute>} />
+        <Route path="/resellers" element={<ProtectedRoute><AdminRoute><LazyWrapper><Resellers /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/resellers/list" element={<ProtectedRoute><AdminRoute><LazyWrapper><Resellers /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/resellers/create" element={<ProtectedRoute><AdminRoute><LazyWrapper><Resellers /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/resellers/credits" element={<ProtectedRoute><AdminRoute><LazyWrapper><Resellers /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/reseller-manager" element={<ProtectedRoute><AdminRoute><LazyWrapper><Resellers /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         
         {/* Leads module */}
-        <Route path="/leads" element={<ProtectedRoute><AdminRoute><SeoLeads /></AdminRoute></ProtectedRoute>} />
-        <Route path="/leads/list" element={<ProtectedRoute><AdminRoute><SeoLeads /></AdminRoute></ProtectedRoute>} />
-        <Route path="/leads/update" element={<ProtectedRoute><AdminRoute><SeoLeads /></AdminRoute></ProtectedRoute>} />
-        <Route path="/seo-leads" element={<ProtectedRoute><AdminRoute><SeoLeads /></AdminRoute></ProtectedRoute>} />
+        <Route path="/leads" element={<ProtectedRoute><AdminRoute><LazyWrapper><SeoLeads /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/leads/list" element={<ProtectedRoute><AdminRoute><LazyWrapper><SeoLeads /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/leads/update" element={<ProtectedRoute><AdminRoute><LazyWrapper><SeoLeads /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/seo-leads" element={<ProtectedRoute><AdminRoute><LazyWrapper><SeoLeads /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         
         {/* System modules */}
-        <Route path="/notifications" element={<ProtectedRoute><AdminRoute><Dashboard /></AdminRoute></ProtectedRoute>} />
-        <Route path="/logs" element={<ProtectedRoute><AdminRoute><AuditLogs /></AdminRoute></ProtectedRoute>} />
-        <Route path="/profile" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-        <Route path="/security" element={<ProtectedRoute><AdminRoute><SystemHealth /></AdminRoute></ProtectedRoute>} />
-        <Route path="/role-detail" element={<ProtectedRoute><RoleDetail /></ProtectedRoute>} />
-        <Route path="/transport-role-detail" element={<ProtectedRoute><TransportRoleDetail /></ProtectedRoute>} />
-        <Route path="/manufacturing-role-detail" element={<ProtectedRoute><ManufacturingRoleDetail /></ProtectedRoute>} />
-        <Route path="/education" element={<ProtectedRoute><EducationCategory /></ProtectedRoute>} />
-        <Route path="/vala-builder" element={<ProtectedRoute><ValaBuilder /></ProtectedRoute>} />
-        <Route path="/ai-chat" element={<ProtectedRoute><AiChat /></ProtectedRoute>} />
-        <Route path="/saas-ai-dashboard" element={<ProtectedRoute><SaasAiDashboard /></ProtectedRoute>} />
-        <Route path="/saas-ai" element={<ProtectedRoute><SaasAiDashboard /></ProtectedRoute>} />
-        <Route path="/ai-apis" element={<ProtectedRoute><AiApis /></ProtectedRoute>} />
-        <Route path="/wallet" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
-        <Route path="/reseller/dashboard" element={<ProtectedRoute><ResellerDashboard /></ProtectedRoute>} />
-        <Route path="/support" element={<ProtectedRoute><Support /></ProtectedRoute>} />
+        <Route path="/notifications" element={<ProtectedRoute><AdminRoute><LazyWrapper><Dashboard /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/logs" element={<ProtectedRoute><AdminRoute><LazyWrapper><AuditLogs /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><LazyWrapper><Settings /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/security" element={<ProtectedRoute><AdminRoute><LazyWrapper><SystemHealth /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/role-detail" element={<ProtectedRoute><LazyWrapper><RoleDetail /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/transport-role-detail" element={<ProtectedRoute><LazyWrapper><TransportRoleDetail /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/manufacturing-role-detail" element={<ProtectedRoute><LazyWrapper><ManufacturingRoleDetail /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/education" element={<ProtectedRoute><LazyWrapper><EducationCategory /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/vala-builder" element={<ProtectedRoute><LazyWrapper><ValaBuilder /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/ai-chat" element={<ProtectedRoute><LazyWrapper><AiChat /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/saas-ai-dashboard" element={<ProtectedRoute><LazyWrapper><SaasAiDashboard /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/saas-ai" element={<ProtectedRoute><LazyWrapper><SaasAiDashboard /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/ai-apis" element={<ProtectedRoute><LazyWrapper><AiApis /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/wallet" element={<ProtectedRoute><LazyWrapper><Wallet /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/reseller/dashboard" element={<ProtectedRoute><LazyWrapper><ResellerDashboard /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/support" element={<ProtectedRoute><LazyWrapper><Support /></LazyWrapper></ProtectedRoute>} />
 
         {/* Admin-only routes */}
-        <Route path="/settings" element={<ProtectedRoute><AdminRoute><Settings /></AdminRoute></ProtectedRoute>} />
-        <Route path="/audit-logs" element={<ProtectedRoute><AdminRoute><AuditLogs /></AdminRoute></ProtectedRoute>} />
-        <Route path="/system-health" element={<ProtectedRoute><AdminRoute><SystemHealth /></AdminRoute></ProtectedRoute>} />
-        <Route path="/automation" element={<ProtectedRoute><AdminRoute><Automation /></AdminRoute></ProtectedRoute>} />
-        <Route path="/auto-pilot" element={<ProtectedRoute><AdminRoute><Automation /></AdminRoute></ProtectedRoute>} />
-        <Route path="/apk-pipeline" element={<ProtectedRoute><AdminRoute><ApkPipeline /></AdminRoute></ProtectedRoute>} />
-        <Route path="/admin/add-product" element={<ProtectedRoute><AdminRoute><AddProduct /></AdminRoute></ProtectedRoute>} />
-        <Route path="/admin/marketplace" element={<ProtectedRoute><AdminRoute><MarketplaceAdmin /></AdminRoute></ProtectedRoute>} />
-        <Route path="/:demoSlug" element={<DemoHostRoute />} />
-        <Route path="/marketplace-admin" element={<ProtectedRoute><AdminRoute><MarketplaceAdmin /></AdminRoute></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute><AdminRoute><LazyWrapper><Settings /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/audit-logs" element={<ProtectedRoute><AdminRoute><LazyWrapper><AuditLogs /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/system-health" element={<ProtectedRoute><AdminRoute><LazyWrapper><SystemHealth /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/automation" element={<ProtectedRoute><AdminRoute><LazyWrapper><Automation /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/auto-pilot" element={<ProtectedRoute><AdminRoute><LazyWrapper><Automation /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/apk-pipeline" element={<ProtectedRoute><AdminRoute><LazyWrapper><ApkPipeline /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/admin/add-product" element={<ProtectedRoute><AdminRoute><LazyWrapper><AddProduct /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/admin/marketplace" element={<ProtectedRoute><AdminRoute><LazyWrapper><MarketplaceAdmin /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/:demoSlug" element={<LazyWrapper><DemoHostRoute /></LazyWrapper>} />
+        <Route path="/marketplace-admin" element={<ProtectedRoute><AdminRoute><LazyWrapper><MarketplaceAdmin /></LazyWrapper></AdminRoute></ProtectedRoute>} />
 
         {/* 404 fallback → redirect to appropriate dashboard */}
         <Route path="*" element={<FallbackRedirect />} />

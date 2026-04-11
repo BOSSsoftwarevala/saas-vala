@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, memo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -378,7 +378,7 @@ export const MarketplaceProductCard = React.memo(React.forwardRef<HTMLDivElement
 }));
 MarketplaceProductCard.displayName = 'MarketplaceProductCard';
 
-export function ComingSoonCard({ label }: { label: string }) {
+export const ComingSoonCard = memo(function ComingSoonCard({ label }: { label: string }) {
   return (
     <div className="flex-shrink-0" style={{ width: 280 }}>
       <div className="rounded-2xl border border-dashed flex flex-col items-center justify-center gap-3 text-center"
@@ -390,4 +390,4 @@ export function ComingSoonCard({ label }: { label: string }) {
       </div>
     </div>
   );
-}
+});

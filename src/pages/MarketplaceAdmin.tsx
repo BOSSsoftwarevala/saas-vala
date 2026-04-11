@@ -24,13 +24,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { Loader2, Plus, Trash2, Edit, Save, X, Eye, EyeOff, Upload, Download, AlertCircle, Check, Copy, ExternalLink, Package } from 'lucide-react';
+import { generateProductThumbnail } from '@/lib/thumbnailGenerator';
 import { marketplaceAdminApi } from '@/lib/api';
 import { normalizeDemoUrlPair, sanitizeDemoSourceUrl } from '@/lib/demoMasking';
 import {
-  Plus,
   Search,
   RefreshCw,
-  Trash2,
   Edit2,
   Eye,
   EyeOff,
@@ -751,13 +751,47 @@ export default function MarketplaceAdmin() {
     setSaving(true);
 
     try {
+      let productId: string;
+      let shouldGenerateThumbnail = false;
+
       if (editProduct.id.startsWith('new-')) {
-        await marketplaceAdminApi.createProduct(payload);
+        const createdProduct = await marketplaceAdminApi.createProduct(payload);
+        productId = createdProduct.id;
         toast.success('Product created');
+        shouldGenerateThumbnail = true;
       } else {
         await marketplaceAdminApi.updateProduct(editProduct.id, payload);
+        productId = editProduct.id;
         toast.success('Product updated');
+        // Generate thumbnail if demo_url changed
+        shouldGenerateThumbnail = normalizedDemo.demoUrl !== editProduct.demo_url;
       }
+
+      // Auto-generate thumbnail if demo URL is provided
+      if (shouldGenerateThumbnail && normalizedDemo.demoUrl) {
+        toast.info('Generating thumbnail for demo URL...');
+        try {
+          const thumbnailResult = await generateProductThumbnail(
+            productId,
+            normalizedDemo.demoUrl,
+            editProduct.target_industry || 'general'
+          );
+          
+          if (thumbnailResult.success) {
+            if (thumbnailResult.fallbackUsed) {
+              toast.info('Thumbnail generated using fallback image');
+            } else {
+              toast.success('Thumbnail generated successfully');
+            }
+          } else {
+            toast.warning(`Thumbnail generation failed: ${thumbnailResult.error || 'Unknown error'}`);
+          }
+        } catch (error) {
+          console.error('Thumbnail generation error:', error);
+          toast.warning('Thumbnail generation failed, using fallback');
+        }
+      }
+
       setEditProduct(null);
       await Promise.all([fetchProducts(), fetchProductCatalog(), fetchStats(), fetchApks()]);
       window.dispatchEvent(new CustomEvent('marketplaceRefresh'));

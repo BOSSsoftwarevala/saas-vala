@@ -36,18 +36,40 @@ export default defineConfig(({ mode }) => {
       sourcemap: false,
       minify: "esbuild",
       reportCompressedSize: true,
+      chunkSizeWarningLimit: 1000,
       rollupOptions: {
         output: {
           manualChunks(id) {
             if (!id.includes("node_modules")) return;
 
+            // Core React
+            if (id.includes("react") || id.includes("react-dom")) return "vendor-react";
+            
+            // Router
             if (id.includes("react-router")) return "vendor-router";
+            
+            // Supabase
             if (id.includes("@supabase")) return "vendor-supabase";
-            if (id.includes("@tanstack")) return "vendor-query";
+            
+            // Query/State Management
+            if (id.includes("@tanstack") || id.includes("react-query")) return "vendor-query";
+            
+            // Charts
             if (id.includes("recharts") || id.includes("d3-")) return "vendor-charts";
+            
+            // UI Components
+            if (id.includes("@radix-ui")) return "vendor-ui";
+            
+            // Utilities
             if (id.includes("date-fns")) return "vendor-date";
             if (id.includes("lucide-react")) return "vendor-icons";
             if (id.includes("framer-motion")) return "vendor-motion";
+            
+            // Audio/Video
+            if (id.includes("@elevenlabs")) return "vendor-audio";
+            
+            // Forms
+            if (id.includes("@hookform") || id.includes("react-hook-form")) return "vendor-forms";
           },
         },
       },

@@ -4,6 +4,44 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Mobile-first performance optimizations */
+@import './styles/mobile-optimizations.css';
+
+/* Performance optimizations */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeSpeed;
+}
+
+/* Optimize images */
+img {
+  max-width: 100%;
+  height: auto;
+  loading: lazy;
+  decoding: async;
+}
+
+/* GPU acceleration for animations */
+.gpu-accelerated {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Reduce paint complexity */
+.main-content {
+  contain: layout style paint;
+}
+
 /* SaaS VALA - PREMIUM ROYAL BLUE Design System v3.0
    Royal Blue + Clean White + Elegant Red Accent
    Matching SoftwareVala™ Logo Colors

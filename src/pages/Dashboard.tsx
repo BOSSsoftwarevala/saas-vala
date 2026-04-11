@@ -40,6 +40,8 @@ export default function Dashboard() {
     deployProductToServer,
     searchGlobal,
     getSystemMetrics,
+    updateProduct,
+    refreshDashboard,
   } = useDashboardStore();
 
   const safeProducts = Array.isArray(products) ? products : [];
@@ -48,6 +50,11 @@ export default function Dashboard() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [aiMode, setAiMode] = useState<'fast' | 'balanced' | 'quality' | 'cheap'>('balanced');
+  const [modalState, setModalState] = useState<{
+    open: boolean;
+    action: 'view' | 'edit' | 'deploy' | null;
+    product: any;
+  }>({ open: false, action: null, product: null });
   const [aiSaving, setAiSaving] = useState(false);
   const [superSummary, setSuperSummary] = useState<{
     leads_total?: number;
@@ -142,6 +149,35 @@ export default function Dashboard() {
       toast.error(e?.message || 'Failed to update AI mode');
     } finally {
       setAiSaving(false);
+    }
+  };
+
+  const handleOpenModal = (action: 'view' | 'edit' | 'deploy', product: any) => {
+    setModalState({ open: true, action, product });
+  };
+
+  const handleCloseModal = () => {
+    setModalState({ open: false, action: null, product: null });
+  };
+
+  const handleSaveProduct = async (productData: Partial<any>) => {
+    if (!modalState.product?.id) return;
+    try {
+      await updateProduct(modalState.product.id, productData);
+      await refreshDashboard();
+      handleCloseModal();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update product');
+    }
+  };
+
+  const handleDeployProduct = async (productId: string, serverId: string) => {
+    try {
+      await deployProductToServer(productId, serverId);
+      await refreshDashboard();
+      handleCloseModal();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to deploy product');
     }
   };
 

@@ -20,6 +20,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useProducts } from '@/hooks/useProducts';
 import { normalizeDemoUrlPair, sanitizeDemoSourceUrl } from '@/lib/demoMasking';
+import { generateProductThumbnail } from '@/lib/thumbnailGenerator';
 
 // ─── Types ─────────────���─────────────────────────────────────────────────────
 
@@ -379,7 +380,7 @@ Return ONLY valid JSON, no markdown.`;
     try {
       const normalizedDemo = normalizeDemoUrlPair(form.slug, form.demo_url);
 
-      await createProduct({
+      const createdProduct = await createProduct({
         name: form.name,
         slug: form.slug,
         description: form.description,
@@ -432,6 +433,32 @@ Return ONLY valid JSON, no markdown.`;
       } as Parameters<typeof createProduct>[0]);
 
       toast.success('Product saved successfully');
+
+      // Auto-generate thumbnail if demo URL is provided
+      if (normalizedDemo.demoUrl && createdProduct?.id) {
+        toast.info('Generating thumbnail for demo URL...');
+        try {
+          const thumbnailResult = await generateProductThumbnail(
+            createdProduct.id,
+            normalizedDemo.demoUrl,
+            form.target_industry || 'general'
+          );
+          
+          if (thumbnailResult.success) {
+            if (thumbnailResult.fallbackUsed) {
+              toast.info('Thumbnail generated using fallback image');
+            } else {
+              toast.success('Thumbnail generated successfully');
+            }
+          } else {
+            toast.warning(`Thumbnail generation failed: ${thumbnailResult.error || 'Unknown error'}`);
+          }
+        } catch (error) {
+          console.error('Thumbnail generation error:', error);
+          toast.warning('Thumbnail generation failed, using fallback');
+        }
+      }
+
       navigate('/products');
     } catch (err: unknown) {
       toast.error(`Save failed: ${err instanceof Error ? err.message : 'Unknown error'}`);

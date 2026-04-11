@@ -8,7 +8,7 @@ const actions = [
   {
     label: 'Add Product',
     icon: Plus,
-    href: '/products/add',
+    href: '/products/create',
     color: 'bg-primary hover:bg-primary/90 text-primary-foreground',
   },
   {

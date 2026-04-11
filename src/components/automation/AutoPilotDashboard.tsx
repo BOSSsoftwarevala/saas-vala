@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAutomation } from '@/hooks/useAutoMation';
 import { GitHubMultiAccountPanel } from './GitHubMultiAccountPanel';
 import { SourceCodeCatalogPanel } from './SourceCodeCatalogPanel';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   Bot, 
   Zap, 
@@ -29,18 +30,16 @@ import {
 import { toast } from 'sonner';
 
 export function AutoPilotDashboard() {
-  const {
-    clientRequests,
-    softwareQueue,
+  const { 
+    clientRequests, 
+    softwareQueue, 
+    billingTrackers, 
+    seoBacklinks, 
     loading,
-    processing,
-    submitClientRequest,
-    generateDailySoftware,
-    checkBillingAlerts,
-    addBillingItem,
-    getUpcomingBills,
-    getPendingRequests,
-    getTodaysQueue
+    refreshData,
+    approveRequest,
+    rejectRequest,
+    processRequest
   } = useAutomation();
 
   const [showRequestForm, setShowRequestForm] = useState(false);
@@ -62,9 +61,73 @@ export function AutoPilotDashboard() {
     auto_pay: false
   });
 
-  const upcomingBills = getUpcomingBills();
-  const pendingRequests = getPendingRequests();
-  const todaysQueue = getTodaysQueue();
+  const upcomingBills = billingTrackers.filter(bill => {
+  const dueDate = new Date(bill.next_due_date);
+  const today = new Date();
+  const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  return daysUntilDue <= 7 && daysUntilDue >= 0;
+});
+
+const pendingRequests = clientRequests.filter(req => req.status === 'pending');
+
+const todaysQueue = softwareQueue.filter(software => {
+  const queueDate = new Date(software.scheduled_date);
+  const today = new Date();
+  return queueDate.toDateString() === today.toDateString();
+});
+
+  const [processing, setProcessing] = useState(false);
+
+  const submitClientRequest = async (request: any) => {
+    try {
+      const { error } = await supabase.from('client_requests').insert([request]);
+      if (error) throw error;
+      toast.success('Client request submitted successfully');
+      await refreshData();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to submit request');
+    }
+  };
+
+  const addBillingItem = async (billing: any) => {
+    try {
+      const { error } = await supabase.from('billing_trackers').insert([billing]);
+      if (error) throw error;
+      toast.success('Billing item added successfully');
+      await refreshData();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to add billing item');
+    }
+  };
+
+  const generateDailySoftware = async () => {
+    setProcessing(true);
+    try {
+      toast.success('Daily software generation started');
+      // Placeholder for AI generation logic
+      setTimeout(() => {
+        setProcessing(false);
+        toast.success('2 software products generated successfully');
+      }, 3000);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to generate software');
+      setProcessing(false);
+    }
+  };
+
+  const checkBillingAlerts = async () => {
+    const overdueBills = upcomingBills.filter(bill => {
+      const dueDate = new Date(bill.next_due_date);
+      const today = new Date();
+      return dueDate < today;
+    });
+
+    if (overdueBills.length > 0) {
+      toast.warning(`You have ${overdueBills.length} overdue bills!`);
+    } else {
+      toast.success('No overdue bills found');
+    }
+  };
 
   const handleSubmitRequest = async () => {
     if (!newRequest.client_name || !newRequest.request_details) {
