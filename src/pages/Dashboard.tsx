@@ -306,7 +306,25 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Actions */}
+        <div style={{backgroundColor: 'orange', padding: '20px', margin: '20px 0', border: '3px solid red'}}>
+          <h2 style={{color: 'white', fontSize: '24px'}}>🚨 QUICK ACTIONS TEST SECTION 🚨</h2>
+          <p style={{color: 'white'}}>If you can see this orange section, the Dashboard is working here!</p>
+          <button onClick={() => alert('Dashboard button works!')} style={{
+            backgroundColor: 'blue', 
+            color: 'white', 
+            padding: '10px 20px', 
+            border: 'none', 
+            borderRadius: '5px',
+            cursor: 'pointer'
+          }}>
+            TEST DASHBOARD BUTTON
+          </button>
+        </div>
         <QuickActions />
+        <div style={{backgroundColor: 'purple', padding: '20px', margin: '20px 0', border: '3px solid yellow'}}>
+          <h2 style={{color: 'white', fontSize: '24px'}}>🚨 AFTER QUICKACTIONS 🚨</h2>
+          <p style={{color: 'white'}}>This section appears after QuickActions component</p>
+        </div>
 
         {/* Netflix Rows */}
         <NetflixRow
