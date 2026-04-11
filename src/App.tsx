@@ -51,6 +51,7 @@ const RealTimeAITest = React.lazy(() => import("./components/RealTimeAITest"));
 const FlowTestSystem = React.lazy(() => import("./components/FlowTestSystem"));
 const LiveAIDemo = React.lazy(() => import("./components/LiveAIDemo"));
 const AISoftwareFactory = React.lazy(() => import("./components/AISoftwareFactory"));
+const UltraAISoftwareFactory = React.lazy(() => import("./components/UltraAISoftwareFactory"));
 const SaasAiDashboard = React.lazy(() => import("./pages/SaasAiDashboard"));
 const AiApis = React.lazy(() => import("./pages/AiApis"));
 const Wallet = React.lazy(() => import("./pages/Wallet"));
@@ -285,6 +286,7 @@ function AppRoutes() {
         <Route path="/flow-test" element={<ProtectedRoute><LazyWrapper><FlowTestSystem /></LazyWrapper></ProtectedRoute>} />
         <Route path="/live-demo" element={<ProtectedRoute><LazyWrapper><LiveAIDemo /></LazyWrapper></ProtectedRoute>} />
         <Route path="/ai-factory" element={<ProtectedRoute><LazyWrapper><AISoftwareFactory /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/ultra-factory" element={<ProtectedRoute><LazyWrapper><UltraAISoftwareFactory /></LazyWrapper></ProtectedRoute>} />
         <Route path="/ai-chat" element={<ProtectedRoute><LazyWrapper><AiChat /></LazyWrapper></ProtectedRoute>} />
         <Route path="/saas-ai-dashboard" element={<ProtectedRoute><LazyWrapper><SaasAiDashboard /></LazyWrapper></ProtectedRoute>} />
         <Route path="/saas-ai" element={<ProtectedRoute><LazyWrapper><SaasAiDashboard /></LazyWrapper></ProtectedRoute>} />
