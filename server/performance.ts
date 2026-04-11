@@ -334,9 +334,9 @@ export class UltraPerformance {
       let compressed = false;
 
       res.write = function (chunk: any, encoding?: any) {
-        if (!compressed && typeof chunk === 'string' || Buffer.isBuffer(chunk)) {
+        if (!compressed && (typeof chunk === 'string' || Buffer.isBuffer(chunk))) {
           const contentType = res.get('content-type') || 'text/html';
-          const compressedChunk = this.compress(chunk, contentType);
+          const compressedChunk = (this as any).compress(chunk, contentType);
           
           if (compressedChunk !== chunk) {
             res.set('Content-Encoding', 'gzip');
@@ -392,7 +392,7 @@ export class UltraPerformance {
       const duration = Date.now() - startTime;
       this.logger.logPerformance('Database query (failed)', duration, { 
         query: query.substring(0, 100),
-        error: error.message 
+        error: error instanceof Error ? error.message : String(error)
       });
       throw error;
     }

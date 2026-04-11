@@ -423,16 +423,16 @@ export class UltraAISupport extends EventEmitter {
       
       // Generate suggestions
       const suggestions = await this.generateSuggestions(message, userId, {
-        language,
-        sentiment,
-        category
+        language: String(language),
+        sentiment: String(sentiment),
+        category: String(category)
       });
       
       // Generate smart replies
       const smartReplies = await this.generateSmartReplies(message, {
-        language,
-        sentiment,
-        category
+        language: String(language),
+        sentiment: String(sentiment),
+        category: String(category)
       });
       
       const processingTime = Date.now() - startTime;
@@ -922,33 +922,41 @@ export class UltraAISupport extends EventEmitter {
   }> {
     const templates = {
       technical: {
+        positive: [
+          { text: "Great! I'm glad I could help. Is there anything else I can assist you with?", confidence: 0.9, tone: 'casual' as const, length: 'short' as const },
+          { text: "Wonderful! I'm happy to help. Please let me know if you need anything else.", confidence: 0.8, tone: 'professional' as const, length: 'medium' as const }
+        ],
         neutral: [
-          { text: "I understand you're experiencing a technical issue. Let me help you resolve this.", confidence: 0.8, tone: 'professional', length: 'medium' },
-          { text: "I'll help you with this technical problem. Can you provide more details?", confidence: 0.7, tone: 'casual', length: 'medium' }
+          { text: "I understand you're experiencing a technical issue. Let me help you resolve this.", confidence: 0.8, tone: 'professional' as const, length: 'medium' as const },
+          { text: "I'll help you with this technical problem. Can you provide more details?", confidence: 0.7, tone: 'casual' as const, length: 'medium' as const }
         ],
         negative: [
-          { text: "I'm sorry you're experiencing technical difficulties. I'll do my best to resolve this quickly.", confidence: 0.9, tone: 'empathetic', length: 'medium' },
-          { text: "I understand your frustration with this technical issue. Let's work together to fix it.", confidence: 0.8, tone: 'empathetic', length: 'medium' }
+          { text: "I'm sorry you're experiencing technical difficulties. I'll do my best to resolve this quickly.", confidence: 0.9, tone: 'empathetic' as const, length: 'medium' as const },
+          { text: "I understand your frustration with this technical issue. Let's work together to fix it.", confidence: 0.8, tone: 'empathetic' as const, length: 'medium' as const }
         ]
       },
       billing: {
+        positive: [
+          { text: "Great! I'm glad I could help. Is there anything else I can assist you with?", confidence: 0.9, tone: 'casual' as const, length: 'short' as const },
+          { text: "Wonderful! I'm happy to help. Please let me know if you need anything else.", confidence: 0.8, tone: 'professional' as const, length: 'medium' as const }
+        ],
         neutral: [
-          { text: "I can help you with your billing inquiry. What specific question do you have?", confidence: 0.8, tone: 'professional', length: 'short' },
-          { text: "I'd be happy to assist with your billing concern. Please provide more details.", confidence: 0.7, tone: 'formal', length: 'medium' }
+          { text: "I can help you with your billing inquiry. What specific question do you have?", confidence: 0.8, tone: 'professional' as const, length: 'short' as const },
+          { text: "I'd be happy to assist with your billing concern. Please provide more details.", confidence: 0.7, tone: 'formal' as const, length: 'medium' as const }
         ],
         negative: [
-          { text: "I understand your concern about billing. Let me help resolve this for you.", confidence: 0.9, tone: 'empathetic', length: 'medium' },
-          { text: "I'm sorry for any billing issues you're experiencing. I'll look into this immediately.", confidence: 0.8, tone: 'empathetic', length: 'medium' }
+          { text: "I understand your concern about billing. Let me help resolve this for you.", confidence: 0.9, tone: 'empathetic' as const, length: 'medium' as const },
+          { text: "I'm sorry for any billing issues you're experiencing. I'll look into this immediately.", confidence: 0.8, tone: 'empathetic' as const, length: 'medium' as const }
         ]
       },
       general: {
         neutral: [
-          { text: "How can I help you today?", confidence: 0.8, tone: 'casual', length: 'short' },
-          { text: "I'm here to assist you. What can I help you with?", confidence: 0.7, tone: 'professional', length: 'short' }
+          { text: "How can I help you today?", confidence: 0.8, tone: 'casual' as const, length: 'short' as const },
+          { text: "I'm here to assist you. What can I help you with?", confidence: 0.7, tone: 'professional' as const, length: 'short' as const }
         ],
         negative: [
-          { text: "I'm here to help. Please let me know what's concerning you.", confidence: 0.8, tone: 'empathetic', length: 'medium' },
-          { text: "I understand you need assistance. I'm here to help resolve your concerns.", confidence: 0.7, tone: 'empathetic', length: 'medium' }
+          { text: "I'm here to help. Please let me know what's concerning you.", confidence: 0.8, tone: 'empathetic' as const, length: 'medium' as const },
+          { text: "I understand you need assistance. I'm here to help resolve your concerns.", confidence: 0.7, tone: 'empathetic' as const, length: 'medium' as const }
         ]
       }
     };

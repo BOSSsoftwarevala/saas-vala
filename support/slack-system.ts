@@ -67,6 +67,22 @@ export interface Permission {
   actions: string[];
 }
 
+export interface User {
+  id: string;
+  email: string;
+  username: string;
+  fullName: string;
+  avatar?: string;
+  role: UserRole;
+  preferences: UserPreferences;
+  workspaces: string[]; // workspaceIds
+  createdAt: Date;
+  updatedAt: Date;
+  lastLogin?: Date;
+  isActive: boolean;
+  metadata: Record<string, any>;
+}
+
 export interface UserPreferences {
   theme: 'light' | 'dark' | 'auto';
   notifications: {

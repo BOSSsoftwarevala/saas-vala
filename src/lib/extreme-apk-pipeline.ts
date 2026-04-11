@@ -1337,4 +1337,33 @@ class ExtremeAPKPipeline {
   }
 }
 
+// Export all interfaces for ExtremeAPKPipelineAdmin
+export type { 
+  DeviceFingerprint, 
+  SecurityCheck, 
+  TimeValidation, 
+  Heartbeat, 
+  GracePeriod, 
+  KeyType, 
+  Watermark, 
+  FeatureLock, 
+  KillSwitch, 
+  SessionControl, 
+  NetworkSecurity, 
+  APIValidation, 
+  EncryptedStorage, 
+  CrashReport, 
+  ServiceProtection, 
+  OpenValidation, 
+  SecureCache, 
+  APKSplit, 
+  Hotfix, 
+  UsageTracker, 
+  EnvironmentConfig, 
+  InstallSource, 
+  SessionRecovery, 
+  HealthScore, 
+  FinalLock 
+};
+
 export const extremeApkPipeline = ExtremeAPKPipeline.getInstance();

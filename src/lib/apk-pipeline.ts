@@ -1037,4 +1037,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 }
 
+// Export all interfaces for ExtremeAPKPipelineAdmin
+export type { BuildSource, BuildResult, BuildLog, TestResult, APKStorage, LicenseKey, BuildQueue };
 export const apkPipeline = APKPipeline.getInstance();

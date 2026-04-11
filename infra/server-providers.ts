@@ -618,10 +618,10 @@ export class UltraServerProviders extends EventEmitter {
         res.on('end', () => {
           try {
             const parsed = JSON.parse(data);
-            if (res.statusCode >= 200 && res.statusCode < 300) {
+            if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
               resolve(parsed);
             } else {
-              reject(new Error(`HTTP ${res.statusCode}: ${parsed.message || parsed.error || 'Unknown error'}`));
+              reject(new Error(`HTTP ${res.statusCode || 'Unknown'}: ${parsed.message || parsed.error || 'Unknown error'}`));
             }
           } catch (error) {
             reject(new Error('Invalid JSON response'));
