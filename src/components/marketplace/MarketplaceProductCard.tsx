@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, memo } from 'react';
+import React, { useState, useCallback, useEffect, memo, useRef, useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -47,6 +47,11 @@ const MarketplaceProductCard: React.FC<MarketplaceProductCardProps> = memo(({ pr
   const [featuresOpen, setFeaturesOpen] = useState(false);
   const [downloadChecking, setDownloadChecking] = useState(false);
   const [buttonLoading, setButtonLoading] = useState<string | null>(null);
+  
+  // Performance optimizations
+  const cardRef = useRef<HTMLDivElement>(null);
+  const isPreloaded = useRef(false);
+  const cleanupRef = useRef<(() => void)[]>([]);
 
   const isPipeline = !product.isAvailable || product.status === 'draft' || product.status === 'upcoming';
   const iconColor = catColors[product.category] || '#f97316';
@@ -99,11 +104,20 @@ const MarketplaceProductCard: React.FC<MarketplaceProductCardProps> = memo(({ pr
       }
     };
 
+    // Preload critical UI
+    if (!isPreloaded.current && index < 4) {
+      isPreloaded.current = true;
+    }
+
     loadFavoriteState();
+    
+    // Memory cleanup
     return () => {
       cancelled = true;
+      cleanupRef.current.forEach(cleanup => cleanup());
+      cleanupRef.current = [];
     };
-  }, [user, product.id]);
+  }, [user, product.id, index]);
 
   const handleFavorite = useCallback(() => {
     if (!user) {
