@@ -1,8 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Plus, Key, Upload, Server, Wallet, Headphones } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 
 const actions = [
@@ -69,24 +67,10 @@ const itemVariants = {
 };
 
 export function QuickActions() {
-  const navigate = useNavigate();
-
   const handleActionClick = (action: typeof actions[0]) => {
     console.log('Quick action clicked:', action.label, 'navigating to:', action.href);
-    
-    try {
-      // Show loading feedback
-      toast.loading(`Opening ${action.label}...`, { id: `quick-action-${action.label}` });
-      
-      // Navigate after a small delay to show feedback
-      setTimeout(() => {
-        navigate(action.href);
-        toast.success(`Opened ${action.label}`, { id: `quick-action-${action.label}` });
-      }, 300);
-    } catch (error) {
-      console.error('Navigation error:', error);
-      toast.error(`Failed to navigate to ${action.label}`, { id: `quick-action-${action.label}` });
-    }
+    // Simple direct navigation
+    window.location.href = action.href;
   };
 
   // Test function to verify all actions work
@@ -101,12 +85,7 @@ export function QuickActions() {
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.3 }}
-      className="neon-card rounded-xl p-5"
-    >
+    <div className="neon-card rounded-xl p-5">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-display text-lg font-bold text-foreground flex items-center gap-2">
           <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
@@ -121,29 +100,18 @@ export function QuickActions() {
           Test All
         </Button>
       </div>
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="show"
-        className="flex flex-wrap gap-3"
-      >
+      <div className="flex flex-wrap gap-3">
         {actions.map((action) => (
-          <motion.div key={action.label} variants={itemVariants}>
-            <motion.div
-              whileHover={{ scale: 1.05, y: -2 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <Button
-                onClick={() => handleActionClick(action)}
-                className={cn('gap-2 shadow-lg', action.color)}
-              >
-                <action.icon className="h-4 w-4" />
-                {action.label}
-              </Button>
-            </motion.div>
-          </motion.div>
+          <Button
+            key={action.label}
+            onClick={() => handleActionClick(action)}
+            className={cn('gap-2 shadow-lg', action.color)}
+          >
+            <action.icon className="h-4 w-4" />
+            {action.label}
+          </Button>
         ))}
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }
