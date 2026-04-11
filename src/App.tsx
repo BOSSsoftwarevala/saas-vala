@@ -47,6 +47,9 @@ const AiChat = React.lazy(() => import("./pages/AiChat"));
 const ValaBuilder = React.lazy(() => import("./pages/ValaBuilder"));
 const ValaBuilderOpenAI = React.lazy(() => import("./components/ValaBuilderOpenAI"));
 const AIIntegrationsSettings = React.lazy(() => import("./components/AIIntegrationsSettings"));
+const RealTimeAITest = React.lazy(() => import("./components/RealTimeAITest"));
+const FlowTestSystem = React.lazy(() => import("./components/FlowTestSystem"));
+const LiveAIDemo = React.lazy(() => import("./components/LiveAIDemo"));
 const SaasAiDashboard = React.lazy(() => import("./pages/SaasAiDashboard"));
 const AiApis = React.lazy(() => import("./pages/AiApis"));
 const Wallet = React.lazy(() => import("./pages/Wallet"));
@@ -277,6 +280,9 @@ function AppRoutes() {
         <Route path="/vala-builder" element={<ProtectedRoute><LazyWrapper><ValaBuilder /></LazyWrapper></ProtectedRoute>} />
         <Route path="/vala-builder-openai" element={<ProtectedRoute><LazyWrapper><ValaBuilderOpenAI /></LazyWrapper></ProtectedRoute>} />
         <Route path="/ai-settings" element={<ProtectedRoute><AdminRoute><LazyWrapper><AIIntegrationsSettings /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/ai-test" element={<ProtectedRoute><LazyWrapper><RealTimeAITest /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/flow-test" element={<ProtectedRoute><LazyWrapper><FlowTestSystem /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/live-demo" element={<ProtectedRoute><LazyWrapper><LiveAIDemo /></LazyWrapper></ProtectedRoute>} />
         <Route path="/ai-chat" element={<ProtectedRoute><LazyWrapper><AiChat /></LazyWrapper></ProtectedRoute>} />
         <Route path="/saas-ai-dashboard" element={<ProtectedRoute><LazyWrapper><SaasAiDashboard /></LazyWrapper></ProtectedRoute>} />
         <Route path="/saas-ai" element={<ProtectedRoute><LazyWrapper><SaasAiDashboard /></LazyWrapper></ProtectedRoute>} />
