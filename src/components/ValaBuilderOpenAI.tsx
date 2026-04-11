@@ -632,36 +632,6 @@ export default function ValaBuilderOpenAI() {
                 )}
 
                 {/* Messages */}
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Templates */}
-                {showTemplates && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-4 bg-muted/30 rounded-lg">
-                    {BUILDER_TEMPLATES.map(template => (
-                      <Button
-                        key={template.id}
-                        variant="outline"
-                        className="h-auto p-4 flex flex-col items-start gap-2 hover:bg-accent/50"
-                        onClick={() => applyTemplate(template)}
-                      >
-                        <div className="flex items-center gap-2 w-full">
-                          <div className="p-1 rounded bg-primary/10">
-                            {template.icon}
-                          </div>
-                          <span className="font-medium">{template.name}</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground text-left">{template.description}</p>
-                        <div className="flex flex-wrap gap-1">
-                          {template.tags.map(tag => (
-                            <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
-                          ))}
-                        </div>
-                      </Button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Messages */}
                 <div className="h-[500px] overflow-y-auto space-y-4 p-4 bg-background rounded-lg border">
                   {messages.map((message) => (
                     <div
