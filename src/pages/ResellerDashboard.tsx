@@ -9,11 +9,16 @@ import { ClientsPanel } from '@/components/reseller/ClientsPanel';
 import { AddBalancePanel } from '@/components/reseller/AddBalancePanel';
 import { ReferralPanel } from '@/components/reseller/ReferralPanel';
 import { ChangePasswordPanel } from '@/components/reseller/ChangePasswordPanel';
+import ResellerBadge from '@/components/ResellerBadge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
 import {
   Table,
   TableBody,
@@ -32,17 +37,31 @@ import {
   CheckCircle,
   Loader2,
   CreditCard,
+  Crown,
+  Star,
+  Zap,
+  Gem,
 } from 'lucide-react';
- 
+import { 
+  resellerPlanSystem, 
+  ResellerAccount, 
+  ResellerPlan, 
+  RESELLER_PLANS 
+} from '@/lib/reseller-plans';
+
 export default function ResellerDashboard() {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const { getResellerData, resellerPurchaseProduct } = useDashboardStore();
   const [resellerData, setResellerData] = useState<any>(null);
+  const [resellerAccount, setResellerAccount] = useState<ResellerAccount | null>(null);
   const [loading, setLoading] = useState(true);
   const [purchaseDialogOpen, setPurchaseDialogOpen] = useState(false);
+  const [planPurchaseDialogOpen, setPlanPurchaseDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [selectedPlan, setSelectedPlan] = useState<ResellerPlan | null>(null);
   const [purchasing, setPurchasing] = useState(false);
+  const [purchasingPlan, setPurchasingPlan] = useState(false);
 
   const activeTab = searchParams.get('tab') || 'products';
 
@@ -86,6 +105,87 @@ export default function ResellerDashboard() {
   const openPurchaseDialog = (product: any) => {
     setSelectedProduct(product);
     setPurchaseDialogOpen(true);
+  };
+
+  // Load reseller account data
+  useEffect(() => {
+    if (user?.id) {
+      const account = resellerPlanSystem.getResellerAccount(user.id);
+      setResellerAccount(account || null);
+    }
+  }, [user]);
+
+  // Handle plan purchase
+  const handlePlanPurchase = async () => {
+    if (!selectedPlan || !user?.id) return;
+
+    setPurchasingPlan(true);
+    try {
+      // Simulate payment processing
+      const paymentData = {
+        amount: selectedPlan.price,
+        currency: 'INR',
+        paymentMethod: 'wallet',
+        transactionId: `txn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      };
+
+      // Check payment security
+      const securityCheck = await resellerPlanSystem.checkPaymentSecurity(
+        paymentData.transactionId,
+        user.id
+      );
+
+      if (!securityCheck.secure) {
+        toast.error(securityCheck.reason || 'Payment security check failed');
+        return;
+      }
+
+      // Process payment and activate plan
+      const result = await resellerPlanSystem.processPaymentAndActivatePlan(
+        user.id,
+        selectedPlan.id,
+        paymentData
+      );
+
+      if (result.success) {
+        toast.success(`${selectedPlan.badge.label} plan activated successfully!`);
+        setResellerAccount(result.account || null);
+        setPlanPurchaseDialogOpen(false);
+        setSelectedPlan(null);
+      } else {
+        toast.error(result.error || 'Plan activation failed');
+      }
+    } catch (error) {
+      console.error('Plan purchase error:', error);
+      toast.error('Plan purchase failed');
+    } finally {
+      setPurchasingPlan(false);
+    }
+  };
+
+  const openPlanPurchaseDialog = (plan: ResellerPlan) => {
+    setSelectedPlan(plan);
+    setPlanPurchaseDialogOpen(true);
+  };
+
+  // Generate key for reseller
+  const handleGenerateKey = async () => {
+    if (!user?.id) return;
+
+    try {
+      const result = await resellerPlanSystem.generateKeyForReseller(user.id);
+      if (result.success) {
+        toast.success('Key generated successfully!');
+        // Refresh account data
+        const account = resellerPlanSystem.getResellerAccount(user.id);
+        setResellerAccount(account || null);
+      } else {
+        toast.error(result.error || 'Key generation failed');
+      }
+    } catch (error) {
+      console.error('Key generation error:', error);
+      toast.error('Key generation failed');
+    }
   };
 
   const renderContent = () => {
@@ -191,6 +291,115 @@ export default function ResellerDashboard() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Reseller Plan Badge Display */}
+          {resellerAccount?.currentPlan && (
+            <Card className="border-2 border-primary/20">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Crown className="h-5 w-5 text-primary" />
+                      Your Reseller Plan
+                    </CardTitle>
+                    <CardDescription>
+                      Active since {resellerAccount.planActivatedAt?.toLocaleDateString()}
+                    </CardDescription>
+                  </div>
+                  <ResellerBadge plan={resellerAccount.currentPlan} size="lg" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-primary">
+                      {resellerAccount.totalKeys - resellerAccount.usedKeys}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Available Keys</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">
+                      {resellerAccount.currentPlan.benefits.marginPercentage}%
+                    </div>
+                    <div className="text-sm text-muted-foreground">Margin</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {resellerAccount.currentPlan.benefits.maxKeysPerMonth}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Max Keys/Month</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-purple-600">
+                      {resellerAccount.planExpiresAt?.toLocaleDateString()}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Expires</div>
+                  </div>
+                </div>
+                <div className="mt-4 flex gap-2">
+                  <Button onClick={handleGenerateKey} className="flex-1">
+                    <Key className="h-4 w-4 mr-2" />
+                    Generate Key
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Reseller Plans Section */}
+          {!resellerAccount?.currentPlan && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Gem className="h-5 w-5" />
+                  Choose Your Reseller Plan
+                </CardTitle>
+                <CardDescription>
+                  Select a plan to unlock reseller features and start earning
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {Object.values(RESELLER_PLANS).map((plan) => (
+                    <Card key={plan.id} className="relative hover:shadow-lg transition-shadow">
+                      <CardHeader className="text-center pb-3">
+                        <div className="text-3xl mb-2">{plan.badge.emoji}</div>
+                        <CardTitle className="text-lg">{plan.badge.label}</CardTitle>
+                        <CardDescription>{plan.name}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="text-center">
+                        <div className="text-3xl font-bold text-primary mb-4">
+                          ₹{plan.price}
+                        </div>
+                        <div className="space-y-2 text-sm mb-4">
+                          <div className="flex justify-between">
+                            <span>Free Keys:</span>
+                            <span className="font-semibold">{plan.benefits.freeKeys}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Margin:</span>
+                            <span className="font-semibold">{plan.benefits.marginPercentage}%</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Max Keys:</span>
+                            <span className="font-semibold">{plan.benefits.maxKeysPerMonth}/mo</span>
+                          </div>
+                        </div>
+                        <Button
+                          onClick={() => openPlanPurchaseDialog(plan)}
+                          className="w-full"
+                          variant={plan.id === 'gold' ? 'default' : 'outline'}
+                        >
+                          {plan.id === 'gold' && <Star className="h-4 w-4 mr-2" />}
+                          Choose {plan.badge.label}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Main Content */}
           <Tabs value={activeTab} className="space-y-4">
@@ -403,6 +612,97 @@ export default function ResellerDashboard() {
                 >
                   {purchasing && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                   Purchase for ${selectedProduct?.price}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Plan Purchase Dialog */}
+          <Dialog open={planPurchaseDialogOpen} onOpenChange={setPlanPurchaseDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Confirm Plan Purchase</DialogTitle>
+                <DialogDescription>
+                  Upgrade your reseller account to unlock premium features
+                </DialogDescription>
+              </DialogHeader>
+
+              {selectedPlan && (
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-4">
+                    <div className="text-4xl">{selectedPlan.badge.emoji}</div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-lg">{selectedPlan.badge.label} Plan</h4>
+                      <p className="text-sm text-muted-foreground">{selectedPlan.name}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-3xl font-bold text-primary">
+                        ₹{selectedPlan.price}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        One-time payment
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-muted/50 p-3 rounded-lg">
+                      <div className="flex items-center space-x-2 text-sm">
+                        <Key className="h-4 w-4 text-blue-500" />
+                        <span className="font-semibold">{selectedPlan.benefits.freeKeys} Free Keys</span>
+                      </div>
+                    </div>
+                    <div className="bg-muted/50 p-3 rounded-lg">
+                      <div className="flex items-center space-x-2 text-sm">
+                        <DollarSign className="h-4 w-4 text-green-500" />
+                        <span className="font-semibold">{selectedPlan.benefits.marginPercentage}% Margin</span>
+                      </div>
+                    </div>
+                    <div className="bg-muted/50 p-3 rounded-lg">
+                      <div className="flex items-center space-x-2 text-sm">
+                        <Package className="h-4 w-4 text-purple-500" />
+                        <span className="font-semibold">{selectedPlan.benefits.maxKeysPerMonth} Keys/Month</span>
+                      </div>
+                    </div>
+                    <div className="bg-muted/50 p-3 rounded-lg">
+                      <div className="flex items-center space-x-2 text-sm">
+                        <Crown className="h-4 w-4 text-yellow-500" />
+                        <span className="font-semibold">{selectedPlan.benefits.supportLevel} Support</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
+                    <div className="flex items-center space-x-2 text-sm text-green-800">
+                      <CheckCircle className="h-4 w-4" />
+                      <span>Plan activates immediately after payment</span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-sm text-green-800 mt-2">
+                      <CheckCircle className="h-4 w-4" />
+                      <span>Free keys added to your account instantly</span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-sm text-green-800 mt-2">
+                      <CheckCircle className="h-4 w-4" />
+                      <span>Access to premium reseller features</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setPlanPurchaseDialogOpen(false)}
+                  disabled={purchasingPlan}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handlePlanPurchase}
+                  disabled={purchasingPlan || !selectedPlan}
+                >
+                  {purchasingPlan && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                  Activate {selectedPlan?.badge.label} Plan - ₹{selectedPlan?.price}
                 </Button>
               </DialogFooter>
             </DialogContent>

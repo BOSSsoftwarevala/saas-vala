@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { publicMarketplaceApi } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
+import { resellerPlanSystem } from '@/lib/reseller-plans';
 
 export interface ResellerPlanBadgeState {
   badgeLabel: string;
@@ -14,9 +14,9 @@ export interface ResellerPlanBadgeState {
 }
 
 const DEFAULT_PLAN_STATE: ResellerPlanBadgeState = {
-  badgeLabel: 'Bronze',
-  badgeIcon: '🥉',
-  planName: 'Bronze',
+  badgeLabel: 'No Plan',
+  badgeIcon: '',
+  planName: 'No Plan',
   marginPercent: 0,
   freeKeysBalance: 0,
   planActive: false,
@@ -25,35 +25,42 @@ const DEFAULT_PLAN_STATE: ResellerPlanBadgeState = {
 };
 
 export function useResellerPlanBadge() {
-  const { isReseller } = useAuth();
+  const { user, isReseller } = useAuth();
   const [plan, setPlan] = useState<ResellerPlanBadgeState>(DEFAULT_PLAN_STATE);
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {
-    if (!isReseller) {
+    if (!isReseller || !user?.id) {
       setPlan(DEFAULT_PLAN_STATE);
       return;
     }
 
     setLoading(true);
     try {
-      const stats = await publicMarketplaceApi.getResellerStats();
-      setPlan({
-        badgeLabel: String(stats?.badge_label || DEFAULT_PLAN_STATE.badgeLabel),
-        badgeIcon: String(stats?.badge_icon || DEFAULT_PLAN_STATE.badgeIcon),
-        planName: String(stats?.plan_name || stats?.badge_label || DEFAULT_PLAN_STATE.planName),
-        marginPercent: Number(stats?.margin_percent || 0),
-        freeKeysBalance: Number(stats?.free_keys_balance || 0),
-        planActive: Boolean(stats?.plan_active),
-        dashboardAccess: Boolean(stats?.dashboard_access),
-        planExpiresAt: stats?.plan_expires_at || null,
-      });
+      // Get reseller account from our new plan system
+      const account = resellerPlanSystem.getResellerAccount(user.id);
+      
+      if (account?.currentPlan) {
+        const availableKeys = account.totalKeys - account.usedKeys;
+        setPlan({
+          badgeLabel: account.currentPlan.badge.label,
+          badgeIcon: account.currentPlan.badge.emoji,
+          planName: account.currentPlan.name,
+          marginPercent: account.currentPlan.benefits.marginPercentage,
+          freeKeysBalance: availableKeys,
+          planActive: true,
+          dashboardAccess: true,
+          planExpiresAt: account.planExpiresAt?.toISOString() || null,
+        });
+      } else {
+        setPlan(DEFAULT_PLAN_STATE);
+      }
     } catch {
       // Keep existing plan state on transient failures.
     } finally {
       setLoading(false);
     }
-  }, [isReseller]);
+  }, [isReseller, user?.id]);
 
   useEffect(() => {
     refresh();
