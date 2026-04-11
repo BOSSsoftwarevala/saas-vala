@@ -46,6 +46,7 @@ const MarketplaceProductCard: React.FC<MarketplaceProductCardProps> = memo(({ pr
   const [demoOpen, setDemoOpen] = useState(false);
   const [featuresOpen, setFeaturesOpen] = useState(false);
   const [downloadChecking, setDownloadChecking] = useState(false);
+  const [buttonLoading, setButtonLoading] = useState<string | null>(null);
 
   const isPipeline = !product.isAvailable || product.status === 'draft' || product.status === 'upcoming';
   const iconColor = catColors[product.category] || '#f97316';
@@ -211,6 +212,9 @@ const MarketplaceProductCard: React.FC<MarketplaceProductCardProps> = memo(({ pr
           width: 260,
           minWidth: 260,
           maxWidth: 260,
+          height: 420,
+          minHeight: 420,
+          maxHeight: 420,
           background: 'rgba(255,255,255,0.03)',
           border: '1px solid rgba(255,255,255,0.07)',
           transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, border-color 0.3s ease',
@@ -246,13 +250,13 @@ const MarketplaceProductCard: React.FC<MarketplaceProductCardProps> = memo(({ pr
         </div>
 
         {/* Body */}
-        <div className="flex-1 px-4 py-3 flex flex-col gap-2">
-          <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
+        <div className="flex-1 px-4 py-3 flex flex-col gap-2 overflow-hidden">
+          <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed overflow-hidden text-ellipsis">
             {product.subtitle || 'Complete solution with all features, reports, and integrations.'}
           </p>
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1 overflow-hidden">
             {features.slice(0, 3).map((f, i) => (
-              <span key={i} className="text-[10px] px-2 py-0.5 rounded bg-muted/80 text-muted-foreground border border-border/50">{f}</span>
+              <span key={i} className="text-[10px] px-2 py-0.5 rounded bg-muted/80 text-muted-foreground border border-border/50 truncate max-w-[80px] overflow-hidden">{f}</span>
             ))}
           </div>
           {/* Price row — dynamic from DB */}
