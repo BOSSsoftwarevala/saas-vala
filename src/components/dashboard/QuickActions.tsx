@@ -3,6 +3,7 @@ import { Plus, Key, Upload, Server, Wallet, Headphones } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
+import { toast } from 'sonner';
 
 const actions = [
   {
@@ -70,6 +71,35 @@ const itemVariants = {
 export function QuickActions() {
   const navigate = useNavigate();
 
+  const handleActionClick = (action: typeof actions[0]) => {
+    console.log('Quick action clicked:', action.label, 'navigating to:', action.href);
+    
+    try {
+      // Show loading feedback
+      toast.loading(`Opening ${action.label}...`, { id: `quick-action-${action.label}` });
+      
+      // Navigate after a small delay to show feedback
+      setTimeout(() => {
+        navigate(action.href);
+        toast.success(`Opened ${action.label}`, { id: `quick-action-${action.label}` });
+      }, 300);
+    } catch (error) {
+      console.error('Navigation error:', error);
+      toast.error(`Failed to navigate to ${action.label}`, { id: `quick-action-${action.label}` });
+    }
+  };
+
+  // Test function to verify all actions work
+  const testAllActions = () => {
+    console.log('Testing all quick actions...');
+    actions.forEach((action, index) => {
+      setTimeout(() => {
+        console.log(`Testing action ${index + 1}: ${action.label} -> ${action.href}`);
+        toast.info(`Test: ${action.label} -> ${action.href}`, { duration: 2000 });
+      }, index * 1000);
+    });
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -77,10 +107,20 @@ export function QuickActions() {
       transition={{ duration: 0.5, delay: 0.3 }}
       className="neon-card rounded-xl p-5"
     >
-      <h3 className="font-display text-lg font-bold text-foreground mb-4 flex items-center gap-2">
-        <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-        Quick Actions
-      </h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-display text-lg font-bold text-foreground flex items-center gap-2">
+          <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+          Quick Actions
+        </h3>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={testAllActions}
+          className="text-xs"
+        >
+          Test All
+        </Button>
+      </div>
       <motion.div
         variants={containerVariants}
         initial="hidden"
@@ -94,7 +134,7 @@ export function QuickActions() {
               whileTap={{ scale: 0.95 }}
             >
               <Button
-                onClick={() => navigate(action.href)}
+                onClick={() => handleActionClick(action)}
                 className={cn('gap-2 shadow-lg', action.color)}
               >
                 <action.icon className="h-4 w-4" />
