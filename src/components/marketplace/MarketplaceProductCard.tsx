@@ -110,13 +110,14 @@ const MarketplaceProductCard: React.FC<MarketplaceProductCardProps> = memo(({ pr
       toast.error('Sign in to add to favorites');
       return;
     }
-    if (favoriteLoading) {
+    if (favoriteLoading || buttonLoading === 'favorite') {
       return;
     }
 
     const wasFavorited = favorited;
     setFavorited(!wasFavorited);
     setFavoriteLoading(true);
+    setButtonLoading('favorite');
 
     const request = wasFavorited
       ? publicMarketplaceApi.removeFavorite(product.id)
@@ -132,8 +133,9 @@ const MarketplaceProductCard: React.FC<MarketplaceProductCardProps> = memo(({ pr
       })
       .finally(() => {
         setFavoriteLoading(false);
+        setButtonLoading(null);
       });
-  }, [user, favorited, favoriteLoading, product.id]);
+  }, [user, favorited, favoriteLoading, buttonLoading, product.id]);
 
   const handleAddToCart = useCallback(() => {
     toggleItem({ id: product.id, title: product.title, subtitle: product.subtitle || '', image: product.image || '', price, category: product.category });
@@ -296,13 +298,13 @@ const MarketplaceProductCard: React.FC<MarketplaceProductCardProps> = memo(({ pr
                 )}
                 {/* Role-based: Show favorite for all logged-in users */}
                 {user && (
-                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={handleFavorite}>
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 min-h-[44px] min-w-[44px]" onClick={handleFavorite}>
                     <Heart style={{ width: 14, height: 14 }} className={favorited ? 'fill-pink-400 text-pink-400' : 'text-muted-foreground'} />
                   </Button>
                 )}
                 {/* Role-based: Show cart for users and resellers */}
                 {(isUser || isReseller) && (
-                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={handleAddToCart} disabled={!buyEnabled}>
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 min-h-[44px] min-w-[44px]" onClick={handleAddToCart} disabled={!buyEnabled}>
                     <ShoppingCart style={{ width: 14, height: 14 }} className={inCart ? 'text-primary' : 'text-muted-foreground'} />
                   </Button>
                 )}
