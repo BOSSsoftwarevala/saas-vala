@@ -202,6 +202,8 @@ function AppRoutes() {
         <Route path="/" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
         <Route path="/marketplace" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
         <Route path="/marketplace/product/:id" element={<LazyWrapper><ProductDetail /></LazyWrapper>} />
+        <Route path="/marketplace/category/:category" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
+        <Route path="/marketplace/search" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
         <Route path="/demo/:slug" element={<LazyWrapper><DemoPage /></LazyWrapper>} />
         <Route path="/favorites" element={<ProtectedRoute><LazyWrapper><Favorites /></LazyWrapper></ProtectedRoute>} />
         <Route path="/orders" element={<ProtectedRoute><LazyWrapper><Orders /></LazyWrapper></ProtectedRoute>} />

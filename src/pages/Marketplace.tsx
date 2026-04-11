@@ -217,23 +217,31 @@ export default function Marketplace() {
     setShowPayment(true);
   };
 
-  const handleDemo = (product: MarketplaceProduct) => {
-    if (user?.id && product.id) {
-      publicMarketplaceApi
-        .logDemoAccess(product.id, crypto.randomUUID())
-        .catch(() => {});
-    }
-    const demoUrl = resolveMaskedDemoUrl({
-      slug: product.slug,
-      demo_url: product.demoUrl || (product as any).demo_url,
-      demo_enabled: product.demoEnabled ?? (product as any).demo_enabled,
-    });
-    if (!demoUrl) {
-      toast.error('Demo is unavailable until SaaS Vala masking is configured.');
+  const handleDemo = useCallback(async (product: MarketplaceProduct) => {
+    if (!user) {
+      navigate('/auth');
       return;
     }
-    window.location.assign(demoUrl);
-  };
+
+    try {
+      // Check if product has demo enabled
+      if (!product.demo_enabled) {
+        toast.info('Demo not available for this product');
+        return;
+      }
+
+      const demoUrl = await resolveMaskedDemoUrl(product.id);
+      if (demoUrl) {
+        window.open(demoUrl, '_blank', 'noopener,noreferrer');
+      } else {
+        // Fallback to demo page if masked URL fails
+        navigate(`/demo/${product.slug || product.id}`);
+      }
+    } catch (error) {
+      console.error('Demo error:', error);
+      toast.error('Failed to load demo');
+    }
+  }, [user, navigate]);
 
   // Handle ?buy=PRODUCT_ID query param coming from cart checkout
   useEffect(() => {
@@ -572,12 +580,22 @@ export default function Marketplace() {
   };
 
   const handleSearchSubmit = () => {
-    setSearchQuery((prev) => prev.trim());
-    document.getElementById('marketplace-healthcare-section')?.scrollIntoView({ behavior: 'smooth' });
+    const trimmedQuery = searchQuery.trim();
+    setSearchQuery(trimmedQuery);
+    if (trimmedQuery) {
+      // Navigate to search results page
+      navigate(`/marketplace/search?q=${encodeURIComponent(trimmedQuery)}`);
+    } else {
+      document.getElementById('marketplace-products-section')?.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   const handleOfferClick = (offer: string) => {
     setSearchQuery(offer);
+    // Scroll to products section
+    setTimeout(() => {
+      document.getElementById('marketplace-products-section')?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
   };
 
   const handleBannerClick = (linkedCategory?: string) => {
@@ -586,6 +604,8 @@ export default function Marketplace() {
       return;
     }
     setSearchQuery(linkedCategory);
+    // Navigate to category page
+    navigate(`/marketplace/category/${linkedCategory.toLowerCase()}`);
   };
 
   return (

@@ -839,62 +839,32 @@ export const publicMarketplaceApi = {
       duration_days: number;
       payment_method: 'wallet' | 'upi' | 'bank' | 'wise' | 'payu' | 'binance';
       amount: number;
-      idempotency_key?: string;
-    },
-    options?: ApiCallOptions
-  ) => {
-    const effectiveIdempotencyKey = data.idempotency_key || options?.idempotencyKey || crypto.randomUUID();
-    return apiCall(
-      'POST',
-      'marketplace/payments/initiate',
-      { ...data, idempotency_key: effectiveIdempotencyKey },
-      { ...(options || {}), idempotencyKey: effectiveIdempotencyKey }
-    );
-  },
-  
-  verifyPayment: (data: { order_id: string; transaction_ref?: string; provider?: string }) =>
+    }
+  ) => apiCall('POST', 'marketplace/payments/initiate', data),
+  verifyPayment: (data: { order_id: string; reference_id?: string }) =>
     apiCall('POST', 'marketplace/payments/verify', data),
-  
-  getPaymentGateways: () => apiCall('GET', 'marketplace/payment-gateways'),
-  
-  // License Keys
-  getLicenseKeys: () => apiCall('GET', 'marketplace/licenses'),
-  getLicenseKey: (id: string) => apiCall('GET', `marketplace/licenses/${id}`),
-  validateLicense: (licenseKey: string, deviceId?: string) =>
-    apiCall('POST', 'marketplace/licenses/validate', { license_key: licenseKey, device_id: deviceId }),
-  downloadAPK: (productId: string, licenseKeyId?: string) =>
-    apiCall('POST', 'marketplace/download-apk', { product_id: productId, license_key_id: licenseKeyId }),
-  
-  // APK Downloads
-  getDownloadLink: (productId: string) => apiCall('GET', `marketplace/apk/${productId}/download-link`),
-  getDownloadHistory: () => apiCall('GET', 'marketplace/download-history'),
-  
-  // Demo Access
-  logDemoAccess: (productId: string, sessionId: string) =>
-    apiCall('POST', `marketplace/demo/${productId}/log`, { session_id: sessionId }),
-  
-  // Wallet
-  getWallet: () => apiCall('GET', 'marketplace/wallet'),
-  addWalletBalance: (amount: number, paymentMethod?: string) =>
-    apiCall('POST', 'marketplace/wallet/add', { amount, payment_method: paymentMethod }),
-  
-  // Reseller Specific
-  getResellerStats: () => apiCall('GET', 'marketplace/reseller/stats'),
-  getResellerPlans: () => apiCall('GET', 'marketplace/reseller/plans'),
-  subscribeToResellerPlan: (planId: string) =>
-    apiCall('POST', 'marketplace/reseller/subscribe', { plan_id: planId }),
-  getResellerEarnings: (params?: { period?: string }) =>
-    apiCall('GET', 'marketplace/reseller/earnings', params),
-  generateResellerKeys: (productId: string, quantity: number, durationDays?: number) =>
-    apiCall('POST', 'marketplace/reseller/generate-keys', { product_id: productId, quantity, duration_days: durationDays }),
-  
-  // Notifications
-  getNotifications: (params?: { page?: number; limit?: number; unread_only?: boolean }) =>
-    apiCall('GET', 'marketplace/notifications', params),
-  markNotificationAsRead: (notificationId: string) =>
-    apiCall('PUT', `marketplace/notifications/${notificationId}/read`, {}),
+  getPaymentMethods: () => apiCall('GET', 'marketplace/payments/methods'),
   
   // Search
-  search: (query: string, params?: { category?: string; min_price?: number; max_price?: number; min_rating?: number; sort?: string }) =>
-    apiCall('GET', 'marketplace/search', { q: query, ...params }),
+  search: (query: string) => apiCall('GET', 'marketplace/products/search', { q: query }),
+  
+  // Orders
+  createOrder: (data: { product_id: string; payment_method: string; amount: number }) =>
+    apiCall('POST', 'marketplace/orders/create', data),
+  getOrder: (id: string) => apiCall('GET', `marketplace/orders/${id}`),
+  
+  // Favorites
+  toggleFavorite: (product_id: string) => apiCall('POST', 'marketplace/favorites/toggle', { product_id }),
+  getFavorites: () => apiCall('GET', 'marketplace/favorites'),
+  
+  // Demo
+  logDemoAccess: (product_id: string, session_id: string) =>
+    apiCall('POST', 'marketplace/demo/log', { product_id, session_id }),
+  getDemoUrl: (product_id: string) => apiCall('GET', `marketplace/products/${product_id}/demo-url`),
+  
+  // Download
+  getDownloadUrl: (product_id: string) => apiCall('GET', `marketplace/products/${product_id}/download`),
+
+  // Banners
+  getBanners: () => apiCall('GET', 'marketplace/banners'),
 };
