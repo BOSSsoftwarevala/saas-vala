@@ -1,21 +1,25 @@
-name: Auto Merge Main Branch
+name: Auto Merge System
 
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, labeled]
 
 jobs:
-  auto-merge:
+  auto-merge-pr:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     
     steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
     - name: Auto-merge PR
-      uses: actions/github-script@v6
+      uses: actions/github-script@v7
       with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
           const { data: pr } = await github.rest.pulls.get({
             owner: context.repo.owner,
@@ -23,18 +27,108 @@ jobs:
             pull_number: context.issue.number
           });
           
-          // Auto-merge if PR is from main branch or has specific labels
-          if (pr.head.ref === 'main' || 
-              pr.labels.some(label => ['auto-merge', 'ready-to-merge'].includes(label.name))) {
-            
-            await github.rest.pulls.merge({
+          // Check if PR is mergeable and has required labels
+          const hasRequiredLabel = pr.labels.some(label => 
+            ['auto-merge', 'ready-to-merge', 'enterprise'].includes(label.name)
+          );
+          
+          const isFromMain = pr.head.ref === 'main';
+          const isMergeable = pr.mergeable;
+          
+          if ((hasRequiredLabel || isFromMain) && isMergeable) {
+            try {
+              await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+                merge_method: 'squash',
+                commit_title: `Auto-merge: ${pr.title}`
+              });
+              
+              console.log(`✅ Auto-merged PR #${context.issue.number}`);
+              
+              // Add comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: '🤖 This PR was automatically merged.'
+              });
+              
+            } catch (error) {
+              console.error(`❌ Failed to merge PR #${context.issue.number}:`, error);
+            }
+          } else {
+            console.log(`⏸️ PR #${context.issue.number} not ready for auto-merge`);
+            console.log(`  - Required label: ${hasRequiredLabel}`);
+            console.log(`  - From main: ${isFromMain}`);
+            console.log(`  - Mergeable: ${isMergeable}`);
+          }
+
+  auto-create-pr:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Check for enterprise features
+      id: check-enterprise
+      run: |
+        if git log --oneline -1 | grep -iE "(enterprise|infra|support|ultra)"; then
+          echo "has_enterprise=true" >> $GITHUB_OUTPUT
+          echo "commit_message=$(git log --oneline -1)" >> $GITHUB_OUTPUT
+        else
+          echo "has_enterprise=false" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Create feature branch and PR
+      if: steps.check-enterprise.outputs.has_enterprise == 'true'
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const commitMessage = `${{ steps.check-enterprise.outputs.commit_message }}`;
+          const branchName = `auto-merge/${Date.now()}`;
+          
+          try {
+            // Create new branch
+            await github.rest.git.createRef({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              pull_number: context.issue.number,
-              merge_method: 'squash'
+              ref: `refs/heads/${branchName}`,
+              sha: context.sha
             });
             
-            console.log(`Auto-merged PR #${context.issue.number}`);
+            console.log(`✅ Created branch: ${branchName}`);
+            
+            // Create PR
+            const pr = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Auto-merge: ${commitMessage}`,
+              head: branchName,
+              base: 'main',
+              body: `🤖 **Auto-generated PR for enterprise features**\n\nThis PR was automatically created because the commit contains enterprise/infra/support features.\n\n**Commit:** ${commitMessage}\n\nThis PR will be automatically merged when ready.`,
+              labels: ['auto-merge', 'enterprise', 'automated']
+            });
+            
+            console.log(`✅ Created PR #${pr.data.number}`);
+            
+            // Add auto-merge label
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.data.number,
+              labels: ['auto-merge', 'ready-to-merge']
+            });
+            
+          } catch (error) {
+            console.error('❌ Failed to create auto-merge PR:', error);
           }
 
   update-main:
