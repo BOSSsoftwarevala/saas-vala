@@ -345,7 +345,7 @@ export default function Dashboard() {
               onClick={() => window.location.href = '/wallet'}
               className="bg-green hover:opacity-90 text-white px-4 py-2 rounded-md gap-2 shadow-lg"
             >
-              � Add Credits
+              💰 Add Credits
             </button>
             
             <button
