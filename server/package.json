@@ -1,0 +1,49 @@
+{
+  "name": "ultra-server",
+  "version": "1.0.0",
+  "description": "Enterprise-grade, self-healing, auto-scaling, zero-downtime server system",
+  "main": "ultra-server.js",
+  "scripts": {
+    "start": "node ultra-server.js start",
+    "stop": "node ultra-server.js stop",
+    "restart": "node ultra-server.js restart",
+    "status": "node ultra-server.js status",
+    "health": "node ultra-server.js health",
+    "test": "node ultra-server.js test",
+    "test-full": "node ultra-server.js test --full",
+    "deploy": "node ultra-server.js deploy",
+    "dev": "node ultra-server.js start"
+  },
+  "keywords": [
+    "enterprise",
+    "server",
+    "self-healing",
+    "auto-scaling",
+    "zero-downtime",
+    "monitoring",
+    "health-check",
+    "auto-recovery"
+  ],
+  "author": "Ultra Server Team",
+  "license": "MIT",
+  "dependencies": {
+    "pg": "^8.11.3",
+    "zlib": "^1.0.5",
+    "crypto": "^1.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BOSSsoftwarevala/saas-vala.git"
+  },
+  "bugs": {
+    "url": "https://github.com/BOSSsoftwarevala/saas-vala/issues"
+  },
+  "homepage": "https://saasvala.com"
+}
