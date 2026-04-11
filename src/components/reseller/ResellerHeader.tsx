@@ -13,6 +13,7 @@
  import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ArrowLeft, Bell, Lock, LogOut, Wallet } from 'lucide-react';
  import { useWallet } from '@/hooks/useWallet';
+import { useResellerPlanBadge } from '@/hooks/useResellerPlanBadge';
  
  const pageTitles: Record<string, string> = {
    '/reseller/dashboard': 'Reseller Dashboard',
@@ -28,6 +29,7 @@ import { ArrowLeft, Bell, Lock, LogOut, Wallet } from 'lucide-react';
    const location = useLocation();
    const { user, signOut } = useAuth();
    const { wallet } = useWallet();
+  const { plan } = useResellerPlanBadge();
  
    const currentPath = location.pathname + location.search;
    const pageTitle = pageTitles[currentPath] || 'Reseller Dashboard';
@@ -102,9 +104,12 @@ import { ArrowLeft, Bell, Lock, LogOut, Wallet } from 'lucide-react';
                  <p className="text-sm font-medium text-foreground">
                    {user?.user_metadata?.full_name || user?.email}
                  </p>
-                 <p className="text-xs text-muted-foreground">
-                   Reseller Account
-                 </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs text-muted-foreground">Reseller Account</p>
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500/30 text-amber-600">
+                      {plan.badgeIcon} {plan.badgeLabel}
+                    </Badge>
+                  </div>
                </div>
              </DropdownMenuLabel>
              <DropdownMenuSeparator className="bg-border" />

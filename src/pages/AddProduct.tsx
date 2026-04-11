@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useProducts } from '@/hooks/useProducts';
+import { normalizeDemoUrlPair, sanitizeDemoSourceUrl } from '@/lib/demoMasking';
 
 // ─── Types ─────────────���─────────────────────────────────────────────────────
 
@@ -360,6 +361,7 @@ Return ONLY valid JSON, no markdown.`;
     }
     if (!form.thumbnail_url) errors.push('Thumbnail is required — upload or AI generate');
     if (!form.short_description.trim()) errors.push('Short description is required — use AI Auto Complete');
+    if (form.demo_url && !sanitizeDemoSourceUrl(form.demo_url)) errors.push('Demo URL must start with http:// or https://');
     return errors;
   };
 
@@ -375,6 +377,8 @@ Return ONLY valid JSON, no markdown.`;
     setValidationErrors([]);
     setSaving(true);
     try {
+      const normalizedDemo = normalizeDemoUrlPair(form.slug, form.demo_url);
+
       await createProduct({
         name: form.name,
         slug: form.slug,
@@ -410,7 +414,8 @@ Return ONLY valid JSON, no markdown.`;
           require_payment: form.require_payment,
           secure_download: form.secure_download,
           log_downloads: form.log_downloads,
-          demo_url: form.demo_url || null,
+          demo_url: normalizedDemo.demoUrl,
+          demo_source_url: normalizedDemo.demoSourceUrl,
           demo_login: form.demo_login || null,
           demo_password: form.demo_password || null,
           demo_enabled: form.demo_enabled,

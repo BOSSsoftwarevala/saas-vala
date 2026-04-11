@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MarketplaceHeader } from '@/components/marketplace/MarketplaceHeader';
 import { HeroBannerSlider } from '@/components/marketplace/HeroBannerSlider';
+import { resolveMaskedDemoUrl } from '@/lib/demoMasking';
 import { MARKETPLACE_CATEGORIES } from '@/data/marketplaceCategories';
 import { useMarketplaceProducts } from '@/hooks/useMarketplaceProducts';
 import { useFavorites } from '@/hooks/useMarketplace';
@@ -151,9 +152,13 @@ export default function MarketplacePublic() {
   };
 
   const handleDemo = (product: any) => {
-    const demoUrl = product.demoUrl || product.demo_url;
+    const demoUrl = resolveMaskedDemoUrl({
+      slug: product.slug,
+      demo_url: product.demoUrl || product.demo_url,
+      demo_enabled: product.demoEnabled ?? product.demo_enabled,
+    });
     if (demoUrl) {
-      window.open(demoUrl, '_blank', 'noopener,noreferrer');
+      window.location.assign(demoUrl);
     }
   };
 

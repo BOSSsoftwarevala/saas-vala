@@ -26,6 +26,7 @@ import {
   generateIdempotencyKey,
 } from '@/lib/marketplaceUtils';
 import { publicMarketplaceApi } from '@/lib/api';
+import { resolveMaskedDemoUrl } from '@/lib/demoMasking';
 import { usePaymentAvailability } from '@/hooks/useFeatureFlags';
 
 interface PricingOption {
@@ -36,13 +37,15 @@ interface PricingOption {
 
 interface Product {
   id: string;
+  slug: string;
   name: string;
   description: string;
   short_description: string;
   category?: string;
   thumbnail_url: string;
-  demo_url: string;
-  apk_url: string;
+  demo_url: string | null;
+  demo_enabled?: boolean | null;
+  apk_url: string | null;
   rating: number;
   created_at: string;
   updated_at: string;
@@ -76,6 +79,13 @@ export default function ProductDetailPage() {
   const purchaseLockRef = useRef(false);
   /** Per-dialog idempotency key locked in when the dialog opens. */
   const purchaseIdempotencyKey = useRef<string>('');
+  const maskedDemoUrl = product
+    ? resolveMaskedDemoUrl({
+        slug: product.slug,
+        demo_url: product.demo_url,
+        demo_enabled: product.demo_enabled,
+      })
+    : null;
 
   useEffect(() => {
     if (!id) return;
@@ -328,7 +338,7 @@ export default function ProductDetailPage() {
                   <ShoppingCart className="h-5 w-5" />
                   Buy Now — {formatCurrency(currentPrice?.base_price ?? 0, currentPrice?.currency ?? 'USD')}
                 </Button>
-                {product.demo_url && (
+                {maskedDemoUrl && (
                   <Button
                     size="lg"
                     variant="outline"
@@ -337,7 +347,7 @@ export default function ProductDetailPage() {
                       if (user?.id && product.id) {
                         publicMarketplaceApi.logDemoAccess(product.id, crypto.randomUUID()).catch(() => {});
                       }
-                      window.open(product.demo_url, '_blank', 'noopener,noreferrer');
+                      window.location.assign(maskedDemoUrl);
                     }}
                   >
                     <Play className="h-5 w-5" />

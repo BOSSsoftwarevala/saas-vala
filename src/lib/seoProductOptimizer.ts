@@ -65,7 +65,7 @@
       productId: p.id,
       productName: p.name,
       productCode: p.product_code,
-      category: p.business_type || 'SaaS',
+      category: p.business_type || p.target_industry || 'SaaS',
       description: p.description || '',
       price: p.price || 499,
       currency: p.currency || 'INR',

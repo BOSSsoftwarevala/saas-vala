@@ -3,27 +3,58 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Loader2, ExternalLink, ArrowLeft } from 'lucide-react';
-import { toast } from 'sonner';
+import {
+  applySaasValaBranding,
+  buildDemoProxyUrl,
+  isMaskedDemoUrl,
+  SAAS_VALA_BRAND,
+} from '@/lib/demoMasking';
 
 export default function DemoPage() {
-  const { id } = useParams<{ id: string }>();
+  const { slug, demoSlug } = useParams<{ slug?: string; demoSlug?: string }>();
   const navigate = useNavigate();
   const [product, setProduct] = useState<any>(null);
-  const [demoUrl, setDemoUrl] = useState<string | null>(null);
+  const [proxyUrl, setProxyUrl] = useState<string | null>(null);
+  const [frameKey, setFrameKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const requestedSlug = demoSlug || slug;
 
   useEffect(() => {
-    if (!id) return;
+    applySaasValaBranding(`${SAAS_VALA_BRAND.name} Demo`, 'Secure branded demo preview powered by SaaS Vala.');
+
+    const onContextMenu = (event: MouseEvent) => event.preventDefault();
+    const onKeyDown = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      const blockedCombo = event.ctrlKey && event.shiftKey && ['i', 'j', 'c'].includes(key);
+      const blockedShortcut = event.ctrlKey && ['u', 's'].includes(key);
+      if (event.key === 'F12' || blockedCombo || blockedShortcut) {
+        event.preventDefault();
+      }
+    };
+
+    document.addEventListener('contextmenu', onContextMenu);
+    window.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      document.removeEventListener('contextmenu', onContextMenu);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!requestedSlug) return;
 
     const fetchDemoProduct = async () => {
       setLoading(true);
       try {
-        const { data, error } = await supabase
+        const query = supabase
           .from('products')
-          .select('id, name, demo_url')
-          .eq('id', id)
-          .single();
+          .select('id, name, slug, demo_url, demo_source_url, demo_enabled');
+
+        const { data, error } = /^[0-9a-f-]{36}$/i.test(requestedSlug)
+          ? await query.eq('id', requestedSlug).single()
+          : await query.eq('slug', requestedSlug).single();
 
         if (error || !data) {
           console.error('Demo fetch error:', error);
@@ -33,12 +64,19 @@ export default function DemoPage() {
         }
 
         setProduct(data);
-        const url = data.demo_url || null;
-        setDemoUrl(url);
+        const isConfigured = Boolean(
+          data.demo_enabled &&
+          data.demo_source_url &&
+          isMaskedDemoUrl(data.demo_url, data.slug)
+        );
 
-        if (url) {
-          window.open(url, '_blank', 'noopener,noreferrer');
+        if (!isConfigured) {
+          setError('Demo is blocked until SaaS Vala masking is fully configured.');
+          setProxyUrl(null);
+          return;
         }
+
+        setProxyUrl(buildDemoProxyUrl(data.slug));
       } catch (fetchError) {
         console.error('Demo page failed:', fetchError);
         setError('Failed to load demo.');
@@ -48,7 +86,7 @@ export default function DemoPage() {
     };
 
     fetchDemoProduct();
-  }, [id]);
+  }, [requestedSlug]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-white px-4 py-10 sm:px-6 lg:px-8">
@@ -72,12 +110,23 @@ export default function DemoPage() {
               </div>
             ) : error ? (
               <p className="text-foreground/80">{error}</p>
-            ) : demoUrl ? (
+            ) : proxyUrl ? (
               <>
-                <p className="mb-4">Demo is launching in a new tab.</p>
+                <p className="mb-4">Demo is running inside the SaaS Vala secure preview container.</p>
+                <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-black/30">
+                  <iframe
+                    key={frameKey}
+                    src={proxyUrl}
+                    title={`${product?.name ?? SAAS_VALA_BRAND.name} Demo`}
+                    className="h-[70vh] w-full border-0"
+                    sandbox="allow-same-origin allow-scripts allow-forms allow-modals"
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <Button className="gap-2" onClick={() => window.open(demoUrl, '_blank', 'noopener,noreferrer')}>
-                    <ExternalLink className="h-4 w-4" /> Open Demo Again
+                  <Button className="gap-2" onClick={() => setFrameKey((current) => current + 1)}>
+                    <ExternalLink className="h-4 w-4" /> Reload Demo
                   </Button>
                   <Button variant="outline" className="gap-2" onClick={() => navigate('/marketplace')}>
                     Back to Marketplace

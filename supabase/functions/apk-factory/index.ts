@@ -12,6 +12,17 @@ function respond(body: any, status = 200) {
   });
 }
 
+function toSafePackageName(slug: string): string {
+  const normalized = String(slug || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '.')
+    .replace(/\.+/g, '.')
+    .replace(/^\.|\.$/g, '');
+
+  const appPart = normalized || 'app';
+  return `com.saasvala.${appPart}`;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -145,7 +156,7 @@ Deno.serve(async (req) => {
             inputs: {
               repo_url: targetRepo,
               app_slug: slug,
-              package_name: `com.saasvala.${slug.replace(/-/g, "_")}`,
+              package_name: toSafePackageName(slug),
               product_id: product_id || "",
                   conversion_type: conversion_type || "web_to_apk",
                   output_platform: output_platform || "android_apk",
@@ -344,7 +355,7 @@ Deno.serve(async (req) => {
                 inputs: {
                   repo_url: repoUrl,
                   app_slug: slug,
-                  package_name: `com.saasvala.${slug.replace(/-/g, "_")}`,
+                  package_name: toSafePackageName(slug),
                   product_id: productId,
                   output_version: outputVersion,
                   version_code: versionCode,

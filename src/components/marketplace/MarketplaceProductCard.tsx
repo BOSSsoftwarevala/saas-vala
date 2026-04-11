@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { useCart } from '@/hooks/useCart';
 import { publicMarketplaceApi } from '@/lib/api';
+import { buildDemoProxyUrl, resolveMaskedDemoUrl } from '@/lib/demoMasking';
 import type { MarketplaceProduct } from '@/hooks/useMarketplaceProducts';
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
@@ -64,16 +65,13 @@ export const MarketplaceProductCard = React.memo(React.forwardRef<HTMLDivElement
       : ['APK Download', 'License Key', 'Auto Updates', '24/7 Support'];
 
   const getDemoUrl = useCallback((): string | null => {
-    // Only return if demo is enabled by admin
-    if (!demoEnabled) return null;
-    const d = (product as any).demoUrl || (product as any).demo_url;
-    if (d && d.startsWith('http') && !d.includes('github.com')) return d;
-    const g = (product as any).gitRepoUrl || (product as any).git_repo_url;
-    if (g && g.startsWith('http')) return g;
-    return null;
+    return resolveMaskedDemoUrl({
+      slug: product.slug,
+      demo_url: (product as any).demoUrl || (product as any).demo_url,
+      demo_enabled: demoEnabled,
+    });
   }, [product, demoEnabled]);
 
-  const isIframeable = (url: string | null) => url ? !url.includes('github.com') : false;
   const hasDemoAvailable = getDemoUrl() !== null;
 
   useEffect(() => {
@@ -151,12 +149,18 @@ export const MarketplaceProductCard = React.memo(React.forwardRef<HTMLDivElement
     }
 
     const demoUrl = (product as any).demoUrl || (product as any).demo_url;
-    if (demoUrl) {
-      window.open(demoUrl, '_blank', 'noopener,noreferrer');
+    const maskedDemoUrl = resolveMaskedDemoUrl({
+      slug: product.slug,
+      demo_url: demoUrl,
+      demo_enabled: demoEnabled,
+    });
+
+    if (maskedDemoUrl) {
+      window.location.assign(maskedDemoUrl);
     } else {
       toast.info('Demo not available for this product');
     }
-  }, [onDemo, product]);
+  }, [demoEnabled, onDemo, product]);
 
   const handleDownloadApk = useCallback(async () => {
     if (!apkEnabled) {
@@ -317,8 +321,8 @@ export const MarketplaceProductCard = React.memo(React.forwardRef<HTMLDivElement
               <DialogDescription className="text-xs">{(product as any).demoLogin && (product as any).demoPassword ? `${(product as any).demoLogin} / ${(product as any).demoPassword}` : 'Demo credentials available'}</DialogDescription>
             </DialogHeader>
             <div className="flex-1 relative bg-muted/30 overflow-hidden">
-              {demoUrl && isIframeable(demoUrl) ? (
-                <iframe src={demoUrl} className="w-full h-full border-0" title="Demo" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" loading="lazy" />
+              {demoUrl ? (
+                <iframe src={buildDemoProxyUrl(product.slug)} className="w-full h-full border-0" title="Demo" sandbox="allow-scripts allow-same-origin allow-forms allow-modals" loading="lazy" referrerPolicy="no-referrer" />
               ) : (
                 <div className="flex items-center justify-center h-full"><p className="text-muted-foreground">Demo coming soon</p></div>
               )}
@@ -330,7 +334,7 @@ export const MarketplaceProductCard = React.memo(React.forwardRef<HTMLDivElement
                   <Button size="sm" variant="outline" className="h-7" onClick={() => { navigator.clipboard.writeText(demoUrl); toast.success('Copied!'); }}>
                     <Copy style={{ width: 12, height: 12 }} />
                   </Button>
-                  <Button size="sm" className="h-7 text-xs" onClick={() => window.open(demoUrl, '_blank')}>
+                  <Button size="sm" className="h-7 text-xs" onClick={() => window.location.assign(demoUrl)}>
                     <ExternalLink style={{ width: 12, height: 12 }} className="mr-1" /> Open
                   </Button>
                 </>

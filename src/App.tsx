@@ -26,6 +26,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { CartProvider } from '@/hooks/useCart';
+import { applySaasValaBranding, DEMO_PUBLIC_HOST } from '@/lib/demoMasking';
 import { Loader2 } from 'lucide-react';
 import React, { Suspense, useEffect } from 'react';
 
@@ -151,7 +152,19 @@ function FallbackRedirect() {
   return <Navigate to={homePath} replace />;
 }
 
+function DemoHostRoute() {
+  if (typeof window === 'undefined') return <PageLoader />;
+  if (window.location.hostname.toLowerCase() !== DEMO_PUBLIC_HOST.toLowerCase()) {
+    return <Navigate to="/" replace />;
+  }
+  return <DemoPage />;
+}
+
 function AppRoutes() {
+  useEffect(() => {
+    applySaasValaBranding();
+  }, []);
+
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
@@ -159,7 +172,7 @@ function AppRoutes() {
         <Route path="/" element={<Marketplace />} />
         <Route path="/marketplace" element={<Marketplace />} />
         <Route path="/marketplace/product/:id" element={<ProductDetail />} />
-        <Route path="/demo/:id" element={<DemoPage />} />
+        <Route path="/demo/:slug" element={<DemoPage />} />
         <Route path="/favorites" element={<ProtectedRoute><Favorites /></ProtectedRoute>} />
         <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
 
@@ -258,6 +271,7 @@ function AppRoutes() {
         <Route path="/apk-pipeline" element={<ProtectedRoute><AdminRoute><ApkPipeline /></AdminRoute></ProtectedRoute>} />
         <Route path="/admin/add-product" element={<ProtectedRoute><AdminRoute><AddProduct /></AdminRoute></ProtectedRoute>} />
         <Route path="/admin/marketplace" element={<ProtectedRoute><AdminRoute><MarketplaceAdmin /></AdminRoute></ProtectedRoute>} />
+        <Route path="/:demoSlug" element={<DemoHostRoute />} />
         <Route path="/marketplace-admin" element={<ProtectedRoute><AdminRoute><MarketplaceAdmin /></AdminRoute></ProtectedRoute>} />
 
         {/* 404 fallback → redirect to appropriate dashboard */}

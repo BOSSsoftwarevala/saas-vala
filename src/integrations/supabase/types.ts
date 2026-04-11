@@ -2857,6 +2857,7 @@ export type Database = {
           demo_enabled: boolean | null
           demo_login: string | null
           demo_password: string | null
+          demo_source_url: string | null
           demo_url: string | null
           deploy_status: string | null
           description: string | null
@@ -2924,6 +2925,7 @@ export type Database = {
           demo_enabled?: boolean | null
           demo_login?: string | null
           demo_password?: string | null
+          demo_source_url?: string | null
           demo_url?: string | null
           deploy_status?: string | null
           description?: string | null
@@ -2991,6 +2993,7 @@ export type Database = {
           demo_enabled?: boolean | null
           demo_login?: string | null
           demo_password?: string | null
+          demo_source_url?: string | null
           demo_url?: string | null
           deploy_status?: string | null
           description?: string | null

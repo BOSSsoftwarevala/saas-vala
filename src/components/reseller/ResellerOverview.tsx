@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
  import { useAuth } from '@/hooks/useAuth';
  import { useWallet } from '@/hooks/useWallet';
 import { dashboardApi } from '@/lib/dashboardApi';
+import { useResellerPlanBadge } from '@/hooks/useResellerPlanBadge';
  import {
    Key,
    Users,
@@ -32,6 +33,7 @@ import { dashboardApi } from '@/lib/dashboardApi';
    const navigate = useNavigate();
    const { user } = useAuth();
    const { wallet } = useWallet();
+  const { plan } = useResellerPlanBadge();
   const [metrics, setMetrics] = useState({
     keysGenerated: 0,
     activeClients: 0,
@@ -68,9 +70,14 @@ import { dashboardApi } from '@/lib/dashboardApi';
          initial={{ opacity: 0, y: 20 }}
          animate={{ opacity: 1, y: 0 }}
        >
-         <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground">
-           Welcome back, {user?.user_metadata?.full_name || 'Partner'}!
-         </h1>
+         <div className="flex items-center gap-2 flex-wrap">
+           <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground">
+             Welcome back, {user?.user_metadata?.full_name || 'Partner'}!
+           </h1>
+           <Badge variant="outline" className="text-xs border-amber-500/30 text-amber-600">
+             {plan.badgeIcon} {plan.badgeLabel}
+           </Badge>
+         </div>
          <p className="text-muted-foreground mt-1">Here's your reseller dashboard overview.</p>
        </motion.div>
  

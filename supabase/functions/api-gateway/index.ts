@@ -46,7 +46,7 @@ async function sentryCaptureException(err: unknown, context?: Record<string, unk
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-idempotency-key, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
   'Content-Type': 'application/json',
 }
 
@@ -103,6 +103,55 @@ function enforceRateLimit(key: string, limit: number, windowMs: number) {
 
 function isUuid(value: unknown): boolean {
   return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+}
+
+type ResellerPlanBenefit = {
+  planCode: 'bronze' | 'silver' | 'gold' | 'diamond'
+  badgeLabel: 'Bronze' | 'Silver' | 'Gold' | 'Diamond'
+  badgeIcon: string
+  defaultMarginPercent: number
+  defaultFreeKeys: number
+}
+
+function deriveResellerPlanBenefitByPrice(price: number): ResellerPlanBenefit | null {
+  const normalized = Number(price.toFixed(2))
+  if (Math.abs(normalized - 99) < 0.01) {
+    return {
+      planCode: 'bronze',
+      badgeLabel: 'Bronze',
+      badgeIcon: '🥉',
+      defaultMarginPercent: 10,
+      defaultFreeKeys: 10,
+    }
+  }
+  if (Math.abs(normalized - 299) < 0.01) {
+    return {
+      planCode: 'silver',
+      badgeLabel: 'Silver',
+      badgeIcon: '🥈',
+      defaultMarginPercent: 15,
+      defaultFreeKeys: 35,
+    }
+  }
+  if (Math.abs(normalized - 499) < 0.01) {
+    return {
+      planCode: 'gold',
+      badgeLabel: 'Gold',
+      badgeIcon: '🥇',
+      defaultMarginPercent: 20,
+      defaultFreeKeys: 70,
+    }
+  }
+  if (Math.abs(normalized - 999) < 0.01) {
+    return {
+      planCode: 'diamond',
+      badgeLabel: 'Diamond',
+      badgeIcon: '💎',
+      defaultMarginPercent: 30,
+      defaultFreeKeys: 180,
+    }
+  }
+  return null
 }
 
 function normalizeText(value: unknown, maxLen = 255): string {
@@ -638,6 +687,7 @@ async function handleProducts(method: string, pathParts: string[], body: any, us
       git_default_branch: body.git_default_branch || 'main',
       deploy_status: body.deploy_status || 'idle',
       marketplace_visible: body.marketplace_visible || false,
+      demo_source_url: body.demo_source_url || null,
       demo_url: body.demo_url || null,
       live_url: body.live_url || null,
     }).select().single()
@@ -4364,6 +4414,7 @@ async function handleMarketplaceAdmin(
     let categoryId = normalizeText(body?.category_id, 60)
     const price = Number(body?.price ?? 5)
     const demoUrl = normalizeText(body?.demo_url, 500)
+    const demoSourceUrl = normalizeText(body?.demo_source_url, 500)
     const apkUrl = normalizeText(body?.apk_url, 500)
     const thumbnailUrl = normalizeText(body?.thumbnail_url, 500)
 
@@ -4375,6 +4426,7 @@ async function handleMarketplaceAdmin(
     }
     if (!Number.isFinite(price) || price < 0) return err('price must be a valid non-negative number', 400)
     if (!isValidUrl(demoUrl)) return err('demo_url must be a valid URL', 400)
+    if (!isValidUrl(demoSourceUrl)) return err('demo_source_url must be a valid URL', 400)
     if (!isValidUrl(apkUrl)) return err('apk_url must be a valid URL', 400)
     if (!isValidUrl(thumbnailUrl)) return err('thumbnail_url must be a valid URL', 400)
 
@@ -4386,6 +4438,7 @@ async function handleMarketplaceAdmin(
       short_description: shortDescription || null,
       category_id: categoryId,
       price: Number(price.toFixed(2)),
+      demo_source_url: demoSourceUrl || null,
       demo_url: demoUrl || null,
       apk_url: apkUrl || null,
       thumbnail_url: thumbnailUrl || null,
@@ -4431,6 +4484,7 @@ async function handleMarketplaceAdmin(
     const categoryId = normalizeText(body?.category_id ?? existing.category_id, 60)
     const price = Number(body?.price ?? existing.price)
     const demoUrl = normalizeText(body?.demo_url ?? existing.demo_url, 500)
+    const demoSourceUrl = normalizeText(body?.demo_source_url ?? existing.demo_source_url, 500)
     const apkUrl = normalizeText(body?.apk_url ?? existing.apk_url, 500)
     const thumbnailUrl = normalizeText(body?.thumbnail_url ?? existing.thumbnail_url, 500)
 
@@ -4438,6 +4492,7 @@ async function handleMarketplaceAdmin(
     if (body?.category_id !== undefined && !isUuid(categoryId)) return err('category_id must be a valid UUID', 400)
     if (!Number.isFinite(price) || price < 0) return err('price must be a valid non-negative number', 400)
     if (!isValidUrl(demoUrl)) return err('demo_url must be a valid URL', 400)
+    if (!isValidUrl(demoSourceUrl)) return err('demo_source_url must be a valid URL', 400)
     if (!isValidUrl(apkUrl)) return err('apk_url must be a valid URL', 400)
     if (!isValidUrl(thumbnailUrl)) return err('thumbnail_url must be a valid URL', 400)
 
@@ -4453,6 +4508,7 @@ async function handleMarketplaceAdmin(
       short_description: normalizeText(body?.short_description ?? existing.short_description, 600) || null,
       category_id: isUuid(categoryId) ? categoryId : existing.category_id,
       price: Number(price.toFixed(2)),
+      demo_source_url: demoSourceUrl || null,
       demo_url: demoUrl || null,
       apk_url: apkUrl || null,
       thumbnail_url: thumbnailUrl || null,
@@ -4682,7 +4738,7 @@ async function handleMarketplaceAdmin(
     const rollbackData = versionRow.after_data ?? versionRow.before_data
     if (!rollbackData) return err('Version has no rollback data', 409)
 
-    const allowedKeys = ['name', 'slug', 'description', 'short_description', 'category_id', 'price', 'demo_url', 'apk_url', 'thumbnail_url', 'status', 'marketplace_visible', 'is_active']
+    const allowedKeys = ['name', 'slug', 'description', 'short_description', 'category_id', 'price', 'demo_source_url', 'demo_url', 'apk_url', 'thumbnail_url', 'status', 'marketplace_visible', 'is_active']
     const updates: any = { updated_at: new Date().toISOString() }
     for (const key of allowedKeys) if (rollbackData[key] !== undefined) updates[key] = rollbackData[key]
 
@@ -6098,12 +6154,44 @@ async function handlePublicMarketplace(
   // ── GET /marketplace/reseller/stats ──
   if (method === 'GET' && action === 'reseller' && pid === 'stats') {
     if (!userId) return err('Unauthorized', 401)
-    const { data: reseller } = await admin.from('resellers').select('id,commission_percent').eq('user_id', userId).maybeSingle()
+    const { data: reseller } = await admin.from('resellers').select('id,commission_percent,margin_percent,meta').eq('user_id', userId).maybeSingle()
     if (!reseller) return err('Reseller account not found', 403)
     const { data: earnings } = await admin.from('reseller_earnings').select('amount,status').eq('reseller_id', reseller.id)
+    const nowIso = new Date().toISOString()
+    const { data: activeSub } = await admin
+      .from('reseller_plan_subscriptions')
+      .select('id,plan_id,expires_at,is_active,reseller_plans(name,price,duration_days,commission_percent,max_monthly_keys)')
+      .eq('reseller_id', reseller.id)
+      .eq('is_active', true)
+      .gt('expires_at', nowIso)
+      .order('expires_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const resellerMeta = (reseller.meta && typeof reseller.meta === 'object') ? reseller.meta : {}
+    const activePlan = activeSub?.reseller_plans ?? null
+    const planBenefit = activePlan ? deriveResellerPlanBenefitByPrice(Number((activePlan as any).price || 0)) : null
+    const badgeLabel = String((resellerMeta as any).badge_label || planBenefit?.badgeLabel || 'Bronze')
+    const badgeIcon = String((resellerMeta as any).badge_icon || planBenefit?.badgeIcon || '🥉')
+    const planName = String((resellerMeta as any).plan_name || (activePlan as any)?.name || badgeLabel)
+    const freeKeysBalance = Number((resellerMeta as any).free_keys_balance || 0)
+    const dashboardAccess = Boolean((resellerMeta as any).dashboard_access)
+
     const earned  = (earnings ?? []).filter((e: any) => e.status === 'earned').reduce((s: number, e: any) => s + e.amount, 0)
     const pending = (earnings ?? []).filter((e: any) => e.status === 'pending').reduce((s: number, e: any) => s + e.amount, 0)
-    return json({ total_earned: earned, total_pending: pending, commission_percent: reseller.commission_percent })
+    return json({
+      total_earned: earned,
+      total_pending: pending,
+      commission_percent: reseller.commission_percent,
+      margin_percent: Number((reseller as any).margin_percent || 0),
+      plan_name: planName,
+      badge_label: badgeLabel,
+      badge_icon: badgeIcon,
+      free_keys_balance: freeKeysBalance,
+      dashboard_access: dashboardAccess,
+      plan_active: !!activeSub,
+      plan_expires_at: activeSub?.expires_at || null,
+    })
   }
 
   // ── GET /marketplace/reseller/plans ──
@@ -6120,12 +6208,186 @@ async function handlePublicMarketplace(
     if (!isUuid(plan_id)) return err('Invalid plan_id')
     const { data: plan } = await admin.from('reseller_plans').select('*').eq('id', plan_id).eq('is_active', true).maybeSingle()
     if (!plan) return err('Plan not found', 404)
-    const { data: reseller } = await admin.from('resellers').select('id').eq('user_id', userId).maybeSingle()
+    const planPrice = Number(plan.price || 0)
+    if (!Number.isFinite(planPrice) || planPrice <= 0) return err('Invalid reseller plan price', 400)
+
+    const planBenefit = deriveResellerPlanBenefitByPrice(planPrice)
+    if (!planBenefit) return err('Unsupported plan pricing. Allowed prices: 99, 299, 499, 999', 400)
+    const activatedMarginPercent = Number(plan.commission_percent ?? planBenefit.defaultMarginPercent)
+    const freeKeysToAdd = Number(plan.max_monthly_keys ?? planBenefit.defaultFreeKeys)
+
+    const { data: reseller } = await admin.from('resellers').select('id,meta').eq('user_id', userId).maybeSingle()
     if (!reseller) return err('Reseller account required', 403)
+
+    const { data: wallet } = await admin.from('wallets').select('id,balance,total_spent').eq('user_id', userId).maybeSingle()
+    if (!wallet) return err('Wallet not found', 404)
+
+    const requestIdempotencyKey = String(req.headers.get('x-idempotency-key') || body?.idempotency_key || '').trim()
+    if (requestIdempotencyKey) {
+      const { data: idemTx } = await admin
+        .from('transactions')
+        .select('id,reference_id,amount,status,meta,created_at')
+        .eq('wallet_id', wallet.id)
+        .eq('reference_type', 'reseller_plan_purchase')
+        .filter('meta->>idempotency_key', 'eq', requestIdempotencyKey)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (idemTx && Number(idemTx.amount || 0) === planPrice && idemTx.status === 'completed') {
+        const { data: idemSub } = await admin
+          .from('reseller_plan_subscriptions')
+          .select('expires_at,is_active')
+          .eq('id', idemTx.reference_id)
+          .maybeSingle()
+
+        return json({
+          success: true,
+          idempotent: true,
+          badge_label: planBenefit.badgeLabel,
+          badge_icon: planBenefit.badgeIcon,
+          margin_percent: activatedMarginPercent,
+          free_keys_added: freeKeysToAdd,
+          expires_at: idemSub?.expires_at || null,
+          dashboard_access: true,
+        })
+      }
+    }
+
+    const lastPlanAttemptSince = new Date(Date.now() - 20_000).toISOString()
+    const { data: duplicateBurstTx } = await admin
+      .from('transactions')
+      .select('id,status,created_at')
+      .eq('wallet_id', wallet.id)
+      .eq('reference_type', 'reseller_plan_purchase')
+      .eq('amount', planPrice)
+      .gte('created_at', lastPlanAttemptSince)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (duplicateBurstTx && duplicateBurstTx.status === 'completed') {
+      return err('Duplicate plan activation attempt detected. Please wait before retrying.', 409)
+    }
+
+    const currentBalance = Number(wallet.balance || 0)
+    if (currentBalance < planPrice) return err('Insufficient wallet balance for this plan', 402)
+
+    const newBalance = Number((currentBalance - planPrice).toFixed(2))
+    const newTotalSpent = Number((Number(wallet.total_spent || 0) + planPrice).toFixed(2))
+
+    const { data: deductedWallet } = await admin
+      .from('wallets')
+      .update({ balance: newBalance, total_spent: newTotalSpent, updated_at: new Date().toISOString() })
+      .eq('id', wallet.id)
+      .eq('balance', currentBalance)
+      .select('id,balance')
+      .maybeSingle()
+
+    if (!deductedWallet) {
+      return err('Wallet changed during payment. Please retry.', 409)
+    }
+
     const now = new Date()
     const expiresAt = new Date(now.getTime() + plan.duration_days * 86400_000)
-    await admin.from('reseller_plan_subscriptions').insert({ reseller_id: reseller.id, plan_id, started_at: now.toISOString(), expires_at: expiresAt.toISOString(), is_active: true })
-    return json({ success: true, expires_at: expiresAt.toISOString() })
+
+    await admin
+      .from('reseller_plan_subscriptions')
+      .update({ is_active: false, updated_at: now.toISOString() })
+      .eq('reseller_id', reseller.id)
+      .eq('is_active', true)
+
+    const { data: subscription, error: subErr } = await admin
+      .from('reseller_plan_subscriptions')
+      .insert({
+        reseller_id: reseller.id,
+        plan_id,
+        started_at: now.toISOString(),
+        expires_at: expiresAt.toISOString(),
+        is_active: true,
+      })
+      .select('id,expires_at')
+      .single()
+
+    if (subErr || !subscription) return err(subErr?.message || 'Failed to create subscription', 500)
+
+    const resellerMeta = (reseller.meta && typeof reseller.meta === 'object') ? reseller.meta : {}
+    const existingFreeKeys = Number((resellerMeta as any).free_keys_balance || 0)
+    const nextFreeKeys = existingFreeKeys + freeKeysToAdd
+
+    const mergedMeta = {
+      ...(resellerMeta as Record<string, unknown>),
+      plan_code: planBenefit.planCode,
+      plan_name: String(plan.name || planBenefit.badgeLabel),
+      badge_label: planBenefit.badgeLabel,
+      badge_icon: planBenefit.badgeIcon,
+      plan_price: planPrice,
+      dashboard_access: true,
+      plan_active: true,
+      plan_started_at: now.toISOString(),
+      plan_expires_at: expiresAt.toISOString(),
+      free_keys_balance: nextFreeKeys,
+      last_plan_purchase_idempotency_key: requestIdempotencyKey || null,
+    }
+
+    const { error: resellerUpdateErr } = await admin
+      .from('resellers')
+      .update({
+        is_active: true,
+        commission_percent: activatedMarginPercent,
+        margin_percent: activatedMarginPercent,
+        meta: mergedMeta,
+        updated_at: now.toISOString(),
+      })
+      .eq('id', reseller.id)
+
+    if (resellerUpdateErr) return err(resellerUpdateErr.message, 500)
+
+    const { error: txErr } = await admin.from('transactions').insert({
+      wallet_id: wallet.id,
+      amount: planPrice,
+      type: 'debit',
+      status: 'completed',
+      balance_after: newBalance,
+      reference_type: 'reseller_plan_purchase',
+      reference_id: subscription.id,
+      description: `Reseller plan purchase: ${String(plan.name || planBenefit.badgeLabel)}`,
+      meta: {
+        reseller_id: reseller.id,
+        plan_id,
+        plan_name: String(plan.name || planBenefit.badgeLabel),
+        plan_code: planBenefit.planCode,
+        badge_label: planBenefit.badgeLabel,
+        badge_icon: planBenefit.badgeIcon,
+        margin_percent: activatedMarginPercent,
+        free_keys_added: freeKeysToAdd,
+        idempotency_key: requestIdempotencyKey || null,
+      },
+      created_by: userId,
+      created_at: now.toISOString(),
+    })
+
+    if (txErr) return err(txErr.message, 500)
+
+    await admin.from('notifications').insert({
+      user_id: userId,
+      type: 'success',
+      title: `${planBenefit.badgeIcon} ${planBenefit.badgeLabel} plan activated`,
+      message: `Your reseller plan is now active. Free keys added: ${freeKeysToAdd}.`,
+      created_at: now.toISOString(),
+      updated_at: now.toISOString(),
+    })
+
+    return json({
+      success: true,
+      idempotent: false,
+      expires_at: expiresAt.toISOString(),
+      badge_label: planBenefit.badgeLabel,
+      badge_icon: planBenefit.badgeIcon,
+      margin_percent: activatedMarginPercent,
+      free_keys_added: freeKeysToAdd,
+      free_keys_balance: nextFreeKeys,
+      dashboard_access: true,
+    })
   }
 
   // ── GET /marketplace/reseller/earnings ──
@@ -6145,8 +6407,29 @@ async function handlePublicMarketplace(
     const qty = Math.min(100, Math.max(1, Number(quantity || 1)))
     const rl = enforceRateLimit(`keygen:${userId}`, 10, 60_000)
     if (rl !== null) return err(`Rate limit exceeded. Retry in ${rl}s`, 429)
-    const { data: reseller } = await admin.from('resellers').select('id').eq('user_id', userId).maybeSingle()
+    const { data: reseller } = await admin.from('resellers').select('id,meta').eq('user_id', userId).maybeSingle()
     if (!reseller) return err('Reseller account required', 403)
+
+    const nowIso = new Date().toISOString()
+    const { data: activeSub } = await admin
+      .from('reseller_plan_subscriptions')
+      .select('id,expires_at,is_active')
+      .eq('reseller_id', reseller.id)
+      .eq('is_active', true)
+      .gt('expires_at', nowIso)
+      .order('expires_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (!activeSub) return err('Active reseller plan required to generate keys', 403)
+
+    const resellerMeta = (reseller.meta && typeof reseller.meta === 'object') ? reseller.meta : {}
+    const dashboardAccess = Boolean((resellerMeta as any).dashboard_access)
+    if (!dashboardAccess) return err('Reseller dashboard access is not active', 403)
+
+    const freeKeysBalance = Number((resellerMeta as any).free_keys_balance || 0)
+    if (freeKeysBalance < qty) return err(`Insufficient free keys. Available: ${freeKeysBalance}`, 402)
+
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
     const inserts = Array.from({ length: qty }, () => {
       let k = ''
@@ -6158,7 +6441,27 @@ async function handlePublicMarketplace(
     })
     const { data: created, error: keyErr } = await admin.from('license_keys').insert(inserts).select('license_key')
     if (keyErr) return err(keyErr.message)
-    return json({ success: true, keys: (created ?? []).map((k: any) => k.license_key), count: created?.length ?? 0 }, 201)
+
+    const remainingFreeKeys = Math.max(0, freeKeysBalance - (created?.length ?? 0))
+    const { error: metaUpdateErr } = await admin
+      .from('resellers')
+      .update({
+        meta: {
+          ...(resellerMeta as Record<string, unknown>),
+          free_keys_balance: remainingFreeKeys,
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', reseller.id)
+
+    if (metaUpdateErr) return err(metaUpdateErr.message, 500)
+
+    return json({
+      success: true,
+      keys: (created ?? []).map((k: any) => k.license_key),
+      count: created?.length ?? 0,
+      remaining_free_keys: remainingFreeKeys,
+    }, 201)
   }
 
   // Fallback to existing admin marketplace handler

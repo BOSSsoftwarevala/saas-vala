@@ -9,6 +9,7 @@ import { useFraudDetection } from '@/hooks/useFraudDetection';
 import { useAuth } from '@/hooks/useAuth';
 import { dashboardApi } from '@/lib/dashboardApi';
 import { publicMarketplaceApi } from '@/lib/api';
+import { resolveMaskedDemoUrl } from '@/lib/demoMasking';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -68,7 +69,7 @@ export default function Marketplace() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   
-  const { products } = useMarketplaceProducts();
+  const { products, loading: productsLoading } = useMarketplaceProducts();
   const [searchQuery, setSearchQuery] = useState('');
 
   const activeProducts = useMemo(
@@ -198,12 +199,16 @@ export default function Marketplace() {
         .logDemoAccess(product.id, crypto.randomUUID())
         .catch(() => {});
     }
-    const demoUrl = product.demoUrl || (product as any).demo_url;
-    if (demoUrl) {
-      window.open(demoUrl, '_blank', 'noopener,noreferrer');
+    const demoUrl = resolveMaskedDemoUrl({
+      slug: product.slug,
+      demo_url: product.demoUrl || (product as any).demo_url,
+      demo_enabled: product.demoEnabled ?? (product as any).demo_enabled,
+    });
+    if (!demoUrl) {
+      toast.error('Demo is unavailable until SaaS Vala masking is configured.');
       return;
     }
-    navigate(`/demo/${product.id}`);
+    window.location.assign(demoUrl);
   };
 
   // Handle ?buy=PRODUCT_ID query param coming from cart checkout
@@ -591,25 +596,31 @@ export default function Marketplace() {
           <p className="text-sm text-muted-foreground">
             {searchQuery.trim()
               ? `${activeProducts.length} products matching "${searchQuery.trim()}"`
-              : `${products.length} products available`}
+              : productsLoading
+                ? 'Loading products...'
+                : `${products.length} products available`}
           </p>
         </div>
 
         {/* Multi-row Grid Display */}
         <div className="px-4 md:px-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {activeProducts.map((product, i) => (
-              <MarketplaceProductCard
-                key={product.id}
-                product={product}
-                index={i}
-                onBuyNow={handleBuyNow}
-                onDemo={handleDemo}
-                rank={i + 1}
-              />
-            ))}
+            {productsLoading
+              ? Array.from({ length: 8 }).map((_, index) => (
+                <div key={`marketplace-skeleton-${index}`} className="h-[420px] rounded-2xl border border-border/40 bg-card/40 animate-pulse" />
+              ))
+              : activeProducts.map((product, i) => (
+                <MarketplaceProductCard
+                  key={product.id}
+                  product={product}
+                  index={i}
+                  onBuyNow={handleBuyNow}
+                  onDemo={handleDemo}
+                  rank={i + 1}
+                />
+              ))}
           </div>
-          {activeProducts.length === 0 && (
+          {!productsLoading && activeProducts.length === 0 && (
             <div className="text-center py-12">
               <p className="text-muted-foreground">No products found matching your search.</p>
             </div>

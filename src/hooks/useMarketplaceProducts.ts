@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { resolveMaskedDemoUrl } from '@/lib/demoMasking';
 
 export interface MarketplaceProduct {
   id: string;
+  slug: string;
   title: string;
   subtitle: string;
   image: string;
@@ -65,8 +67,8 @@ function formatProductName(name: string): string {
 
 function getProductPriorityScore(product: MarketplaceProduct): number {
   const repoUrl = (product.gitRepoUrl || '').toLowerCase();
-  const demoUrl = (product.demoUrl || '').toLowerCase();
-  const hasLiveDemo = Boolean(demoUrl && demoUrl.startsWith('http') && !demoUrl.includes('github.com'));
+  const demoUrl = (resolveMaskedDemoUrl({ slug: product.slug, demo_url: product.demoUrl || null, demo_enabled: product.demoEnabled }) || '').toLowerCase();
+  const hasLiveDemo = Boolean(demoUrl);
   const hasRealRepo = repoUrl.includes('github.com/saasvala/') || repoUrl.includes('github.com/softwarevala/');
   const hasAnyRepo = Boolean(repoUrl);
   const isLive = product.status === 'live' || product.status === 'bestseller';
@@ -89,8 +91,10 @@ export function mapDbProduct(product: any, index: number): MarketplaceProduct {
     ? product.features.slice(0, 4).map((f: any) => typeof f === 'string' ? { icon: 'CheckCircle2', text: f } : f)
     : defaultFeatures;
   const isAvailable = product.status === 'active' && product.deploy_status !== 'failed';
+  const businessType = product.business_type || product.target_industry || '';
   return {
     id: product.id,
+    slug: product.slug,
     title: formatProductName(product.name || product.slug || 'Software Product'),
     subtitle: product.short_description || product.description?.substring(0, 80) || 'Professional Software Solution',
     image: product.thumbnail_url || stockImages[index % stockImages.length],
@@ -100,8 +104,8 @@ export function mapDbProduct(product: any, index: number): MarketplaceProduct {
       : 'upcoming',
     price: Number(product.price) || 0,
     features, techStack: defaultTechStack,
-    category: product.business_type || 'Software',
-    businessType: product.business_type || '',
+    category: businessType || 'Software',
+    businessType,
     gitRepoUrl: product.git_repo_url, apkUrl: product.apk_url || undefined,
     demoUrl: product.demo_url || undefined, demoLogin: product.demo_login || undefined,
     demoPassword: product.demo_password || undefined, demoEnabled: Boolean(product.demo_enabled),
@@ -125,7 +129,7 @@ export function useMarketplaceProducts() {
       const to = from + pageSize - 1;
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, slug, description, short_description, price, status, features, thumbnail_url, git_repo_url, marketplace_visible, apk_url, demo_url, demo_login, demo_password, demo_enabled, featured, trending, business_type, deploy_status, discount_percent, rating, tags, apk_enabled, license_enabled, buy_enabled, created_at')
+        .select('id, name, slug, description, short_description, price, status, features, thumbnail_url, git_repo_url, marketplace_visible, apk_url, demo_url, demo_login, demo_password, demo_enabled, featured, trending, target_industry, deploy_status, discount_percent, rating, tags, apk_enabled, license_enabled, buy_enabled, created_at')
         .eq('marketplace_visible', true)
         .order('created_at', { ascending: false })
         .range(from, to);
@@ -220,7 +224,7 @@ export function useProductsByCategory(categories: string[], options?: { enabled?
         const to = from + pageSize - 1;
         const res = await supabase
           .from('products')
-          .select('id, name, slug, description, short_description, price, status, features, thumbnail_url, git_repo_url, marketplace_visible, apk_url, demo_url, demo_login, demo_password, demo_enabled, featured, trending, business_type, deploy_status, discount_percent, rating, tags, apk_enabled, license_enabled, buy_enabled, created_at')
+          .select('id, name, slug, description, short_description, price, status, features, thumbnail_url, git_repo_url, marketplace_visible, apk_url, demo_url, demo_login, demo_password, demo_enabled, featured, trending, target_industry, deploy_status, discount_percent, rating, tags, apk_enabled, license_enabled, buy_enabled, created_at')
           .eq('marketplace_visible', true)
           .order('created_at', { ascending: false })
           .range(from, to);

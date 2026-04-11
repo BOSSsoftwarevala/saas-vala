@@ -1,6 +1,6 @@
 param(
   [Parameter(Mandatory = $true)]
-  [string]$Host,
+  [string]$ServerHost,
 
   [Parameter(Mandatory = $true)]
   [string]$User,
@@ -54,10 +54,10 @@ if ($KeyPath) {
   $scpArgs += @("-i", $KeyPath)
 }
 
-$remote = "$User@$Host"
+$remote = "$User@$ServerHost"
 
 Write-Host "[3/5] Uploading archive to VPS..." -ForegroundColor Cyan
-& scp @scpArgs $archivePath "$remote:/tmp/saasvala-site.tgz"
+& scp @scpArgs $archivePath "${remote}:/tmp/saasvala-site.tgz"
 if ($LASTEXITCODE -ne 0) {
   throw "SCP upload failed"
 }

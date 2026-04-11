@@ -31,6 +31,14 @@ export interface DashboardReseller {
   id: string;
   name: string;
   credits: number;
+  plan_name?: string;
+  badge_label?: string;
+  badge_icon?: string;
+  margin_percent?: number;
+  free_keys_balance?: number;
+  dashboard_access?: boolean;
+  plan_active?: boolean;
+  plan_expires_at?: string | null;
   wallet_balance?: number;
   total_added?: number;
   total_spent?: number;
@@ -169,10 +177,19 @@ function mapKey(row: any): DashboardKey {
 }
 
 function mapReseller(row: any): DashboardReseller {
+  const meta = (row?.meta && typeof row.meta === 'object') ? row.meta : {};
   return {
     id: row.id,
     name: row.company_name ?? row.name ?? '',
     credits: Number(row.wallet_balance ?? row.credits ?? row.credit_limit ?? 0),
+    plan_name: String((meta as any).plan_name || ''),
+    badge_label: String((meta as any).badge_label || ''),
+    badge_icon: String((meta as any).badge_icon || ''),
+    margin_percent: Number(row.margin_percent ?? row.commission_percent ?? 0),
+    free_keys_balance: Number((meta as any).free_keys_balance || 0),
+    dashboard_access: Boolean((meta as any).dashboard_access),
+    plan_active: Boolean((meta as any).plan_active),
+    plan_expires_at: ((meta as any).plan_expires_at as string | undefined) || null,
     created_at: row.created_at,
   };
 }
@@ -377,7 +394,7 @@ async function resolveResellerAndWallet(userId: string) {
 
   const { data: reseller, error: resellerError } = await (supabase as any)
     .from('resellers')
-    .select('id, user_id, company_name, created_at')
+    .select('id, user_id, company_name, created_at, is_active, commission_percent, margin_percent, meta')
     .eq('user_id', userId)
     .single();
   if (resellerError || !reseller) throw resellerError || new ValidationError('Reseller account not found');
@@ -1518,6 +1535,19 @@ export const dashboardApi = {
   getResellerData: async (userId: string) => {
     return withErrorHandling(async () => {
       const { reseller, wallet } = await resolveResellerAndWallet(userId);
+      const resellerMeta = ((reseller as any).meta && typeof (reseller as any).meta === 'object') ? (reseller as any).meta : {};
+      const dashboardAccess = Boolean((resellerMeta as any).dashboard_access);
+      if (!dashboardAccess) {
+        throw new PermissionError('Reseller plan not active. Complete plan payment to access reseller dashboard.');
+      }
+
+      const planExpiresAtRaw = (resellerMeta as any).plan_expires_at;
+      if (typeof planExpiresAtRaw === 'string' && planExpiresAtRaw.trim()) {
+        const expiresAt = new Date(planExpiresAtRaw);
+        if (!Number.isNaN(expiresAt.getTime()) && expiresAt.getTime() <= Date.now()) {
+          throw new PermissionError('Reseller plan expired. Renew your plan to access dashboard features.');
+        }
+      }
 
       // Get assigned keys (all keys, not just active ones for display)
       const { data: keys, error: keysError } = await (supabase as any)
@@ -1859,6 +1889,23 @@ export const dashboardApi = {
       const { reseller, wallet } = await resolveResellerAndWallet(userId);
       if ((wallet as any).is_locked) throw new ValidationError('Wallet is locked. Please contact support.');
 
+      const resellerMeta = ((reseller as any).meta && typeof (reseller as any).meta === 'object') ? (reseller as any).meta : {};
+      const dashboardAccess = Boolean((resellerMeta as any).dashboard_access);
+      if (!dashboardAccess) {
+        throw new PermissionError('Reseller plan not active. Complete plan payment to unlock dashboard features.');
+      }
+
+      const planExpiresAtRaw = (resellerMeta as any).plan_expires_at;
+      if (typeof planExpiresAtRaw === 'string' && planExpiresAtRaw.trim()) {
+        const expiresAt = new Date(planExpiresAtRaw);
+        if (!Number.isNaN(expiresAt.getTime()) && expiresAt.getTime() <= Date.now()) {
+          throw new PermissionError('Reseller plan expired. Renew plan to continue generating keys.');
+        }
+      }
+
+      const freeKeysBalance = Math.max(0, Number((resellerMeta as any).free_keys_balance || 0));
+      const hasFreeKeys = freeKeysBalance > 0;
+
       if (payload.clientId) {
         const { data: client, error: clientError } = await (supabase as any)
           .from('reseller_clients')
@@ -1888,7 +1935,7 @@ export const dashboardApi = {
       if (planPrice <= 0) throw new ValidationError('Invalid plan price for this product');
 
       const currentBalance = Number(wallet.balance || 0);
-      if (currentBalance < planPrice) {
+      if (!hasFreeKeys && currentBalance < planPrice) {
         throw new ValidationError(`Insufficient balance. Need $${planPrice.toFixed(2)}, have $${currentBalance.toFixed(2)}`);
       }
 
@@ -1918,58 +1965,140 @@ export const dashboardApi = {
       const uniqueKey = await ensureUniqueKey(keyBundle.key);
       const idempotencyKey = normalizeRequestId(payload.idempotencyKey);
 
-      const debitResult = await generateResellerLicenseKeyAtomic({
-        requestId: idempotencyKey,
-        userId,
-        resellerId: reseller.id,
-        walletId: wallet.id,
-        productId,
-        planDuration,
-        amount: planPrice,
-        licenseKey: uniqueKey,
-        keySignature: keyBundle.signature,
-        keyType: getKeyTypeForPlan(planDuration),
-        expiresAt: effectiveExpiresAt,
-        deviceLimit: 1,
-        clientId: payload.clientId || null,
-        sellPrice,
-        deliveryStatus: payload.deliveryMethod ? 'sent' : 'pending',
-        notes: `Reseller generated key (${planDuration}) for ${product.name}`,
-        meta: {
+      let createdKeyId = '';
+      let transaction: any = null;
+      let updatedWallet: any = wallet;
+      let nextBalance = Number(wallet.balance || 0);
+
+      if (hasFreeKeys) {
+        const { data: createdKey, error: keyInsertError } = await (supabase as any)
+          .from('license_keys')
+          .insert({
+            product_id: productId,
+            reseller_id: reseller.id,
+            assigned_to: payload.clientId || reseller.id,
+            license_key: uniqueKey,
+            key_signature: keyBundle.signature,
+            key_type: getKeyTypeForPlan(planDuration),
+            key_status: payload.clientId ? 'active' : 'unused',
+            status: 'active',
+            max_devices: 1,
+            activated_devices: 0,
+            expires_at: effectiveExpiresAt,
+            created_by: userId,
+            plan_name: planDuration,
+            duration_days: planDuration === '1M' ? 30 : planDuration === '3M' ? 90 : planDuration === '6M' ? 180 : planDuration === '12M' ? 365 : 3650,
+            notes: `Reseller generated key (${planDuration}) for ${product.name} [free-plan-key]`,
+          })
+          .select('id')
+          .single();
+        if (keyInsertError || !createdKey) throw keyInsertError || new ValidationError('Key generation failed');
+
+        createdKeyId = String(createdKey.id);
+        const nextFreeKeys = Math.max(0, freeKeysBalance - 1);
+        const { error: resellerUpdateError } = await (supabase as any)
+          .from('resellers')
+          .update({
+            meta: {
+              ...(resellerMeta as Record<string, unknown>),
+              free_keys_balance: nextFreeKeys,
+            },
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', reseller.id);
+        if (resellerUpdateError) throw resellerUpdateError;
+
+        const { data: freeKeyTx, error: freeKeyTxError } = await (supabase as any)
+          .from('transactions')
+          .insert({
+            wallet_id: wallet.id,
+            reseller_id: reseller.id,
+            product_id: productId,
+            amount: 0,
+            balance_after: Number(wallet.balance || 0),
+            type: 'adjustment',
+            status: 'completed',
+            reference_type: 'reseller_free_key_generation',
+            description: `Free key used for ${product.name} (${planDuration})`,
+            created_by: userId,
+            meta: {
+              reseller_id: reseller.id,
+              product_id: productId,
+              plan_duration: planDuration,
+              charged_price: 0,
+              free_key_used: true,
+              idempotency_key: idempotencyKey,
+            },
+          })
+          .select('id')
+          .single();
+        if (freeKeyTxError || !freeKeyTx) throw freeKeyTxError || new ValidationError('Transaction failed');
+
+        transaction = {
+          id: freeKeyTx.id,
+          wallet_id: wallet.id,
           reseller_id: reseller.id,
           product_id: productId,
-          plan_duration: planDuration,
-          base_monthly_price: baseMonthlyPrice,
-          charged_price: planPrice,
-          offline_payload: keyBundle.payload,
-          generated_mode: 'reseller_wallet_plan',
-          idempotency_key: idempotencyKey,
-        },
-      });
+          amount: 0,
+          balance_after: Number(wallet.balance || 0),
+          type: 'adjustment',
+          status: 'completed',
+        };
+      } else {
+        const debitResult = await generateResellerLicenseKeyAtomic({
+          requestId: idempotencyKey,
+          userId,
+          resellerId: reseller.id,
+          walletId: wallet.id,
+          productId,
+          planDuration,
+          amount: planPrice,
+          licenseKey: uniqueKey,
+          keySignature: keyBundle.signature,
+          keyType: getKeyTypeForPlan(planDuration),
+          expiresAt: effectiveExpiresAt,
+          deviceLimit: 1,
+          clientId: payload.clientId || null,
+          sellPrice,
+          deliveryStatus: payload.deliveryMethod ? 'sent' : 'pending',
+          notes: `Reseller generated key (${planDuration}) for ${product.name}`,
+          meta: {
+            reseller_id: reseller.id,
+            product_id: productId,
+            plan_duration: planDuration,
+            base_monthly_price: baseMonthlyPrice,
+            charged_price: planPrice,
+            offline_payload: keyBundle.payload,
+            generated_mode: 'reseller_wallet_plan',
+            idempotency_key: idempotencyKey,
+          },
+        });
 
-      const nextBalance = Number(debitResult.balanceAfter || 0);
-      const updatedWallet = {
-        ...wallet,
-        balance: nextBalance,
-        total_spent: Number(debitResult.totalSpent || walletSpent + planPrice),
-        version: Number(debitResult.walletVersion || walletVersion + 1),
-      };
-      const transaction = {
-        id: debitResult.transactionId,
-        wallet_id: wallet.id,
-        reseller_id: reseller.id,
-        product_id: productId,
-        amount: planPrice,
-        balance_after: nextBalance,
-        type: 'debit',
-        status: 'completed',
-      };
+        createdKeyId = String(debitResult.licenseKeyId);
+        nextBalance = Number(debitResult.balanceAfter || 0);
+        updatedWallet = {
+          ...wallet,
+          balance: nextBalance,
+          total_spent: Number(debitResult.totalSpent || walletSpent + planPrice),
+          version: Number(debitResult.walletVersion || walletVersion + 1),
+        };
+        transaction = {
+          id: debitResult.transactionId,
+          wallet_id: wallet.id,
+          reseller_id: reseller.id,
+          product_id: productId,
+          amount: planPrice,
+          balance_after: nextBalance,
+          type: 'debit',
+          status: 'completed',
+        };
+      }
 
       try {
         const { data: createdKey, error: keyError } = await (supabase as any)
           .from('license_keys')
           .select('*')
-          .eq('id', debitResult.licenseKeyId)
+          .eq('id', createdKeyId)
           .single();
 
         if (keyError || !createdKey) throw keyError || new ValidationError('Key generation failed');

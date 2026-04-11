@@ -77,3 +77,6 @@ verify_jwt = false
 
 [functions.seed-marketplace]
 verify_jwt = false
+
+[functions.demo-proxy]
+verify_jwt = false

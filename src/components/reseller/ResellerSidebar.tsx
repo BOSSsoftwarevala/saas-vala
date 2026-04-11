@@ -14,8 +14,10 @@
    LogOut,
  } from 'lucide-react';
  import { Button } from '@/components/ui/button';
+ import { Badge } from '@/components/ui/badge';
  import saasValaLogo from '@/assets/saas-vala-logo.jpg';
  import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+ import { useResellerPlanBadge } from '@/hooks/useResellerPlanBadge';
  
  interface NavItem {
    title: string;
@@ -36,6 +38,7 @@
    const [collapsed, setCollapsed] = useState(false);
    const location = useLocation();
    const { signOut } = useAuth();
+  const { plan } = useResellerPlanBadge();
  
     const isActive = (href: string) => {
       if (href === '/reseller/dashboard') {
@@ -60,6 +63,9 @@
                <div>
                  <span className="font-display text-lg font-bold text-foreground">SaaS VALA</span>
                  <span className="ml-2 text-xs text-secondary font-medium">Reseller</span>
+                 <Badge variant="outline" className="ml-2 text-[10px] px-1.5 py-0 border-amber-500/30 text-amber-600">
+                   {plan.badgeIcon} {plan.badgeLabel}
+                 </Badge>
                </div>
              </div>
            )}

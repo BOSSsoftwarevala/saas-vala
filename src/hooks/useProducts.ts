@@ -22,6 +22,7 @@ export interface Product {
   deploy_status: string | null;
   marketplace_visible: boolean | null;
   demo_url: string | null;
+  demo_source_url: string | null;
   live_url: string | null;
   thumbnail_url: string | null;
 }

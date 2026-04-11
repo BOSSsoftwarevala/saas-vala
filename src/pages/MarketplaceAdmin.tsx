@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { marketplaceAdminApi } from '@/lib/api';
+import { normalizeDemoUrlPair, sanitizeDemoSourceUrl } from '@/lib/demoMasking';
 import {
   Plus,
   Search,
@@ -66,8 +67,10 @@ interface Product {
   price: number;
   status: ProductStatusDb;
   business_type: string | null;
+  target_industry?: string | null;
   tags: string[];
   demo_url: string | null;
+  demo_source_url: string | null;
   demo_login: string | null;
   demo_password: string | null;
   demo_enabled: boolean;
@@ -224,8 +227,10 @@ const emptyProduct = (): Product => ({
   price: 5,
   status: 'draft',
   business_type: 'software',
+  target_industry: 'software',
   tags: [],
   demo_url: '',
+  demo_source_url: '',
   demo_login: '',
   demo_password: '',
   demo_enabled: false,
@@ -433,7 +438,12 @@ export default function MarketplaceAdmin() {
         limit: PAGE_SIZE,
         search: search.trim() || undefined,
       }) as any;
-      setProducts((res?.data || []) as Product[]);
+      const normalized = ((res?.data || []) as any[]).map((p) => ({
+        ...p,
+        business_type: p.business_type || p.target_industry || '',
+        target_industry: p.target_industry || p.business_type || '',
+      }));
+      setProducts(normalized as Product[]);
     } catch {
       toast.error('Failed to load products');
     }
@@ -695,17 +705,10 @@ export default function MarketplaceAdmin() {
       toast.error('Product name is required');
       return;
     }
-    if (editProduct.demo_enabled && editProduct.demo_url) {
-      try {
-        const parsed = new URL(editProduct.demo_url);
-        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-          toast.error('Demo URL must start with http:// or https://');
-          return;
-        }
-      } catch {
-        toast.error('Demo URL must be a valid HTTP/HTTPS URL');
-        return;
-      }
+    const rawDemoInput = editProduct.demo_source_url || editProduct.demo_url;
+    if (rawDemoInput && !sanitizeDemoSourceUrl(rawDemoInput)) {
+      toast.error('Demo URL must be a valid HTTP/HTTPS URL');
+      return;
     }
     if (editProduct.apk_enabled && !editProduct.apk_url) {
       toast.error('APK URL is required when download is enabled');
@@ -716,6 +719,8 @@ export default function MarketplaceAdmin() {
       return;
     }
 
+    const normalizedDemo = normalizeDemoUrlPair(productSlug, rawDemoInput);
+
     const payload = {
       name: editProduct.name.trim(),
       slug: productSlug,
@@ -723,9 +728,10 @@ export default function MarketplaceAdmin() {
       short_description: editProduct.short_description || '',
       price: Number(editProduct.price || 0),
       status: editProduct.status || 'active',
-      business_type: editProduct.business_type || 'software',
+      target_industry: editProduct.business_type || editProduct.target_industry || 'software',
       tags: editProduct.tags || [],
-      demo_url: editProduct.demo_url || null,
+      demo_url: normalizedDemo.demoUrl,
+      demo_source_url: normalizedDemo.demoSourceUrl,
       demo_login: editProduct.demo_login || null,
       demo_password: editProduct.demo_password || null,
       demo_enabled: Boolean(editProduct.demo_enabled),
@@ -1857,7 +1863,7 @@ export default function MarketplaceAdmin() {
 
               <div className="grid gap-2 md:grid-cols-2">
                 <Field label="Category / Business Type">
-                  <Input value={editProduct.business_type || ''} onChange={(e) => setEditProduct({ ...editProduct, business_type: e.target.value })} className="h-9 text-sm" />
+                  <Input value={editProduct.business_type || editProduct.target_industry || ''} onChange={(e) => setEditProduct({ ...editProduct, business_type: e.target.value, target_industry: e.target.value })} className="h-9 text-sm" />
                 </Field>
                 <Field label="Tags (comma separated)">
                   <Input value={(editProduct.tags || []).join(', ')} onChange={(e) => setEditProduct({ ...editProduct, tags: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} className="h-9 text-sm" />
@@ -1869,7 +1875,7 @@ export default function MarketplaceAdmin() {
               </Field>
 
               <Field label="Demo URL">
-                <Input value={editProduct.demo_url || ''} onChange={(e) => setEditProduct({ ...editProduct, demo_url: e.target.value })} className="h-9 text-sm" />
+                <Input value={editProduct.demo_source_url || editProduct.demo_url || ''} onChange={(e) => setEditProduct({ ...editProduct, demo_source_url: e.target.value })} className="h-9 text-sm" />
               </Field>
 
               <div className="grid gap-2 md:grid-cols-2">
