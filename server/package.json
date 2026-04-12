@@ -27,9 +27,7 @@
   "author": "Ultra Server Team",
   "license": "MIT",
   "dependencies": {
-    "pg": "^8.11.3",
-    "zlib": "^1.0.5",
-    "crypto": "^1.0.1"
+    "pg": "^8.11.3"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
