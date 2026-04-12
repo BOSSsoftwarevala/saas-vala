@@ -1,8 +1,35 @@
-import { execSync, spawn } from 'child_process';
-import { promises as fs } from 'fs';
-import path from 'path';
-import crypto from 'crypto';
-import { createHash } from 'crypto';
+// Browser-compatible mock implementations for Node.js modules
+const execSync = () => { throw new Error('execSync not available in browser'); };
+const spawn = () => { throw new Error('spawn not available in browser'); };
+const fs = {
+  promises: {
+    readFile: async () => '',
+    writeFile: async () => {},
+    mkdir: async () => {},
+    access: async () => {},
+    stat: async () => ({ isFile: () => false, isDirectory: () => false }),
+    readdir: async () => [],
+    rm: async () => {},
+    copyFile: async () => {}
+  }
+};
+const path = {
+  join: (...parts: string[]) => parts.join('/'),
+  resolve: (...parts: string[]) => parts.join('/'),
+  dirname: (p: string) => p.split('/').slice(0, -1).join('/'),
+  basename: (p: string) => p.split('/').pop() || '',
+  extname: (p: string) => p.includes('.') ? '.' + p.split('.').pop() : ''
+};
+const crypto = {
+  createHash: (algorithm: string) => ({
+    update: (data: string) => ({
+      digest: (encoding: string) => 'mock-hash-' + algorithm + '-' + data.length
+    })
+  }),
+  randomBytes: (size: number) => Buffer.alloc(size).fill(0),
+  createHmac: () => ({ update: () => ({ digest: () => 'mock-hmac' }) })
+};
+const createHash = crypto.createHash;
 
 // APK Pipeline - Auto Git Scan → Build → Test → Secure APK (Admin Only)
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { InternalChat } from '@/components/InternalChat';
+import InternalChat from '@/components/InternalChat';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';

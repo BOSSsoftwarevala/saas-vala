@@ -247,7 +247,7 @@ export default function Resellers() {
     }
   };
 
-  const handleRejectApplication = async () => {
+  const handleRejectApplicationWithModal = async () => {
     // VALIDATION
     if (!rejectApplicationId || !rejectionReason.trim()) {
       toast.error('Rejection reason is required');
@@ -260,10 +260,10 @@ export default function Resellers() {
       await rejectResellerApplication(rejectApplicationId, rejectionReason);
       // STATE UPDATE + UI REFLECT
       await getResellerApplications();
-      setRejectDialogOpen(false);
-      setRejectApplicationId(null);
-      setRejectionReason('');
       toast.success('Reseller application rejected');
+      setRejectDialogOpen(false);
+      setRejectApplicationId('');
+      setRejectionReason('');
     } catch (error: any) {
       // ERROR HANDLING
       console.error('Application rejection failed:', error);
@@ -870,7 +870,7 @@ export default function Resellers() {
               Cancel
             </Button>
             <Button
-              onClick={handleRejectApplication}
+              onClick={handleRejectApplicationWithModal}
               disabled={!rejectionReason.trim() || submitting}
               className="bg-destructive hover:bg-destructive/90"
             >

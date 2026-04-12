@@ -202,11 +202,11 @@ export class RemoteSupportClient {
   }
 
   // Set callbacks
-  onIncomingCall(callback: (sessionId: string, adminId: string) => void): void {
+  setOnIncomingCall(callback: (sessionId: string, adminId: string) => void): void {
     this.onIncomingCall = callback
   }
 
-  onSessionEnd(callback: () => void): void {
+  setOnSessionEnd(callback: () => void): void {
     this.onSessionEnd = callback
   }
 

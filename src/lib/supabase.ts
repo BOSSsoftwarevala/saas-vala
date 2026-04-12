@@ -339,14 +339,14 @@ export class EnterpriseDatabase {
       if (error) updateData.error = error;
     }
 
-    const { data, error } = await supabase
+    const { data, error: updateError } = await supabase
       .from('jobs')
       .update(updateData)
       .eq('id', jobId)
       .select()
       .single();
     
-    if (error) throw error;
+    if (updateError) throw updateError;
     return data;
   }
 

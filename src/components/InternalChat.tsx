@@ -24,7 +24,7 @@ import {
   Users,
   MessageSquare,
   Settings,
-  Block
+  Ban
 } from 'lucide-react';
 
 const InternalChat: React.FC = () => {
@@ -83,13 +83,13 @@ const InternalChat: React.FC = () => {
       }
     }
   }, []);
+
   const [isRecording, setIsRecording] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isTranslating, setIsTranslating] = useState(false);
   const [userLanguage, setUserLanguage] = useState('en');
-  
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -122,7 +122,7 @@ const InternalChat: React.FC = () => {
   const handleTyping = useCallback(() => {
     if (!isTyping && selectedChat) {
       setIsTyping(true);
-      setTypingIndicator(selectedChat.chat_id, true);
+      sendTypingIndicator(selectedChat.chat_id, true);
       
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
@@ -130,12 +130,12 @@ const InternalChat: React.FC = () => {
       
       typingTimeoutRef.current = setTimeout(() => {
         setIsTyping(false);
-        setTypingIndicator(selectedChat.chat_id, false);
+        sendTypingIndicator(selectedChat.chat_id, false);
       }, 3000);
     }
   }, [isTyping, selectedChat]);
 
-  const setTypingIndicator = async (chatId: string, isTyping: boolean) => {
+  const sendTypingIndicator = async (chatId: string, isTyping: boolean) => {
     try {
       await fetch('/api/internal-chat/typing', {
         method: 'POST',

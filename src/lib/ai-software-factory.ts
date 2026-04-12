@@ -154,7 +154,7 @@ export interface DeploymentResult {
   logs: string[];
 }
 
-class AISoftwareFactory {
+export class AISoftwareFactory {
   private static instance: AISoftwareFactory;
   private currentProject: ProjectPlan | null = null;
   private generatedCode: GeneratedCode | null = null;
@@ -1661,4 +1661,8 @@ class CacheService {
   }
 }
 
-export const cacheService = new CacheService();
+export const cacheService = new CacheService();`;
+  }
+}
+
+export const aiSoftwareFactory = AISoftwareFactory.getInstance();

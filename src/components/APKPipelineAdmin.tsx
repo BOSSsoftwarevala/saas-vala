@@ -27,7 +27,7 @@ import {
   RefreshCw, Trash2, Save, FolderOpen, Link, Lock,
   Unlock, Monitor, Cpu, HardDrive, Wifi, Battery,
   Code, TestTube, Flask, Bug, Hammer, Wrench,
-  Rocket, Launch, Globe, Android, Apple, Smartphone as PhoneIcon
+  Rocket, Launch, Globe, Smartphone, Monitor, Smartphone as PhoneIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 

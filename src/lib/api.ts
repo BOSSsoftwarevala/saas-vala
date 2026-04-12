@@ -848,11 +848,9 @@ export const publicMarketplaceApi = {
   // Orders
   createOrder: (data: { product_id: string; payment_method: string; amount: number }) =>
     apiCall('POST', 'marketplace/orders/create', data),
-  getOrder: (id: string) => apiCall('GET', `marketplace/orders/${id}`),
   
   // Favorites
   toggleFavorite: (product_id: string) => apiCall('POST', 'marketplace/favorites/toggle', { product_id }),
-  getFavorites: () => apiCall('GET', 'marketplace/favorites'),
   
   // Demo
   logDemoAccess: (product_id: string, session_id: string) =>
