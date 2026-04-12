@@ -41,9 +41,10 @@ const Orders = React.lazy(() => import("./pages/Orders"));
 const Dashboard = React.lazy(() => import("./pages/Dashboard"));
 const Products = React.lazy(() => import("./pages/Products"));
 const AddProduct = React.lazy(() => import("./pages/AddProduct"));
+const Support = React.lazy(() => import("./pages/Support"));
+const AiChatLive = React.lazy(() => import("./pages/AiChatLive"));
 const Keys = React.lazy(() => import("./pages/Keys"));
 const Servers = React.lazy(() => import("./pages/Servers"));
-const InternalChat = React.lazy(() => import("./components/InternalChat"));
 const ValaBuilder = React.lazy(() => import("./pages/ValaBuilder"));
 const ValaBuilderOpenAI = React.lazy(() => import("./components/ValaBuilderOpenAI"));
 const AIIntegrationsSettings = React.lazy(() => import("./components/AIIntegrationsSettings"));
@@ -61,6 +62,7 @@ const AiApis = React.lazy(() => import("./pages/AiApis"));
 const Wallet = React.lazy(() => import("./pages/Wallet"));
 const SeoLeads = React.lazy(() => import("./pages/SeoLeads"));
 const Resellers = React.lazy(() => import("./pages/Resellers"));
+const DemoPage = React.lazy(() => import("./pages/DemoPage"));
 const Settings = React.lazy(() => import("./pages/Settings"));
 const AuditLogs = React.lazy(() => import("./pages/AuditLogs"));
 const SystemHealth = React.lazy(() => import("./pages/SystemHealth"));
@@ -70,10 +72,6 @@ const Cart = React.lazy(() => import("./pages/Cart"));
 const ApkPipeline = React.lazy(() => import("./pages/ApkPipeline"));
 const OfflineAppTemplate = React.lazy(() => import("./pages/OfflineAppTemplate"));
 const MarketplaceAdmin = React.lazy(() => import("./pages/MarketplaceAdmin"));
-
-// Missing components
-import { FallbackRedirect } from './components/FallbackRedirect';
-import { PageLoader } from './components/PageLoader';
 
 // PWA Components - grouped for better chunking
 const EduPwa = React.lazy(() => import("./pages/EduPwa"));
@@ -299,9 +297,8 @@ function AppRoutes() {
         <Route path="/apk-pipeline" element={<ProtectedRoute><AdminRoute><LazyWrapper><APKPipelineAdmin /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         <Route path="/ultra-apk-pipeline" element={<ProtectedRoute><AdminRoute><LazyWrapper><UltraAPKPipelineAdmin /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         <Route path="/extreme-apk-pipeline" element={<ProtectedRoute><AdminRoute><LazyWrapper><ExtremeAPKPipelineAdmin /></LazyWrapper></AdminRoute></ProtectedRoute>} />
-        <Route path="/ai-chat" element={<ProtectedRoute><LazyWrapper><InternalChat /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/internal-chat" element={<ProtectedRoute><LazyWrapper><InternalChat /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/chat" element={<ProtectedRoute><LazyWrapper><InternalChat /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/ai-chat" element={<ProtectedRoute><LazyWrapper><AiChatLive /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/support" element={<ProtectedRoute><LazyWrapper><Support /></LazyWrapper></ProtectedRoute>} />
         <Route path="/saas-ai-dashboard" element={<ProtectedRoute><LazyWrapper><SaasAiDashboard /></LazyWrapper></ProtectedRoute>} />
         <Route path="/saas-ai" element={<ProtectedRoute><LazyWrapper><SaasAiDashboard /></LazyWrapper></ProtectedRoute>} />
         <Route path="/ai-apis" element={<ProtectedRoute><LazyWrapper><AiApis /></LazyWrapper></ProtectedRoute>} />

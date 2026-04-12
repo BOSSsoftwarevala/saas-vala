@@ -67,36 +67,23 @@ const itemVariants = {
 };
 
 export function QuickActions() {
-  console.log('QUICKACTIONS COMPONENT IS RENDERING!!!');
-  
   return (
-    <div style={{
-      backgroundColor: 'red',
-      color: 'white',
-      padding: '20px',
-      border: '5px solid yellow',
-      fontSize: '24px',
-      fontWeight: 'bold'
-    }}>
-      🚨 QUICKACTIONS COMPONENT IS WORKING! 🚨
-      <br />
-      If you can see this, the component is rendering!
-      <br />
-      <button 
-        onClick={() => alert('BUTTON CLICK WORKS!')}
-        style={{
-          backgroundColor: 'blue',
-          color: 'white',
-          padding: '10px 20px',
-          fontSize: '18px',
-          border: 'none',
-          borderRadius: '5px',
-          marginTop: '10px',
-          cursor: 'pointer'
-        }}
-      >
-        CLICK ME TO TEST
-      </button>
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {actions.map((action) => {
+        const Icon = action.icon;
+        return (
+          <Button
+            key={action.href}
+            asChild
+            className={cn('h-14 justify-start gap-3 rounded-xl shadow-sm', action.color)}
+          >
+            <a href={action.href}>
+              <Icon className="h-5 w-5" />
+              <span>{action.label}</span>
+            </a>
+          </Button>
+        );
+      })}
     </div>
   );
 }
