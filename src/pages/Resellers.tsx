@@ -153,12 +153,16 @@ export default function Resellers() {
 
   const handleSubmit = async () => {
     // VALIDATION
-    if (!formData.name.trim()) {
-      toast.error('Reseller name is required');
+    if (!formData.company_name.trim()) {
+      toast.error('Company name is required');
       return;
     }
-    if (!formData.email.trim()) {
-      toast.error('Email is required');
+    if (formData.commission_percent < 0 || formData.commission_percent > 100) {
+      toast.error('Commission must be between 0 and 100');
+      return;
+    }
+    if (formData.credit_limit < 0) {
+      toast.error('Credit limit cannot be negative');
       return;
     }
     
@@ -175,12 +179,11 @@ export default function Resellers() {
       // STATE UPDATE + UI REFLECT
       setDialogOpen(false);
       setFormData({
-        name: '',
-        email: '',
-        phone: '',
-        business_name: '',
-        margin_percent: 20,
-        credits: 0,
+        company_name: '',
+        commission_percent: 10,
+        credit_limit: 0,
+        is_active: true,
+        is_verified: false,
       });
       setEditReseller(null);
     } catch (error: any) {

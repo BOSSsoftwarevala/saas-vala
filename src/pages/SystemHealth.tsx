@@ -23,6 +23,7 @@ import {
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
+import { getCurrentSystemHealth, getHealthHistory } from '@/lib/systemHealth';
 
 interface HealthCheck {
   name: string;
@@ -64,98 +65,105 @@ const SystemHealthPage: React.FC = () => {
     }
 
     try {
-      // Check if saasvala.com is accessible
-      const siteResponse = await fetch('https://saasvala.com', {
-        method: 'GET',
-        mode: 'no-cors' // Avoid CORS issues
-      });
-      
-      // Since saasvala.com is static and hosted on Cloudflare, 
-      // we'll provide realistic health status
-      const healthData = {
-          database: 'connected', // Static sites don't have databases
-          apis: [
-            { endpoint: 'site', status: 'up' }, // Main site is up
-            { endpoint: 'cdn', status: 'up' }, // Cloudflare CDN is up
-            { endpoint: 'assets', status: 'up' } // Static assets are served
-          ],
-          server: {
-            cpu: 15, // Low CPU for static site
-            ram: 25, // Low RAM usage
-            disk: 60, // Moderate disk usage
-            uptime: 86400000 // 24 hours+
-          }
-        };
-      
-      // Update health checks with mock data
-      const updatedChecks = healthChecks.map(check => {
-        let status: 'ok' | 'warning' | 'error' | 'checking' = 'ok';
-        let message = 'Operational';
-        
-        if (check.name === 'Database Connection') {
-          status = 'ok';
-          message = 'Static site - No DB needed';
-        } else if (check.name === 'Authentication Service') {
-          status = 'ok';
-          message = 'Client-side auth';
-        } else if (check.name === 'Products Table') {
-          status = 'ok';
-          message = 'Static content';
-        } else if (check.name === 'License Keys') {
-          status = 'ok';
-          message = 'Client-side validation';
-        } else if (check.name === 'User Profiles') {
-          status = 'ok';
-          message = 'Local storage';
-        } else if (check.name === 'Servers Table') {
-          status = 'ok';
-          message = 'Cloudflare CDN';
-        } else if (check.name === 'Wallets & Transactions') {
-          status = 'ok';
-          message = 'Static demo';
-        } else if (check.name === 'Audit Logs') {
-          status = 'ok';
-          message = 'Client-side logs';
-        } else if (check.name === 'AI Usage Tracking') {
-          status = 'ok';
-          message = 'Local tracking';
-        } else if (check.name === 'Storage Buckets') {
-          status = 'ok';
-          message = 'CDN assets';
-        } else {
-          // Random status for demo
-          const random = Math.random();
-          if (random > 0.8) {
-            status = 'warning';
-            message = 'High latency';
-          } else if (random > 0.95) {
-            status = 'error';
-            message = 'Service unavailable';
-          }
-        }
-        
-        return {
-          ...check,
-          status,
-          message,
-          latencyMs: Math.random() * 1000,
-          uptimePct: Math.random() * 100
-        };
-      });
+      const report = await getCurrentSystemHealth();
+      const history = getHealthHistory();
+
+      const apiDownCount = report.apis.filter((api) => api.status === 'down').length;
+      const criticalErrors = report.errors.filter((error) => error.type === 'server' || error.type === 'database').length;
+      const runningServices = report.services.filter((service) => service.status === 'running').length;
+
+      const updatedChecks: HealthCheck[] = [
+        {
+          name: 'Database Connection',
+          status: report.database.status === 'connected' ? 'ok' : 'error',
+          message: report.database.status === 'connected' ? 'Connected' : (report.database.error || 'Disconnected'),
+          icon: Database,
+          latencyMs: report.database.responseTime,
+          uptimePct: report.uptime.percentage,
+        },
+        {
+          name: 'Authentication Service',
+          status: report.apis.some((api) => api.endpoint.toLowerCase().includes('auth') && api.status === 'down') ? 'error' : 'ok',
+          message: report.apis.some((api) => api.endpoint.toLowerCase().includes('auth') && api.status === 'down') ? 'Auth API unavailable' : 'Auth API operational',
+          icon: Shield,
+          latencyMs: report.apis.find((api) => api.endpoint.toLowerCase().includes('auth'))?.responseTime,
+          uptimePct: report.uptime.percentage,
+        },
+        {
+          name: 'Products Table',
+          status: report.database.status === 'connected' ? 'ok' : 'error',
+          message: report.database.status === 'connected' ? 'Products DB reachable' : 'Products DB unavailable',
+          icon: Package,
+          latencyMs: report.database.responseTime,
+          uptimePct: report.uptime.percentage,
+        },
+        {
+          name: 'License Keys',
+          status: report.database.status === 'connected' ? 'ok' : 'error',
+          message: report.database.status === 'connected' ? 'License data reachable' : 'License data unavailable',
+          icon: Key,
+          latencyMs: report.database.responseTime,
+          uptimePct: report.uptime.percentage,
+        },
+        {
+          name: 'User Profiles',
+          status: report.database.status === 'connected' ? 'ok' : 'error',
+          message: report.database.status === 'connected' ? 'Profiles reachable' : 'Profiles unavailable',
+          icon: Users,
+          latencyMs: report.database.responseTime,
+          uptimePct: report.uptime.percentage,
+        },
+        {
+          name: 'Servers Table',
+          status: report.server.status === 'up' ? 'ok' : 'error',
+          message: report.server.status === 'up' ? 'Server monitoring online' : 'Server monitoring offline',
+          icon: Server,
+          uptimePct: report.uptime.percentage,
+        },
+        {
+          name: 'Wallets & Transactions',
+          status: report.database.status === 'connected' ? 'ok' : 'error',
+          message: report.database.status === 'connected' ? 'Transaction storage reachable' : 'Transaction storage unavailable',
+          icon: CreditCard,
+          latencyMs: report.database.responseTime,
+          uptimePct: report.uptime.percentage,
+        },
+        {
+          name: 'Audit Logs',
+          status: report.database.status === 'connected' ? 'ok' : 'error',
+          message: report.database.status === 'connected' ? 'Audit logging active' : 'Audit logging unavailable',
+          icon: Activity,
+          latencyMs: report.database.responseTime,
+          uptimePct: report.uptime.percentage,
+        },
+        {
+          name: 'AI Usage Tracking',
+          status: apiDownCount > 0 ? 'warning' : 'ok',
+          message: apiDownCount > 0 ? `${apiDownCount} API endpoint(s) down` : 'API endpoints operational',
+          icon: Cpu,
+          latencyMs: report.apis[0]?.responseTime,
+          uptimePct: report.uptime.percentage,
+        },
+        {
+          name: 'Storage Buckets',
+          status: runningServices > 0 ? 'ok' : 'warning',
+          message: runningServices > 0 ? `${runningServices} service(s) running` : 'No services reported running',
+          icon: HardDrive,
+          uptimePct: report.uptime.percentage,
+        },
+      ];
 
       setHealthChecks(updatedChecks);
       setLastCheck(new Date());
-      
-      // Set mock metrics
-      setHistoryCount(Math.floor(Math.random() * 100));
-      setActiveAlerts(Math.floor(Math.random() * 5));
-      setQueuePending(Math.floor(Math.random() * 10));
-      setAutoActions(Math.floor(Math.random() * 3));
+
+      setHistoryCount(history.length);
+      setActiveAlerts(report.errors.length);
+      setQueuePending(apiDownCount);
+      setAutoActions(criticalErrors);
 
     } catch (error) {
       console.error('Failed to load health dashboard:', error);
       
-      // Set fallback data
       const fallbackChecks = healthChecks.map(check => ({
         ...check,
         status: 'error' as const,
