@@ -11,23 +11,7 @@ import { Calendar, Download, Filter, RefreshCw, Eye, AlertTriangle, Info, AlertC
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { auditLogger, type AuditLog, type LogFilter } from '@/lib/auditLogs';
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
+import { 
   Search,
   FileText,
   User,
@@ -35,15 +19,13 @@ import {
   Key,
   Server,
   CreditCard,
-  RefreshCw,
   Loader2,
   Eye,
   Download,
-  Calendar,
+  Calendar
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
 
 type AuditLog = Database['public']['Tables']['audit_logs']['Row'];

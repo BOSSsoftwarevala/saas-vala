@@ -7,7 +7,6 @@ import { NetflixRow } from '@/components/dashboard/NetflixRow';
 import { ProductCard } from '@/components/dashboard/ProductCard';
 import { ServerCard } from '@/components/dashboard/ServerCard';
 import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
-import { DeadButtonDetector } from '@/components/debug/DeadButtonDetector';
 import { QuickActions } from '@/components/dashboard/QuickActions';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -314,42 +313,42 @@ export default function Dashboard() {
           </h3>
           <div className="flex flex-wrap gap-3">
             <button
-              onClick={() => window.location.href = '/products/create'}
+              onClick={() => navigate('/admin/add-product')}
               className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-md gap-2 shadow-lg"
             >
               ➕ Add Product
             </button>
             
             <button
-              onClick={() => window.location.href = '/keys'}
+              onClick={() => navigate('/keys')}
               className="bg-cyan hover:opacity-90 text-primary-foreground px-4 py-2 rounded-md gap-2 shadow-lg"
             >
               🔑 Generate Key
             </button>
             
             <button
-              onClick={() => window.location.href = '/apk-pipeline'}
+              onClick={() => navigate('/apk-pipeline')}
               className="bg-purple hover:opacity-90 text-white px-4 py-2 rounded-md gap-2 shadow-lg"
             >
               📤 Upload APK
             </button>
             
             <button
-              onClick={() => window.location.href = '/servers'}
+              onClick={() => navigate('/servers')}
               className="bg-muted hover:bg-muted/80 text-foreground px-4 py-2 rounded-md gap-2 shadow-lg"
             >
               🖥️ Deploy Server
             </button>
             
             <button
-              onClick={() => window.location.href = '/wallet'}
+              onClick={() => navigate('/wallet')}
               className="bg-green hover:opacity-90 text-white px-4 py-2 rounded-md gap-2 shadow-lg"
             >
               💰 Add Credits
             </button>
             
             <button
-              onClick={() => window.location.href = '/support'}
+              onClick={() => navigate('/support')}
               className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-md gap-2 shadow-lg"
             >
               🎧 Support
@@ -513,6 +512,5 @@ export default function Dashboard() {
         )}
       </div>
     </DashboardLayout>
-    <DeadButtonDetector />
   );
 }

@@ -152,13 +152,41 @@ export default function Resellers() {
   };
 
   const handleSubmit = async () => {
+    // VALIDATION
+    if (!formData.name.trim()) {
+      toast.error('Reseller name is required');
+      return;
+    }
+    if (!formData.email.trim()) {
+      toast.error('Email is required');
+      return;
+    }
+    
     setSubmitting(true);
     try {
+      // API CALL
       if (editReseller) {
         await updateReseller(editReseller.id, formData);
+        toast.success('Reseller updated successfully');
+      } else {
+        // Note: Creating new reseller requires user_id from an existing user
+        toast.info('Creating new reseller requires existing user');
       }
-      // Note: Creating new reseller requires user_id from an existing user
+      // STATE UPDATE + UI REFLECT
       setDialogOpen(false);
+      setFormData({
+        name: '',
+        email: '',
+        phone: '',
+        business_name: '',
+        margin_percent: 20,
+        credits: 0,
+      });
+      setEditReseller(null);
+    } catch (error: any) {
+      // ERROR HANDLING
+      console.error('Reseller operation failed:', error);
+      toast.error(error.message || 'Failed to save reseller');
     } finally {
       setSubmitting(false);
     }
@@ -166,8 +194,18 @@ export default function Resellers() {
 
   const handleDelete = async () => {
     if (!deleteId) return;
-    await deleteReseller(deleteId);
-    setDeleteId(null);
+    
+    try {
+      // API CALL
+      await deleteReseller(deleteId);
+      // STATE UPDATE + UI REFLECT
+      setDeleteId(null);
+      toast.success('Reseller deleted successfully');
+    } catch (error: any) {
+      // ERROR HANDLING
+      console.error('Reseller deletion failed:', error);
+      toast.error(error.message || 'Failed to delete reseller');
+    }
   };
 
   // Load applications on mount
@@ -178,23 +216,58 @@ export default function Resellers() {
   const handleApproveApplication = async (applicationId: string) => {
     setSubmitting(true);
     try {
+      // API CALL
       await approveResellerApplication(applicationId);
+      // STATE UPDATE + UI REFLECT
       await getResellerApplications();
+      toast.success('Reseller application approved');
+    } catch (error: any) {
+      // ERROR HANDLING
+      console.error('Application approval failed:', error);
+      toast.error(error.message || 'Failed to approve application');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRejectApplication = async (applicationId: string, rejectionReason: string) => {
+    setSubmitting(true);
+    try {
+      // API CALL
+      await rejectResellerApplication(applicationId, rejectionReason);
+      // STATE UPDATE + UI REFLECT
+      await getResellerApplications();
+      toast.success('Reseller application rejected');
+    } catch (error: any) {
+      // ERROR HANDLING
+      console.error('Application rejection failed:', error);
+      toast.error(error.message || 'Failed to reject application');
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleRejectApplication = async () => {
-    if (!rejectApplicationId || !rejectionReason.trim()) return;
+    // VALIDATION
+    if (!rejectApplicationId || !rejectionReason.trim()) {
+      toast.error('Rejection reason is required');
+      return;
+    }
 
     setSubmitting(true);
     try {
+      // API CALL
       await rejectResellerApplication(rejectApplicationId, rejectionReason);
+      // STATE UPDATE + UI REFLECT
       await getResellerApplications();
       setRejectDialogOpen(false);
       setRejectApplicationId(null);
       setRejectionReason('');
+      toast.success('Reseller application rejected');
+    } catch (error: any) {
+      // ERROR HANDLING
+      console.error('Application rejection failed:', error);
+      toast.error(error.message || 'Failed to reject application');
     } finally {
       setSubmitting(false);
     }

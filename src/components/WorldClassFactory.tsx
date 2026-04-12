@@ -26,9 +26,9 @@ import {
   TrendingUp, AlertCircle, Ban, Lock, Unlock, Settings, Play, Pause,
   SkipForward, RotateCcw, Save, FolderOpen, FileSearch, Target,
   Battery, Wifi, HardDrive, Cpu, Memory, Server, Terminal,
-  GitBranch, GitMerge, GitCommit, History, TestTube, Flask,
-  ShieldCheck, Security, Eye, EyeOff, Users, UserCheck,
-  Layers, Package, Archive, Clean, Sparkles, Rocket
+  GitBranch, GitMerge, GitCommit, History, TestTube, Beaker,
+  ShieldCheck, Shield, Eye, EyeOff, Users, UserCheck,
+  Layers, Package, Archive, Sparkles, Rocket
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 

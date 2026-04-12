@@ -813,9 +813,6 @@ export const publicMarketplaceApi = {
   // Categories
   getCategories: () => apiCall('GET', 'marketplace/categories'),
   
-  // Banners
-  getBanners: () => apiCall('GET', 'marketplace/banners'),
-  
   // Ratings & Reviews
   getRatings: (productId: string) => apiCall('GET', `marketplace/products/${productId}/ratings`),
   submitRating: (productId: string, data: { rating: number; review_title?: string; review_text?: string }) =>
@@ -865,6 +862,4 @@ export const publicMarketplaceApi = {
   // Download
   getDownloadUrl: (product_id: string) => apiCall('GET', `marketplace/products/${product_id}/download`),
 
-  // Banners
-  getBanners: () => apiCall('GET', 'marketplace/banners'),
-};
+  };

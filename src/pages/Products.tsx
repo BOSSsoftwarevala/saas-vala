@@ -166,16 +166,44 @@ export default function Products() {
   };
 
   const handleSubmit = async () => {
-    if (!formData.name.trim()) return;
+    // VALIDATION
+    if (!formData.name.trim()) {
+      toast.error('Product name is required');
+      return;
+    }
+    if (formData.price < 0) {
+      toast.error('Price cannot be negative');
+      return;
+    }
+    
     setSubmitting(true);
     try {
+      // API CALL
       const slug = formData.slug || formData.name.toLowerCase().replace(/[^a-z0-9]/g, '-');
       if (editProduct) {
         await updateProduct(editProduct.id, { ...formData, slug });
+        toast.success('Product updated successfully');
       } else {
         await createProduct({ ...formData, slug });
+        toast.success('Product created successfully');
       }
+      
+      // STATE UPDATE + UI REFLECT
       setDialogOpen(false);
+      setFormData({
+        name: '',
+        slug: '',
+        description: '',
+        price: 0,
+        status: 'draft',
+        category_id: '',
+        version: '1.0.0',
+      });
+      setEditProduct(null);
+    } catch (error: any) {
+      // ERROR HANDLING
+      console.error('Product operation failed:', error);
+      toast.error(error.message || 'Failed to save product');
     } finally {
       setSubmitting(false);
     }
@@ -183,8 +211,18 @@ export default function Products() {
 
   const handleDelete = async () => {
     if (!deleteId) return;
-    await deleteProduct(deleteId);
-    setDeleteId(null);
+    
+    try {
+      // API CALL
+      await deleteProduct(deleteId);
+      // STATE UPDATE + UI REFLECT
+      setDeleteId(null);
+      toast.success('Product deleted successfully');
+    } catch (error: any) {
+      // ERROR HANDLING
+      console.error('Product deletion failed:', error);
+      toast.error(error.message || 'Failed to delete product');
+    }
   };
 
   // Git import functions - uses server-side tokens, no OAuth needed
@@ -211,7 +249,7 @@ export default function Products() {
   };
 
   const importRepoAsProduct = async (repo: GitHubRepo) => {
-    // Check if already imported
+    // VALIDATION
     const alreadyExists = products.some(
       (p) => p.git_repo_url === repo.html_url || p.git_repo_name === repo.full_name
     );
@@ -222,6 +260,7 @@ export default function Products() {
 
     setImportingRepos((prev) => new Set(prev).add(repo.id));
     try {
+      // API CALL
       await createProduct({
         name: repo.name.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
         slug: repo.name.toLowerCase(),
@@ -233,9 +272,12 @@ export default function Products() {
         status: 'draft',
         price: 0,
       });
+      // STATE UPDATE + UI REFLECT
       toast.success(`Imported "${repo.name}" as product`);
-    } catch {
-      toast.error(`Failed to import "${repo.name}"`);
+    } catch (error: any) {
+      // ERROR HANDLING
+      console.error('Repo import failed:', error);
+      toast.error(error.message || `Failed to import "${repo.name}"`);
     } finally {
       setImportingRepos((prev) => {
         const next = new Set(prev);
@@ -246,6 +288,7 @@ export default function Products() {
   };
 
   const importAllRepos = async () => {
+    // VALIDATION
     const unimported = gitRepos.filter(
       (repo) => !products.some((p) => p.git_repo_url === repo.html_url || p.git_repo_name === repo.full_name)
     );
@@ -253,16 +296,31 @@ export default function Products() {
       toast.info('All repositories are already imported.');
       return;
     }
+    
+    // API CALL - Import all repos sequentially
     for (const repo of unimported) {
       await importRepoAsProduct(repo);
     }
+    toast.success(`Imported ${unimported.length} repositories`);
   };
 
-  const isRepoImported = (repo: GitHubRepo) =>
-    products.some((p) => p.git_repo_url === repo.html_url || p.git_repo_name === repo.full_name);
-
   const toggleMarketplace = async (product: Product) => {
-    await updateProduct(product.id, { marketplace_visible: !product.marketplace_visible } as any);
+    try {
+      // API CALL
+      await updateProduct(product.id, { marketplace_visible: !product.marketplace_visible });
+      // STATE UPDATE + UI REFLECT
+      toast.success(`Product ${product.marketplace_visible ? 'hidden from' : 'listed on'} marketplace`);
+    } catch (error: any) {
+      // ERROR HANDLING
+      console.error('Marketplace toggle failed:', error);
+      toast.error(error.message || 'Failed to update marketplace visibility');
+    }
+  };
+
+  const isRepoImported = (repo: GitHubRepo) => {
+    return products.some(
+      (p) => p.git_repo_url === repo.html_url || p.git_repo_name === repo.full_name
+    );
   };
 
   return (
@@ -290,7 +348,7 @@ export default function Products() {
                 Add Product
               </Button>
             )}
-            <Button variant="outline" className="gap-2 border-border">
+            <Button variant="outline" className="gap-2 border-border" onClick={() => toast.info('APK upload feature coming soon')}>
               <Upload className="h-4 w-4" />
               Upload APK
             </Button>
@@ -423,6 +481,7 @@ export default function Products() {
                           size="sm"
                           className="h-7 gap-1 text-xs"
                           onClick={() => toggleMarketplace(product)}
+                          disabled={loading}
                         >
                           <Store className={cn('h-3 w-3', product.marketplace_visible ? 'text-success' : 'text-muted-foreground')} />
                           {product.marketplace_visible ? 'Listed' : 'Hidden'}
@@ -436,7 +495,7 @@ export default function Products() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="bg-popover border-border">
-                            <DropdownMenuItem className="gap-2 cursor-pointer">
+                            <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => navigate(`/products/${product.id}`)}>
                               <Eye className="h-4 w-4" /> View
                             </DropdownMenuItem>
                             <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => openEditDialog(product)}>
@@ -447,15 +506,15 @@ export default function Products() {
                                 <ExternalLink className="h-4 w-4" /> Open Repo
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem className="gap-2 cursor-pointer">
+                            <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => toast.info('Deploy feature coming soon')}>
                               <Rocket className="h-4 w-4" /> Deploy
                             </DropdownMenuItem>
                             {product.status === 'suspended' ? (
-                              <DropdownMenuItem className="gap-2 cursor-pointer text-success" onClick={() => activateProduct(product.id)}>
+                              <DropdownMenuItem className="gap-2 cursor-pointer text-success" onClick={() => activateProduct(product.id)} disabled={loading}>
                                 <Play className="h-4 w-4" /> Activate
                               </DropdownMenuItem>
                             ) : (
-                              <DropdownMenuItem className="gap-2 cursor-pointer text-warning" onClick={() => suspendProduct(product.id)}>
+                              <DropdownMenuItem className="gap-2 cursor-pointer text-warning" onClick={() => suspendProduct(product.id)} disabled={loading}>
                                 <Ban className="h-4 w-4" /> Suspend
                               </DropdownMenuItem>
                             )}
@@ -601,7 +660,13 @@ export default function Products() {
             <>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm text-muted-foreground">{gitRepos.length} repositories found</span>
-                <Button size="sm" variant="outline" onClick={importAllRepos} className="gap-1 text-xs">
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={importAllRepos} 
+                  className="gap-1 text-xs"
+                  disabled={loading || importingRepos.size > 0}
+                >
                   <Plus className="h-3 w-3" />
                   Import All
                 </Button>
@@ -683,7 +748,11 @@ export default function Products() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
+            <AlertDialogAction 
+              onClick={handleDelete} 
+              className="bg-destructive text-destructive-foreground"
+              disabled={!!deleteId && products.find(p => p.id === deleteId) === undefined}
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -407,8 +407,11 @@ const MarketplaceProductCard: React.FC<MarketplaceProductCardProps> = memo(({ pr
       )}
     </>
   );
-}));
+});
 MarketplaceProductCard.displayName = 'MarketplaceProductCard';
+
+export default MarketplaceProductCard;
+export { MarketplaceProductCard };
 
 export const ComingSoonCard = memo(function ComingSoonCard({ label }: { label: string }) {
   return (

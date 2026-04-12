@@ -28,7 +28,7 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { CartProvider } from '@/hooks/useCart';
 import { applySaasValaBranding, DEMO_PUBLIC_HOST } from '@/lib/demoMasking';
 import { Loader2 } from 'lucide-react';
-import React, { Suspense, useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 
 
 // Lazy loaded components for better performance
@@ -70,7 +70,8 @@ const Cart = React.lazy(() => import("./pages/Cart"));
 const ApkPipeline = React.lazy(() => import("./pages/ApkPipeline"));
 const OfflineAppTemplate = React.lazy(() => import("./pages/OfflineAppTemplate"));
 const MarketplaceAdmin = React.lazy(() => import("./pages/MarketplaceAdmin"));
-const Support = React.lazy(() => import("./pages/Support"));
+const SupportUser = React.lazy(() => import("./pages/SupportUser"));
+const SupportAdmin = React.lazy(() => import("./pages/SupportAdmin"));
 
 // PWA Components - grouped for better chunking
 const EduPwa = React.lazy(() => import("./pages/EduPwa"));
@@ -117,7 +118,8 @@ function preloadCriticalRoutes() {
     import("./pages/Favorites"),
     import("./pages/Orders"),
     import("./pages/Dashboard"),
-    import("./pages/Support"),
+    import("./pages/SupportUser"),
+    import("./pages/SupportAdmin"),
   ]);
 }
 
@@ -303,7 +305,9 @@ function AppRoutes() {
         <Route path="/ai-apis" element={<ProtectedRoute><LazyWrapper><AiApis /></LazyWrapper></ProtectedRoute>} />
         <Route path="/wallet" element={<ProtectedRoute><LazyWrapper><Wallet /></LazyWrapper></ProtectedRoute>} />
         <Route path="/reseller/dashboard" element={<ProtectedRoute><LazyWrapper><ResellerDashboard /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/support" element={<ProtectedRoute><LazyWrapper><Support /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/support" element={<SupportUser />} />
+        <Route path="/support-user" element={<SupportUser />} />
+        <Route path="/support-admin" element={<SupportAdmin />} />
 
         {/* Admin-only routes */}
         <Route path="/settings" element={<ProtectedRoute><AdminRoute><LazyWrapper><Settings /></LazyWrapper></AdminRoute></ProtectedRoute>} />

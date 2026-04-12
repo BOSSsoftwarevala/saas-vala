@@ -42,7 +42,7 @@ import {
   GitBranch, Users, Lock, TrendingUp, Clock, ArrowRight, ArrowDown,
   Search, Filter, Globe2, Languages, Monitor, Tablet, Smartphone as PhoneIcon,
   Calendar, Bell, Webhook, Puzzle, Archive, RefreshCw, Save,
-  History, Memory, GitMerge, Diff, AlertTriangle, Target, Gauge,
+  History, Brain, GitMerge, Diff, AlertTriangle, Target, Gauge,
   FileSearch, BookOpen, CheckSquare, Square, Key, CreditCard,
   UserCheck, Fingerprint, ShieldCheck, Audit, Timer, Ban,
   Battery, Wifi, Cpu, HardDrive, Cloud, Database as DatabaseIcon

@@ -172,33 +172,22 @@ export default function Marketplace() {
 
   useEffect(() => {
     const loadBanners = async () => {
-      try {
-        const bannerData = await publicMarketplaceApi.getBanners();
-        if (!Array.isArray(bannerData?.banners) || bannerData.banners.length === 0) {
-          return;
+      // Banners feature removed - using static data
+      const staticBanners = [
+        {
+          id: '1',
+          title: 'SaaS Vala Marketplace',
+          subtitle: 'Discover amazing software',
+          image: '/api/placeholder/800/400',
+          linkedCategory: undefined,
+          badge: 'Featured',
+          badgeColor: undefined,
+          offerText: undefined,
+          couponCode: undefined,
         }
+      ];
 
-        const mapped = bannerData.banners
-          .filter((banner: any) => banner.is_active !== false)
-          .map((banner: any) => ({
-            id: banner.id,
-            title: banner.title,
-            subtitle: banner.subtitle || '',
-            image: banner.image_url,
-            linkedCategory: banner.link_url || undefined,
-            badge: banner.badge || undefined,
-            badgeColor: banner.badge_color || undefined,
-            offerText: banner.offer_text || undefined,
-            couponCode: banner.coupon_code || undefined,
-          }))
-          .filter((banner: any) => Boolean(banner.image));
-
-        if (mapped.length > 0) {
-          setBannerSlides(mapped);
-        }
-      } catch {
-        // HeroBannerSlider has built-in fallback + DB loading.
-      }
+      setBannerSlides(staticBanners);
     };
 
     loadBanners();
