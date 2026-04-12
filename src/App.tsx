@@ -44,6 +44,7 @@ const AddProduct = React.lazy(() => import("./pages/AddProduct"));
 const Keys = React.lazy(() => import("./pages/Keys"));
 const Servers = React.lazy(() => import("./pages/Servers"));
 const AiChat = React.lazy(() => import("./pages/AiChat"));
+const InternalChat = React.lazy(() => import("./components/InternalChat"));
 const ValaBuilder = React.lazy(() => import("./pages/ValaBuilder"));
 const ValaBuilderOpenAI = React.lazy(() => import("./components/ValaBuilderOpenAI"));
 const AIIntegrationsSettings = React.lazy(() => import("./components/AIIntegrationsSettings"));
@@ -299,7 +300,9 @@ function AppRoutes() {
         <Route path="/apk-pipeline" element={<ProtectedRoute><AdminRoute><LazyWrapper><APKPipelineAdmin /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         <Route path="/ultra-apk-pipeline" element={<ProtectedRoute><AdminRoute><LazyWrapper><UltraAPKPipelineAdmin /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         <Route path="/extreme-apk-pipeline" element={<ProtectedRoute><AdminRoute><LazyWrapper><ExtremeAPKPipelineAdmin /></LazyWrapper></AdminRoute></ProtectedRoute>} />
-        <Route path="/ai-chat" element={<ProtectedRoute><LazyWrapper><AiChat /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/ai-chat" element={<ProtectedRoute><LazyWrapper><InternalChat /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/internal-chat" element={<ProtectedRoute><LazyWrapper><InternalChat /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/chat" element={<ProtectedRoute><LazyWrapper><InternalChat /></LazyWrapper></ProtectedRoute>} />
         <Route path="/saas-ai-dashboard" element={<ProtectedRoute><LazyWrapper><SaasAiDashboard /></LazyWrapper></ProtectedRoute>} />
         <Route path="/saas-ai" element={<ProtectedRoute><LazyWrapper><SaasAiDashboard /></LazyWrapper></ProtectedRoute>} />
         <Route path="/ai-apis" element={<ProtectedRoute><LazyWrapper><AiApis /></LazyWrapper></ProtectedRoute>} />
