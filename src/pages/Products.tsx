@@ -348,7 +348,7 @@ export default function Products() {
                 Add Product
               </Button>
             )}
-            <Button variant="outline" className="gap-2 border-border" onClick={() => toast.info('APK upload feature coming soon')}>
+            <Button variant="outline" className="gap-2 border-border" onClick={() => navigate('/apk-pipeline')}>
               <Upload className="h-4 w-4" />
               Upload APK
             </Button>
@@ -506,7 +506,7 @@ export default function Products() {
                                 <ExternalLink className="h-4 w-4" /> Open Repo
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => toast.info('Deploy feature coming soon')}>
+                            <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => navigate('/servers/deploy')}>
                               <Rocket className="h-4 w-4" /> Deploy
                             </DropdownMenuItem>
                             {product.status === 'suspended' ? (

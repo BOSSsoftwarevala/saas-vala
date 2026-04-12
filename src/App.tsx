@@ -33,8 +33,8 @@ import { Suspense, useEffect } from 'react';
 
 // Lazy loaded components for better performance
 const Auth = React.lazy(() => import("./pages/Auth"));
-const Marketplace = React.lazy(() => import("./pages/Marketplace"));
-const DemoPage = React.lazy(() => import("./pages/DemoPage"));
+const Marketplace = React.lazy(() => import("./pages/SimpleMarketplace"));
+const SoftwareDemo = React.lazy(() => import("./pages/SoftwareDemo"));
 const ProductDetail = React.lazy(() => import("./pages/ProductDetail"));
 const Favorites = React.lazy(() => import("./pages/Favorites"));
 const Orders = React.lazy(() => import("./pages/Orders"));
@@ -43,7 +43,6 @@ const Products = React.lazy(() => import("./pages/Products"));
 const AddProduct = React.lazy(() => import("./pages/AddProduct"));
 const Keys = React.lazy(() => import("./pages/Keys"));
 const Servers = React.lazy(() => import("./pages/Servers"));
-const AiChat = React.lazy(() => import("./pages/AiChat"));
 const InternalChat = React.lazy(() => import("./components/InternalChat"));
 const ValaBuilder = React.lazy(() => import("./pages/ValaBuilder"));
 const ValaBuilderOpenAI = React.lazy(() => import("./components/ValaBuilderOpenAI"));
@@ -71,8 +70,10 @@ const Cart = React.lazy(() => import("./pages/Cart"));
 const ApkPipeline = React.lazy(() => import("./pages/ApkPipeline"));
 const OfflineAppTemplate = React.lazy(() => import("./pages/OfflineAppTemplate"));
 const MarketplaceAdmin = React.lazy(() => import("./pages/MarketplaceAdmin"));
-const SupportUser = React.lazy(() => import("./pages/SupportUser"));
-const SupportAdmin = React.lazy(() => import("./pages/SupportAdmin"));
+
+// Missing components
+import { FallbackRedirect } from './components/FallbackRedirect';
+import { PageLoader } from './components/PageLoader';
 
 // PWA Components - grouped for better chunking
 const EduPwa = React.lazy(() => import("./pages/EduPwa"));
@@ -114,14 +115,12 @@ import ProtectedShellProviders from './components/layout/ProtectedShellProviders
 
 function preloadCriticalRoutes() {
   return Promise.allSettled([
-    import("./pages/Marketplace"),
+    import("./pages/SimpleMarketplace"),
     import("./pages/ProductDetail"),
     import("./pages/Favorites"),
     import("./pages/Orders"),
     import("./pages/Dashboard"),
-    import("./pages/SupportUser"),
-    import("./pages/SupportAdmin"),
-  ]);
+      ]);
 }
 
 const queryClient = new QueryClient({
@@ -207,7 +206,7 @@ function AppRoutes() {
         <Route path="/marketplace/product/:id" element={<LazyWrapper><ProductDetail /></LazyWrapper>} />
         <Route path="/marketplace/category/:category" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
         <Route path="/marketplace/search" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
-        <Route path="/demo/:slug" element={<LazyWrapper><DemoPage /></LazyWrapper>} />
+        <Route path="/demo/:slug" element={<LazyWrapper><SoftwareDemo /></LazyWrapper>} />
         <Route path="/favorites" element={<ProtectedRoute><LazyWrapper><Favorites /></LazyWrapper></ProtectedRoute>} />
         <Route path="/orders" element={<ProtectedRoute><LazyWrapper><Orders /></LazyWrapper></ProtectedRoute>} />
 
@@ -308,10 +307,7 @@ function AppRoutes() {
         <Route path="/ai-apis" element={<ProtectedRoute><LazyWrapper><AiApis /></LazyWrapper></ProtectedRoute>} />
         <Route path="/wallet" element={<ProtectedRoute><LazyWrapper><Wallet /></LazyWrapper></ProtectedRoute>} />
         <Route path="/reseller/dashboard" element={<ProtectedRoute><LazyWrapper><ResellerDashboard /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/support" element={<SupportUser />} />
-        <Route path="/support-user" element={<SupportUser />} />
-        <Route path="/support-admin" element={<SupportAdmin />} />
-
+        
         {/* Admin-only routes */}
         <Route path="/settings" element={<ProtectedRoute><AdminRoute><LazyWrapper><Settings /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         <Route path="/audit-logs" element={<ProtectedRoute><AdminRoute><LazyWrapper><AuditLogs /></LazyWrapper></AdminRoute></ProtectedRoute>} />
