@@ -1,13 +1,49 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import {
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { 
+  Activity, 
+  Server, 
+  Database, 
+  Globe, 
+  AlertTriangle, 
+  CheckCircle, 
+  XCircle, 
+  Clock, 
+  RefreshCw,
+  Monitor,
+  HardDrive,
+  Cpu,
+  Wifi,
+  WifiOff,
+  AlertCircle,
+  TrendingUp,
+  TrendingDown,
+  Play,
+  Square,
+  Eye,
+  TestTube
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
+import { 
+  systemHealthMonitor, 
+  type SystemHealthReport, 
+  type HealthStatus,
+  type ServerHealth,
+  type APIHealth,
+  type DatabaseHealth,
+  type ServiceHealth,
+  startHealthMonitoring,
+  stopHealthMonitoring,
+  getCurrentSystemHealth,
+  getHealthHistory,
+  testDowntimeDetection
+} from '@/lib/systemHealth';
   RefreshCw,
   Server,
   Database,
