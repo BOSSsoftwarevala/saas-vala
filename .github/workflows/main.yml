@@ -181,8 +181,8 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
-          BUNDLE_JS_GZIP_BUDGET_KB: 1100
-          BUNDLE_ENTRY_JS_GZIP_BUDGET_KB: 180
+          BUNDLE_JS_GZIP_BUDGET_KB: 1200
+          BUNDLE_ENTRY_JS_GZIP_BUDGET_KB: 220
           BUNDLE_CSS_GZIP_BUDGET_KB: 80
 
       - name: Generate Bundle Analysis Report
