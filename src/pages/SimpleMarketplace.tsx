@@ -3,6 +3,7 @@ import { SimpleNetflixRow } from '@/components/marketplace/SimpleNetflixRow';
 import { SimpleSoftwareCard } from '@/components/marketplace/SimpleSoftwareCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Category {
   id: string;
@@ -33,31 +34,21 @@ const SimpleMarketplace: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch categories
+  // Define categories directly
   useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/api-gateway/marketplace/categories`, {
-          headers: {
-            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
-          }
-        });
-        const data = await response.json();
-        
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to fetch categories');
-        }
-        
-        setCategories(data.categories || []);
-      } catch (error) {
-        console.error('Error fetching categories:', error);
-        setError('Failed to load categories');
-        toast.error('Failed to load categories');
-      }
-    };
-
-    fetchCategories();
+    const categoryList: Category[] = [
+      { id: '1', name: 'Software', slug: 'software', icon: '💻' },
+      { id: '2', name: 'Mobile Apps', slug: 'mobile', icon: '📱' },
+      { id: '3', name: 'Web Apps', slug: 'web', icon: '🌐' },
+      { id: '4', name: 'ERP Systems', slug: 'erp', icon: '🏢' },
+      { id: '5', name: 'CRM', slug: 'crm', icon: '👥' },
+      { id: '6', name: 'E-commerce', slug: 'ecommerce', icon: '🛒' },
+      { id: '7', name: 'Education', slug: 'education', icon: '📚' },
+      { id: '8', name: 'Healthcare', slug: 'healthcare', icon: '🏥' },
+      { id: '9', name: 'Finance', slug: 'finance', icon: '💰' },
+      { id: '10', name: 'Productivity', slug: 'productivity', icon: '⚡' },
+    ];
+    setCategories(categoryList);
   }, []);
 
   // Fetch softwares for each category
@@ -69,33 +60,49 @@ const SimpleMarketplace: React.FC = () => {
       const newSoftwaresByCategory: Record<string, Software[]> = {};
 
       try {
-        // Fetch softwares for each category from Supabase API gateway
-        const promises = categories.map(async (category) => {
-          const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/api-gateway/marketplace/products?category=${category.slug}&limit=15`, {
-            headers: {
-              'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
-            }
-          });
-          const data = await response.json();
-          
-          if (response.ok && data) {
-            return { category: category.slug, softwares: data.products || data.softwares || [] };
-          }
-          return { category: category.slug, softwares: [] };
-        });
+        // Fetch softwares directly from products table (bypassing API gateway)
+        const { data: products, error } = await supabase
+          .from('products')
+          .select('*')
+          .eq('marketplace_visible', true)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false });
 
-        const results = await Promise.all(promises);
-        
-        results.forEach(({ category, softwares }) => {
-          newSoftwaresByCategory[category] = softwares || [];
+        if (error) throw error;
+
+        // Group products by category
+        categories.forEach((category) => {
+          const categoryProducts = (products || [])
+            .filter((p: any) => 
+              p.business_type === category.slug || 
+              p.target_industry === category.slug ||
+              category.slug === 'software'
+            )
+            .slice(0, 15)
+            .map((p: any) => ({
+              id: p.id,
+              name: p.name,
+              slug: p.slug,
+              tagline: p.short_description || p.tagline || '',
+              icon: p.thumbnail_url || '',
+              price: p.price || 0,
+              currency: p.currency || 'USD',
+              status: p.status,
+              demo_url: p.demo_url,
+              categories: {
+                name: category.name,
+                slug: category.slug,
+              },
+            }));
+
+          newSoftwaresByCategory[category.slug] = categoryProducts;
         });
 
         setSoftwaresByCategory(newSoftwaresByCategory);
       } catch (error) {
-        console.error('Error fetching softwares:', error);
-        setError('Failed to load softwares');
-        toast.error('Failed to load softwares');
+        console.error('Error fetching products:', error);
+        setError('Failed to load products');
+        toast.error('Failed to load products');
       } finally {
         setLoading(false);
       }

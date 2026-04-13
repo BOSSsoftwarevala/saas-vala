@@ -51,6 +51,23 @@ interface Product {
   updated_at: string;
 }
 
+interface ProductSeo {
+  id: string;
+  product_id: string;
+  slug: string;
+  title: string;
+  meta_description: string;
+  keywords: string[];
+  hashtags: string[];
+  seo_score: number;
+  og_title?: string;
+  og_description?: string;
+  og_image?: string;
+  twitter_card?: string;
+  canonical_url?: string;
+  target_country?: string;
+}
+
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -62,6 +79,7 @@ export default function ProductDetailPage() {
   const [searchParams] = useSearchParams();
 
   const [product, setProduct] = useState<Product | null>(null);
+  const [productSeo, setProductSeo] = useState<ProductSeo | null>(null);
   const [pricing, setPricing] = useState<PricingOption[]>([]);
   const [selectedDuration, setSelectedDuration] = useState<number>(30);
   const [loading, setLoading] = useState(true);
@@ -92,6 +110,61 @@ export default function ProductDetailPage() {
     fetchProduct();
   }, [id]);
 
+  // Update meta tags based on SEO data
+  useEffect(() => {
+    if (!product) return;
+
+    const seoTitle = productSeo?.title || product.name || 'SaaS Vala Marketplace';
+    const seoDescription = productSeo?.meta_description || product.short_description || product.description || 'Browse and buy premium software solutions';
+    const seoKeywords = productSeo?.keywords?.join(', ') || 'software, saas, marketplace';
+    const ogTitle = productSeo?.og_title || product.name;
+    const ogDescription = productSeo?.og_description || seoDescription;
+    const ogImage = productSeo?.og_image || product.thumbnail_url;
+    const canonicalUrl = productSeo?.canonical_url || window.location.href;
+
+    // Update document title
+    document.title = seoTitle;
+
+    // Update or create meta tags
+    const updateMetaTag = (name: string, content: string, property?: string) => {
+      let tag = document.querySelector(`meta[property="${property}"]`) as HTMLMetaElement ||
+                 document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement;
+      
+      if (!tag) {
+        tag = document.createElement('meta');
+        if (property) {
+          tag.setAttribute('property', property);
+        } else {
+          tag.setAttribute('name', name);
+        }
+        document.head.appendChild(tag);
+      }
+      tag.setAttribute('content', content);
+    };
+
+    // Basic SEO tags
+    updateMetaTag('description', seoDescription);
+    updateMetaTag('keywords', seoKeywords);
+    updateMetaTag('og:title', ogTitle, 'og:title');
+    updateMetaTag('og:description', ogDescription, 'og:description');
+    updateMetaTag('og:image', ogImage, 'og:image');
+    updateMetaTag('og:type', 'product', 'og:type');
+    updateMetaTag('twitter:card', productSeo?.twitter_card || 'summary_large_image', 'twitter:card');
+    updateMetaTag('twitter:title', ogTitle, 'twitter:title');
+    updateMetaTag('twitter:description', ogDescription, 'twitter:description');
+    updateMetaTag('twitter:image', ogImage, 'twitter:image');
+    
+    // Canonical URL
+    let canonicalTag = document.querySelector('link[rel="canonical"]') as HTMLLinkElement;
+    if (!canonicalTag) {
+      canonicalTag = document.createElement('link');
+      canonicalTag.setAttribute('rel', 'canonical');
+      document.head.appendChild(canonicalTag);
+    }
+    canonicalTag.setAttribute('href', canonicalUrl);
+
+  }, [product, productSeo]);
+
   useEffect(() => {
     if (searchParams.get('action') !== 'buy') return;
     if (!product || showPurchaseDialog) return;
@@ -117,6 +190,17 @@ export default function ProductDetailPage() {
         ...prod,
         category: prod.category || prod.category_id || 'General',
       });
+
+      // Fetch SEO data
+      const { data: seoData } = await (supabase as any)
+        .from('marketplace_seo')
+        .select('*')
+        .eq('product_id', id)
+        .single();
+      
+      if (seoData) {
+        setProductSeo(seoData);
+      }
 
       // Fetch pricing options
       const { data: prices } = await (supabase as any)
