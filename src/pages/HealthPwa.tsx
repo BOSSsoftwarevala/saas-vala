@@ -1,3 +1,5 @@
+import { SectionHeader } from '@/components/marketplace/SectionHeader';
+import { SectionSlider } from '@/components/marketplace/SectionSlider';
 import { useState, useEffect, useCallback } from 'react';
 
 
@@ -240,3 +242,4 @@ export default function HealthPwa() {
     </div>
   );
 }
+

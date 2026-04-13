@@ -1,3 +1,5 @@
+import { SectionHeader } from '@/components/marketplace/SectionHeader';
+import { SectionSlider } from '@/components/marketplace/SectionSlider';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 
 
@@ -282,3 +284,4 @@ export default function AgriculturePwa() {
     </div>
   );
 }
+

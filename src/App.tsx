@@ -33,7 +33,7 @@ import { Suspense, useEffect } from 'react';
 
 // Lazy loaded components for better performance
 const Auth = React.lazy(() => import("./pages/Auth"));
-const Marketplace = React.lazy(() => import("./pages/Marketplace"));
+const Marketplace = React.lazy(() => import("./pages/SimpleMarketplace"));
 const SoftwareDemo = React.lazy(() => import("./pages/SoftwareDemo"));
 const ProductDetail = React.lazy(() => import("./pages/ProductDetail"));
 const Favorites = React.lazy(() => import("./pages/Favorites"));
@@ -113,7 +113,7 @@ import ProtectedShellProviders from './components/layout/ProtectedShellProviders
 
 function preloadCriticalRoutes() {
   return Promise.allSettled([
-    import("./pages/Marketplace"),
+    import("./pages/SimpleMarketplace"),
     import("./pages/ProductDetail"),
     import("./pages/Favorites"),
     import("./pages/Orders"),
@@ -202,6 +202,8 @@ function AppRoutes() {
         <Route path="/" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
         <Route path="/marketplace" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
         <Route path="/marketplace/product/:id" element={<LazyWrapper><ProductDetail /></LazyWrapper>} />
+        <Route path="/marketplace/category/:category" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
+        <Route path="/marketplace/search" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
         <Route path="/demo/:slug" element={<LazyWrapper><SoftwareDemo /></LazyWrapper>} />
         <Route path="/favorites" element={<ProtectedRoute><LazyWrapper><Favorites /></LazyWrapper></ProtectedRoute>} />
         <Route path="/orders" element={<ProtectedRoute><LazyWrapper><Orders /></LazyWrapper></ProtectedRoute>} />

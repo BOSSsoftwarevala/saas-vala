@@ -1,3 +1,5 @@
+import { SectionHeader } from '@/components/marketplace/SectionHeader';
+import { SectionSlider } from '@/components/marketplace/SectionSlider';
 import { useState, useEffect } from 'react';
 
 
@@ -167,3 +169,4 @@ export default function ProductivityPwa() {
     </div>
   );
 }
+
