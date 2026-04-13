@@ -92,7 +92,7 @@ const SimpleMarketplace: React.FC = () => {
   }, []);
 
   const handleViewAll = (categorySlug: string) => {
-    window.location.href = `/category/${categorySlug}`;
+    window.location.href = `/marketplace/category/${categorySlug}`;
   };
 
   // Skeleton loading component

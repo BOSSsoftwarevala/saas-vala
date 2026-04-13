@@ -29,7 +29,7 @@ export const SimpleSoftwareCard: React.FC<SimpleSoftwareCardProps> = ({ software
   };
 
   const handleDetails = () => {
-    window.location.href = `/products/${software.slug}`;
+    window.location.href = `/marketplace/product/${software.id}`;
   };
 
   const handleBuyNow = () => {

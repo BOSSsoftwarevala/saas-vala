@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Software {
   id: string;
@@ -20,7 +21,7 @@ interface Software {
 }
 
 const SoftwareDemo: React.FC = () => {
-  const { softwareSlug } = useParams<{ softwareSlug: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const [software, setSoftware] = useState<Software | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,23 +29,32 @@ const SoftwareDemo: React.FC = () => {
 
   useEffect(() => {
     const fetchSoftware = async () => {
-      if (!softwareSlug) return;
+      if (!slug) return;
 
       try {
-        const response = await fetch(`/api/softwares?slug=${softwareSlug}`);
-        const data = await response.json();
-        
-        if (!response.ok) {
-          throw new Error(data.error || 'Software not found');
-        }
-        
-        if (data.softwares && data.softwares.length > 0) {
-          setSoftware(data.softwares[0]);
-        } else {
-          throw new Error('Software not found');
-        }
-      } catch (error) {
-        console.error('Error fetching software:', error);
+        const { data, error: dbError } = await supabase
+          .from('products')
+          .select('id, name, slug, description, short_description, thumbnail_url, price, currency, demo_url, business_type')
+          .eq('slug', slug)
+          .eq('status', 'active')
+          .single();
+
+        if (dbError || !data) throw new Error('Software not found');
+
+        setSoftware({
+          id: data.id,
+          name: data.name,
+          slug: data.slug,
+          description: data.description || '',
+          tagline: (data as any).short_description || '',
+          icon: (data as any).thumbnail_url || '📦',
+          price: (data as any).price || 0,
+          currency: (data as any).currency || 'USD',
+          demo_url: (data as any).demo_url || '',
+          category: (data as any).business_type || 'software',
+        });
+      } catch (err) {
+        console.error('Error fetching software:', err);
         setError('Software not found');
         toast.error('Software not found');
       } finally {
@@ -53,11 +63,12 @@ const SoftwareDemo: React.FC = () => {
     };
 
     fetchSoftware();
-  }, [softwareSlug]);
+  }, [slug]);
 
   const handleBuyNow = () => {
-    toast.success(`Redirecting to purchase ${software?.name} for $${software?.price}`);
-    // TODO: Implement payment flow
+    if (software?.id) {
+      navigate(`/marketplace/product/${software.id}?action=buy`);
+    }
   };
 
   const handleDownload = () => {
