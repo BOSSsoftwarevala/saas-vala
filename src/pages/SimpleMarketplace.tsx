@@ -69,13 +69,18 @@ const SimpleMarketplace: React.FC = () => {
       const newSoftwaresByCategory: Record<string, Software[]> = {};
 
       try {
-        // Fetch softwares for each category
+        // Fetch softwares for each category from Supabase API gateway
         const promises = categories.map(async (category) => {
-          const response = await fetch(`/api/softwares?category=${category.slug}&limit=15`);
+          const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/api-gateway/marketplace/products?category=${category.slug}&limit=15`, {
+            headers: {
+              'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
+            }
+          });
           const data = await response.json();
           
-          if (response.ok) {
-            return { category: category.slug, softwares: data.softwares };
+          if (response.ok && data) {
+            return { category: category.slug, softwares: data.products || data.softwares || [] };
           }
           return { category: category.slug, softwares: [] };
         });
@@ -83,7 +88,7 @@ const SimpleMarketplace: React.FC = () => {
         const results = await Promise.all(promises);
         
         results.forEach(({ category, softwares }) => {
-          newSoftwaresByCategory[category] = softwares;
+          newSoftwaresByCategory[category] = softwares || [];
         });
 
         setSoftwaresByCategory(newSoftwaresByCategory);
