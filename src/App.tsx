@@ -244,36 +244,18 @@ function AppRoutes() {
         
         {/* Products module */}
         <Route path="/products" element={<ProtectedRoute><LazyWrapper><Products /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/products/list" element={<ProtectedRoute><LazyWrapper><Products /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/products/create" element={<ProtectedRoute><LazyWrapper><AddProduct /></LazyWrapper></ProtectedRoute>} />
         <Route path="/products/add" element={<ProtectedRoute><LazyWrapper><AddProduct /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/products/edit/:id" element={<ProtectedRoute><LazyWrapper><Products /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/products/view/:id" element={<ProtectedRoute><LazyWrapper><Products /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/products/deploy/:id" element={<ProtectedRoute><AdminRoute><LazyWrapper><Products /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         
         {/* Keys module */}
         <Route path="/keys" element={<ProtectedRoute><LazyWrapper><Keys /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/keys/list" element={<ProtectedRoute><LazyWrapper><Keys /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/keys/generate" element={<ProtectedRoute><AdminRoute><LazyWrapper><Keys /></LazyWrapper></AdminRoute></ProtectedRoute>} />
-        <Route path="/keys/assign" element={<ProtectedRoute><AdminRoute><LazyWrapper><Keys /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         
         {/* Servers module */}
         <Route path="/servers" element={<ProtectedRoute><LazyWrapper><Servers /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/servers/list" element={<ProtectedRoute><LazyWrapper><Servers /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/servers/deploy" element={<ProtectedRoute><AdminRoute><LazyWrapper><Servers /></LazyWrapper></AdminRoute></ProtectedRoute>} />
-        <Route path="/servers/logs" element={<ProtectedRoute><AdminRoute><LazyWrapper><Servers /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         
         {/* Resellers module */}
         <Route path="/resellers" element={<ProtectedRoute><AdminRoute><LazyWrapper><Resellers /></LazyWrapper></AdminRoute></ProtectedRoute>} />
-        <Route path="/resellers/list" element={<ProtectedRoute><AdminRoute><LazyWrapper><Resellers /></LazyWrapper></AdminRoute></ProtectedRoute>} />
-        <Route path="/resellers/create" element={<ProtectedRoute><AdminRoute><LazyWrapper><Resellers /></LazyWrapper></AdminRoute></ProtectedRoute>} />
-        <Route path="/resellers/credits" element={<ProtectedRoute><AdminRoute><LazyWrapper><Resellers /></LazyWrapper></AdminRoute></ProtectedRoute>} />
-        <Route path="/reseller-manager" element={<ProtectedRoute><AdminRoute><LazyWrapper><Resellers /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         
         {/* Leads module */}
-        <Route path="/leads" element={<ProtectedRoute><AdminRoute><LazyWrapper><SeoLeads /></LazyWrapper></AdminRoute></ProtectedRoute>} />
-        <Route path="/leads/list" element={<ProtectedRoute><AdminRoute><LazyWrapper><SeoLeads /></LazyWrapper></AdminRoute></ProtectedRoute>} />
-        <Route path="/leads/update" element={<ProtectedRoute><AdminRoute><LazyWrapper><SeoLeads /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         <Route path="/seo-leads" element={<ProtectedRoute><AdminRoute><LazyWrapper><SeoLeads /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         
         {/* System modules */}
@@ -299,7 +281,6 @@ function AppRoutes() {
         <Route path="/extreme-apk-pipeline" element={<ProtectedRoute><AdminRoute><LazyWrapper><ExtremeAPKPipelineAdmin /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         <Route path="/ai-chat" element={<ProtectedRoute><LazyWrapper><AiChatLive /></LazyWrapper></ProtectedRoute>} />
         <Route path="/support" element={<ProtectedRoute><LazyWrapper><Support /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/saas-ai-dashboard" element={<ProtectedRoute><LazyWrapper><SaasAiDashboard /></LazyWrapper></ProtectedRoute>} />
         <Route path="/saas-ai" element={<ProtectedRoute><LazyWrapper><SaasAiDashboard /></LazyWrapper></ProtectedRoute>} />
         <Route path="/ai-apis" element={<ProtectedRoute><LazyWrapper><AiApis /></LazyWrapper></ProtectedRoute>} />
         <Route path="/wallet" element={<ProtectedRoute><LazyWrapper><Wallet /></LazyWrapper></ProtectedRoute>} />
@@ -310,9 +291,6 @@ function AppRoutes() {
         <Route path="/audit-logs" element={<ProtectedRoute><AdminRoute><LazyWrapper><AuditLogs /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         <Route path="/system-health" element={<ProtectedRoute><AdminRoute><LazyWrapper><SystemHealth /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         <Route path="/automation" element={<ProtectedRoute><AdminRoute><LazyWrapper><Automation /></LazyWrapper></AdminRoute></ProtectedRoute>} />
-        <Route path="/auto-pilot" element={<ProtectedRoute><AdminRoute><LazyWrapper><Automation /></LazyWrapper></AdminRoute></ProtectedRoute>} />
-        <Route path="/admin/add-product" element={<ProtectedRoute><AdminRoute><LazyWrapper><AddProduct /></LazyWrapper></AdminRoute></ProtectedRoute>} />
-        <Route path="/admin/marketplace" element={<ProtectedRoute><AdminRoute><LazyWrapper><MarketplaceAdmin /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         <Route path="/:demoSlug" element={<LazyWrapper><DemoHostRoute /></LazyWrapper>} />
         <Route path="/marketplace-admin" element={<ProtectedRoute><AdminRoute><LazyWrapper><MarketplaceAdmin /></LazyWrapper></AdminRoute></ProtectedRoute>} />
 
