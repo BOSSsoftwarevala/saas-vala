@@ -198,13 +198,6 @@ export function useSupport() {
       .eq('channel_id', channelId)
       .eq('user_id', user.id);
 
-    await (supabase as any)
-      .from('chat_message_receipts')
-      .update({ read_at: nowIso })
-      .eq('channel_id', channelId)
-      .eq('user_id', user.id)
-      .is('read_at', null);
-
     setUnreadCounts((prev) => ({ ...prev, [channelId]: 0 }));
   }, [user]);
 
@@ -332,19 +325,6 @@ export function useSupport() {
       toast.error(messageError.message || 'Failed to send file');
       return;
     }
-
-    await (supabase as any)
-      .from('chat_message_files')
-      .insert({
-        message_id: inserted?.id,
-        channel_id: activeChannel.id,
-        uploader_id: user.id,
-        bucket_name: SUPPORT_UPLOAD_BUCKET,
-        file_path: filePath,
-        file_name: file.name,
-        content_type: file.type || 'application/octet-stream',
-        file_size: file.size,
-      });
 
     toast.success(`Shared ${file.name} (${formatFileSize(file.size)})`);
   }, [user, activeChannel, canAccessChannel]);
