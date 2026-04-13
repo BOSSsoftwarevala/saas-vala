@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
-import { useMarketplaceOrders, useLicenseKeys } from '@/hooks/useMarketplace';
 import { toast } from 'sonner';
 import { publicMarketplaceApi } from '@/lib/api';
 import {
@@ -35,13 +34,34 @@ import {
 export default function OrdersPage() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { orders, loading: ordersLoading, fetchOrders } = useMarketplaceOrders();
-  const { licenses } = useLicenseKeys();
+  const [orders, setOrders] = useState<any[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [licenses] = useState<any[]>([]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('');
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+
+  const fetchOrders = async (filters?: { status?: string }) => {
+    if (!user) return;
+    setOrdersLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('marketplace_orders')
+        .select('*')
+        .eq('buyer_id', user.id)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setOrders(data || []);
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      toast.error('Failed to load orders');
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (user && !authLoading) {

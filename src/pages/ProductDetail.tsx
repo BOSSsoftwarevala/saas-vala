@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
-import { useMarketplacePayment, useFavorites, useProductRatings, useLicenseKeys } from '@/hooks/useMarketplace';
+import { useFavorites } from '@/hooks/useFavorites';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
@@ -19,15 +19,30 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  formatCurrency,
-  getFallbackImage,
-  durationLabel,
-  generateIdempotencyKey,
-} from '@/lib/marketplaceUtils';
 import { publicMarketplaceApi } from '@/lib/api';
 import { resolveMaskedDemoUrl } from '@/lib/demoMasking';
 import { usePaymentAvailability } from '@/hooks/useFeatureFlags';
+
+// Simple helper functions to replace marketplaceUtils
+const formatCurrency = (amount: number, currency: string = 'USD') => {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
+};
+
+const getFallbackImage = (category: string) => {
+  return 'https://via.placeholder.com/400x300?text=No+Image';
+};
+
+const durationLabel = (days: number) => {
+  if (days === 30) return '1 Month';
+  if (days === 90) return '3 Months';
+  if (days === 180) return '6 Months';
+  if (days === 365) return '1 Year';
+  return `${days} Days`;
+};
+
+const generateIdempotencyKey = () => {
+  return `pay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+};
 
 interface PricingOption {
   duration_days: number;
@@ -56,10 +71,10 @@ export default function ProductDetailPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { isFavorited, toggleFavorite } = useFavorites();
-  const { ratings, submitRating, averageRating } = useProductRatings(id || '');
-  const { initiatePayment, processing } = useMarketplacePayment();
   const { walletEnabled, disabledReason } = usePaymentAvailability();
   const [searchParams] = useSearchParams();
+  const [ratings] = useState<any[]>([]);
+  const [processing, setProcessing] = useState(false);
 
   const [product, setProduct] = useState<Product | null>(null);
   const [pricing, setPricing] = useState<PricingOption[]>([]);

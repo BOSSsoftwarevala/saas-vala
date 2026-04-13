@@ -26,7 +26,6 @@ import { SeoAnalytics } from '@/components/seo-leads/SeoAnalytics';
 import { SeoSettings } from '@/components/seo-leads/SeoSettings';
  import { EnterpriseSeoEngine } from '@/components/seo-leads/EnterpriseSeoEngine';
 import { WorldClassSeoEngine } from '@/components/seo-leads/WorldClassSeoEngine';
-import { MarketplaceSeoControl } from '@/components/seo-leads/MarketplaceSeoControl';
 
 export default function SeoLeads() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -133,10 +132,7 @@ export default function SeoLeads() {
             <LeadSources />
           </TabsContent>
 
-          <TabsContent value="marketplace" className="mt-6">
-            <MarketplaceSeoControl />
-          </TabsContent>
-
+          
           <TabsContent value="analytics" className="mt-6">
             <SeoAnalytics />
           </TabsContent>

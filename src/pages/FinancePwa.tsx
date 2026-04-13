@@ -1,6 +1,4 @@
 import { useState, useEffect } from 'react';
-import { SectionSlider } from '@/components/marketplace/SectionSlider';
-import { SectionHeader } from '@/components/marketplace/SectionHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -97,8 +95,17 @@ export default function FinancePwa() {
             <Button size="sm" onClick={handleMasterDownload} className="gap-1 bg-green-600 hover:bg-green-700 text-white"><Download className="h-3 w-3" /> Download Master Copy</Button>
           </div>
         )}
-        <SectionHeader icon="💳" title="Finance & FinTech Platforms" subtitle="Top 5 Finance & FinTech Software Clones — Offline Ready." badge="ROW 13" badgeVariant="hot" totalCount={5} />
-        <SectionSlider>
+        <div className="mb-6">
+          <div className="flex items-center gap-3 mb-2">
+            <span className="text-3xl">💳</span>
+            <div>
+              <h2 className="text-2xl font-bold">Finance & FinTech Platforms</h2>
+              <p className="text-sm text-muted-foreground">Top 5 Finance & FinTech Software Clones — Offline Ready.</p>
+            </div>
+            <Badge className="bg-orange-500 text-white ml-auto">ROW 13</Badge>
+          </div>
+        </div>
+        <div className="flex gap-4 overflow-x-auto pb-4">
           {PRODUCTS.map((p, i) => (
             <div key={p.id} className="min-w-[280px] max-w-[320px] flex-shrink-0 group">
               <Card className="relative overflow-hidden border-border/50 bg-card hover:border-primary/40 transition-all duration-300 hover:scale-[1.05] hover:shadow-[0_0_30px_rgba(249,115,22,0.15)]">
@@ -121,7 +128,7 @@ export default function FinancePwa() {
               </Card>
             </div>
           ))}
-        </SectionSlider>
+        </div>
       </main>
 
       <Dialog open={showKey} onOpenChange={setShowKey}>

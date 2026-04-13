@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { SectionSlider } from '@/components/marketplace/SectionSlider';
-import { SectionHeader } from '@/components/marketplace/SectionHeader';
+
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
