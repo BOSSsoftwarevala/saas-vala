@@ -12,7 +12,10 @@ interface SimpleSoftwareCardProps {
     name: string;
     slug: string;
     tagline: string;
-    category: string;
+    categories: {
+      name: string;
+      slug: string;
+    };
     icon: string;
     price: number;
     currency: string;
@@ -54,7 +57,7 @@ export const SimpleSoftwareCard: React.FC<SimpleSoftwareCardProps> = ({ software
         <div className="flex items-center justify-between mb-3">
           <div className="text-3xl">{software.icon}</div>
           <Badge variant="secondary" className="text-xs">
-            {software.category}
+            {software.categories.name}
           </Badge>
         </div>
 

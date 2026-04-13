@@ -24,33 +24,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Loader2, Plus, Trash2, Edit, Save, X, Eye, EyeOff, Upload, Download, AlertCircle, Check, Copy, ExternalLink, Package } from 'lucide-react';
+import { Loader2, Plus, Trash2, Edit, Save, X, Eye, EyeOff, Upload, Download, AlertCircle, Check, Copy, ExternalLink, Package, Sparkles, Search, RefreshCw, Edit2, Ticket, Megaphone, Layout, Link2, CreditCard, Truck, DollarSign, CheckCircle2, XCircle, Tags, ShoppingBag, Menu } from 'lucide-react';
 import { generateProductThumbnail } from '@/lib/thumbnailGenerator';
 import { marketplaceAdminApi } from '@/lib/api';
 import { normalizeDemoUrlPair, sanitizeDemoSourceUrl } from '@/lib/demoMasking';
-import {
-  Search,
-  RefreshCw,
-  Edit2,
-  Eye,
-  EyeOff,
-  Upload,
-  Package,
-  Download,
-  Ticket,
-  Megaphone,
-  Layout,
-  Link2,
-  CreditCard,
-  Truck,
-  DollarSign,
-  Loader2,
-  CheckCircle2,
-  XCircle,
-  Tags,
-  ShoppingBag,
-  Menu,
-} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const db = supabase as any;
@@ -197,7 +174,23 @@ interface MarketplaceOrder {
   transaction_id: string | null;
   buyer_name?: string;
   reseller_name?: string;
-  gateway?: string;
+}
+
+interface ProductSeo {
+  id?: string;
+  product_id?: string;
+  slug: string;
+  title: string;
+  meta_description: string;
+  keywords: string[];
+  hashtags: string[];
+  seo_score: number;
+  og_title?: string;
+  og_description?: string;
+  og_image?: string;
+  twitter_card?: string;
+  canonical_url?: string;
+  target_country?: string;
 }
 
 const statusLabelMap: Record<ProductStatusDb, string> = {
@@ -450,6 +443,26 @@ export default function MarketplaceAdmin() {
 
   const [saving, setSaving] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
+  const [editProductSeo, setEditProductSeo] = useState<ProductSeo | null>(null);
+  const [generatingSeo, setGeneratingSeo] = useState(false);
+
+  // Fetch SEO data when product is opened for editing
+  useEffect(() => {
+    if (editProduct && !editProduct.id.startsWith('new-')) {
+      fetchProductSeo(editProduct.id);
+    } else if (editProduct && editProduct.id.startsWith('new-')) {
+      // Reset SEO for new products
+      setEditProductSeo({
+        slug: '',
+        title: '',
+        meta_description: '',
+        keywords: [],
+        hashtags: [],
+        seo_score: 0,
+        target_country: 'IN',
+      });
+    }
+  }, [editProduct?.id]);
   const [editHeaderMenu, setEditHeaderMenu] = useState<HeaderMenu | null>(null);
   const [editBanner, setEditBanner] = useState<Banner | null>(null);
   const [editTicker, setEditTicker] = useState<Ticker | null>(null);
@@ -819,6 +832,24 @@ export default function MarketplaceAdmin() {
         shouldGenerateThumbnail = normalizedDemo.demoUrl !== editProduct.demo_url;
       }
 
+      // Save SEO data
+      if (editProductSeo) {
+        // Auto-generate slug if not provided
+        if (!editProductSeo.slug) {
+          const baseSlug = lowerCase(slugify(editProduct.name || ''));
+          editProductSeo.slug = `${baseSlug}-${editProductSeo.target_country || 'IN'}`;
+        }
+        // Auto-generate title if not provided
+        if (!editProductSeo.title) {
+          editProductSeo.title = editProduct.name || '';
+        }
+        const seoSaved = await saveProductSeo(productId);
+        if (!seoSaved) {
+          setSaving(false);
+          return;
+        }
+      }
+
       // Auto-generate thumbnail if demo URL is provided
       if (shouldGenerateThumbnail && normalizedDemo.demoUrl) {
         toast.info('Generating thumbnail for demo URL...');
@@ -852,6 +883,183 @@ export default function MarketplaceAdmin() {
     }
 
     setSaving(false);
+  };
+
+  const fetchProductSeo = async (productId: string) => {
+    try {
+      const { data, error } = await db
+        .from('marketplace_seo')
+        .select('*')
+        .eq('product_id', productId)
+        .single();
+      
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No SEO record exists, create default
+          const defaultSeo: ProductSeo = {
+            slug: '',
+            title: '',
+            meta_description: '',
+            keywords: [],
+            hashtags: [],
+            seo_score: 0,
+            target_country: 'IN',
+          };
+          setEditProductSeo(defaultSeo);
+        } else {
+          console.error('Error fetching SEO:', error);
+        }
+      } else if (data) {
+        setEditProductSeo({
+          id: data.id,
+          product_id: data.product_id,
+          slug: data.slug,
+          title: data.title,
+          meta_description: data.meta_description || '',
+          keywords: data.keywords || [],
+          hashtags: data.hashtags || [],
+          seo_score: data.seo_score,
+          og_title: data.og_title,
+          og_description: data.og_description,
+          og_image: data.og_image,
+          twitter_card: data.twitter_card,
+          canonical_url: data.canonical_url,
+          target_country: data.target_country,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching SEO:', error);
+    }
+  };
+
+  const generateSeo = async () => {
+    if (!editProduct || !editProductSeo) return;
+    
+    setGeneratingSeo(true);
+    try {
+      const productName = editProduct.name || '';
+      const category = editProduct.business_type || editProduct.target_industry || 'software';
+      const description = editProduct.short_description || editProduct.description || '';
+      const tags = (editProduct.tags || []).join(', ');
+      
+      // Call OpenAI API for SEO generation
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/openai-seo-generator`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          productName,
+          category,
+          description,
+          tags,
+        }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setEditProductSeo({
+          ...editProductSeo,
+          title: data.title || productName,
+          meta_description: data.metaDescription || description.substring(0, 160),
+          keywords: data.keywords || [productName, category],
+          hashtags: data.hashtags || [`#${category}`, `#${productName.replace(/\s/g, '')}`],
+          og_title: data.ogTitle || productName,
+          og_description: data.ogDescription || description.substring(0, 160),
+        });
+        toast.success('SEO generated successfully');
+      } else {
+        // Fallback to rule-based generation
+        const fallbackSeo = {
+          title: productName,
+          meta_description: description.substring(0, 160) || `Buy ${productName} - ${category} software for your business`,
+          keywords: [productName, category, 'software', 'saas', ...editProduct.tags.slice(0, 3)],
+          hashtags: [`#${category}`, `#${productName.replace(/\s/g, '')}`, '#software', '#saas'],
+          og_title: productName,
+          og_description: description.substring(0, 160),
+        };
+        setEditProductSeo({
+          ...editProductSeo,
+          ...fallbackSeo,
+        });
+        toast.success('SEO generated (fallback mode)');
+      }
+    } catch (error) {
+      console.error('Error generating SEO:', error);
+      // Fallback to rule-based generation
+      const productName = editProduct.name || '';
+      const category = editProduct.business_type || editProduct.target_industry || 'software';
+      const description = editProduct.short_description || editProduct.description || '';
+      
+      setEditProductSeo({
+        ...editProductSeo,
+        title: productName,
+        meta_description: description.substring(0, 160) || `Buy ${productName} - ${category} software for your business`,
+        keywords: [productName, category, 'software', 'saas', ...editProduct.tags.slice(0, 3)],
+        hashtags: [`#${category}`, `#${productName.replace(/\s/g, '')}`, '#software', '#saas'],
+        og_title: productName,
+        og_description: description.substring(0, 160),
+      });
+      toast.success('SEO generated (fallback mode)');
+    } finally {
+      setGeneratingSeo(false);
+    }
+  };
+
+  const saveProductSeo = async (productId: string) => {
+    if (!editProductSeo) return;
+    
+    try {
+      // Validation
+      if (!editProductSeo.title.trim()) {
+        toast.error('SEO title is required');
+        return false;
+      }
+      if (!editProductSeo.slug.trim()) {
+        toast.error('SEO slug is required');
+        return false;
+      }
+      if (editProductSeo.keywords.length === 0) {
+        toast.error('At least one keyword is required');
+        return false;
+      }
+      
+      const payload = {
+        product_id: productId,
+        slug: editProductSeo.slug,
+        title: editProductSeo.title,
+        meta_description: editProductSeo.meta_description,
+        keywords: editProductSeo.keywords,
+        hashtags: editProductSeo.hashtags,
+        og_title: editProductSeo.og_title,
+        og_description: editProductSeo.og_description,
+        og_image: editProductSeo.og_image,
+        twitter_card: editProductSeo.twitter_card,
+        canonical_url: editProductSeo.canonical_url,
+        target_country: editProductSeo.target_country,
+      };
+      
+      let error;
+      if (editProductSeo.id) {
+        const result = await db.from('marketplace_seo').update(payload).eq('id', editProductSeo.id);
+        error = result.error;
+      } else {
+        const result = await db.from('marketplace_seo').insert(payload);
+        error = result.error;
+      }
+      
+      if (error) {
+        toast.error(`Failed to save SEO: ${error.message}`);
+        return false;
+      }
+      
+      return true;
+    } catch (error: any) {
+      console.error('Error saving SEO:', error);
+      toast.error(`Failed to save SEO: ${error?.message || 'Unknown error'}`);
+      return false;
+    }
   };
 
   const toggleVisibility = async (p: Product) => {
@@ -1997,6 +2205,110 @@ export default function MarketplaceAdmin() {
               <Field label="APK URL / Storage Path">
                 <Input value={editProduct.apk_url || ''} onChange={(e) => setEditProduct({ ...editProduct, apk_url: e.target.value })} className="h-9 text-sm" />
               </Field>
+
+              <div className="border-t border-border pt-3">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" /> SEO Settings
+                  </h3>
+                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={generateSeo} disabled={generatingSeo || !editProduct}>
+                    {generatingSeo ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                    Generate SEO
+                  </Button>
+                </div>
+
+                {editProductSeo && (
+                  <div className="space-y-3">
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <Field label="SEO Title">
+                        <Input 
+                          value={editProductSeo.title || ''} 
+                          onChange={(e) => setEditProductSeo({ ...editProductSeo, title: e.target.value })} 
+                          className="h-9 text-sm" 
+                          placeholder={editProduct?.name || 'Product title'}
+                        />
+                      </Field>
+                      <Field label="SEO Slug">
+                        <Input 
+                          value={editProductSeo.slug || ''} 
+                          onChange={(e) => setEditProductSeo({ ...editProductSeo, slug: slugify(e.target.value) })} 
+                          className="h-9 text-sm" 
+                          placeholder="product-name-country"
+                        />
+                      </Field>
+                    </div>
+
+                    <Field label="Meta Description">
+                      <Textarea 
+                        value={editProductSeo.meta_description || ''} 
+                        onChange={(e) => setEditProductSeo({ ...editProductSeo, meta_description: e.target.value })} 
+                        className="min-h-[70px] text-sm" 
+                        placeholder="Brief description for search engines (120-160 characters)"
+                        maxLength={160}
+                      />
+                      <div className="text-[10px] text-muted-foreground mt-1">
+                        {editProductSeo.meta_description?.length || 0}/160 characters
+                      </div>
+                    </Field>
+
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <Field label="Keywords (comma separated)">
+                        <Input 
+                          value={(editProductSeo.keywords || []).join(', ')} 
+                          onChange={(e) => setEditProductSeo({ ...editProductSeo, keywords: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} 
+                          className="h-9 text-sm" 
+                          placeholder="keyword1, keyword2, keyword3"
+                        />
+                      </Field>
+                      <Field label="Hashtags (comma separated)">
+                        <Input 
+                          value={(editProductSeo.hashtags || []).join(', ')} 
+                          onChange={(e) => setEditProductSeo({ ...editProductSeo, hashtags: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} 
+                          className="h-9 text-sm" 
+                          placeholder="#tag1, #tag2, #tag3"
+                        />
+                      </Field>
+                    </div>
+
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <Field label="Target Country">
+                        <Select 
+                          value={editProductSeo.target_country || 'IN'} 
+                          onValueChange={(value) => setEditProductSeo({ ...editProductSeo, target_country: value })}
+                        >
+                          <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="IN">India</SelectItem>
+                            <SelectItem value="US">United States</SelectItem>
+                            <SelectItem value="UK">United Kingdom</SelectItem>
+                            <SelectItem value="AE">UAE</SelectItem>
+                            <SelectItem value="AU">Australia</SelectItem>
+                            <SelectItem value="CA">Canada</SelectItem>
+                            <SelectItem value="DE">Germany</SelectItem>
+                            <SelectItem value="FR">France</SelectItem>
+                            <SelectItem value="JP">Japan</SelectItem>
+                            <SelectItem value="SG">Singapore</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                      <Field label="SEO Score">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 bg-muted rounded-full h-2">
+                            <div 
+                              className={`h-2 rounded-full transition-all ${
+                                editProductSeo.seo_score >= 80 ? 'bg-green-500' : 
+                                editProductSeo.seo_score >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+                              }`}
+                              style={{ width: `${editProductSeo.seo_score}%` }}
+                            />
+                          </div>
+                          <span className="text-xs font-medium">{editProductSeo.seo_score}/100</span>
+                        </div>
+                      </Field>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <div className="grid gap-2 md:grid-cols-3">
                 {[

@@ -15,10 +15,13 @@ import {
   Link2,
   Download,
   Loader2,
+  AlertCircle,
+  CheckCircle2,
+  Activity,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, AreaChart, Area } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, AreaChart, Area, BarChart, Bar } from 'recharts';
 
 interface DashboardStats {
   totalPages: number;
@@ -26,10 +29,13 @@ interface DashboardStats {
   leadsToday: number;
   leadsMonth: number;
   conversionRate: number;
-  aiTasksRunning: number;
+  avgSeoScore: number;
+  errorsCount: number;
   countryTraffic: { country: string; visits: number; percentage: number }[];
   leadSources: { name: string; value: number; color: string }[];
-  seoGrowth: { date: string; organic: number; paid: number; direct: number }[];
+  seoGrowth: { date: string; pages: number; score: number }[];
+  keywordRanks: { keyword: string; rank: number }[];
+  recentScans: { action: string; result: string; created_at: string }[];
 }
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--success))', 'hsl(var(--warning))', 'hsl(var(--cyan))', 'hsl(var(--purple))'];
@@ -41,39 +47,97 @@ export function SeoDashboard() {
     leadsToday: 0,
     leadsMonth: 0,
     conversionRate: 0,
-    aiTasksRunning: 0,
+    avgSeoScore: 0,
+    errorsCount: 0,
     countryTraffic: [],
     leadSources: [],
     seoGrowth: [],
+    keywordRanks: [],
+    recentScans: [],
   });
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [projectId, setProjectId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchStats();
+    initializeProject();
   }, []);
 
-  const fetchStats = async () => {
+  const initializeProject = async () => {
+    try {
+      // Get or create default project
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { data: projects } = await supabase
+        .from('seo_projects')
+        .select('id')
+        .eq('user_id', user?.id)
+        .limit(1);
+      
+      if (projects && projects.length > 0) {
+        setProjectId(projects[0].id);
+        fetchStats(projects[0].id);
+      } else if (user) {
+        // Create default project
+        const { data: newProject, error } = await supabase
+          .from('seo_projects')
+          .insert({
+            user_id: user.id,
+            project_name: 'Default Project',
+            domain: window.location.hostname,
+          })
+          .select('id')
+          .single();
+        
+        if (newProject) {
+          setProjectId(newProject.id);
+          fetchStats(newProject.id);
+        }
+      }
+    } catch (err) {
+      console.error('Error initializing project:', err);
+      setLoading(false);
+    }
+  };
+
+  const fetchStats = async (pid: string) => {
     setLoading(true);
     try {
-      // Fetch SEO data
-      const { data: seoData } = await supabase.from('seo_data').select('*');
+      // Fetch from NEW tables
+      const { data: pages } = await supabase
+        .from('seo_pages')
+        .select('seo_score,status')
+        .eq('project_id', pid);
       
-      // Fetch leads
+      const { data: keywords } = await supabase
+        .from('seo_keywords')
+        .select('*')
+        .eq('project_id', pid);
+      
+      const { data: errors } = await supabase
+        .from('seo_errors')
+        .select('id')
+        .eq('project_id', pid)
+        .eq('is_fixed', false);
+      
+      // Fetch seo_leads
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
       
-      const { data: leadsData } = await supabase.from('leads').select('*');
-      const leads = leadsData || [];
+      const { data: leadsData } = await supabase
+        .from('seo_leads')
+        .select('*')
+        .eq('project_id', pid);
       
+      const leads = leadsData || [];
       const leadsToday = leads.filter(l => new Date(l.created_at!) >= today).length;
       const leadsMonth = leads.filter(l => new Date(l.created_at!) >= monthStart).length;
       const converted = leads.filter(l => l.status === 'converted').length;
       const conversionRate = leads.length > 0 ? (converted / leads.length) * 100 : 0;
 
-      // Calculate lead sources
+      // Lead sources from seo_leads
       const sourceCounts: Record<string, number> = {};
       leads.forEach(l => {
         sourceCounts[l.source || 'other'] = (sourceCounts[l.source || 'other'] || 0) + 1;
@@ -85,11 +149,10 @@ export function SeoDashboard() {
         color: COLORS[idx % COLORS.length],
       }));
 
-      // Get country data from leads meta
+      // Country data from seo_leads
       const countryMap: Record<string, number> = {};
       leads.forEach(l => {
-        const meta = l.meta as any;
-        const country = meta?.country || 'Unknown';
+        const country = l.geo_country || 'Unknown';
         countryMap[country] = (countryMap[country] || 0) + 1;
       });
       
@@ -103,47 +166,54 @@ export function SeoDashboard() {
         .sort((a, b) => b.visits - a.visits)
         .slice(0, 6);
 
-      // Build SEO growth chart from real leads by day
+      // Pages added per day (last 7 days)
       const seoGrowth = Array.from({ length: 7 }, (_, i) => {
         const d = new Date();
         d.setDate(d.getDate() - (6 - i));
-        const dayStart = new Date(d); dayStart.setHours(0, 0, 0, 0);
-        const dayEnd = new Date(d); dayEnd.setHours(23, 59, 59, 999);
-        const dayLeads = leads.filter(l => {
-          const t = new Date(l.created_at!);
-          return t >= dayStart && t <= dayEnd;
-        });
-        const organic = dayLeads.filter(l => l.source === 'organic').length;
-        const paid = dayLeads.filter(l => l.source === 'paid').length;
-        const direct = dayLeads.filter(l => !l.source || l.source === 'direct').length;
+        const dayStr = d.toISOString().split('T')[0];
         return {
           date: d.toLocaleDateString('en-US', { weekday: 'short' }),
-          organic: organic || 0,
-          paid: paid || 0,
-          direct: direct || 0,
+          pages: pages?.filter(p => p.status !== 'error').length || 0,
+          score: pages && pages.length > 0
+            ? Math.round(pages.reduce((sum, p) => sum + (p.seo_score || 0), 0) / pages.length)
+            : 0,
         };
       });
 
-      // Extract keywords from SEO data
-      const allKeywords = (seoData || []).flatMap(s => s.keywords || []);
-      const uniqueKeywords = new Set(allKeywords);
+      // Keyword rankings
+      const keywordRanks = (keywords || [])
+        .filter(k => k.current_rank !== null)
+        .slice(0, 5)
+        .map(k => ({
+          keyword: k.keyword,
+          rank: k.current_rank || 0,
+        }));
+
+      // Recent scan logs
+      const { data: recentLogs } = await supabase
+        .from('seo_logs')
+        .select('action,result,created_at')
+        .eq('project_id', pid)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      const avgScore = pages && pages.length > 0
+        ? Math.round(pages.reduce((sum, p) => sum + (p.seo_score || 0), 0) / pages.length)
+        : 0;
 
       setStats({
-        totalPages: (seoData || []).length,
-        activeKeywords: uniqueKeywords.size,
+        totalPages: pages?.length || 0,
+        activeKeywords: keywords?.length || 0,
         leadsToday,
         leadsMonth,
         conversionRate,
-        aiTasksRunning: 0,
+        avgSeoScore: avgScore,
+        errorsCount: errors?.length || 0,
         countryTraffic,
-        leadSources: leadSources.length > 0 ? leadSources : [
-          { name: 'Organic', value: 45, color: COLORS[0] },
-          { name: 'Referral', value: 25, color: COLORS[1] },
-          { name: 'Social', value: 15, color: COLORS[2] },
-          { name: 'Ads', value: 10, color: COLORS[3] },
-          { name: 'Direct', value: 5, color: COLORS[4] },
-        ],
+        leadSources: leadSources.length > 0 ? leadSources : [],
         seoGrowth,
+        keywordRanks,
+        recentScans: recentLogs || [],
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -153,15 +223,23 @@ export function SeoDashboard() {
   };
 
   const runFullSeoScan = async () => {
+    if (!projectId) {
+      toast.error('No project selected');
+      return;
+    }
     setScanning(true);
     toast.info('Starting full SEO scan...');
     try {
       const { error } = await supabase.functions.invoke('seo-automation-engine', {
-        body: { action: 'full-scan', market: 'india' },
+        body: { 
+          action: 'full-scan', 
+          projectId,
+          scanType: 'comprehensive'
+        },
       });
       if (error) throw error;
-      toast.success('SEO scan completed!', { description: 'All pages analyzed and meta tags updated.' });
-      await fetchStats();
+      toast.success('SEO scan completed!', { description: 'All pages analyzed.' });
+      if (projectId) await fetchStats(projectId);
     } catch (err: any) {
       toast.error('SEO scan failed: ' + (err.message || 'Unknown error'));
     } finally {
@@ -170,14 +248,28 @@ export function SeoDashboard() {
   };
 
   const syncWithGoogle = async () => {
+    if (!projectId) {
+      toast.error('No project selected');
+      return;
+    }
     setSyncing(true);
     toast.info('Syncing with Google Search Console...');
     try {
+      const { data: project } = await supabase
+        .from('seo_projects')
+        .select('domain')
+        .eq('id', projectId)
+        .single();
+      
       const { error } = await supabase.functions.invoke('seo-automation-engine', {
-        body: { action: 'submit-sitemap', siteUrl: 'https://saasvala.com' },
+        body: { 
+          action: 'submit-sitemap', 
+          siteUrl: project?.domain || window.location.origin,
+          projectId
+        },
       });
       if (error) throw error;
-      toast.success('Google sync complete!', { description: 'Sitemap submitted and indexing requested.' });
+      toast.success('Google sync complete!', { description: 'Sitemap submitted.' });
     } catch (err: any) {
       toast.error('Google sync failed: ' + (err.message || 'Unknown error'));
     } finally {
@@ -186,35 +278,54 @@ export function SeoDashboard() {
   };
 
   const generateMetaForAll = async () => {
+    if (!projectId) {
+      toast.error('No project selected');
+      return;
+    }
     toast.info('Generating meta tags for all pages...');
     try {
       const { error } = await supabase.functions.invoke('seo-optimize', {
-        body: { action: 'generate-meta-all' },
+        body: { 
+          action: 'generate-meta-all',
+          projectId
+        },
       });
       if (error) throw error;
-      toast.success('Meta tags generated!', { description: 'AI-powered meta tags applied to all pages.' });
+      toast.success('Meta tags generated!', { description: 'AI meta tags applied.' });
+      if (projectId) await fetchStats(projectId);
     } catch (err: any) {
       toast.error('Meta generation failed: ' + (err.message || 'Unknown error'));
     }
   };
 
   const exportLeads = async () => {
-    const { data } = await supabase.from('leads').select('*');
+    if (!projectId) {
+      toast.error('No project selected');
+      return;
+    }
+    const { data } = await supabase
+      .from('seo_leads')
+      .select('*')
+      .eq('project_id', projectId);
+    
     if (!data?.length) {
       toast.error('No leads to export');
       return;
     }
     
     const csv = [
-      ['Name', 'Email', 'Phone', 'Company', 'Source', 'Status', 'Created'].join(','),
-      ...data.map(l => [l.name, l.email, l.phone, l.company, l.source, l.status, l.created_at].join(','))
+      ['Name', 'Email', 'Phone', 'Company', 'Source', 'Status', 'Score', 'Temperature', 'Created'].join(','),
+      ...data.map(l => [
+        l.name, l.email, l.phone, l.company, l.source, l.status, 
+        l.score, l.temperature, l.created_at
+      ].join(','))
     ].join('\n');
     
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `leads-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `seo-leads-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     toast.success('Leads exported!');
   };
@@ -229,8 +340,8 @@ export function SeoDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      {/* Stats Cards - REAL DATA ONLY */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
         <Card className="glass-card-hover">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -304,12 +415,26 @@ export function SeoDashboard() {
         <Card className="glass-card-hover">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-secondary/20 flex items-center justify-center">
-                <Cpu className="h-5 w-5 text-secondary" />
+              <div className={`h-10 w-10 rounded-lg ${stats.avgSeoScore >= 80 ? 'bg-green-500/20' : stats.avgSeoScore >= 60 ? 'bg-amber-500/20' : 'bg-red-500/20'} flex items-center justify-center`}>
+                <CheckCircle2 className={`h-5 w-5 ${stats.avgSeoScore >= 80 ? 'text-green-500' : stats.avgSeoScore >= 60 ? 'text-amber-500' : 'text-red-500'}`} />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{stats.aiTasksRunning}</p>
-                <p className="text-xs text-muted-foreground">AI Tasks</p>
+                <p className={`text-2xl font-bold ${stats.avgSeoScore >= 80 ? 'text-green-500' : stats.avgSeoScore >= 60 ? 'text-amber-500' : 'text-red-500'}`}>{stats.avgSeoScore}</p>
+                <p className="text-xs text-muted-foreground">Avg SEO Score</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card-hover">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className={`h-10 w-10 rounded-lg ${stats.errorsCount === 0 ? 'bg-green-500/20' : 'bg-red-500/20'} flex items-center justify-center`}>
+                <AlertCircle className={`h-5 w-5 ${stats.errorsCount === 0 ? 'text-green-500' : 'text-red-500'}`} />
+              </div>
+              <div>
+                <p className={`text-2xl font-bold ${stats.errorsCount === 0 ? 'text-green-500' : 'text-red-500'}`}>{stats.errorsCount}</p>
+                <p className="text-xs text-muted-foreground">SEO Errors</p>
               </div>
             </div>
           </CardContent>
@@ -341,25 +466,16 @@ export function SeoDashboard() {
         {/* SEO Growth Chart */}
         <Card className="glass-card lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-lg">SEO Growth</CardTitle>
+            <CardTitle className="text-lg">SEO Performance (Last 7 Days)</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={stats.seoGrowth}>
-                  <defs>
-                    <linearGradient id="colorOrganic" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="colorPaid" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--success))" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="hsl(var(--success))" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
+                <LineChart data={stats.seoGrowth}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                  <YAxis yAxisId="right" orientation="right" stroke="hsl(var(--success))" fontSize={12} domain={[0, 100]} />
                   <Tooltip 
                     contentStyle={{ 
                       backgroundColor: 'hsl(var(--popover))', 
@@ -368,10 +484,9 @@ export function SeoDashboard() {
                     }} 
                   />
                   <Legend />
-                  <Area type="monotone" dataKey="organic" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#colorOrganic)" />
-                  <Area type="monotone" dataKey="paid" stroke="hsl(var(--success))" fillOpacity={1} fill="url(#colorPaid)" />
-                  <Line type="monotone" dataKey="direct" stroke="hsl(var(--warning))" strokeWidth={2} dot={false} />
-                </AreaChart>
+                  <Line yAxisId="left" type="monotone" dataKey="pages" name="Pages" stroke="hsl(var(--primary))" strokeWidth={2} />
+                  <Line yAxisId="right" type="monotone" dataKey="score" name="Avg Score" stroke="hsl(var(--success))" strokeWidth={2} />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
@@ -427,14 +542,7 @@ export function SeoDashboard() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {(stats.countryTraffic.length > 0 ? stats.countryTraffic : [
-              { country: 'India', visits: 450, percentage: 35 },
-              { country: 'USA', visits: 320, percentage: 25 },
-              { country: 'UK', visits: 180, percentage: 14 },
-              { country: 'UAE', visits: 150, percentage: 12 },
-              { country: 'Canada', visits: 100, percentage: 8 },
-              { country: 'Australia', visits: 80, percentage: 6 },
-            ]).map((item, idx) => (
+            {stats.countryTraffic.length > 0 ? stats.countryTraffic.map((item, idx) => (
               <div key={idx} className="p-4 rounded-lg bg-muted/30 border border-border">
                 <div className="flex items-center gap-2 mb-2">
                   <Globe2 className="h-4 w-4 text-primary" />
@@ -444,10 +552,79 @@ export function SeoDashboard() {
                 <Progress value={item.percentage} className="h-1 mt-2" />
                 <p className="text-xs text-muted-foreground mt-1">{item.percentage}% of traffic</p>
               </div>
-            ))}
+            )) : (
+              <p className="col-span-full text-center text-muted-foreground py-4">
+                No country data available yet. Leads will populate this data.
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
+
+      {/* Recent Activity & Keyword Rankings */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Scans */}
+        <Card className="glass-card">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Activity className="h-5 w-5 text-primary" />
+              Recent SEO Activity
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {stats.recentScans.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">
+                No recent activity. Run a scan to see activity here.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {stats.recentScans.map((scan, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className={`h-2 w-2 rounded-full ${scan.result === 'success' ? 'bg-green-500' : scan.result === 'error' ? 'bg-red-500' : 'bg-amber-500'}`} />
+                      <span className="text-sm font-medium">{scan.action}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(scan.created_at).toLocaleTimeString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Keyword Rankings */}
+        <Card className="glass-card">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Target className="h-5 w-5 text-primary" />
+              Top Keyword Rankings
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {stats.keywordRanks.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">
+                No keyword rankings yet. Add keywords to track rankings.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {stats.keywordRanks.map((kw, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                    <span className="text-sm font-medium truncate max-w-[200px]">{kw.keyword}</span>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-sm font-bold ${kw.rank <= 10 ? 'text-green-500' : kw.rank <= 30 ? 'text-amber-500' : 'text-red-500'}`}>
+                        #{kw.rank}
+                      </span>
+                      <Progress value={Math.max(0, 100 - kw.rank)} className="w-16 h-2" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

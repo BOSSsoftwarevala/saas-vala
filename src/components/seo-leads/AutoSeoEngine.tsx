@@ -42,8 +42,15 @@ interface PageSeo {
   title: string | null;
   description: string | null;
   keywords: string[];
-  status: 'optimized' | 'pending' | 'error';
+  status: 'optimized' | 'pending' | 'error' | 'scanning';
   score: number;
+  h1: string | null;
+  word_count: number;
+  has_sitemap: boolean;
+  has_robots: boolean;
+  page_speed: number | null;
+  mobile_friendly: boolean | null;
+  scan_errors: any[];
 }
 
 const defaultFeatures: SeoFeature[] = [
@@ -69,20 +76,53 @@ export function AutoSeoEngine() {
     fetchSeoData();
   }, []);
 
-  const fetchSeoData = async () => {
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [scanResults, setScanResults] = useState<any>(null);
+
+  useEffect(() => {
+    getProjectId();
+  }, []);
+
+  const getProjectId = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: projects } = await supabase
+      .from('seo_projects')
+      .select('id')
+      .eq('user_id', user?.id)
+      .limit(1);
+    
+    if (projects?.[0]) {
+      setProjectId(projects[0].id);
+      fetchSeoData(projects[0].id);
+    }
+  };
+
+  const fetchSeoData = async (pid: string) => {
     setLoading(true);
     try {
-      const { data } = await supabase.from('seo_data').select('*').limit(50);
+      const { data } = await supabase
+        .from('seo_pages')
+        .select('*')
+        .eq('project_id', pid)
+        .order('created_at', { ascending: false })
+        .limit(50);
       
       if (data) {
         setPages(data.map(d => ({
           id: d.id,
           url: d.url,
           title: d.title,
-          description: d.meta_description,
+          description: d.description,
           keywords: d.keywords || [],
-          status: d.title && d.meta_description ? 'optimized' : 'pending',
-          score: d.title && d.meta_description ? (d as any).seo_score ?? 85 : (d as any).seo_score ?? 40,
+          status: d.status as any,
+          score: d.seo_score || 0,
+          h1: d.h1,
+          word_count: d.word_count || 0,
+          has_sitemap: d.has_sitemap,
+          has_robots: d.has_robots,
+          page_speed: d.page_speed,
+          mobile_friendly: d.mobile_friendly,
+          scan_errors: d.scan_errors || [],
         })));
       }
     } catch (error) {
@@ -115,15 +155,75 @@ export function AutoSeoEngine() {
       if (error) throw error;
 
       setProgress(85);
-      await fetchSeoData();
-      setProgress(100);
-      toast.success('Auto SEO completed!', {
-        description: 'SEO data refreshed from live optimization run.',
-      });
-    } catch (error: any) {
-      toast.error(error?.message || 'Auto SEO failed');
+      if (projectId) await fetchSeoData(projectId);
+      toast.success('Auto SEO completed!');
+    } catch (err: any) {
+      toast.error('Scan failed: ' + err.message);
     } finally {
       setRunning(false);
+      setProgress(100);
+    }
+  };
+
+  const scanSinglePage = async (pageId: string) => {
+    try {
+      const { error } = await supabase.functions.invoke('seo-automation-engine', {
+        body: { 
+          action: 'scan-page', 
+          pageId,
+          projectId
+        },
+      });
+      
+      if (error) throw error;
+      
+      if (projectId) await fetchSeoData(projectId);
+      toast.success('Page scanned successfully');
+    } catch (err: any) {
+      toast.error('Page scan failed: ' + err.message);
+    }
+  };
+
+  const runFullScan = async () => {
+    if (!projectId) {
+      toast.error('No project selected');
+      return;
+    }
+    setRunning(true);
+    setProgress(0);
+    toast.info('Starting comprehensive SEO scan...');
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('seo-automation-engine', {
+        body: { 
+          action: 'full-scan', 
+          projectId,
+          features: features.filter(f => f.enabled).map(f => f.id),
+          scanType: 'comprehensive'
+        },
+      });
+      
+      if (error) throw error;
+      
+      toast.success('SEO scan completed!', {
+        description: `Scanned ${data?.pagesScanned || 0} pages, found ${data?.issuesFound || 0} issues.`
+      });
+      if (projectId) await fetchSeoData(projectId);
+    } catch (err: any) {
+      toast.error('Scan failed: ' + err.message);
+    } finally {
+      setRunning(false);
+      setProgress(100);
+    }
+  };
+
+  const rollbackChanges = async () => {
+    toast.info('Refreshing latest persisted SEO state...');
+    try {
+      if (projectId) await fetchSeoData(projectId);
+      toast.success('SEO state restored from database');
+    } catch {
+      toast.error('Failed to restore SEO state');
     }
   };
 
@@ -151,16 +251,6 @@ export function AutoSeoEngine() {
     }
   };
 
-  const rollbackChanges = async () => {
-    toast.info('Refreshing latest persisted SEO state...');
-    try {
-      await fetchSeoData();
-      toast.success('SEO state restored from database');
-    } catch {
-      toast.error('Failed to restore SEO state');
-    }
-  };
-
   const getStatusBadge = (status: PageSeo['status']) => {
     switch (status) {
       case 'optimized':
@@ -169,6 +259,10 @@ export function AutoSeoEngine() {
         return <Badge className="bg-warning/20 text-warning border-warning/30">Pending</Badge>;
       case 'error':
         return <Badge className="bg-destructive/20 text-destructive border-destructive/30">Error</Badge>;
+      case 'scanning':
+        return <Badge className="bg-primary/20 text-primary border-primary/30"><Loader2 className="h-3 w-3 animate-spin mr-1 inline" />Scanning</Badge>;
+      default:
+        return <Badge variant="outline">Unknown</Badge>;
     }
   };
 
