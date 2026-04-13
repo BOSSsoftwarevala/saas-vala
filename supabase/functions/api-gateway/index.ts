@@ -46,8 +46,24 @@ async function sentryCaptureException(err: unknown, context?: Record<string, unk
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-idempotency-key, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-idempotency-key, x-api-version, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
   'Content-Type': 'application/json',
+}
+
+const REQUIRED_ENV_VARS = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY'] as const
+const SUPPORTED_API_VERSIONS = new Set(['2026-04-01', '1'])
+
+function getMissingRequiredEnvVars(): string[] {
+  return REQUIRED_ENV_VARS.filter((key) => !String(Deno.env.get(key) || '').trim())
+}
+
+const missingRequiredEnvVars = getMissingRequiredEnvVars()
+
+function validateApiVersion(req: Request): Response | null {
+  const version = String(req.headers.get('x-api-version') || '').trim()
+  if (!version) return null
+  if (SUPPORTED_API_VERSIONS.has(version)) return null
+  return err('Unsupported API version', 400)
 }
 
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>()
@@ -75,8 +91,67 @@ function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: corsHeaders })
 }
 
-function err(message: string, status = 400) {
-  return json({ error: message }, status)
+function successResponse(data: unknown = null, message = 'Success') {
+  return json({
+    success: true,
+    message,
+    data,
+    timestamp: new Date().toISOString()
+  }, 200)
+}
+
+function getUserFriendlyError(message: string, status: number): string {
+  const lowerMsg = message.toLowerCase()
+
+  // Auth errors
+  if (status === 401) return 'Authentication required. Please log in and try again.'
+  if (lowerMsg.includes('unauthorized')) return 'You do not have permission to perform this action.'
+  if (lowerMsg.includes('forbidden')) return 'Access denied. Please check your permissions.'
+
+  // Rate limit errors
+  if (status === 429) return 'Too many requests. Please wait a moment and try again.'
+
+  // Validation errors
+  if (status === 400) {
+    if (lowerMsg.includes('required')) return 'Required information is missing. Please check your input.'
+    if (lowerMsg.includes('invalid')) return 'Invalid input. Please check the provided data.'
+    if (lowerMsg.includes('email')) return 'Invalid email address. Please check and try again.'
+    if (lowerMsg.includes('password')) return 'Invalid password. Please check and try again.'
+  }
+
+  // Not found errors
+  if (status === 404) return 'The requested resource was not found.'
+  if (lowerMsg.includes('not found')) return 'Resource not found. Please check and try again.'
+
+  // Server errors
+  if (status >= 500) return 'Server error occurred. Please try again later or contact support.'
+
+  // Wallet errors
+  if (lowerMsg.includes('insufficient balance')) return 'Insufficient balance. Please add funds to your wallet.'
+  if (lowerMsg.includes('wallet')) return 'Wallet operation failed. Please check your balance and try again.'
+
+  // Payment errors
+  if (lowerMsg.includes('payment')) return 'Payment failed. Please check your payment details and try again.'
+
+  // Key errors
+  if (lowerMsg.includes('key') && lowerMsg.includes('invalid')) return 'Invalid key. Please check and try again.'
+  if (lowerMsg.includes('key') && lowerMsg.includes('expired')) return 'Key has expired. Please generate a new key.'
+
+  // Default to original message for developer debugging
+  return message
+}
+
+function err(message: string, status = 400, details?: Record<string, unknown>) {
+  const userMessage = getUserFriendlyError(message, status)
+  return json({
+    success: false,
+    message: userMessage,
+    error: message,
+    data: null,
+    status,
+    timestamp: new Date().toISOString(),
+    ...details
+  }, status)
 }
 
 function enforceRateLimit(key: string, limit: number, windowMs: number) {
@@ -103,6 +178,133 @@ function enforceRateLimit(key: string, limit: number, windowMs: number) {
 
 function isUuid(value: unknown): boolean {
   return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+}
+
+function validateId(id: unknown, fieldName = 'id'): { valid: boolean; error?: string } {
+  if (!id) return { valid: false, error: `${fieldName} is required` }
+  if (typeof id !== 'string') return { valid: false, error: `${fieldName} must be a string` }
+  if (!isUuid(id)) return { valid: false, error: `${fieldName} must be a valid UUID` }
+  return { valid: true }
+}
+
+function sanitizeInput(input: unknown): string {
+  if (input === null || input === undefined) return ''
+  if (typeof input === 'string') {
+    // Remove script tags and dangerous patterns
+    return input
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+      .replace(/javascript:/gi, '')
+      .replace(/on\w+\s*=/gi, '')
+      .trim()
+  }
+  if (typeof input === 'number') return String(input)
+  if (typeof input === 'boolean') return String(input)
+  return ''
+}
+
+function sanitizeFileName(fileName: string): string {
+  if (!fileName || typeof fileName !== 'string') return `file_${Date.now()}`
+
+  // Remove path traversal attempts
+  const sanitized = fileName.replace(/\.\./g, '').replace(/[\/\\]/g, '_')
+
+  // Remove special characters except alphanumerics, dots, hyphens, underscores
+  const cleanName = sanitized.replace(/[^a-zA-Z0-9._-]/g, '_')
+
+  // Limit length
+  const maxLength = 255
+  const truncated = cleanName.length > maxLength ? cleanName.substring(0, maxLength) : cleanName
+
+  // Ensure not empty
+  return truncated || `file_${Date.now()}`
+}
+
+function generateUniqueFileName(fileName: string, userId: string): string {
+  const sanitizedName = sanitizeFileName(fileName)
+  const timestamp = Date.now()
+  const randomSuffix = Math.random().toString(36).substring(2, 8)
+  const ext = sanitizedName.includes('.') ? sanitizedName.split('.').pop() : ''
+  const baseName = sanitizedName.replace(/\.[^.]+$/, '')
+
+  return `${userId}_${timestamp}_${randomSuffix}_${baseName}${ext ? '.' + ext : ''}`
+}
+
+// Auto Error Detection System
+async function detectAndLogError(admin: any, errorType: string, details: Record<string, unknown>, userId?: string) {
+  try {
+    await admin.from('error_detection_logs').insert({
+      error_type: errorType,
+      details,
+      user_id: userId || null,
+      detected_at: new Date().toISOString(),
+      resolved: false
+    })
+    console.warn(`[ERROR DETECTED] ${errorType}:`, details)
+  } catch (logError) {
+    console.error('Failed to log error detection:', logError)
+  }
+}
+
+async function detect404Route(admin: any, module: string, pathParts: string[], userId?: string) {
+  const knownModules = new Set([
+    'auth', 'products', 'resellers', 'marketplace-admin', 'marketplace',
+    'health', 'feature-flags', 'keys', 'projects', 'deploy', 'deploy-targets',
+    'domain', 'server', 'server-management', 'github', 'ai', 'chat',
+    'api-keys', 'api-usage', 'auto', 'apk', 'wallet', 'leads', 'seo', 'system'
+  ])
+
+  if (!knownModules.has(module)) {
+    await detectAndLogError(admin, 'unknown_route', { module, pathParts }, userId)
+  }
+}
+
+async function detectDBError(admin: any, error: any, operation: string, table?: string, userId?: string) {
+  const errorPatterns = {
+    connection: /connection|timeout|network/i,
+    constraint: /constraint|duplicate|unique/i,
+    permission: /permission|denied|access/i,
+    not_found: /not found|does not exist/i
+  }
+
+  let errorType = 'unknown_db_error'
+  for (const [type, pattern] of Object.entries(errorPatterns)) {
+    if (pattern.test(error.message)) {
+      errorType = `db_${type}`
+      break
+    }
+  }
+
+  await detectAndLogError(admin, errorType, {
+    operation,
+    table,
+    error_message: error.message,
+    error_code: error.code
+  }, userId)
+}
+
+async function detectAPIFailure(admin: any, module: string, action: string, latency: number, status: number, userId?: string) {
+  if (status >= 500) {
+    await detectAndLogError(admin, 'api_server_error', {
+      module,
+      action,
+      latency,
+      status
+    }, userId)
+  } else if (status === 404) {
+    await detectAndLogError(admin, 'api_not_found', {
+      module,
+      action,
+      latency
+    }, userId)
+  } else if (latency > 5000) {
+    await detectAndLogError(admin, 'api_slow_response', {
+      module,
+      action,
+      latency,
+      status
+    }, userId)
+  }
 }
 
 type ResellerPlanBenefit = {
@@ -258,7 +460,47 @@ async function ensureUniqueProductSlug(admin: any, requestedSlug: string, produc
 
 async function authenticate(req: Request) {
   const authHeader = req.headers.get('Authorization')
-  if (!authHeader?.startsWith('Bearer ')) return null
+  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  
+  if (!authHeader?.startsWith('Bearer ')) {
+    console.warn('[Security] Missing or invalid auth header from IP:', clientIp)
+    return null
+  }
+
+  const token = authHeader.replace('Bearer ', '')
+
+  // Check token expiration
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) {
+      console.warn('[Security] Invalid token format from IP:', clientIp)
+      return null
+    }
+
+    const payload = JSON.parse(atob(parts[1]))
+    const now = Math.floor(Date.now() / 1000)
+
+    // Check if token is expired
+    if (payload.exp && payload.exp < now) {
+      console.warn('[Security] Token expired for user:', payload.sub, 'from IP:', clientIp)
+      return null
+    }
+
+    // Check if token is not yet valid (nbf)
+    if (payload.nbf && payload.nbf > now) {
+      console.warn('[Security] Token not yet valid from IP:', clientIp)
+      return null
+    }
+
+    // Check for token mismatch (iss claim)
+    if (payload.iss && !payload.iss.includes(Deno.env.get('SUPABASE_URL') || '')) {
+      console.warn('[Security] Token issuer mismatch from IP:', clientIp)
+      return null
+    }
+  } catch (e) {
+    console.warn('[Security] Failed to parse token from IP:', clientIp, 'error:', e)
+    return null
+  }
 
   const sb = createClient(
     Deno.env.get('SUPABASE_URL')!,
@@ -266,11 +508,38 @@ async function authenticate(req: Request) {
     { global: { headers: { Authorization: authHeader } } }
   )
 
-  const token = authHeader.replace('Bearer ', '')
-  const { data, error } = await sb.auth.getClaims(token)
-  if (error || !data?.claims) return null
+  const { data, error } = await sb.auth.getUser()
+  if (error || !data?.user) {
+    console.warn('[Security] Invalid token or user not found from IP:', clientIp, 'error:', error?.message)
+    return null
+  }
 
-  return { userId: data.claims.sub as string, supabase: sb }
+  // Verify session is still active
+  const { data: sessionData, error: sessionError } = await sb.auth.getSession()
+  if (sessionError || !sessionData.session) {
+    console.warn('[Security] Session not active for user:', data.user.id, 'from IP:', clientIp)
+    return null
+  }
+
+  // Check if user is banned/suspended
+  const admin = adminClient()
+  const { data: profile } = await admin
+    .from('profiles')
+    .select('is_banned, is_suspended')
+    .eq('user_id', data.user.id)
+    .maybeSingle()
+  
+  if (profile?.is_banned) {
+    console.warn('[Security] Banned user attempted access:', data.user.id, 'from IP:', clientIp)
+    return null
+  }
+
+  if (profile?.is_suspended) {
+    console.warn('[Security] Suspended user attempted access:', data.user.id, 'from IP:', clientIp)
+    return null
+  }
+
+  return { userId: data.user.id, supabase: sb }
 }
 
 function adminClient() {
@@ -857,6 +1126,82 @@ async function handleKeys(method: string, pathParts: string[], body: any, userId
 
   // POST /keys/generate
   if (method === 'POST' && action === 'generate') {
+    // Data validation
+    if (!body || typeof body !== 'object') {
+      return err('Invalid request body', 400)
+    }
+
+    // Validate key_type
+    const validKeyTypes = ['monthly', 'yearly', 'lifetime']
+    const keyType = body.key_type || 'yearly'
+    if (!validKeyTypes.includes(keyType)) {
+      return err(`Invalid key_type. Must be one of: ${validKeyTypes.join(', ')}`, 400)
+    }
+
+    const requestIdempotencyKey = String(body?.idempotency_key || '').trim()
+    if (requestIdempotencyKey) {
+      const { data: existingIdempotency, error: existingIdempotencyError } = await admin
+        .from('platform_idempotency_keys')
+        .select('id,response_payload,status_code,expires_at')
+        .eq('scope', 'keys.generate')
+        .eq('idem_key', requestIdempotencyKey)
+        .gt('expires_at', new Date().toISOString())
+        .maybeSingle()
+
+      if (existingIdempotencyError) return err(existingIdempotencyError.message, 500)
+
+      if (existingIdempotency?.response_payload) {
+        return json(existingIdempotency.response_payload, existingIdempotency.status_code || 200)
+      }
+
+      if (existingIdempotency) {
+        return err('A key generation request with this idempotency key is already in progress', 409)
+      }
+
+      const { error: reserveIdempotencyError } = await admin.from('platform_idempotency_keys').insert({
+        scope: 'keys.generate',
+        idem_key: requestIdempotencyKey,
+        request_hash: JSON.stringify({
+          product_id: body?.product_id || '',
+          key_type: keyType,
+          owner_email: body?.owner_email ? String(body.owner_email).trim().toLowerCase() : null,
+          max_devices: body?.max_devices ?? 1,
+        }),
+        status_code: 202,
+        expires_at: new Date(Date.now() + 24 * 3600_000).toISOString(),
+      })
+
+      if (reserveIdempotencyError) return err(reserveIdempotencyError.message, 500)
+    }
+
+    // Validate owner_email if provided
+    if (body.owner_email && typeof body.owner_email === 'string') {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(body.owner_email)) {
+        return err('Invalid email address', 400)
+      }
+    }
+
+    // Validate max_devices
+    if (body.max_devices !== undefined) {
+      const maxDevices = Number(body.max_devices)
+      if (isNaN(maxDevices) || maxDevices < 1 || maxDevices > 100) {
+        return err('max_devices must be between 1 and 100', 400)
+      }
+    }
+
+    // Check wallet balance before key generation
+    const { data: wallet } = await sb.from('wallets').select('id,balance,version').eq('user_id', userId).maybeSingle()
+    if (!wallet) return err('Wallet not found', 404)
+    const currentBalance = Number(wallet.balance || 0)
+    const currentVersion = Number((wallet as any).version || 0)
+
+    // Define minimum balance required for key generation (can be adjusted based on pricing)
+    const MIN_BALANCE_FOR_KEY = 10
+    if (currentBalance < MIN_BALANCE_FOR_KEY) {
+      return err(`Insufficient wallet balance. Minimum ₹${MIN_BALANCE_FOR_KEY} required to generate a key.`, 400)
+    }
+
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
     let key = ''
     for (let j = 0; j < 4; j++) {
@@ -864,30 +1209,144 @@ async function handleKeys(method: string, pathParts: string[], body: any, userId
       for (let i = 0; i < 4; i++) key += chars.charAt(Math.floor(Math.random() * chars.length))
     }
     const licenseKey = body.license_key || key
+
+    // Check for duplicate key
+    const { data: existingKey } = await admin.from('license_keys').select('id').eq('license_key', licenseKey).maybeSingle()
+    if (existingKey) {
+      return err('Duplicate key detected. Please try again.', 400)
+    }
+    
+    // Auto-calculate expires_at based on key_type if not provided
+    let expiresAt = body.expires_at
+    if (!expiresAt) {
+      const durationDays = keyType === 'monthly' ? 30 : keyType === 'yearly' ? 365 : keyType === 'lifetime' ? 36500 : 365
+      expiresAt = new Date(Date.now() + durationDays * 86400_000).toISOString()
+    }
+    
+    // Deduct cost from wallet
+    const keyCost = MIN_BALANCE_FOR_KEY
+    const newBalance = currentBalance - keyCost
+    const { data: updatedWallet, error: walletUpdateError } = await sb.from('wallets').update({ balance: newBalance, version: currentVersion + 1 }).eq('id', wallet.id).eq('version', currentVersion).select('id,balance').maybeSingle()
+    if (walletUpdateError) return err(walletUpdateError.message)
+    if (!updatedWallet) return err('Wallet was updated by another request. Please retry.', 409)
+    
+    // Record transaction
+    await sb.from('wallet_transactions').insert({
+      wallet_id: wallet.id,
+      type: 'debit',
+      amount: keyCost,
+      balance_after: newBalance,
+      status: 'completed',
+      description: `Key generation: ${licenseKey}`,
+      reference_type: 'key_generation',
+      created_by: userId,
+      meta: requestIdempotencyKey ? { idempotency_key: requestIdempotencyKey } : null,
+    })
+    
     const { data, error } = await sb.from('license_keys').insert({
       product_id: body.product_id || '',
       license_key: licenseKey,
-      key_type: body.key_type || 'yearly',
+      key_type: keyType,
       status: body.status || 'active',
       owner_email: body.owner_email,
       owner_name: body.owner_name,
       max_devices: body.max_devices || 1,
-      expires_at: body.expires_at,
+      expires_at: expiresAt,
       notes: body.notes,
       created_by: userId,
     }).select().single()
-    if (error) return err(error.message)
-    await logActivity(admin, 'license_key', data.id, 'generated', userId, { key: licenseKey })
-    return json({ data }, 201)
+    if (error) {
+      // Rollback wallet deduction if key insertion fails
+      await sb.from('wallets').update({ balance: currentBalance, version: currentVersion + 2 }).eq('id', wallet.id).eq('version', currentVersion + 1)
+      return err(error.message)
+    }
+
+    if (requestIdempotencyKey) {
+      await admin.from('platform_idempotency_keys').update({
+        response_payload: { data, balance: newBalance },
+        status_code: 201,
+      }).eq('scope', 'keys.generate').eq('idem_key', requestIdempotencyKey)
+    }
+
+    await logActivity(admin, 'license_key', data.id, 'generated', userId, { key: licenseKey, cost: keyCost })
+    return json({ data, balance: newBalance }, 201)
   }
 
   // POST /keys/validate
   if (method === 'POST' && action === 'validate') {
-    const { data, error } = await admin.from('license_keys').select('*')
-      .eq('license_key', body.license_key).single()
-    if (error || !data) return err('Invalid license key', 404)
-    const valid = data.status === 'active' && (!data.expires_at || new Date(data.expires_at) > new Date())
-    return json({ valid, key: data })
+    const licenseKey = body.license_key
+    const deviceId = body.device_id
+
+    if (!licenseKey) {
+      return err('License key is required', 400)
+    }
+
+    const { data: keyData, error } = await admin.from('license_keys').select('*')
+      .eq('license_key', licenseKey).single()
+    if (error || !keyData) return err('Invalid license key', 404)
+
+    // Check if key is active
+    if (keyData.status !== 'active') {
+      return successResponse({
+        valid: false,
+        reason: 'License key is not active',
+        key: { id: keyData.id, status: keyData.status }
+      }, 'License key inactive')
+    }
+
+    // Check expiry
+    if (keyData.expires_at && new Date(keyData.expires_at) < new Date()) {
+      return successResponse({
+        valid: false,
+        reason: 'License key has expired',
+        key: { id: keyData.id, expires_at: keyData.expires_at }
+      }, 'License key expired')
+    }
+
+    // Check device binding if device_id provided
+    if (deviceId && keyData.device_id) {
+      if (keyData.device_id !== deviceId) {
+        return successResponse({
+          valid: false,
+          reason: 'License key is bound to a different device',
+          key: { id: keyData.id, device_id: keyData.device_id }
+        }, 'Device mismatch')
+      }
+    }
+
+    // Check max devices
+    if (keyData.max_devices && keyData.current_devices >= keyData.max_devices) {
+      return successResponse({
+        valid: false,
+        reason: 'Maximum device limit reached',
+        key: { id: keyData.id, current_devices: keyData.current_devices, max_devices: keyData.max_devices }
+      }, 'Device limit exceeded')
+    }
+
+    // Tamper detection - check if key has been modified recently
+    const keyAge = Date.now() - new Date(keyData.updated_at || keyData.created_at).getTime()
+    const suspiciousModifications = keyAge < 60000 && keyData.tamper_count > 0
+    if (suspiciousModifications) {
+      return successResponse({
+        valid: false,
+        reason: 'License key appears to be tampered',
+        key: { id: keyData.id, tamper_count: keyData.tamper_count }
+      }, 'Tamper detected')
+    }
+
+    // All checks passed
+    return successResponse({
+      valid: true,
+      key: {
+        id: keyData.id,
+        license_key: keyData.license_key,
+        status: keyData.status,
+        expires_at: keyData.expires_at,
+        max_devices: keyData.max_devices,
+        current_devices: keyData.current_devices,
+        product_id: keyData.product_id
+      }
+    }, 'License key valid')
   }
 
   // PUT /keys/:id/activate
@@ -1795,15 +2254,46 @@ async function handleApk(method: string, pathParts: string[], body: any, userId:
       .eq('id', pathParts[1]).single()
     if (error || !apk?.file_url) return err('APK not found', 404)
 
+    // Verify license key if provided
+    const licenseKey = body?.license_key
+    if (licenseKey) {
+      const { data: keyData, error: keyError } = await admin.from('license_keys')
+        .select('id, status, expires_at, owner_email, max_devices')
+        .eq('license_key', licenseKey)
+        .single()
+      
+      if (keyError || !keyData) {
+        return err('Invalid license key', 403)
+      }
+      
+      if (keyData.status !== 'active') {
+        return err('License key is not active', 403)
+      }
+      
+      if (keyData.expires_at && new Date(keyData.expires_at) < new Date()) {
+        return err('License key has expired', 403)
+      }
+    }
+
+    // Generate time-limited signed URL (5 minutes)
     const { data: signedUrl } = await admin.storage.from('apks')
       .createSignedUrl(apk.file_url, 300)
     if (!signedUrl?.signedUrl) return err('Failed to generate download URL', 500)
 
+    // Log download with user binding
     await admin.from('apk_download_logs').insert({
-      product_id: apk.product_id, user_id: userId, license_key: body?.license_key || 'direct',
+      product_id: apk.product_id,
+      user_id: userId,
+      license_key: licenseKey || 'direct',
+      ip_address: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+      downloaded_at: new Date().toISOString(),
     })
 
-    return json({ url: signedUrl.signedUrl })
+    return successResponse({
+      url: signedUrl.signedUrl,
+      expires_at: new Date(Date.now() + 300000).toISOString(),
+      product_id: apk.product_id
+    }, 'Download link generated')
   }
 
   return err('Not found', 404)
@@ -5598,7 +6088,7 @@ async function handlePublicMarketplace(
 
   // ── GET /marketplace/categories ──
   if (method === 'GET' && action === 'categories') {
-    const { data, error } = await admin.from('categories').select('id,name,slug,description,icon_url,is_active').eq('is_active', true).order('sort_order')
+    const { data, error } = await admin.from('categories').select('*').limit(100)
     if (error) return err(error.message)
     return json({ categories: data ?? [] })
   }
@@ -6464,29 +6954,61 @@ async function handlePublicMarketplace(
     }, 201)
   }
 
-  // Fallback to existing admin marketplace handler
-  return handleMarketplace(method, pathParts, body, userId ?? '', sb)
+// ===================== HEALTH + FEATURE FLAGS =====================
+async function getFeatureFlagEnabled(admin: any, flagKey: string): Promise<boolean> {
+  const { data } = await admin
+    .from('feature_flags')
+    .select('is_enabled')
+    .eq('flag_key', flagKey)
+    .maybeSingle()
+
+  return !!data?.is_enabled
 }
 
-// ===================== HEALTH + FEATURE FLAGS =====================
+async function enforceEmergencyGuards(admin: any, req: Request, module: string): Promise<Response | null> {
+  const isReadOperation = req.method === 'GET' || req.method === 'HEAD'
+
+  if (await getFeatureFlagEnabled(admin, 'global_kill_switch')) {
+    return err('System is temporarily disabled by emergency control', 503)
+  }
+
+  if (await getFeatureFlagEnabled(admin, `module_disabled_${module}`)) {
+    return err(`${module} is temporarily unavailable`, 503)
+  }
+
+  if (!isReadOperation && await getFeatureFlagEnabled(admin, 'global_read_only_mode')) {
+    return err('System is in emergency read-only mode', 503)
+  }
+
+  if (module === 'marketplace' && !isReadOperation && await getFeatureFlagEnabled(admin, 'payments_write_disabled')) {
+    return err('Payments are temporarily disabled', 503)
+  }
+
+  if (module === 'keys' && !isReadOperation && await getFeatureFlagEnabled(admin, 'keys_write_disabled')) {
+    return err('Key generation is temporarily disabled', 503)
+  }
+
+  if ((module === 'deploy' || module === 'projects' || module === 'server' || module === 'domain') && !isReadOperation && await getFeatureFlagEnabled(admin, 'deploy_write_disabled')) {
+    return err('Deployment actions are temporarily disabled', 503)
+  }
+
+  return null
+}
+
 async function handleHealth(method: string, parts: string[], body: any, userId: string) {
   const admin = adminClient()
-  const { data: userRoles } = await admin.from('user_roles').select('role').eq('user_id', userId)
-  const roles = (userRoles ?? []).map((r: any) => String(r.role))
-  const isPrivileged = roles.includes('super_admin') || roles.includes('admin')
-
-  const runHealthScan = async (autoFix: boolean, persist = true, saveSnapshot = false) => {
-    const nowIso = new Date().toISOString()
-    const checks: Array<{
-      module: string
-      status: 'healthy' | 'warning' | 'failed'
-      latency_ms: number
-      records: number
-      message: string
-      auto_action?: string | null
-      uptime_pct?: number
-      activity_1h?: number
-    }> = []
+  const isPrivileged = await isAdmin(admin, userId)
+  const nowIso = new Date().toISOString()
+  const checks: Array<{
+    module: string
+    status: 'healthy' | 'warning' | 'failed'
+    latency_ms: number
+    records: number
+    message: string
+    auto_action?: string | null
+    uptime_pct?: number
+    activity_1h?: number
+  }> = []
 
     const getUptimePct = async (module: string): Promise<number> => {
       const windowStart = new Date(Date.now() - 24 * 60 * 60_000).toISOString()
@@ -7010,6 +7532,13 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
+  if (missingRequiredEnvVars.length > 0) {
+    return err(`Missing required environment variables: ${missingRequiredEnvVars.join(', ')}`, 500)
+  }
+
+  const apiVersionError = validateApiVersion(req)
+  if (apiVersionError) return apiVersionError
+
   try {
     const url = new URL(req.url)
     const fullPath = url.pathname.replace(/^\/api-gateway\/?/, '').replace(/\/$/, '')
@@ -7065,9 +7594,16 @@ Deno.serve(async (req) => {
     const auditAdmin = adminClient()
     const roleName = await resolvePrimaryRole(auditAdmin, userId)
 
+    const emergencyGuard = await enforceEmergencyGuards(auditAdmin, req, module)
+    if (emergencyGuard) return emergencyGuard
+
+    // Auto error detection for unknown routes
+    await detect404Route(auditAdmin, module, subParts, userId)
+
     let response: Response
 
-    switch (module) {
+    try {
+      switch (module) {
       case 'products': response = await handleProducts(req.method, subParts, body, userId, sb); break
       case 'resellers': response = await handleResellers(req.method, subParts, body, userId, sb); break
       case 'marketplace-admin': response = await handleMarketplaceAdmin(req.method, subParts, body, userId, sb, req); break
@@ -7110,6 +7646,14 @@ Deno.serve(async (req) => {
     const tableName = module
     const recordId = subParts.find((x) => isUuid(x)) || null
     const status = response.status
+
+    // Log slow queries (>2s)
+    if (latencyMs > 2000) {
+      console.warn(`[SLOW QUERY] ${actionType} took ${latencyMs}ms | trace_id: ${traceId} | user: ${userId}`)
+    }
+
+    // Auto error detection for API failures
+    await detectAPIFailure(auditAdmin, module, actionType, latencyMs, status, userId)
     let responsePayload: any = { status }
     try {
       responsePayload = await getResponsePayloadPreview(response)
@@ -7166,6 +7710,9 @@ Deno.serve(async (req) => {
     }
 
     return response
+    } catch (routeError) {
+      throw routeError
+    }
   } catch (e) {
     console.error('API Gateway Error:', e)
     await sentryCaptureException(e, { url: req.url, method: req.method })

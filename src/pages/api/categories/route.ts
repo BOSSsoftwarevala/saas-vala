@@ -1,29 +1,35 @@
-import { createClient } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables');
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function GET() {
   try {
-    const supabase = createClient();
-    
     const { data: categories, error } = await supabase
       .from('categories')
       .select('*')
-      .eq('status', 'active')
-      .order('order_index', { ascending: true });
+      .limit(100);
 
     if (error) {
       console.error('Error fetching categories:', error);
       return NextResponse.json(
-        { error: 'Failed to fetch categories' },
+        { error: 'Failed to fetch categories', details: error.message },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ categories });
-  } catch (error) {
+    return NextResponse.json({ categories: categories ?? [] });
+  } catch (error: any) {
     console.error('Server error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: error?.message },
       { status: 500 }
     );
   }
@@ -32,7 +38,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, slug, description, icon, order_index } = body;
+    const { name, slug, description, icon, sort_order, level } = body;
 
     if (!name || !slug) {
       return NextResponse.json(
@@ -41,8 +47,6 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = createClient();
-    
     const { data: category, error } = await supabase
       .from('categories')
       .insert([
@@ -51,7 +55,9 @@ export async function POST(request: Request) {
           slug,
           description,
           icon,
-          order_index: order_index || 0,
+          level: ['master', 'sub', 'micro', 'nano'].includes(String(level)) ? level : 'master',
+          sort_order: Number.isFinite(Number(sort_order)) ? Number(sort_order) : 0,
+          is_active: true,
         },
       ])
       .select()
@@ -66,10 +72,10 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ category }, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Server error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: error?.message },
       { status: 500 }
     );
   }

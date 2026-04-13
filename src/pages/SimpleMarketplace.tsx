@@ -37,14 +37,19 @@ const SimpleMarketplace: React.FC = () => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await fetch('/api/categories');
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/api-gateway/marketplace/categories`, {
+          headers: {
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`
+          }
+        });
         const data = await response.json();
         
         if (!response.ok) {
           throw new Error(data.error || 'Failed to fetch categories');
         }
         
-        setCategories(data.categories);
+        setCategories(data.categories || []);
       } catch (error) {
         console.error('Error fetching categories:', error);
         setError('Failed to load categories');

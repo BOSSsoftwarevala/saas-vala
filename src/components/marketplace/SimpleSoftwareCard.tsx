@@ -33,9 +33,38 @@ export const SimpleSoftwareCard: React.FC<SimpleSoftwareCardProps> = ({ software
     window.location.href = `/products/${software.slug}`;
   };
 
-  const handleBuyNow = () => {
-    toast.success(`Buying ${software.name} for $${software.price}`);
-    // TODO: Implement payment flow
+  const handleBuyNow = async () => {
+    try {
+      toast.loading('Initiating payment...');
+      const response = await fetch('/api/v1/marketplace/payments/initiate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          product_id: software.id,
+          duration_days: 30,
+          payment_method: 'wallet',
+          amount: software.price,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Payment failed');
+      }
+
+      toast.dismiss();
+      toast.success('Payment successful! License key issued.');
+      
+      if (data.license_key) {
+        toast.success(`Your license key: ${data.license_key}`);
+      }
+    } catch (error: any) {
+      toast.dismiss();
+      toast.error(error.message || 'Payment failed. Please try again.');
+    }
   };
 
   const handleNotifyMe = async () => {

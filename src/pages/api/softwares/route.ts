@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
@@ -9,18 +9,17 @@ export async function GET(request: Request) {
     const limit = parseInt(searchParams.get('limit') || '20');
     const offset = parseInt(searchParams.get('offset') || '0');
 
-    const supabase = createClient();
-    
     let query = supabase
-      .from('softwares')
+      .from('products')
       .select(`
         *,
-        categories:category_id (
+        categories!inner (
           name,
           slug
         )
       `)
       .eq('status', 'active')
+      .eq('marketplace_visible', true)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -35,9 +34,9 @@ export async function GET(request: Request) {
     const { data: softwares, error } = await query;
 
     if (error) {
-      console.error('Error fetching softwares:', error);
+      console.error('Error fetching products:', error);
       return NextResponse.json(
-        { error: 'Failed to fetch softwares' },
+        { error: 'Failed to fetch products' },
         { status: 500 }
       );
     }
@@ -76,10 +75,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = createClient();
-    
     const { data: software, error } = await supabase
-      .from('softwares')
+      .from('products')
       .insert([
         {
           name,
@@ -93,15 +90,17 @@ export async function POST(request: Request) {
           price: price || 5.00,
           currency: currency || 'USD',
           featured: featured || false,
+          status: 'active',
+          marketplace_visible: true,
         },
       ])
       .select()
       .single();
 
     if (error) {
-      console.error('Error creating software:', error);
+      console.error('Error creating product:', error);
       return NextResponse.json(
-        { error: 'Failed to create software' },
+        { error: 'Failed to create product' },
         { status: 500 }
       );
     }

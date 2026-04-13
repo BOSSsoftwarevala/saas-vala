@@ -5,6 +5,7 @@ import { promisify } from 'util';
 import { UltraLogger } from './logger';
 import { UltraHealthMonitor } from './health-monitor';
 import { UltraDatabase } from './database';
+import { UltraSelfTest } from './self-test';
 
 const execAsync = promisify(exec);
 
@@ -43,6 +44,7 @@ export class UltraDeployment {
   private logger: UltraLogger;
   private healthMonitor: UltraHealthMonitor;
   private database: UltraDatabase;
+  private selfTest: UltraSelfTest;
   private deployments: Map<string, Deployment> = new Map();
   private currentDeployment?: Deployment;
 
@@ -57,6 +59,7 @@ export class UltraDeployment {
     this.logger = UltraLogger.getInstance();
     this.healthMonitor = UltraHealthMonitor.getInstance();
     this.database = UltraDatabase.getInstance();
+    this.selfTest = UltraSelfTest.getInstance();
     
     this.config = {
       projectPath: process.env.PROJECT_PATH || '/var/www/saasvala-site',
@@ -250,6 +253,14 @@ export class UltraDeployment {
       if (!service || service.status !== 'healthy') {
         throw new Error(`Critical service ${serviceName} not healthy`);
       }
+    }
+
+    const quickChecks = await this.selfTest.quickHealthCheck();
+    const failedChecks = quickChecks.filter(check => check.status === 'fail');
+
+    if (failedChecks.length > 0) {
+      const failedNames = failedChecks.map(check => check.name).join(', ');
+      throw new Error(`Deployment blocked by failed validation checks: ${failedNames}`);
     }
 
     return true;

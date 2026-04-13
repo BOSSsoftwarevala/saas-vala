@@ -1,9 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
+
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } });
 
 interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -129,6 +134,18 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  let userId: string | null = null;
+
+  try {
+    const authHeader = req.headers.get('authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+      const { data: { user } } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
+      userId = user?.id || null;
+    }
+  } catch (e) {
+    console.warn('[VALA AI] Auth check failed:', e);
+  }
+
   try {
     const body = await req.json();
     const {
@@ -158,7 +175,7 @@ serve(async (req) => {
       ...messages.slice(-10), // Context window limit
     ];
 
-    console.log(`[VALA AI] Request | model: ${model} | msgs: ${allMessages.length} | temp: ${temperature}`);
+    console.log(`[VALA AI] Request | model: ${model} | msgs: ${allMessages.length} | temp: ${temperature} | user: ${userId || 'anonymous'}`);
 
     let result: { content: string; usage?: any; model: string; provider: string } | null = null;
 
@@ -190,6 +207,66 @@ serve(async (req) => {
     }
 
     console.log(`[VALA AI] ✅ Success | provider: ${result.provider} | model: ${result.model} | tokens: ${result.usage?.total_tokens ?? 'N/A'}`);
+
+    // Track usage for billing
+    if (userId && result.usage) {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const tokensInput = result.usage.prompt_tokens || 0;
+        const tokensOutput = result.usage.completion_tokens || 0;
+        const totalTokens = result.usage.total_tokens || 0;
+
+        // Upsert to ai_usage_daily
+        await supabaseAdmin
+          .from('ai_usage_daily')
+          .upsert({
+            user_id: userId,
+            date: today,
+            model: result.model,
+            provider: result.provider,
+            tokens_input: tokensInput,
+            tokens_output: tokensOutput,
+            total_tokens: totalTokens,
+            requests_count: 1,
+            updated_at: new Date().toISOString(),
+          }, {
+            onConflict: 'user_id,date,model,provider',
+            ignoreDuplicates: false
+          });
+
+        // If upsert failed due to conflict, increment instead
+        const { error: upsertError } = await supabaseAdmin
+          .from('ai_usage_daily')
+          .select('id,requests_count,total_tokens')
+          .eq('user_id', userId)
+          .eq('date', today)
+          .eq('model', result.model)
+          .eq('provider', result.provider)
+          .single();
+
+        if (upsertError && upsertError.code === 'PGRST116') {
+          // Record exists, increment
+          await supabaseAdmin
+            .from('ai_usage_daily')
+            .update({
+              tokens_input: supabaseAdmin.raw(`tokens_input + ${tokensInput}`),
+              tokens_output: supabaseAdmin.raw(`tokens_output + ${tokensOutput}`),
+              total_tokens: supabaseAdmin.raw(`total_tokens + ${totalTokens}`),
+              requests_count: supabaseAdmin.raw(`requests_count + 1`),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('user_id', userId)
+            .eq('date', today)
+            .eq('model', result.model)
+            .eq('provider', result.provider);
+        }
+
+        console.log(`[VALA AI] Usage tracked for user ${userId}: ${totalTokens} tokens`);
+      } catch (trackError) {
+        console.warn('[VALA AI] Failed to track usage:', trackError);
+        // Don't fail the request if tracking fails
+      }
+    }
 
     return new Response(
       JSON.stringify({
