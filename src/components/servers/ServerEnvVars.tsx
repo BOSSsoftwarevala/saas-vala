@@ -24,13 +24,13 @@ const mockEnvVars = {
   ],
   preview: [
     { id: '5', key: 'DATABASE_URL', value: 'postgresql://****:****@db.example.com/staging', encrypted: true },
-    { id: '6', key: 'API_SECRET', value: 'sk-staging-****', encrypted: true },
-    { id: '7', key: 'NEXT_PUBLIC_API_URL', value: 'https://api-staging.saas-vala.com', encrypted: false },
+    { id: '6', key: 'API_SECRET', value: 'sk-prod-****', encrypted: true },
+    { id: '7', key: 'NEXT_PUBLIC_API_URL', value: 'https://api.saas-vala.com', encrypted: false },
   ],
   development: [
-    { id: '8', key: 'DATABASE_URL', value: 'postgresql://localhost/dev', encrypted: false },
+    { id: '8', key: 'DATABASE_URL', value: 'postgresql://astmdnelnuqwpdbyzecr.supabase.co:5432/dev', encrypted: false },
     { id: '9', key: 'API_SECRET', value: 'dev-secret', encrypted: false },
-    { id: '10', key: 'NEXT_PUBLIC_API_URL', value: 'http://localhost:3001', encrypted: false },
+    { id: '10', key: 'NEXT_PUBLIC_API_URL', value: 'https://saasvala.com', encrypted: false },
   ],
 };
 

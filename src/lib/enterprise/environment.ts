@@ -165,13 +165,13 @@ export class EnvironmentManager {
     const baseConfig: Partial<EnvironmentConfig> = {
       name: this.currentEnvironment,
       database: {
-        url: process.env.DATABASE_URL || 'postgresql://localhost:5432/saasvala',
-        ssl: this.currentEnvironment === 'production',
+        url: process.env.DATABASE_URL || import.meta.env.VITE_SUPABASE_URL,
+        ssl: true,
         poolSize: parseInt(process.env.DB_POOL_SIZE || '20'),
         timeout: parseInt(process.env.DB_TIMEOUT || '30000'),
       },
       api: {
-        baseUrl: process.env.API_BASE_URL || 'http://localhost:3000',
+        baseUrl: process.env.API_BASE_URL || import.meta.env.VITE_SUPABASE_URL,
         timeout: parseInt(process.env.API_TIMEOUT || '30000'),
         retries: parseInt(process.env.API_RETRIES || '3'),
       },

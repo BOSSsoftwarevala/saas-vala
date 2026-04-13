@@ -849,13 +849,13 @@ AWS_REGION="us-east-1"
 AWS_S3_BUCKET="your-s3-bucket"
 
 # Next.js
-NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_URL="https://saasvala.com"
 NEXTAUTH_SECRET="your-nextauth-secret"
 
 # App
 NODE_ENV="development"
 PORT=3000
-API_URL="http://localhost:3001"
+API_URL="https://saasvala.com"
 `;
   }
 

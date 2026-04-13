@@ -897,7 +897,7 @@ class UltraAIFactory {
       resource,
       changes,
       timestamp: new Date(),
-      ip: '127.0.0.1', // Get from request
+      ip: process.env.REMOTE_IP || '0.0.0.0', // Get from request
       userAgent: 'Mozilla/5.0...' // Get from request
     };
     
