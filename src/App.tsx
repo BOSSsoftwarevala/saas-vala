@@ -69,7 +69,6 @@ const SystemHealth = React.lazy(() => import("./pages/SystemHealth"));
 const ResellerDashboard = React.lazy(() => import("./pages/ResellerDashboard"));
 const Automation = React.lazy(() => import("./pages/Automation"));
 const Cart = React.lazy(() => import("./pages/Cart"));
-const ApkPipeline = React.lazy(() => import("./pages/ApkPipeline"));
 const OfflineAppTemplate = React.lazy(() => import("./pages/OfflineAppTemplate"));
 const MarketplaceAdmin = React.lazy(() => import("./pages/MarketplaceAdmin"));
 
@@ -304,14 +303,6 @@ function AppRoutes() {
 
 const App = () => {
   React.useEffect(() => {
-    // Debug: confirm App root renders
-    // eslint-disable-next-line no-console
-    console.log('App root mounted');
-    // Log env variables
-    // eslint-disable-next-line no-console
-    console.log('VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL);
-    // eslint-disable-next-line no-console
-    console.log('VITE_SUPABASE_PUBLISHABLE_KEY:', import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
     const runner = () => {
       void preloadCriticalRoutes();
     };

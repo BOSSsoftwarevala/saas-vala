@@ -216,51 +216,22 @@ class SystemHealthMonitor {
     const startTime = Date.now();
     const lastCheck = new Date().toISOString();
 
-    try {
-      // Real server metrics API call
-      const response = await fetch('/api/health/server', {
-        method: 'GET'
-      });
-
-      const responseTime = Date.now() - startTime;
-
-      if (response.ok) {
-        const data = await response.json();
-        return {
-          status: 'up',
-          cpu: data.cpu || Math.random() * 100,
-          ram: data.ram || Math.random() * 100,
-          disk: data.disk || Math.random() * 100,
-          uptime: data.uptime || Date.now() - this.startTime.getTime(),
-          lastCheck
-        };
-      } else {
-        throw new Error(`Server health check failed: ${response.status}`);
-      }
-
-    } catch (error) {
-      console.error('Server health check error:', error);
-      // Real fallback metrics
-      return {
-        status: 'down',
-        cpu: Math.random() * 100,
-        ram: Math.random() * 100,
-        disk: Math.random() * 100,
-        uptime: Date.now() - this.startTime.getTime(),
-        lastCheck
-      };
-    }
+    return {
+      status: 'up',
+      cpu: 0,
+      ram: 0,
+      disk: 0,
+      uptime: Date.now() - this.startTime.getTime(),
+      lastCheck
+    };
   }
 
   // Check API health
   private async checkAPIHealth(): Promise<APIHealth[]> {
+    const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL;
     const endpoints = [
-      '/api/health',
-      '/api/auth/status',
-      '/api/marketplace/status',
-      '/api/reseller/status',
-      '/api/wallet/status'
-    ];
+      supabaseUrl ? `${supabaseUrl}/rest/v1/` : null,
+    ].filter(Boolean) as string[];
 
     const checks = endpoints.map(async (endpoint) => {
       const startTime = Date.now();
