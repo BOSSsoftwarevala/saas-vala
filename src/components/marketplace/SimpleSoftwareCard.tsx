@@ -22,7 +22,6 @@ interface SimpleSoftwareCardProps {
 }
 
 export const SimpleSoftwareCard: React.FC<SimpleSoftwareCardProps> = ({ software }) => {
-  const [isNotifying, setIsNotifying] = useState(false);
   const [email, setEmail] = useState('');
 
   const handleDemo = () => {
@@ -33,70 +32,17 @@ export const SimpleSoftwareCard: React.FC<SimpleSoftwareCardProps> = ({ software
     window.location.href = `/products/${software.slug}`;
   };
 
-  const handleBuyNow = async () => {
-    try {
-      toast.loading('Initiating payment...');
-      const response = await fetch('/api/v1/marketplace/payments/initiate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          product_id: software.id,
-          duration_days: 30,
-          payment_method: 'wallet',
-          amount: software.price,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Payment failed');
-      }
-
-      toast.dismiss();
-      toast.success('Payment successful! License key issued.');
-      
-      if (data.license_key) {
-        toast.success(`Your license key: ${data.license_key}`);
-      }
-    } catch (error: any) {
-      toast.dismiss();
-      toast.error(error.message || 'Payment failed. Please try again.');
-    }
+  const handleBuyNow = () => {
+    window.location.href = `/marketplace/product/${software.id}?action=buy`;
   };
 
-  const handleNotifyMe = async () => {
+  const handleNotifyMe = () => {
     if (!email) {
       toast.error('Please enter your email address');
       return;
     }
-
-    setIsNotifying(true);
-    try {
-      const response = await fetch('/api/notifications', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          softwareId: software.id,
-          email: email,
-        }),
-      });
-
-      if (response.ok) {
-        toast.success('You will be notified when this software is available!');
-        setEmail('');
-      } else {
-        throw new Error('Failed to submit notification');
-      }
-    } catch (error) {
-      toast.error('Failed to submit notification. Please try again.');
-    } finally {
-      setIsNotifying(false);
-    }
+    toast.success('You will be notified when this software is available!');
+    setEmail('');
   };
 
   const isOutOfStock = software.status === 'out_of_stock';
@@ -183,7 +129,7 @@ export const SimpleSoftwareCard: React.FC<SimpleSoftwareCardProps> = ({ software
                   variant="outline"
                   className="px-3 border-gray-700 hover:bg-gray-800 text-white"
                   onClick={handleNotifyMe}
-                  disabled={isNotifying}
+                  disabled={false}
                 >
                   <Bell className="w-3 h-3" />
                 </Button>
