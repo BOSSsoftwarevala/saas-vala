@@ -133,28 +133,19 @@ export default function ProductDetailPage() {
         category: prod.category || prod.category_id || 'General',
       });
 
-      // Fetch pricing options
-      const { data: prices } = await (supabase as any)
-        .from('product_pricing')
-        .select('*')
-        .eq('product_id', id)
-        .order('duration_days', { ascending: true });
-
-      if (prices && prices.length > 0) {
-        const mappedPrices: PricingOption[] = prices.map((p: any) => ({
-          duration_days: Number(p.duration_days || 30),
-          base_price: Number(p.base_price || 0),
-          currency: String(p.currency || 'USD'),
-        }));
-        setPricing(mappedPrices);
-        setSelectedDuration(mappedPrices[0].duration_days);
-      } else {
-        // Default pricing if none found
+      // Build pricing from product's own price field
+      const basePrice = Number(prod.price || 0);
+      const currency = String(prod.currency || 'USD');
+      if (basePrice > 0) {
         setPricing([
-          { duration_days: 30, base_price: 5, currency: 'USD' },
-          { duration_days: 90, base_price: 12, currency: 'USD' },
-          { duration_days: 180, base_price: 22, currency: 'USD' },
-          { duration_days: 365, base_price: 40, currency: 'USD' },
+          { duration_days: 30, base_price: basePrice, currency },
+          { duration_days: 90, base_price: Math.round(basePrice * 2.5), currency },
+          { duration_days: 180, base_price: Math.round(basePrice * 4.5), currency },
+          { duration_days: 365, base_price: Math.round(basePrice * 8), currency },
+        ]);
+      } else {
+        setPricing([
+          { duration_days: 30, base_price: 0, currency },
         ]);
       }
     } catch (err) {
