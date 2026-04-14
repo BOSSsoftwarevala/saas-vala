@@ -24,7 +24,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Loader2, Plus, Trash2, Edit, Save, X, Eye, EyeOff, Upload, Download, AlertCircle, Check, Copy, ExternalLink, Package, Sparkles, Search, RefreshCw, Edit2, Ticket, Megaphone, Layout, Link2, CreditCard, Truck, DollarSign, CheckCircle2, XCircle, Tags, ShoppingBag, Menu } from 'lucide-react';
+import {
+  Search, Plus, Edit2, Trash2, Layout, Menu, Package, Truck, CreditCard, Tags, RefreshCw,
+  Upload, Download, Eye, Copy, X, ChevronRight, Loader2, CheckCircle, XCircle, AlertCircle, Info,
+  BarChart3, Calendar, MessageSquare, Clock, TrendingUp, Users, DollarSign, Star, ThumbsUp, ThumbsDown,
+} from 'lucide-react';
 import { generateProductThumbnail } from '@/lib/thumbnailGenerator';
 import { marketplaceAdminApi } from '@/lib/api';
 import { normalizeDemoUrlPair, sanitizeDemoSourceUrl } from '@/lib/demoMasking';
@@ -744,6 +748,120 @@ export default function MarketplaceAdmin() {
     }
   };
 
+  // Phase 2: Fetch scheduled launches
+  const fetchScheduledLaunches = async () => {
+    setScheduledLaunchesLoading(true);
+    try {
+      const { data, error } = await db
+        .from('scheduled_launches')
+        .select('*')
+        .order('launch_date', { ascending: true });
+      
+      if (error) {
+        console.error('Failed to fetch scheduled launches:', error);
+        setScheduledLaunches([]);
+      } else {
+        setScheduledLaunches(data || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch scheduled launches:', e);
+      setScheduledLaunches([]);
+    } finally {
+      setScheduledLaunchesLoading(false);
+    }
+  };
+
+  // Phase 2: Fetch reviews for moderation
+  const fetchReviewsForModeration = async () => {
+    setReviewsLoading(true);
+    try {
+      // product_reviews table may not exist yet, handle gracefully
+      const { data, error } = await (db as any)
+        .from('product_reviews')
+        .select('*')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Failed to fetch reviews:', error);
+        setReviewsToModerate([]);
+      } else {
+        setReviewsToModerate(data || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch reviews:', e);
+      setReviewsToModerate([]);
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
+
+  // Phase 2: Fetch advanced analytics
+  const fetchAdvancedAnalytics = async () => {
+    setAnalyticsLoading(true);
+    try {
+      // Daily sales and revenue for last 30 days
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const { data: ordersData } = await db
+        .from('marketplace_orders')
+        .select('created_at, amount, status')
+        .gte('created_at', thirtyDaysAgo.toISOString())
+        .eq('status', 'completed');
+      
+      // Process daily sales
+      const dailySalesMap = new Map<string, { sales: number; revenue: number }>();
+      (ordersData || []).forEach(order => {
+        const date = new Date(order.created_at).toISOString().split('T')[0];
+        const current = dailySalesMap.get(date) || { sales: 0, revenue: 0 };
+        current.sales += 1;
+        current.revenue += Number(order.amount || 0);
+        dailySalesMap.set(date, current);
+      });
+      
+      const dailySales = Array.from(dailySalesMap.entries()).map(([date, data]) => ({
+        date,
+        sales: data.sales,
+        revenue: data.revenue,
+      })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      
+      // Top products by sales
+      const { data: topProductsData } = await db
+        .from('marketplace_orders')
+        .select('product_id, product_name')
+        .eq('status', 'completed');
+      
+      const productSalesMap = new Map<string, number>();
+      (topProductsData || []).forEach(order => {
+        const productId = order.product_id || 'unknown';
+        productSalesMap.set(productId, (productSalesMap.get(productId) || 0) + 1);
+      });
+      
+      const topProducts = Array.from(productSalesMap.entries())
+        .map(([id, sales]) => ({ id, name: (topProductsData || []).find(o => o.product_id === id)?.product_name || id, sales }))
+        .sort((a, b) => b.sales - a.sales)
+        .slice(0, 10);
+      
+      setAnalyticsData({
+        dailySales,
+        topProducts,
+        userGrowth: [], // Would need user registration data
+        categoryPerformance: [], // Would need category breakdown
+      });
+    } catch (e) {
+      console.error('Failed to fetch analytics:', e);
+      setAnalyticsData({
+        dailySales: [],
+        topProducts: [],
+        userGrowth: [],
+        categoryPerformance: [],
+      });
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  };
+
   const calculateProductQualityScore = (product: Product): number => {
     let score = 0;
     
@@ -795,6 +913,10 @@ export default function MarketplaceAdmin() {
       fetchApks(),
       fetchOrders(),
       fetchStats(),
+      fetchActivityTimeline(),
+      fetchScheduledLaunches(),
+      fetchReviewsForModeration(),
+      fetchAdvancedAnalytics(),
     ]);
   };
 
@@ -1660,13 +1782,16 @@ export default function MarketplaceAdmin() {
         </div>
 
         <Tabs defaultValue="settings" className="w-full">
-          <TabsList className="grid h-10 w-full grid-cols-6">
+          <TabsList className="grid h-10 w-full grid-cols-9">
             <TabsTrigger value="settings" className="text-[10px] gap-1"><Layout className="h-3 w-3" />Settings</TabsTrigger>
             <TabsTrigger value="products" className="text-[10px] gap-1"><Package className="h-3 w-3" />Products</TabsTrigger>
             <TabsTrigger value="apk" className="text-[10px] gap-1"><Truck className="h-3 w-3" />APK</TabsTrigger>
             <TabsTrigger value="payments" className="text-[10px] gap-1"><CreditCard className="h-3 w-3" />Payments</TabsTrigger>
             <TabsTrigger value="offers" className="text-[10px] gap-1"><Tags className="h-3 w-3" />Offers</TabsTrigger>
             <TabsTrigger value="bulk" className="text-[10px] gap-1"><RefreshCw className="h-3 w-3" />Bulk</TabsTrigger>
+            <TabsTrigger value="analytics" className="text-[10px] gap-1"><BarChart3 className="h-3 w-3" />Analytics</TabsTrigger>
+            <TabsTrigger value="launches" className="text-[10px] gap-1"><Calendar className="h-3 w-3" />Launches</TabsTrigger>
+            <TabsTrigger value="reviews" className="text-[10px] gap-1"><MessageSquare className="h-3 w-3" />Reviews</TabsTrigger>
           </TabsList>
 
           <TabsContent value="settings" className="space-y-4 mt-4">
@@ -2563,6 +2688,148 @@ export default function MarketplaceAdmin() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Phase 2: Analytics Dashboard */}
+      <TabsContent value="analytics" className="space-y-4 mt-4">
+        <div className="rounded-lg border border-border bg-card p-3 space-y-4">
+          <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 text-primary" />
+            Advanced Analytics Dashboard
+          </h2>
+          
+          {analyticsLoading ? (
+            <Skeleton className="h-64 w-full" />
+          ) : (
+            <div className="space-y-4">
+              {/* Daily Sales Chart */}
+              <div className="rounded-lg border border-border bg-muted/30 p-4">
+                <h3 className="text-xs font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <TrendingUp className="h-3 w-3" />
+                  Daily Sales & Revenue (Last 30 Days)
+                </h3>
+                <div className="space-y-2">
+                  {analyticsData.dailySales.slice(-7).map((day) => (
+                    <div key={day.date} className="flex items-center gap-2 text-xs">
+                      <span className="w-24 text-muted-foreground">{day.date}</span>
+                      <div className="flex-1 h-6 bg-border rounded overflow-hidden">
+                        <div 
+                          className="h-full bg-primary" 
+                          style={{ width: `${Math.min((day.sales / 10) * 100, 100)}%` }}
+                        />
+                      </div>
+                      <span className="w-16 text-right">{day.sales} sales</span>
+                      <span className="w-20 text-right text-primary font-bold">₹{day.revenue.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Top Products */}
+              <div className="rounded-lg border border-border bg-muted/30 p-4">
+                <h3 className="text-xs font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <Star className="h-3 w-3" />
+                  Top 10 Products by Sales
+                </h3>
+                <div className="space-y-2">
+                  {analyticsData.topProducts.map((product, index) => (
+                    <div key={product.id} className="flex items-center gap-2 text-xs">
+                      <span className="w-6 text-muted-foreground">#{index + 1}</span>
+                      <span className="flex-1 truncate">{product.name}</span>
+                      <span className="w-16 text-right font-bold">{product.sales} sales</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </TabsContent>
+
+      {/* Phase 2: Scheduled Launches */}
+      <TabsContent value="launches" className="space-y-4 mt-4">
+        <div className="rounded-lg border border-border bg-card p-3 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-primary" />
+              Scheduled Product Launches
+            </h2>
+            <Button size="sm" className="h-7 text-xs gap-1" onClick={() => toast.info('Launch scheduler coming soon')}>
+              <Plus className="h-3 w-3" /> Schedule Launch
+            </Button>
+          </div>
+          
+          {scheduledLaunchesLoading ? (
+            <Skeleton className="h-32 w-full" />
+          ) : scheduledLaunches.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-8">No scheduled launches yet</p>
+          ) : (
+            <div className="space-y-2">
+              {scheduledLaunches.map((launch) => (
+                <div key={launch.id} className="rounded-lg border border-border bg-muted/30 p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-semibold text-foreground">{launch.product_name || 'Product'}</p>
+                      <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {new Date(launch.launch_date).toLocaleString()}
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="text-[9px]">
+                      {launch.status || 'Scheduled'}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </TabsContent>
+
+      {/* Phase 2: Review Moderation */}
+      <TabsContent value="reviews" className="space-y-4 mt-4">
+        <div className="rounded-lg border border-border bg-card p-3 space-y-4">
+          <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+            <MessageSquare className="h-4 w-4 text-primary" />
+            Review Moderation
+          </h2>
+          
+          {reviewsLoading ? (
+            <Skeleton className="h-32 w-full" />
+          ) : reviewsToModerate.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-8">No reviews pending moderation</p>
+          ) : (
+            <div className="space-y-2">
+              {reviewsToModerate.map((review) => (
+                <div key={review.id} className="rounded-lg border border-border bg-muted/30 p-3">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <p className="text-xs font-semibold text-foreground">{review.user_name || 'Anonymous'}</p>
+                      <p className="text-[10px] text-muted-foreground">{review.product_name || 'Product'}</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map(star => (
+                        <Star
+                          key={star}
+                          className={`h-3 w-3 ${star <= review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-xs text-foreground mb-2">{review.comment}</p>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => toast.info('Approve review coming soon')}>
+                      <ThumbsUp className="h-3 w-3" /> Approve
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => toast.info('Reject review coming soon')}>
+                      <ThumbsDown className="h-3 w-3" /> Reject
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </TabsContent>
 
     </DashboardLayout>
   );

@@ -20,7 +20,8 @@ import { Input } from '@/components/ui/input';
 import {
   ShoppingCart, CreditCard, Wallet, Loader2, ChevronDown, ChevronUp, Copy, Key, Download,
   Send, Paperclip, X, Grid, List, Filter, SlidersHorizontal, Star, TrendingUp,
-  Clock, DollarSign, Zap, Sparkles, Award, Flame,
+  Clock, DollarSign, Zap, Sparkles, Award, Flame, Moon, Sun, Heart, Share2, GitCompare,
+  MessageSquare, CheckCircle, XCircle, ThumbsUp, ThumbsDown, Eye,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -79,6 +80,16 @@ export default function Marketplace() {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000]);
   const [minRating, setMinRating] = useState<number>(0);
   const [showFilters, setShowFilters] = useState(false);
+  
+  // Phase 2: Reviews, Wishlist, Recently Viewed, Share, Dark Mode
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [showReviews, setShowReviews] = useState(false);
+  const [wishlist, setWishlist] = useState<Set<string>>(new Set());
+  const [recentlyViewed, setRecentlyViewed] = useState<string[]>([]);
+  const [showShare, setShowShare] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
+  const [selectedProductsForComparison, setSelectedProductsForComparison] = useState<MarketplaceProduct[]>([]);
+  const [showComparison, setShowComparison] = useState(false);
 
   const categories = useMemo(() => {
     const cats = new Set(products.map(p => p.category || 'Other'));
@@ -151,6 +162,111 @@ export default function Marketplace() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [loadMore]);
 
+  // Phase 2: Load wishlist from localStorage
+  useEffect(() => {
+    const savedWishlist = localStorage.getItem('marketplace_wishlist');
+    if (savedWishlist) {
+      setWishlist(new Set(JSON.parse(savedWishlist)));
+    }
+  }, []);
+
+  // Phase 2: Load recently viewed from localStorage
+  useEffect(() => {
+    const savedRecentlyViewed = localStorage.getItem('marketplace_recently_viewed');
+    if (savedRecentlyViewed) {
+      setRecentlyViewed(JSON.parse(savedRecentlyViewed));
+    }
+  }, []);
+
+  // Phase 2: Load dark mode preference
+  useEffect(() => {
+    const savedDarkMode = localStorage.getItem('marketplace_dark_mode');
+    if (savedDarkMode) {
+      setDarkMode(JSON.parse(savedDarkMode));
+    }
+  }, []);
+
+  // Phase 2: Toggle dark mode
+  const toggleDarkMode = () => {
+    const newMode = !darkMode;
+    setDarkMode(newMode);
+    localStorage.setItem('marketplace_dark_mode', JSON.stringify(newMode));
+    document.documentElement.classList.toggle('dark', newMode);
+  };
+
+  // Phase 2: Add to wishlist
+  const toggleWishlist = (productId: string) => {
+    const newWishlist = new Set(wishlist);
+    if (newWishlist.has(productId)) {
+      newWishlist.delete(productId);
+      toast.success('Removed from wishlist');
+    } else {
+      newWishlist.add(productId);
+      toast.success('Added to wishlist');
+    }
+    setWishlist(newWishlist);
+    localStorage.setItem('marketplace_wishlist', JSON.stringify(Array.from(newWishlist)));
+  };
+
+  // Phase 2: Add to recently viewed
+  const addToRecentlyViewed = (productId: string) => {
+    const newRecentlyViewed = [productId, ...recentlyViewed.filter(id => id !== productId)].slice(0, 10);
+    setRecentlyViewed(newRecentlyViewed);
+    localStorage.setItem('marketplace_recently_viewed', JSON.stringify(newRecentlyViewed));
+  };
+
+  // Phase 2: Share product
+  const shareProduct = (product: MarketplaceProduct) => {
+    const url = `${window.location.origin}/marketplace?product=${product.slug}`;
+    if (navigator.share) {
+      navigator.share({
+        title: product.title,
+        text: product.subtitle,
+        url: url,
+      });
+    } else {
+      navigator.clipboard.writeText(url);
+      toast.success('Link copied to clipboard');
+    }
+  };
+
+  // Phase 2: Add to comparison
+  const toggleComparison = (product: MarketplaceProduct) => {
+    if (selectedProductsForComparison.find(p => p.id === product.id)) {
+      setSelectedProductsForComparison(selectedProductsForComparison.filter(p => p.id !== product.id));
+      toast.success('Removed from comparison');
+    } else {
+      if (selectedProductsForComparison.length >= 3) {
+        toast.error('Maximum 3 products can be compared');
+        return;
+      }
+      setSelectedProductsForComparison([...selectedProductsForComparison, product]);
+      toast.success('Added to comparison');
+    }
+  };
+
+  // Phase 2: Fetch reviews for product
+  const fetchReviews = async (productId: string) => {
+    try {
+      // product_reviews table may not exist yet, handle gracefully
+      const { data, error } = await (supabase as any)
+        .from('product_reviews')
+        .select('*')
+        .eq('product_id', productId)
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Failed to fetch reviews:', error);
+        setReviews([]);
+      } else {
+        setReviews(data || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch reviews:', e);
+      setReviews([]);
+    }
+  };
+
   const loadResellerData = async () => {
     if (!user) {
       setResellerId(null);
@@ -210,8 +326,7 @@ export default function Marketplace() {
       try {
         const searchResult = await publicMarketplaceApi.search(query);
         const rawProducts = Array.isArray(searchResult?.products) ? searchResult.products : [];
-        const mappedProducts = rawProducts.map((product: any, index: number) => mapDbProduct(product, index));
-        setServerSearchProducts(mappedProducts);
+        setServerSearchProducts(rawProducts as MarketplaceProduct[]);
       } catch {
         setServerSearchProducts([]);
       }
@@ -687,7 +802,7 @@ export default function Marketplace() {
               </p>
             </div>
 
-            {/* View Toggle & Filter Button */}
+            {/* View Toggle, Filter, Dark Mode, Wishlist, Comparison Buttons */}
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -697,6 +812,24 @@ export default function Marketplace() {
                 <Filter className="h-4 w-4" />
                 Filters
               </button>
+              <button
+                type="button"
+                onClick={toggleDarkMode}
+                className="flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-lg hover:bg-accent transition-colors"
+                title="Toggle Dark Mode"
+              >
+                {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </button>
+              {selectedProductsForComparison.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowComparison(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  <GitCompare className="h-4 w-4" />
+                  Compare ({selectedProductsForComparison.length})
+                </button>
+              )}
               <div className="flex items-center border border-border rounded-lg overflow-hidden">
                 <button
                   type="button"
@@ -834,6 +967,58 @@ export default function Marketplace() {
           </div>
         </div>
 
+        {/* Phase 2: Wishlist Section */}
+        {wishlist.size > 0 && (
+          <div className="px-4 md:px-8 mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Heart className="h-5 w-5 text-pink-500" />
+              <h3 className="text-lg font-bold text-foreground">Your Wishlist ({wishlist.size})</h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {products.filter(p => wishlist.has(p.id)).slice(0, 3).map(product => (
+                <MarketplaceProductCard
+                  key={product.id}
+                  product={product}
+                  onBuyNow={handleBuyNow}
+                  onDemo={handleDemo}
+                  onWishlistToggle={toggleWishlist}
+                  onComparisonToggle={toggleComparison}
+                  onShare={shareProduct}
+                  onRecentlyViewed={addToRecentlyViewed}
+                  isWishlisted={wishlist.has(product.id)}
+                  isInComparison={selectedProductsForComparison.find(p => p.id === product.id) !== undefined}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Phase 2: Recently Viewed Section */}
+        {recentlyViewed.length > 0 && (
+          <div className="px-4 md:px-8 mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Eye className="h-5 w-5 text-primary" />
+              <h3 className="text-lg font-bold text-foreground">Recently Viewed</h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {products.filter(p => recentlyViewed.includes(p.id)).slice(0, 3).map(product => (
+                <MarketplaceProductCard
+                  key={product.id}
+                  product={product}
+                  onBuyNow={handleBuyNow}
+                  onDemo={handleDemo}
+                  onWishlistToggle={toggleWishlist}
+                  onComparisonToggle={toggleComparison}
+                  onShare={shareProduct}
+                  onRecentlyViewed={addToRecentlyViewed}
+                  isWishlisted={wishlist.has(product.id)}
+                  isInComparison={selectedProductsForComparison.find(p => p.id === product.id) !== undefined}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Multi-row Grid/List Display */}
         <div className="px-4 md:px-8">
           <div className={`${viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4' : 'space-y-4'}`}>
@@ -849,6 +1034,12 @@ export default function Marketplace() {
                   onBuyNow={handleBuyNow}
                   onDemo={handleDemo}
                   rank={i + 1}
+                  onWishlistToggle={toggleWishlist}
+                  onComparisonToggle={toggleComparison}
+                  onShare={shareProduct}
+                  onRecentlyViewed={addToRecentlyViewed}
+                  isWishlisted={wishlist.has(product.id)}
+                  isInComparison={selectedProductsForComparison.find(p => p.id === product.id) !== undefined}
                 />
               ))}
           </div>
@@ -1054,6 +1245,121 @@ export default function Marketplace() {
                 </div>
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Phase 2: Comparison Dialog */}
+      {showComparison && selectedProductsForComparison.length > 0 && (
+        <Dialog open={showComparison} onOpenChange={setShowComparison}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <GitCompare className="h-5 w-5" />
+                Compare Products ({selectedProductsForComparison.length})
+              </DialogTitle>
+              <DialogDescription>Compare features, pricing, and ratings</DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-3 gap-4 mt-4">
+              {selectedProductsForComparison.map(product => (
+                <div key={product.id} className="border border-border rounded-lg p-4 space-y-3">
+                  <h4 className="font-bold text-sm">{product.title}</h4>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Price:</span>
+                      <span className="font-bold">₹{product.price}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Rating:</span>
+                      <span className="flex items-center gap-1">
+                        <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                        {product.rating}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Category:</span>
+                      <span>{product.category}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Demo:</span>
+                      <span>{product.demo_enabled ? '✓' : '✗'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">APK:</span>
+                      <span>{product.apk_enabled ? '✓' : '✗'}</span>
+                    </div>
+                  </div>
+                  <Button
+                    className="w-full h-8 text-xs"
+                    onClick={() => {
+                      setSelectedProductsForComparison(selectedProductsForComparison.filter(p => p.id !== product.id));
+                    }}
+                    variant="outline"
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Phase 2: Reviews Dialog */}
+      {showReviews && selectedProduct && (
+        <Dialog open={showReviews} onOpenChange={setShowReviews}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5" />
+                Reviews - {selectedProduct.title}
+              </DialogTitle>
+              <DialogDescription>Customer reviews and ratings</DialogDescription>
+            </DialogHeader>
+            <div className="mt-4 space-y-4">
+              <div className="flex items-center gap-4 p-4 bg-muted rounded-lg">
+                <div className="text-4xl font-bold">{selectedProduct.rating}</div>
+                <div>
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <Star
+                        key={star}
+                        className={`h-4 w-4 ${star <= Math.round(selectedProduct.rating) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-sm text-muted-foreground">Based on {reviews.length} reviews</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {reviews.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No reviews yet</p>
+                ) : (
+                  reviews.map(review => (
+                    <div key={review.id} className="border border-border rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold">
+                            {(review.user_name || 'U')[0].toUpperCase()}
+                          </div>
+                          <span className="font-medium text-sm">{review.user_name || 'Anonymous'}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {[1, 2, 3, 4, 5].map(star => (
+                            <Star
+                              key={star}
+                              className={`h-3 w-3 ${star <= review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      <p className="text-sm text-foreground">{review.comment}</p>
+                      <p className="text-xs text-muted-foreground mt-2">{new Date(review.created_at).toLocaleDateString()}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       )}

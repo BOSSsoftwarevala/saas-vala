@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   ShoppingCart, Bell, Heart, Star, Info, Download,
-  Package, Play, Box, Copy, ExternalLink, Eye, X, ChevronRight
+  Package, Play, Box, Copy, ExternalLink, Eye, X, ChevronRight, Share2, GitCompare
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -23,6 +23,13 @@ interface MarketplaceProductCardProps {
   onBuyNow: (p: any) => void;
   onDemo?: (p: any) => void;
   rank?: number;
+  // Phase 2 props
+  onWishlistToggle?: (productId: string) => void;
+  onComparisonToggle?: (product: MarketplaceProduct) => void;
+  onShare?: (product: MarketplaceProduct) => void;
+  onRecentlyViewed?: (productId: string) => void;
+  isWishlisted?: boolean;
+  isInComparison?: boolean;
 }
 
 const catColors: Record<string, string> = {
@@ -31,10 +38,29 @@ const catColors: Record<string, string> = {
   Marketing: '#e879f9', HR: '#818cf8', Logistics: '#facc15',
 };
 
-const MarketplaceProductCard: React.FC<MarketplaceProductCardProps> = memo(({ product, index = 0, onBuyNow, onDemo, rank }) => {
+const MarketplaceProductCard: React.FC<MarketplaceProductCardProps> = memo(({ 
+  product, 
+  index = 0, 
+  onBuyNow, 
+  onDemo, 
+  rank,
+  onWishlistToggle,
+  onComparisonToggle,
+  onShare,
+  onRecentlyViewed,
+  isWishlisted,
+  isInComparison
+}) => {
   const { user } = useAuth();
   const { isInCart, toggleItem } = useCart();
   const inCart = isInCart(product.id);
+
+  // Track recently viewed when card is rendered
+  useEffect(() => {
+    if (onRecentlyViewed) {
+      onRecentlyViewed(product.id);
+    }
+  }, [product.id, onRecentlyViewed]);
 
   const isAdmin = user?.role === 'admin';
   const isReseller = user?.role === 'reseller';
@@ -354,6 +380,36 @@ const MarketplaceProductCard: React.FC<MarketplaceProductCardProps> = memo(({ pr
             )}
             <Button size="sm" variant="outline" className={cn('h-7 text-[10px] font-bold rounded-lg border-white/10 text-muted-foreground', apkEnabled ? 'flex-1' : 'w-full')} onClick={() => setFeaturesOpen(true)}>
               <Info style={{ width: 11, height: 11 }} className="mr-1" /> FEATURES
+            </Button>
+          </div>
+          {/* Phase 2: Action Buttons */}
+          <div className="flex gap-1.5">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="flex-1 h-7 text-[10px] font-bold rounded-lg"
+              onClick={() => onWishlistToggle?.(product.id)}
+            >
+              <Heart style={{ width: 11, height: 11 }} className={cn('mr-1', isWishlisted ? 'fill-pink-400 text-pink-400' : '')} />
+              {isWishlisted ? 'WISHLISTED' : 'WISHLIST'}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="flex-1 h-7 text-[10px] font-bold rounded-lg"
+              onClick={() => onComparisonToggle?.(product)}
+            >
+              <GitCompare style={{ width: 11, height: 11 }} className={cn('mr-1', isInComparison ? 'text-primary' : '')} />
+              {isInComparison ? 'ADDED' : 'COMPARE'}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="flex-1 h-7 text-[10px] font-bold rounded-lg"
+              onClick={() => onShare?.(product)}
+            >
+              <Share2 style={{ width: 11, height: 11 }} className="mr-1" />
+              SHARE
             </Button>
           </div>
         </div>
