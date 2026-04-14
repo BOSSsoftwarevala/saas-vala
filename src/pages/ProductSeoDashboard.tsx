@@ -254,10 +254,11 @@ export default function ProductSeoDashboard() {
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="seo">SEO Table</TabsTrigger>
             <TabsTrigger value="keywords">Keywords</TabsTrigger>
+            <TabsTrigger value="preview">Preview</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
             <TabsTrigger value="global">Global</TabsTrigger>
             <TabsTrigger value="actions">Actions</TabsTrigger>
@@ -608,6 +609,99 @@ export default function ProductSeoDashboard() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Preview Tab */}
+          <TabsContent value="preview">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Content Editor */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium">Content Editor</CardTitle>
+                  <CardDescription>Edit your SEO content and see live preview</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium">Title</label>
+                    <Input
+                      value={seoData?.title || ''}
+                      onChange={(e) => setSeoData({ ...seoData!, title: e.target.value })}
+                      className="h-9 text-sm"
+                      placeholder="Page title"
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      {seoData?.title?.length || 0}/60 characters
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium">Meta Description</label>
+                    <textarea
+                      value={seoData?.meta_description || ''}
+                      onChange={(e) => setSeoData({ ...seoData!, meta_description: e.target.value })}
+                      className="w-full h-24 px-3 py-2 text-sm rounded-md border border-input bg-background"
+                      placeholder="Meta description"
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      {seoData?.meta_description?.length || 0}/160 characters
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium">Slug</label>
+                    <Input
+                      value={seoData?.slug || ''}
+                      onChange={(e) => setSeoData({ ...seoData!, slug: e.target.value })}
+                      className="h-9 text-sm"
+                      placeholder="URL slug"
+                    />
+                  </div>
+                  <Button size="sm" className="w-full" onClick={() => {}}>
+                    Save Changes
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Google SERP Preview */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium">Google SERP Preview</CardTitle>
+                  <CardDescription>See how your page appears in Google search results</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="border border-border rounded-lg p-4 bg-white">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs">
+                          {seoData?.title?.charAt(0) || 'S'}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-xs font-medium text-gray-700">saasvala.com</p>
+                          <p className="text-[10px] text-gray-500">
+                            https://www.saasvala.com/product/{seoData?.slug || '...'}
+                          </p>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-sm text-blue-600 hover:underline cursor-pointer">
+                          {seoData?.title || product?.name || 'Page Title'}
+                        </p>
+                        <p className="text-xs text-gray-600 mt-1">
+                          {seoData?.meta_description || product?.description || 'Meta description will appear here...'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4 p-3 bg-muted/30 rounded-lg">
+                    <h4 className="text-xs font-medium mb-2">SEO Tips</h4>
+                    <ul className="text-[10px] text-muted-foreground space-y-1">
+                      <li>• Keep title under 60 characters for optimal display</li>
+                      <li>• Keep meta description under 160 characters</li>
+                      <li>• Include primary keyword in title and description</li>
+                      <li>• Make title compelling to increase click-through rate</li>
+                    </ul>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* Analytics Tab */}
