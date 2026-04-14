@@ -526,6 +526,23 @@ export default function MarketplaceAdmin() {
     lastTranslated: null as string | null,
   });
 
+  // Phase 11: Master Global SEO AI (Module 120)
+  const [masterSeoConfig, setMasterSeoConfig] = useState({
+    autoMode: false,
+    scheduleInterval: 'daily', // 'hourly', 'daily', 'weekly'
+    enablePageGeneration: true,
+    enableMetaGeneration: true,
+    enableKeywordExpansion: true,
+    enableSitemapGeneration: true,
+    enableIndexing: true,
+    enableTranslation: false,
+  });
+  const [masterSeoStats, setMasterSeoStats] = useState({
+    totalActions: 0,
+    lastRun: null as string | null,
+    nextRun: null as string | null,
+  });
+
   const [apkForm, setApkForm] = useState({
     product_id: '',
     version: '1.0.0',
@@ -1955,6 +1972,79 @@ export default function MarketplaceAdmin() {
     });
 
     return translated;
+  };
+
+  // Phase 11: Master Global SEO AI (Module 120)
+  const runMasterSeoAutomation = async () => {
+    setSaving(true);
+    try {
+      let totalActions = 0;
+
+      // Run enabled modules in sequence
+      if (masterSeoConfig.enablePageGeneration) {
+        await generateProgrammablePages();
+        totalActions++;
+      }
+
+      if (masterSeoConfig.enableMetaGeneration) {
+        await generateMetaTags();
+        totalActions++;
+      }
+
+      if (masterSeoConfig.enableKeywordExpansion) {
+        await expandKeywords();
+        totalActions++;
+      }
+
+      if (masterSeoConfig.enableSitemapGeneration) {
+        await generateSitemap();
+        totalActions++;
+      }
+
+      if (masterSeoConfig.enableIndexing) {
+        await submitForIndexing();
+        totalActions++;
+      }
+
+      if (masterSeoConfig.enableTranslation) {
+        await translateContent();
+        totalActions++;
+      }
+
+      setMasterSeoStats({
+        totalActions: masterSeoStats.totalActions + totalActions,
+        lastRun: new Date().toISOString(),
+        nextRun: calculateNextRun(),
+      });
+
+      setSaving(false);
+      toast.success(`Master SEO AI completed ${totalActions} actions`);
+    } catch (e) {
+      console.error('Failed to run master SEO automation:', e);
+      toast.error('Failed to run master SEO automation');
+      setSaving(false);
+    }
+  };
+
+  const calculateNextRun = (): string => {
+    const now = new Date();
+    const interval = masterSeoConfig.scheduleInterval;
+
+    switch (interval) {
+      case 'hourly':
+        now.setHours(now.getHours() + 1);
+        break;
+      case 'daily':
+        now.setDate(now.getDate() + 1);
+        break;
+      case 'weekly':
+        now.setDate(now.getDate() + 7);
+        break;
+      default:
+        now.setDate(now.getDate() + 1);
+    }
+
+    return now.toISOString();
   };
 
   const fetchApks = async () => {
@@ -5203,6 +5293,96 @@ export default function MarketplaceAdmin() {
                   Last translated: {new Date(translationStats.lastTranslated).toLocaleString()}
                 </p>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Module 120: Master Global SEO AI */}
+          <Card className="border-primary/50">
+            <CardHeader>
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Zap className="h-4 w-4 text-primary" /> Module 120: Master Global SEO AI
+              </CardTitle>
+              <CardDescription>Master controller to coordinate all SEO automation modules</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="p-3 bg-muted/30 rounded-lg text-center">
+                  <p className="text-[10px] text-muted-foreground">Total Actions</p>
+                  <p className="text-lg font-bold">{masterSeoStats.totalActions}</p>
+                </div>
+                <div className="p-3 bg-muted/30 rounded-lg text-center">
+                  <p className="text-[10px] text-muted-foreground">Last Run</p>
+                  <p className="text-xs font-medium">{masterSeoStats.lastRun ? new Date(masterSeoStats.lastRun).toLocaleString() : 'Never'}</p>
+                </div>
+                <div className="p-3 bg-muted/30 rounded-lg text-center">
+                  <p className="text-[10px] text-muted-foreground">Next Run</p>
+                  <p className="text-xs font-medium">{masterSeoStats.nextRun ? new Date(masterSeoStats.nextRun).toLocaleString() : 'Scheduled'}</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Auto Mode</span>
+                <Switch 
+                  checked={masterSeoConfig.autoMode}
+                  onCheckedChange={(checked) => setMasterSeoConfig({...masterSeoConfig, autoMode: checked})}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-medium">Schedule Interval</label>
+                <select 
+                  className="w-full h-8 text-xs rounded-md border border-input bg-background px-3"
+                  value={masterSeoConfig.scheduleInterval}
+                  onChange={(e) => setMasterSeoConfig({...masterSeoConfig, scheduleInterval: e.target.value})}
+                >
+                  <option value="hourly">Hourly</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                </select>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Enable Page Generation (Module 101)</span>
+                <Switch 
+                  checked={masterSeoConfig.enablePageGeneration}
+                  onCheckedChange={(checked) => setMasterSeoConfig({...masterSeoConfig, enablePageGeneration: checked})}
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Enable Meta Generation (Module 102)</span>
+                <Switch 
+                  checked={masterSeoConfig.enableMetaGeneration}
+                  onCheckedChange={(checked) => setMasterSeoConfig({...masterSeoConfig, enableMetaGeneration: checked})}
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Enable Keyword Expansion (Module 103)</span>
+                <Switch 
+                  checked={masterSeoConfig.enableKeywordExpansion}
+                  onCheckedChange={(checked) => setMasterSeoConfig({...masterSeoConfig, enableKeywordExpansion: checked})}
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Enable Sitemap Generation (Module 109)</span>
+                <Switch 
+                  checked={masterSeoConfig.enableSitemapGeneration}
+                  onCheckedChange={(checked) => setMasterSeoConfig({...masterSeoConfig, enableSitemapGeneration: checked})}
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Enable Indexing (Module 110)</span>
+                <Switch 
+                  checked={masterSeoConfig.enableIndexing}
+                  onCheckedChange={(checked) => setMasterSeoConfig({...masterSeoConfig, enableIndexing: checked})}
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Enable Translation (Module 104)</span>
+                <Switch 
+                  checked={masterSeoConfig.enableTranslation}
+                  onCheckedChange={(checked) => setMasterSeoConfig({...masterSeoConfig, enableTranslation: checked})}
+                />
+              </div>
+              <Button size="sm" className="w-full bg-primary" onClick={runMasterSeoAutomation} disabled={saving}>
+                {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Run Master SEO AI'}
+              </Button>
             </CardContent>
           </Card>
 
