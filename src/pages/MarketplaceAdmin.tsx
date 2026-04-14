@@ -473,6 +473,16 @@ export default function MarketplaceAdmin() {
     targetPlatform: 'google', // 'google', 'instagram', 'linkedin'
   });
 
+  // Phase 7: Global Keyword Expansion AI (Module 103)
+  const [keywordExpansionConfig, setKeywordExpansionConfig] = useState({
+    baseKeyword: '',
+    longTailExpansion: false,
+    countryExpansion: false,
+    languageExpansion: false,
+    targetLanguage: 'en', // 'en', 'hi', 'ar', 'fr', 'es'
+  });
+  const [expandedKeywords, setExpandedKeywords] = useState<any[]>([]);
+
   const [apkForm, setApkForm] = useState({
     product_id: '',
     version: '1.0.0',
@@ -1481,6 +1491,146 @@ export default function MarketplaceAdmin() {
     }
 
     return baseHashtags;
+  };
+
+  // Phase 7: Global Keyword Expansion AI (Module 103)
+  const expandKeywords = async () => {
+    if (!keywordExpansionConfig.baseKeyword) {
+      toast.error('Please enter a base keyword');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const expandedList: any[] = [];
+      const baseKeyword = keywordExpansionConfig.baseKeyword;
+
+      // Long-tail expansion
+      if (keywordExpansionConfig.longTailExpansion) {
+        const longTailKeywords = generateLongTailKeywords(baseKeyword);
+        longTailKeywords.forEach(kw => {
+          expandedList.push({
+            keyword: kw,
+            type: 'long-tail',
+            base_keyword: baseKeyword,
+          });
+        });
+      }
+
+      // Country-based expansion
+      if (keywordExpansionConfig.countryExpansion) {
+        const countries = ['IN', 'US', 'AE', 'UK', 'CA'];
+        countries.forEach(country => {
+          expandedList.push({
+            keyword: `${baseKeyword} ${country}`,
+            type: 'country-based',
+            base_keyword: baseKeyword,
+            country_code: country,
+          });
+          expandedList.push({
+            keyword: `${baseKeyword} in ${country}`,
+            type: 'country-based',
+            base_keyword: baseKeyword,
+            country_code: country,
+          });
+        });
+      }
+
+      // Language-based expansion
+      if (keywordExpansionConfig.languageExpansion) {
+        const languageKeywords = generateLanguageKeywords(baseKeyword, keywordExpansionConfig.targetLanguage);
+        languageKeywords.forEach(kw => {
+          expandedList.push({
+            keyword: kw,
+            type: 'language-based',
+            base_keyword: baseKeyword,
+            language_code: keywordExpansionConfig.targetLanguage,
+          });
+        });
+      }
+
+      setExpandedKeywords(expandedList);
+      setSaving(false);
+      toast.success(`Expanded to ${expandedList.length} keywords`);
+    } catch (e) {
+      console.error('Failed to expand keywords:', e);
+      toast.error('Failed to expand keywords');
+      setSaving(false);
+    }
+  };
+
+  const generateLongTailKeywords = (keyword: string): string[] => {
+    const modifiers = [
+      'best', 'top', 'cheap', 'affordable', 'premium', 'professional',
+      'for business', 'for small business', 'for enterprise', 'for startup',
+      'online', 'free', 'open source', 'cloud-based', 'web-based'
+    ];
+
+    return modifiers.map(modifier => `${modifier} ${keyword}`);
+  };
+
+  const generateLanguageKeywords = (keyword: string, language: string): string[] => {
+    const translations: Record<string, string[]> = {
+      en: [`${keyword} software`, `${keyword} solution`, `${keyword} system`],
+      hi: [`${keyword} सॉफ्टवेयर`, `${keyword} समाधान`, `${keyword} प्रणाली`],
+      ar: [`برنامج ${keyword}`, `حل ${keyword}`, `نظام ${keyword}`],
+      fr: [`logiciel ${keyword}`, `solution ${keyword}`, `système ${keyword}`],
+      es: [`software ${keyword}`, `solución ${keyword}`, `sistema ${keyword}`],
+    };
+
+    return translations[language] || translations.en;
+  };
+
+  const applyExpandedKeywords = async () => {
+    if (expandedKeywords.length === 0) {
+      toast.error('No expanded keywords to apply');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      let appliedCount = 0;
+
+      for (const kw of expandedKeywords) {
+        // Check if page already exists
+        const { data: existingPage } = await db
+          .from('programmable_pages')
+          .select('id')
+          .eq('slug', kw.keyword.toLowerCase().replace(/\s+/g, '-'))
+          .single();
+
+        if (!existingPage) {
+          const { error } = await db
+            .from('programmable_pages')
+            .insert({
+              slug: kw.keyword.toLowerCase().replace(/\s+/g, '-'),
+              title: kw.keyword.toUpperCase(),
+              page_type: 'service',
+              base_keyword: kw.base_keyword,
+              country_code: kw.country_code || null,
+              language_code: kw.language_code || 'en',
+              status: 'draft',
+              auto_generated: true,
+            });
+
+          if (!error) appliedCount++;
+        }
+      }
+
+      setSaving(false);
+
+      if (appliedCount > 0) {
+        toast.success(`Created ${appliedCount} new pages from expanded keywords`);
+        fetchProgrammablePages();
+        setExpandedKeywords([]);
+      } else {
+        toast.info('All keywords already exist as pages');
+      }
+    } catch (e) {
+      console.error('Failed to apply expanded keywords:', e);
+      toast.error('Failed to apply expanded keywords');
+      setSaving(false);
+    }
   };
 
   const fetchApks = async () => {
@@ -4457,23 +4607,69 @@ export default function MarketplaceAdmin() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <label className="text-xs font-medium">Base Keyword</label>
-                <Input placeholder="crm-software" className="h-8 text-xs" />
+                <Input 
+                  placeholder="crm-software" 
+                  className="h-8 text-xs"
+                  value={keywordExpansionConfig.baseKeyword}
+                  onChange={(e) => setKeywordExpansionConfig({...keywordExpansionConfig, baseKeyword: e.target.value})}
+                />
               </div>
               <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
                 <span className="text-xs">Long-tail Expansion</span>
-                <Switch checked={false} />
+                <Switch 
+                  checked={keywordExpansionConfig.longTailExpansion}
+                  onCheckedChange={(checked) => setKeywordExpansionConfig({...keywordExpansionConfig, longTailExpansion: checked})}
+                />
               </div>
               <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
                 <span className="text-xs">Country-based Expansion</span>
-                <Switch checked={false} />
+                <Switch 
+                  checked={keywordExpansionConfig.countryExpansion}
+                  onCheckedChange={(checked) => setKeywordExpansionConfig({...keywordExpansionConfig, countryExpansion: checked})}
+                />
               </div>
               <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
                 <span className="text-xs">Language-based Expansion</span>
-                <Switch checked={false} />
+                <Switch 
+                  checked={keywordExpansionConfig.languageExpansion}
+                  onCheckedChange={(checked) => setKeywordExpansionConfig({...keywordExpansionConfig, languageExpansion: checked})}
+                />
               </div>
-              <Button size="sm" className="w-full" onClick={() => toast.info('Keyword Expansion coming soon')}>
-                Expand Keywords
+              <div className="space-y-2">
+                <label className="text-xs font-medium">Target Language</label>
+                <select 
+                  className="w-full h-8 text-xs rounded-md border border-input bg-background px-3"
+                  value={keywordExpansionConfig.targetLanguage}
+                  onChange={(e) => setKeywordExpansionConfig({...keywordExpansionConfig, targetLanguage: e.target.value})}
+                >
+                  <option value="en">English</option>
+                  <option value="hi">Hindi</option>
+                  <option value="ar">Arabic</option>
+                  <option value="fr">French</option>
+                  <option value="es">Spanish</option>
+                </select>
+              </div>
+              <Button size="sm" className="w-full" onClick={expandKeywords} disabled={saving}>
+                {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Expand Keywords'}
               </Button>
+
+              {/* Expanded Keywords Preview */}
+              {expandedKeywords.length > 0 && (
+                <div className="mt-4">
+                  <h3 className="text-xs font-semibold mb-2">Expanded Keywords ({expandedKeywords.length})</h3>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {expandedKeywords.slice(0, 20).map((kw, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-2 rounded bg-muted/30 text-xs">
+                        <span className="font-medium">{kw.keyword}</span>
+                        <Badge variant="outline" className="text-[9px]">{kw.type}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                  <Button size="sm" className="w-full mt-2" onClick={applyExpandedKeywords} disabled={saving}>
+                    {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Apply & Create Pages'}
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
 
