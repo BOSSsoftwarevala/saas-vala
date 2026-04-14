@@ -28,7 +28,7 @@ import {
   Search, Plus, Edit2, Trash2, Layout, Menu, Package, Truck, CreditCard, Tags, RefreshCw,
   Upload, Download, Eye, Copy, X, ChevronRight, Loader2, CheckCircle, XCircle, AlertCircle, Info,
   BarChart3, Calendar, MessageSquare, Clock, TrendingUp, Users, DollarSign, Star, ThumbsUp, ThumbsDown,
-  Folder, Image,
+  Folder, Image, Shield,
 } from 'lucide-react';
 import { generateProductThumbnail } from '@/lib/thumbnailGenerator';
 import { marketplaceAdminApi } from '@/lib/api';
@@ -2326,7 +2326,7 @@ export default function MarketplaceAdmin() {
         </div>
 
         <Tabs defaultValue="settings" className="w-full">
-          <TabsList className="grid h-10 w-full grid-cols-13">
+          <TabsList className="grid h-10 w-full grid-cols-14">
             <TabsTrigger value="settings" className="text-[10px] gap-1"><Layout className="h-3 w-3" />Settings</TabsTrigger>
             <TabsTrigger value="products" className="text-[10px] gap-1"><Package className="h-3 w-3" />Products</TabsTrigger>
             <TabsTrigger value="categories" className="text-[10px] gap-1"><Folder className="h-3 w-3" />Categories</TabsTrigger>
@@ -2340,6 +2340,7 @@ export default function MarketplaceAdmin() {
             <TabsTrigger value="analytics" className="text-[10px] gap-1"><BarChart3 className="h-3 w-3" />Analytics</TabsTrigger>
             <TabsTrigger value="launches" className="text-[10px] gap-1"><Calendar className="h-3 w-3" />Launches</TabsTrigger>
             <TabsTrigger value="reviews" className="text-[10px] gap-1"><MessageSquare className="h-3 w-3" />Reviews</TabsTrigger>
+            <TabsTrigger value="seo" className="text-[10px] gap-1"><TrendingUp className="h-3 w-3" />SEO</TabsTrigger>
           </TabsList>
 
           <TabsContent value="licenses" className="space-y-4 mt-4">
@@ -3822,6 +3823,107 @@ export default function MarketplaceAdmin() {
               ))}
             </div>
           )}
+        </div>
+      </TabsContent>
+
+      {/* SEO TABLE Tab */}
+      <TabsContent value="seo" className="space-y-4 mt-4">
+        <div className="rounded-lg border border-border bg-card p-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold text-foreground flex items-center gap-2"><TrendingUp className="h-4 w-4 text-primary" />SEO Management</h2>
+            <div className="flex items-center gap-2">
+              <Button size="sm" className="h-7 text-xs gap-1" onClick={() => toast.info('Bulk SEO Generate coming soon')}>
+                <RefreshCw className="h-3 w-3" /> Bulk Generate
+              </Button>
+              <Button size="sm" className="h-7 text-xs gap-1" onClick={() => toast.info('Export SEO Data coming soon')}>
+                <Download className="h-3 w-3" /> Export
+              </Button>
+            </div>
+          </div>
+
+          {/* SEO Filters */}
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="Search products..."
+              className="h-8 text-xs w-64"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <select className="h-8 text-xs rounded-md border border-input bg-background px-3 w-32">
+              <option value="all">All Status</option>
+              <option value="active">Active</option>
+              <option value="draft">Draft</option>
+            </select>
+            <select className="h-8 text-xs rounded-md border border-input bg-background px-3 w-32">
+              <option value="all">All Countries</option>
+              <option value="IN">India</option>
+              <option value="US">USA</option>
+              <option value="AE">UAE</option>
+            </select>
+            <select className="h-8 text-xs rounded-md border border-input bg-background px-3 w-32">
+              <option value="all">All Languages</option>
+              <option value="en">English</option>
+              <option value="hi">Hindi</option>
+            </select>
+          </div>
+
+          {/* SEO Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/40">
+                <tr>
+                  <th className="p-2 text-left">Product</th>
+                  <th className="p-2 text-left">Slug</th>
+                  <th className="p-2 text-left">SEO Title</th>
+                  <th className="p-2 text-left">Keywords</th>
+                  <th className="p-2 text-center">Score</th>
+                  <th className="p-2 text-center">Index</th>
+                  <th className="p-2 text-center">Backlinks</th>
+                  <th className="p-2 text-center">Traffic</th>
+                  <th className="p-2 text-center">Updated</th>
+                  <th className="p-2 text-center">Status</th>
+                  <th className="p-2 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.slice(0, 10).map((product) => (
+                  <tr key={product.id} className="border-t border-border">
+                    <td className="p-2 font-medium">{product.name}</td>
+                    <td className="p-2 text-muted-foreground">{product.slug}</td>
+                    <td className="p-2 text-muted-foreground max-w-[150px] truncate">SEO Title for {product.name}</td>
+                    <td className="p-2 text-muted-foreground max-w-[100px] truncate">crm, software, business</td>
+                    <td className="p-2 text-center">
+                      <Badge variant={75 >= 70 ? 'default' : 75 >= 40 ? 'secondary' : 'destructive'} className="text-[9px]">
+                        {75}/100
+                      </Badge>
+                    </td>
+                    <td className="p-2 text-center">
+                      <Badge variant="outline" className="text-[9px]">Indexed</Badge>
+                    </td>
+                    <td className="p-2 text-center">24</td>
+                    <td className="p-2 text-center">1.2K</td>
+                    <td className="p-2 text-center text-muted-foreground">2 days ago</td>
+                    <td className="p-2 text-center">
+                      <Badge variant="default" className="text-[9px]">Active</Badge>
+                    </td>
+                    <td className="p-2 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => toast.info('Edit SEO coming soon')}>
+                          <Edit2 className="h-3 w-3" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => toast.info('Generate SEO coming soon')}>
+                          <RefreshCw className="h-3 w-3" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => navigate(`/product/${product.slug}/seo-dashboard`)}>
+                          <Eye className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </TabsContent>
 
