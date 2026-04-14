@@ -33,7 +33,7 @@ import { Suspense, useEffect } from 'react';
 
 // Lazy loaded components for better performance
 const Auth = React.lazy(() => import("./pages/Auth"));
-const Marketplace = React.lazy(() => import("./pages/SimpleMarketplace"));
+const Marketplace = React.lazy(() => import("./pages/Marketplace"));
 const SoftwareDemo = React.lazy(() => import("./pages/SoftwareDemo"));
 const ProductDetail = React.lazy(() => import("./pages/ProductDetail"));
 const Favorites = React.lazy(() => import("./pages/Favorites"));
@@ -112,7 +112,7 @@ import ProtectedShellProviders from './components/layout/ProtectedShellProviders
 
 function preloadCriticalRoutes() {
   return Promise.allSettled([
-    import("./pages/SimpleMarketplace"),
+    import("./pages/Marketplace"),
     import("./pages/ProductDetail"),
     import("./pages/Favorites"),
     import("./pages/Orders"),
