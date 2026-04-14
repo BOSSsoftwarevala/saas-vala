@@ -28,7 +28,7 @@ import {
   Search, Plus, Edit2, Trash2, Layout, Menu, Package, Truck, CreditCard, Tags, RefreshCw,
   Upload, Download, Eye, Copy, X, ChevronRight, Loader2, CheckCircle, XCircle, AlertCircle, Info,
   BarChart3, Calendar, MessageSquare, Clock, TrendingUp, Users, DollarSign, Star, ThumbsUp, ThumbsDown,
-  Folder, Image, Shield, Globe, Hash, FileText, Target, Zap,
+  Folder, Image, Shield, Globe, Hash, FileText, Target, Zap, Map, Mail, Send, Kanban,
 } from 'lucide-react';
 import { generateProductThumbnail } from '@/lib/thumbnailGenerator';
 import { marketplaceAdminApi } from '@/lib/api';
@@ -3228,6 +3228,7 @@ export default function MarketplaceAdmin() {
             <TabsTrigger value="reviews" className="text-[10px] gap-1"><MessageSquare className="h-3 w-3" />Reviews</TabsTrigger>
             <TabsTrigger value="seo" className="text-[10px] gap-1"><TrendingUp className="h-3 w-3" />SEO</TabsTrigger>
             <TabsTrigger value="global-seo" className="text-[10px] gap-1"><Globe className="h-3 w-3" />Global SEO</TabsTrigger>
+            <TabsTrigger value="lead-gen" className="text-[10px] gap-1"><Users className="h-3 w-3" />Lead Gen</TabsTrigger>
           </TabsList>
 
           <TabsContent value="licenses" className="space-y-4 mt-4">
@@ -5386,6 +5387,165 @@ export default function MarketplaceAdmin() {
             </CardContent>
           </Card>
 
+        </div>
+      </TabsContent>
+
+      {/* Lead Generation Tab */}
+      <TabsContent value="lead-gen" className="mt-6">
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold">Lead Generation System</h2>
+              <p className="text-muted-foreground">Automated lead generation, scraping, and outreach system</p>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => {}}>
+                <RefreshCw className="h-4 w-4 mr-2" /> Refresh
+              </Button>
+              <Button size="sm" className="bg-primary">
+                <Plus className="h-4 w-4 mr-2" /> New Campaign
+              </Button>
+            </div>
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card className="glass-card">
+              <CardContent className="p-4">
+                <p className="text-[10px] text-muted-foreground">Total Leads</p>
+                <p className="text-2xl font-bold">0</p>
+              </CardContent>
+            </Card>
+            <Card className="glass-card">
+              <CardContent className="p-4">
+                <p className="text-[10px] text-muted-foreground">Hot Leads</p>
+                <p className="text-2xl font-bold text-green-600">0</p>
+              </CardContent>
+            </Card>
+            <Card className="glass-card">
+              <CardContent className="p-4">
+                <p className="text-[10px] text-muted-foreground">Emails Sent</p>
+                <p className="text-2xl font-bold text-blue-600">0</p>
+              </CardContent>
+            </Card>
+            <Card className="glass-card">
+              <CardContent className="p-4">
+                <p className="text-[10px] text-muted-foreground">Conversions</p>
+                <p className="text-2xl font-bold text-purple-600">0</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Modules Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Map className="h-4 w-4 text-primary" /> Module 1: Google Maps Scraper
+                </CardTitle>
+                <CardDescription>Auto search and extract business data from Google Maps</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button size="sm" className="w-full" variant="outline">Configure</Button>
+              </CardContent>
+            </Card>
+
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Globe className="h-4 w-4 text-primary" /> Module 2: Website Scraper
+                </CardTitle>
+                <CardDescription>Extract emails, forms, and social links from websites</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button size="sm" className="w-full" variant="outline">Configure</Button>
+              </CardContent>
+            </Card>
+
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-primary" /> Module 3: Email Finder
+                </CardTitle>
+                <CardDescription>Find and verify emails with SMTP validation</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button size="sm" className="w-full" variant="outline">Configure</Button>
+              </CardContent>
+            </Card>
+
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-primary" /> Module 4: SEO Analyzer
+                </CardTitle>
+                <CardDescription>Analyze SEO metrics and competition</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button size="sm" className="w-full" variant="outline">Configure</Button>
+              </CardContent>
+            </Card>
+
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Star className="h-4 w-4 text-primary" /> Module 7: AI Lead Scoring
+                </CardTitle>
+                <CardDescription>Score leads based on multiple factors</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button size="sm" className="w-full" variant="outline">Configure</Button>
+              </CardContent>
+            </Card>
+
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Send className="h-4 w-4 text-primary" /> Module 8: Auto Outreach
+                </CardTitle>
+                <CardDescription>Automated email and WhatsApp outreach</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button size="sm" className="w-full" variant="outline">Configure</Button>
+              </CardContent>
+            </Card>
+
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Kanban className="h-4 w-4 text-primary" /> Module 9: CRM Pipeline
+                </CardTitle>
+                <CardDescription>Manage lead stages and activities</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button size="sm" className="w-full" variant="outline">Configure</Button>
+              </CardContent>
+            </Card>
+
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-primary" /> Module 10: Analytics
+                </CardTitle>
+                <CardDescription>Track performance and ROI metrics</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button size="sm" className="w-full" variant="outline">Configure</Button>
+              </CardContent>
+            </Card>
+
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-primary" /> Workflow Automation
+                </CardTitle>
+                <CardDescription>Orchestrate complete automation workflows</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button size="sm" className="w-full bg-primary">Run Workflow</Button>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </TabsContent>
 
