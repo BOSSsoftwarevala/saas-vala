@@ -28,7 +28,7 @@ import {
   Search, Plus, Edit2, Trash2, Layout, Menu, Package, Truck, CreditCard, Tags, RefreshCw,
   Upload, Download, Eye, Copy, X, ChevronRight, Loader2, CheckCircle, XCircle, AlertCircle, Info,
   BarChart3, Calendar, MessageSquare, Clock, TrendingUp, Users, DollarSign, Star, ThumbsUp, ThumbsDown,
-  Folder, Image, Shield,
+  Folder, Image, Shield, Globe, Hash, FileText, Target, Zap,
 } from 'lucide-react';
 import { generateProductThumbnail } from '@/lib/thumbnailGenerator';
 import { marketplaceAdminApi } from '@/lib/api';
@@ -2326,7 +2326,7 @@ export default function MarketplaceAdmin() {
         </div>
 
         <Tabs defaultValue="settings" className="w-full">
-          <TabsList className="grid h-10 w-full grid-cols-14">
+          <TabsList className="grid h-10 w-full grid-cols-15">
             <TabsTrigger value="settings" className="text-[10px] gap-1"><Layout className="h-3 w-3" />Settings</TabsTrigger>
             <TabsTrigger value="products" className="text-[10px] gap-1"><Package className="h-3 w-3" />Products</TabsTrigger>
             <TabsTrigger value="categories" className="text-[10px] gap-1"><Folder className="h-3 w-3" />Categories</TabsTrigger>
@@ -2341,6 +2341,7 @@ export default function MarketplaceAdmin() {
             <TabsTrigger value="launches" className="text-[10px] gap-1"><Calendar className="h-3 w-3" />Launches</TabsTrigger>
             <TabsTrigger value="reviews" className="text-[10px] gap-1"><MessageSquare className="h-3 w-3" />Reviews</TabsTrigger>
             <TabsTrigger value="seo" className="text-[10px] gap-1"><TrendingUp className="h-3 w-3" />SEO</TabsTrigger>
+            <TabsTrigger value="global-seo" className="text-[10px] gap-1"><Globe className="h-3 w-3" />Global SEO</TabsTrigger>
           </TabsList>
 
           <TabsContent value="licenses" className="space-y-4 mt-4">
@@ -3924,6 +3925,199 @@ export default function MarketplaceAdmin() {
               </tbody>
             </table>
           </div>
+        </div>
+      </TabsContent>
+
+      {/* Global SEO Tab */}
+      <TabsContent value="global-seo" className="space-y-4 mt-4">
+        <div className="rounded-lg border border-border bg-card p-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold text-foreground flex items-center gap-2"><Globe className="h-4 w-4 text-primary" />Global SEO Automation</h2>
+            <div className="flex items-center gap-2">
+              <Button size="sm" className="h-7 text-xs gap-1" onClick={() => toast.info('Master AI Controller coming soon')}>
+                <Zap className="h-3 w-3" /> Master AI
+              </Button>
+            </div>
+          </div>
+
+          {/* Module 101: Global Programmable Page Factory */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Package className="h-4 w-4" /> Module 101: Programmable Page Factory
+              </CardTitle>
+              <CardDescription>Auto create pages at scale (Country + City + Service)</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium">Base Keywords</label>
+                  <Input placeholder="crm-software, inventory-system, pos-system" className="h-8 text-xs" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium">Target Countries</label>
+                  <select className="w-full h-8 text-xs rounded-md border border-input bg-background px-3">
+                    <option value="all">All Countries</option>
+                    <option value="IN">India</option>
+                    <option value="US">USA</option>
+                    <option value="AE">UAE</option>
+                    <option value="UK">UK</option>
+                    <option value="CA">Canada</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium">Target Cities</label>
+                  <Input placeholder="mumbai, delhi, bangalore" className="h-8 text-xs" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium">Page Template</label>
+                  <select className="w-full h-8 text-xs rounded-md border border-input bg-background px-3">
+                    <option value="default">Default Template</option>
+                    <option value="service">Service Page</option>
+                    <option value="location">Location Page</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Auto Generate Content</span>
+                <Switch checked={false} />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Auto Index Pages</span>
+                <Switch checked={false} />
+              </div>
+              <Button size="sm" className="w-full" onClick={() => toast.info('Page Factory coming soon')}>
+                Generate Pages
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Module 102: Auto Meta + Hashtag Engine */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Hash className="h-4 w-4" /> Module 102: Auto Meta + Hashtag Engine
+              </CardTitle>
+              <CardDescription>Generate optimized meta tags and hashtags</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Auto Generate Title</span>
+                <Switch checked={false} />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Auto Generate Meta Description</span>
+                <Switch checked={false} />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Auto Generate Keywords</span>
+                <Switch checked={false} />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Platform Hashtags (Google/Instagram/LinkedIn)</span>
+                <Switch checked={false} />
+              </div>
+              <Button size="sm" className="w-full" onClick={() => toast.info('Meta Engine coming soon')}>
+                Generate Meta + Hashtags
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Module 103: Global Keyword Expansion AI */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Search className="h-4 w-4" /> Module 103: Global Keyword Expansion AI
+              </CardTitle>
+              <CardDescription>Expand keywords with long-tail, country-based, language-based variants</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-medium">Base Keyword</label>
+                <Input placeholder="crm-software" className="h-8 text-xs" />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Long-tail Expansion</span>
+                <Switch checked={false} />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Country-based Expansion</span>
+                <Switch checked={false} />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Language-based Expansion</span>
+                <Switch checked={false} />
+              </div>
+              <Button size="sm" className="w-full" onClick={() => toast.info('Keyword Expansion coming soon')}>
+                Expand Keywords
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Module 109: Global Sitemap Engine */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <FileText className="h-4 w-4" /> Module 109: Global Sitemap Engine
+              </CardTitle>
+              <CardDescription>Multi sitemap management (pages, products, blog)</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="p-3 bg-muted/30 rounded-lg text-center">
+                  <p className="text-[10px] text-muted-foreground">Pages Sitemap</p>
+                  <p className="text-lg font-bold">0</p>
+                </div>
+                <div className="p-3 bg-muted/30 rounded-lg text-center">
+                  <p className="text-[10px] text-muted-foreground">Products Sitemap</p>
+                  <p className="text-lg font-bold">0</p>
+                </div>
+                <div className="p-3 bg-muted/30 rounded-lg text-center">
+                  <p className="text-[10px] text-muted-foreground">Blog Sitemap</p>
+                  <p className="text-lg font-bold">0</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Auto Update Sitemap</span>
+                <Switch checked={false} />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Auto Submit to Google</span>
+                <Switch checked={false} />
+              </div>
+              <Button size="sm" className="w-full" onClick={() => toast.info('Sitemap Engine coming soon')}>
+                Generate Sitemaps
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Module 110: Auto Indexing Engine */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Target className="h-4 w-4" /> Module 110: Auto Indexing Engine
+              </CardTitle>
+              <CardDescription>Submit to Google Index API, Bing, and fast indexing</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Google Index API</span>
+                <Switch checked={false} />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Bing Webmaster API</span>
+                <Switch checked={false} />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Fast Indexing Mode</span>
+                <Switch checked={false} />
+              </div>
+              <Button size="sm" className="w-full" onClick={() => toast.info('Indexing Engine coming soon')}>
+                Submit for Indexing
+              </Button>
+            </CardContent>
+          </Card>
+
         </div>
       </TabsContent>
 
