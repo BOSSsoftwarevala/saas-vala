@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, ShoppingCart, Heart, Share2, Star, Download, Play, ArrowLeft, Check, AlertCircle } from 'lucide-react';
+import { Loader2, ShoppingCart, Heart, Share2, Star, Download, Play, ArrowLeft, Check, AlertCircle, ChevronLeft, ChevronRight, FileText, Package, Shield, Clock, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +22,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { publicMarketplaceApi } from '@/lib/api';
 import { resolveMaskedDemoUrl } from '@/lib/demoMasking';
 import { usePaymentAvailability } from '@/hooks/useFeatureFlags';
+import { cn } from '@/lib/utils';
 
 // Simple helper functions to replace marketplaceUtils
 const formatCurrency = (amount: number, currency: string = 'USD') => {
@@ -64,6 +65,17 @@ interface Product {
   rating: number;
   created_at: string;
   updated_at: string;
+  // Phase 3 fields
+  screenshots?: string[];
+  features?: string[];
+  version?: string;
+  version_code?: number;
+  apk_enabled?: boolean;
+  license_enabled?: boolean;
+  file_size?: number;
+  min_android_version?: string;
+  system_requirements?: string[];
+  changelog?: string;
 }
 
 interface ProductSeo {
@@ -104,6 +116,20 @@ export default function ProductDetailPage() {
   const [reviewTitle, setReviewTitle] = useState('');
   const [reviewText, setReviewText] = useState('');
   const [submittingRating, setSubmittingRating] = useState(false);
+
+  // Phase 3: Screenshots gallery
+  const [currentScreenshotIndex, setCurrentScreenshotIndex] = useState(0);
+  const [showScreenshotModal, setShowScreenshotModal] = useState(false);
+
+  // Phase 3: APK versions
+  const [apkVersions, setApkVersions] = useState<any[]>([]);
+  const [apkVersionsLoading, setApkVersionsLoading] = useState(false);
+
+  // Phase 3: Download management
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [downloadLoading, setDownloadLoading] = useState(false);
+  const [ownedLicenses, setOwnedLicenses] = useState<any[]>([]);
+  const [licenseKey, setLicenseKey] = useState<string | null>(null);
 
   /**
    * Ref-based lock: prevents concurrent purchase calls (double-click,
@@ -221,11 +247,119 @@ export default function ProductDetailPage() {
           { duration_days: 30, base_price: 0, currency },
         ]);
       }
+
+      // Phase 3: Fetch APK versions
+      fetchApkVersions(id);
+
+      // Phase 3: Check if user owns this product
+      if (user) {
+        fetchOwnedLicenses(id);
+      }
     } catch (err) {
       console.error('Failed to fetch product:', err);
       toast.error('Failed to load product details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Phase 3: Fetch APK versions
+  const fetchApkVersions = async (productId: string) => {
+    setApkVersionsLoading(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from('apks')
+        .select('*')
+        .eq('product_id', productId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Failed to fetch APK versions:', error);
+        setApkVersions([]);
+      } else {
+        setApkVersions(data || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch APK versions:', e);
+      setApkVersions([]);
+    } finally {
+      setApkVersionsLoading(false);
+    }
+  };
+
+  // Phase 3: Fetch owned licenses
+  const fetchOwnedLicenses = async (productId: string) => {
+    try {
+      const { data, error } = await (supabase as any)
+        .from('marketplace_licenses')
+        .select('*')
+        .eq('product_id', productId)
+        .eq('user_id', user.id)
+        .eq('status', 'active');
+
+      if (error) {
+        console.error('Failed to fetch licenses:', error);
+        setOwnedLicenses([]);
+      } else {
+        setOwnedLicenses(data || []);
+        if (data && data.length > 0) {
+          setLicenseKey(data[0].license_key);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch licenses:', e);
+      setOwnedLicenses([]);
+    }
+  };
+
+  // Phase 3: Generate secure download URL
+  const generateDownloadUrl = async () => {
+    if (!user || !product || !licenseKey) {
+      toast.error('You need to purchase this product to download');
+      return;
+    }
+
+    setDownloadLoading(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from('marketplace_licenses')
+        .select('download_url, expires_at')
+        .eq('license_key', licenseKey)
+        .eq('user_id', user.id)
+        .single();
+
+      if (error || !data) {
+        toast.error('Failed to generate download link');
+        return;
+      }
+
+      // Check if download link is expired
+      if (data.expires_at && new Date(data.expires_at) < new Date()) {
+        // Generate new download link
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+        const { data: updateData, error: updateError } = await (supabase as any)
+          .from('marketplace_licenses')
+          .update({
+            download_url: `https://www.saasvala.com/api/download/${licenseKey}`,
+            expires_at: expiresAt.toISOString(),
+          })
+          .eq('license_key', licenseKey);
+
+        if (updateError) {
+          toast.error('Failed to generate download link');
+          return;
+        }
+        setDownloadUrl(`https://www.saasvala.com/api/download/${licenseKey}`);
+      } else {
+        setDownloadUrl(data.download_url);
+      }
+
+      toast.success('Download link generated successfully');
+    } catch (e) {
+      console.error('Failed to generate download link:', e);
+      toast.error('Failed to generate download link');
+    } finally {
+      setDownloadLoading(false);
     }
   };
 
@@ -309,6 +443,7 @@ export default function ProductDetailPage() {
   }
 
   const currentPrice = pricing.find((p) => p.duration_days === selectedDuration);
+  const screenshots = product?.screenshots || [product?.thumbnail_url].filter(Boolean) as string[];
 
   return (
     <div className="min-h-screen bg-background">
@@ -336,17 +471,50 @@ export default function ProductDetailPage() {
 
       <main className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Product Image */}
-          <div className="lg:col-span-1">
-            <img
-              src={product.thumbnail_url || getFallbackImage(product.category || 'general')}
-              alt={product.name ?? 'Product image'}
-              className="w-full rounded-lg object-cover aspect-square"
-              onError={(e) => {
-                const img = e.currentTarget;
-                img.src = getFallbackImage(product.category || 'general');
-              }}
-            />
+          {/* Product Image & Screenshots */}
+          <div className="lg:col-span-1 space-y-4">
+            {/* Main Image */}
+            <div 
+              className="relative rounded-lg overflow-hidden aspect-square cursor-pointer"
+              onClick={() => setShowScreenshotModal(true)}
+            >
+              <img
+                src={screenshots[currentScreenshotIndex] || product.thumbnail_url || getFallbackImage(product.category || 'general')}
+                alt={product.name ?? 'Product image'}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  const img = e.currentTarget;
+                  img.src = getFallbackImage(product.category || 'general');
+                }}
+              />
+              {screenshots.length > 1 && (
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 text-white text-xs px-2 py-1 rounded">
+                  {currentScreenshotIndex + 1} / {screenshots.length}
+                </div>
+              )}
+            </div>
+
+            {/* Screenshots Thumbnails */}
+            {screenshots.length > 1 && (
+              <div className="grid grid-cols-4 gap-2">
+                {screenshots.map((screenshot, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setCurrentScreenshotIndex(index)}
+                    className={cn(
+                      'rounded-lg overflow-hidden aspect-square border-2 transition-all',
+                      currentScreenshotIndex === index ? 'border-primary' : 'border-transparent hover:border-primary/50'
+                    )}
+                  >
+                    <img
+                      src={screenshot}
+                      alt={`Screenshot ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Product Info */}
@@ -442,32 +610,107 @@ export default function ProductDetailPage() {
                 <CardTitle className="text-lg">What's Included</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <Check className="h-5 w-5 text-green-500" />
-                  <span>Full APK Download</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Check className="h-5 w-5 text-green-500" />
-                  <span>Active License Key</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Check className="h-5 w-5 text-green-500" />
-                  <span>Email Delivery</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Check className="h-5 w-5 text-green-500" />
-                  <span>24/7 Support</span>
-                </div>
+                {(product.features || [
+                  'Full APK Download',
+                  'Active License Key',
+                  'Email Delivery',
+                  '24/7 Support'
+                ]).map((feature, index) => (
+                  <div key={index} className="flex items-center gap-3">
+                    <Check className="h-5 w-5 text-green-500" />
+                    <span>{feature}</span>
+                  </div>
+                ))}
               </CardContent>
             </Card>
+
+            {/* Phase 3: Version Info */}
+            {(product.version || apkVersions.length > 0) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    Version Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Current Version</p>
+                      <p className="font-semibold">{product.version || apkVersions[0]?.version || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">File Size</p>
+                      <p className="font-semibold">
+                        {product.file_size ? `${(product.file_size / 1024 / 1024).toFixed(2)} MB` : 'N/A'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Min Android</p>
+                      <p className="font-semibold">{product.min_android_version || '5.0+'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Updated</p>
+                      <p className="font-semibold">
+                        {product.updated_at ? new Date(product.updated_at).toLocaleDateString() : 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Phase 3: Download Section */}
+            {ownedLicenses.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Download className="h-4 w-4" />
+                    Download
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Shield className="h-4 w-4 text-green-500" />
+                    <span>You own this product</span>
+                  </div>
+                  {licenseKey && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">License Key</p>
+                      <code className="text-xs bg-muted px-2 py-1 rounded">{licenseKey}</code>
+                    </div>
+                  )}
+                  <Button
+                    className="w-full gap-2"
+                    onClick={generateDownloadUrl}
+                    disabled={downloadLoading}
+                  >
+                    {downloadLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                    {downloadLoading ? 'Generating Link...' : 'Download APK'}
+                  </Button>
+                  {downloadUrl && (
+                    <a
+                      href={downloadUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-primary hover:underline"
+                    >
+                      Download link valid for 24 hours
+                    </a>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
 
         {/* Tabs Section */}
         <div className="mt-12">
           <Tabs defaultValue="details" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="details">Details</TabsTrigger>
+              <TabsTrigger value="changelog">Changelog</TabsTrigger>
+              <TabsTrigger value="requirements">Requirements</TabsTrigger>
               <TabsTrigger value="reviews">Reviews</TabsTrigger>
               <TabsTrigger value="faq">FAQ</TabsTrigger>
             </TabsList>
@@ -485,6 +728,91 @@ export default function ProductDetailPage() {
                       <p className="text-muted-foreground">{product.description}</p>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Phase 3: Changelog */}
+            <TabsContent value="changelog" className="mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Version History
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {apkVersionsLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    </div>
+                  ) : apkVersions.length > 0 ? (
+                    apkVersions.map((version) => (
+                      <div key={version.id} className="border-b border-border pb-4 last:border-0">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">{version.version}</Badge>
+                            <span className="text-sm text-muted-foreground">
+                              {new Date(version.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                          {version.is_stable && (
+                            <Badge className="bg-green-500">Stable</Badge>
+                          )}
+                        </div>
+                        {version.changelog && (
+                          <p className="text-sm text-muted-foreground">{version.changelog}</p>
+                        )}
+                      </div>
+                    ))
+                  ) : product.changelog ? (
+                    <p className="text-sm text-muted-foreground">{product.changelog}</p>
+                  ) : (
+                    <p className="text-center text-muted-foreground py-8">No changelog available</p>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Phase 3: System Requirements */}
+            <TabsContent value="requirements" className="mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Zap className="h-4 w-4" />
+                    System Requirements
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {product.system_requirements && product.system_requirements.length > 0 ? (
+                    <ul className="space-y-2">
+                      {product.system_requirements.map((req, index) => (
+                        <li key={index} className="flex items-start gap-2 text-sm">
+                          <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                          <span>{req}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-2 text-sm">
+                        <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span>Android 5.0 (Lollipop) or higher</span>
+                      </div>
+                      <div className="flex items-start gap-2 text-sm">
+                        <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span>Minimum 2GB RAM</span>
+                      </div>
+                      <div className="flex items-start gap-2 text-sm">
+                        <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span>Minimum 100MB free storage space</span>
+                      </div>
+                      <div className="flex items-start gap-2 text-sm">
+                        <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                        <span>Stable internet connection for activation</span>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -654,6 +982,42 @@ export default function ProductDetailPage() {
                 Submit Review
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Phase 3: Screenshot Modal */}
+      <Dialog open={showScreenshotModal} onOpenChange={setShowScreenshotModal}>
+        <DialogContent className="max-w-4xl">
+          <div className="relative">
+            <img
+              src={screenshots[currentScreenshotIndex] || product.thumbnail_url || getFallbackImage(product.category || 'general')}
+              alt={`Screenshot ${currentScreenshotIndex + 1}`}
+              className="w-full rounded-lg"
+            />
+            {screenshots.length > 1 && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white hover:bg-black/70"
+                  onClick={() => setCurrentScreenshotIndex((prev) => (prev > 0 ? prev - 1 : screenshots.length - 1))}
+                >
+                  <ChevronLeft className="h-6 w-6" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white hover:bg-black/70"
+                  onClick={() => setCurrentScreenshotIndex((prev) => (prev < screenshots.length - 1 ? prev + 1 : 0))}
+                >
+                  <ChevronRight className="h-6 w-6" />
+                </Button>
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/50 text-white text-xs px-3 py-1 rounded-full">
+                  {currentScreenshotIndex + 1} / {screenshots.length}
+                </div>
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>

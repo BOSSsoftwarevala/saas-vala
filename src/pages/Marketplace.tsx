@@ -80,7 +80,14 @@ export default function Marketplace() {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000]);
   const [minRating, setMinRating] = useState<number>(0);
   const [showFilters, setShowFilters] = useState(false);
-  
+
+  // Phase 3: Advanced Search Filters
+  const [selectedBusinessType, setSelectedBusinessType] = useState<string>('all');
+  const [selectedIndustry, setSelectedIndustry] = useState<string>('all');
+  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
+  const [showFeaturedOnly, setShowFeaturedOnly] = useState(false);
+  const [showTrendingOnly, setShowTrendingOnly] = useState(false);
+
   // Phase 2: Reviews, Wishlist, Recently Viewed, Share, Dark Mode
   const [reviews, setReviews] = useState<any[]>([]);
   const [showReviews, setShowReviews] = useState(false);
@@ -124,10 +131,10 @@ export default function Marketplace() {
         filtered = [...filtered].sort((a, b) => b.rating - a.rating);
         break;
       case 'newest':
-        filtered = [...filtered].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+        filtered = [...filtered].sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
         break;
       case 'trending':
-        filtered = [...filtered].sort((a, b) => (b.sales_count || 0) - (a.sales_count || 0));
+        filtered = [...filtered].sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0));
         break;
     }
 
@@ -379,12 +386,16 @@ export default function Marketplace() {
 
     try {
       // Check if product has demo enabled
-      if (!product.demo_enabled) {
+      if (!product.demoEnabled) {
         toast.info('Demo not available for this product');
         return;
       }
 
-      const demoUrl = await resolveMaskedDemoUrl(product.id);
+      const demoUrl = await resolveMaskedDemoUrl({
+        slug: product.slug,
+        demo_url: product.demoUrl || '',
+        demo_enabled: product.demoEnabled || false,
+      });
       if (demoUrl) {
         window.open(demoUrl, '_blank', 'noopener,noreferrer');
       } else {
@@ -873,6 +884,70 @@ export default function Marketplace() {
                 </div>
               </div>
 
+              {/* Phase 3: Business Type Filter */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">Business Type</label>
+                <div className="flex flex-wrap gap-2">
+                  {['all', 'software', 'service', 'product'].map(type => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setSelectedBusinessType(type)}
+                      className={`px-3 py-1 rounded-full text-sm ${
+                        selectedBusinessType === type
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                      }`}
+                    >
+                      {type === 'all' ? 'All Types' : type.charAt(0).toUpperCase() + type.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Phase 3: Target Industry Filter */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">Target Industry</label>
+                <div className="flex flex-wrap gap-2">
+                  {['all', 'retail', 'healthcare', 'education', 'finance', 'manufacturing', 'other'].map(industry => (
+                    <button
+                      key={industry}
+                      type="button"
+                      onClick={() => setSelectedIndustry(industry)}
+                      className={`px-3 py-1 rounded-full text-sm ${
+                        selectedIndustry === industry
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                      }`}
+                    >
+                      {industry === 'all' ? 'All Industries' : industry.charAt(0).toUpperCase() + industry.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Phase 3: Featured/Trending Toggle */}
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showFeaturedOnly}
+                    onChange={(e) => setShowFeaturedOnly(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm">Featured Only</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showTrendingOnly}
+                    onChange={(e) => setShowTrendingOnly(e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm">Trending Only</span>
+                </label>
+              </div>
+
               {/* Price Range Filter */}
               <div>
                 <label className="text-sm font-medium mb-2 block">Price Range: ₹{priceRange[0]} - ₹{priceRange[1]}</label>
@@ -937,6 +1012,25 @@ export default function Marketplace() {
                   ))}
                 </div>
               </div>
+
+              {/* Clear Filters */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSelectedCategory('all');
+                  setSelectedBusinessType('all');
+                  setSelectedIndustry('all');
+                  setSelectedTags(new Set());
+                  setPriceRange([0, 10000]);
+                  setMinRating(0);
+                  setShowFeaturedOnly(false);
+                  setShowTrendingOnly(false);
+                  setSortBy('default');
+                }}
+              >
+                Clear All Filters
+              </Button>
             </div>
           )}
         </div>
@@ -1282,7 +1376,7 @@ export default function Marketplace() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Demo:</span>
-                      <span>{product.demo_enabled ? '✓' : '✗'}</span>
+                      <span>{product.demoEnabled ? '✓' : '✗'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">APK:</span>

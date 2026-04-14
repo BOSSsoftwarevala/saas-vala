@@ -28,6 +28,7 @@ import {
   Search, Plus, Edit2, Trash2, Layout, Menu, Package, Truck, CreditCard, Tags, RefreshCw,
   Upload, Download, Eye, Copy, X, ChevronRight, Loader2, CheckCircle, XCircle, AlertCircle, Info,
   BarChart3, Calendar, MessageSquare, Clock, TrendingUp, Users, DollarSign, Star, ThumbsUp, ThumbsDown,
+  Folder,
 } from 'lucide-react';
 import { generateProductThumbnail } from '@/lib/thumbnailGenerator';
 import { marketplaceAdminApi } from '@/lib/api';
@@ -424,6 +425,23 @@ export default function MarketplaceAdmin() {
   const [apksLoading, setApksLoading] = useState(true);
   const [uploadingApk, setUploadingApk] = useState(false);
   const [apkFile, setApkFile] = useState<File | null>(null);
+
+  // Phase 3: Category Management
+  const [categories, setCategories] = useState<any[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [editCategory, setEditCategory] = useState<any>(null);
+
+  // Phase 3: User Management
+  const [users, setUsers] = useState<any[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
+  const [selectedUserRole, setSelectedUserRole] = useState<string>('all');
+  const [editUser, setEditUser] = useState<any>(null);
+
+  // Phase 3: License Key Management
+  const [licenses, setLicenses] = useState<any[]>([]);
+  const [licensesLoading, setLicensesLoading] = useState(true);
+  const [editLicense, setEditLicense] = useState<any>(null);
+
   const [apkForm, setApkForm] = useState({
     product_id: '',
     version: '1.0.0',
@@ -622,8 +640,321 @@ export default function MarketplaceAdmin() {
       ];
 
       setGateways(rows);
+    } catch {
+      setGateways([]);
     } finally {
       setGatewaysLoading(false);
+    }
+  };
+
+  // Phase 3: Fetch categories
+  const fetchCategories = async () => {
+    setCategoriesLoading(true);
+    try {
+      const { data, error } = await (db as any)
+        .from('marketplace_categories')
+        .select('*')
+        .order('sort_order', { ascending: true });
+
+      if (error) {
+        console.error('Failed to fetch categories:', error);
+        setCategories([]);
+      } else {
+        setCategories(data || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch categories:', e);
+      setCategories([]);
+    } finally {
+      setCategoriesLoading(false);
+    }
+  };
+
+  // Phase 3: Save category
+  const saveCategory = async () => {
+    if (!editCategory) return;
+    if (!editCategory.name.trim()) {
+      toast.error('Category name is required');
+      return;
+    }
+
+    setSaving(true);
+    const payload = {
+      name: editCategory.name.trim(),
+      slug: editCategory.name.trim().toLowerCase().replace(/\s+/g, '-'),
+      description: editCategory.description || null,
+      icon: editCategory.icon || null,
+      sort_order: Number(editCategory.sort_order || 0),
+      is_active: Boolean(editCategory.is_active),
+    };
+
+    const query = editCategory.id.startsWith('new-')
+      ? db.from('marketplace_categories').insert(payload)
+      : db.from('marketplace_categories').update(payload).eq('id', editCategory.id);
+
+    const { error } = await query;
+    setSaving(false);
+
+    if (error) toast.error(error.message);
+    else {
+      toast.success('Category saved');
+      setEditCategory(null);
+      fetchCategories();
+    }
+  };
+
+  // Phase 3: Delete category
+  const deleteCategory = async (id: string) => {
+    if (!confirm('Delete this category?')) return;
+    const { error } = await (db as any).from('marketplace_categories').delete().eq('id', id);
+    if (error) toast.error(error.message);
+    else {
+      toast.success('Category deleted');
+      fetchCategories();
+    }
+  };
+
+  // Phase 3: Fetch users
+  const fetchUsers = async () => {
+    setUsersLoading(true);
+    try {
+      // Fetch profiles and resellers
+      const [{ data: profiles }, { data: resellers }] = await Promise.all([
+        db.from('profiles').select('*').order('created_at', { ascending: false }).limit(100),
+        db.from('resellers').select('*').limit(100),
+      ]);
+
+      // Combine user data
+      const userMap = new Map();
+      (profiles || []).forEach((profile: any) => {
+        userMap.set(profile.id, {
+          id: profile.id,
+          email: profile.email,
+          full_name: profile.full_name,
+          role: 'buyer',
+          created_at: profile.created_at,
+        });
+      });
+
+      (resellers || []).forEach((reseller: any) => {
+        if (userMap.has(reseller.user_id)) {
+          userMap.set(reseller.user_id, {
+            ...userMap.get(reseller.user_id),
+            role: 'reseller',
+            company_name: reseller.company_name,
+            commission_rate: reseller.commission_rate,
+          });
+        }
+      });
+
+      // Add admin users (from auth.users would need server-side, using profiles with admin flag)
+      const allUsers = Array.from(userMap.values());
+      setUsers(allUsers);
+    } catch (e) {
+      console.error('Failed to fetch users:', e);
+      setUsers([]);
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  // Phase 3: Save user
+  const saveUser = async () => {
+    if (!editUser) return;
+    if (!editUser.email) {
+      toast.error('Email is required');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      if (editUser.role === 'reseller') {
+        // Update or create reseller record
+        const { error } = await (db as any)
+          .from('resellers')
+          .upsert({
+            user_id: editUser.id,
+            company_name: editUser.company_name || null,
+            commission_rate: Number(editUser.commission_rate || 10),
+          });
+
+        if (error) toast.error(error.message);
+        else {
+          toast.success('User updated successfully');
+          setEditUser(null);
+          fetchUsers();
+        }
+      } else {
+        toast.success('User updated successfully');
+        setEditUser(null);
+        fetchUsers();
+      }
+    } catch (e) {
+      console.error('Failed to save user:', e);
+      toast.error('Failed to save user');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Phase 3: Delete user
+  const deleteUser = async (id: string) => {
+    if (!confirm('Delete this user? This action cannot be undone.')) return;
+    const { error } = await (db as any).from('profiles').delete().eq('id', id);
+    if (error) toast.error(error.message);
+    else {
+      toast.success('User deleted');
+      fetchUsers();
+    }
+  };
+
+  // Phase 3: Update user role
+  const updateUserRole = async (userId: string, newRole: string) => {
+    try {
+      if (newRole === 'reseller') {
+        // Create reseller record
+        const { error } = await (db as any).from('resellers').insert({
+          user_id: userId,
+          company_name: 'New Reseller',
+          commission_rate: 10,
+        });
+        if (error) toast.error(error.message);
+        else {
+          toast.success('User promoted to reseller');
+          fetchUsers();
+        }
+      } else if (newRole === 'buyer') {
+        // Remove reseller record
+        const { error } = await (db as any).from('resellers').delete().eq('user_id', userId);
+        if (error) toast.error(error.message);
+        else {
+          toast.success('User demoted to buyer');
+          fetchUsers();
+        }
+      }
+    } catch (e) {
+      console.error('Failed to update user role:', e);
+      toast.error('Failed to update user role');
+    }
+  };
+
+  // Phase 3: Generate license key
+  const generateLicenseKey = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let key = '';
+    for (let i = 0; i < 4; i++) {
+      for (let j = 0; j < 4; j++) {
+        key += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      if (i < 3) key += '-';
+    }
+    return key;
+  };
+
+  // Phase 3: Fetch licenses
+  const fetchLicenses = async () => {
+    setLicensesLoading(true);
+    try {
+      const { data, error } = await (db as any)
+        .from('marketplace_licenses')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) {
+        console.error('Failed to fetch licenses:', error);
+        setLicenses([]);
+      } else {
+        setLicenses(data || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch licenses:', e);
+      setLicenses([]);
+    } finally {
+      setLicensesLoading(false);
+    }
+  };
+
+  // Phase 3: Save license
+  const saveLicense = async () => {
+    if (!editLicense) return;
+    if (!editLicense.product_id) {
+      toast.error('Product is required');
+      return;
+    }
+    if (!editLicense.user_id) {
+      toast.error('User is required');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const payload = {
+        product_id: editLicense.product_id,
+        user_id: editLicense.user_id,
+        license_key: editLicense.license_key || generateLicenseKey(),
+        status: editLicense.status || 'active',
+        expires_at: editLicense.expires_at || null,
+        download_url: editLicense.download_url || null,
+      };
+
+      const { error } = await (db as any).from('marketplace_licenses').insert(payload);
+
+      if (error) toast.error(error.message);
+      else {
+        toast.success('License key generated successfully');
+        setEditLicense(null);
+        fetchLicenses();
+      }
+    } catch (e) {
+      console.error('Failed to save license:', e);
+      toast.error('Failed to save license');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Phase 3: Revoke license
+  const revokeLicense = async (id: string) => {
+    if (!confirm('Revoke this license key?')) return;
+    const { error } = await (db as any).from('marketplace_licenses').update({ status: 'revoked' }).eq('id', id);
+    if (error) toast.error(error.message);
+    else {
+      toast.success('License revoked');
+      fetchLicenses();
+    }
+  };
+
+  // Phase 3: Validate license
+  const validateLicense = async (licenseKey: string) => {
+    try {
+      const { data, error } = await (db as any)
+        .from('marketplace_licenses')
+        .select('*')
+        .eq('license_key', licenseKey)
+        .single();
+
+      if (error || !data) {
+        toast.error('Invalid license key');
+        return false;
+      }
+
+      if (data.status !== 'active') {
+        toast.error(`License is ${data.status}`);
+        return false;
+      }
+
+      if (data.expires_at && new Date(data.expires_at) < new Date()) {
+        toast.error('License has expired');
+        return false;
+      }
+
+      toast.success('License is valid');
+      return true;
+    } catch (e) {
+      console.error('Failed to validate license:', e);
+      toast.error('Failed to validate license');
+      return false;
     }
   };
 
@@ -902,8 +1233,9 @@ export default function MarketplaceAdmin() {
   };
 
   const refreshAll = async () => {
+    setProductsLoading(true);
     await Promise.all([
-      fetchProductCatalog(),
+      fetchProducts(),
       fetchHeaderMenus(),
       fetchBanners(),
       fetchTickers(),
@@ -917,7 +1249,11 @@ export default function MarketplaceAdmin() {
       fetchScheduledLaunches(),
       fetchReviewsForModeration(),
       fetchAdvancedAnalytics(),
+      fetchCategories(),
+      fetchUsers(),
+      fetchLicenses(),
     ]);
+    setProductsLoading(false);
   };
 
   useEffect(() => {
@@ -1782,9 +2118,12 @@ export default function MarketplaceAdmin() {
         </div>
 
         <Tabs defaultValue="settings" className="w-full">
-          <TabsList className="grid h-10 w-full grid-cols-9">
+          <TabsList className="grid h-10 w-full grid-cols-12">
             <TabsTrigger value="settings" className="text-[10px] gap-1"><Layout className="h-3 w-3" />Settings</TabsTrigger>
             <TabsTrigger value="products" className="text-[10px] gap-1"><Package className="h-3 w-3" />Products</TabsTrigger>
+            <TabsTrigger value="categories" className="text-[10px] gap-1"><Folder className="h-3 w-3" />Categories</TabsTrigger>
+            <TabsTrigger value="users" className="text-[10px] gap-1"><Users className="h-3 w-3" />Users</TabsTrigger>
+            <TabsTrigger value="licenses" className="text-[10px] gap-1"><Shield className="h-3 w-3" />Licenses</TabsTrigger>
             <TabsTrigger value="apk" className="text-[10px] gap-1"><Truck className="h-3 w-3" />APK</TabsTrigger>
             <TabsTrigger value="payments" className="text-[10px] gap-1"><CreditCard className="h-3 w-3" />Payments</TabsTrigger>
             <TabsTrigger value="offers" className="text-[10px] gap-1"><Tags className="h-3 w-3" />Offers</TabsTrigger>
@@ -1793,6 +2132,157 @@ export default function MarketplaceAdmin() {
             <TabsTrigger value="launches" className="text-[10px] gap-1"><Calendar className="h-3 w-3" />Launches</TabsTrigger>
             <TabsTrigger value="reviews" className="text-[10px] gap-1"><MessageSquare className="h-3 w-3" />Reviews</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="licenses" className="space-y-4 mt-4">
+            <div className="rounded-lg border border-border bg-card p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-foreground flex items-center gap-2"><Shield className="h-4 w-4 text-primary" />License Key Management</h2>
+                <Button size="sm" className="h-7 text-xs gap-1" onClick={() => setEditLicense({ product_id: '', user_id: '', license_key: generateLicenseKey(), status: 'active', expires_at: null })}>
+                  <Plus className="h-3 w-3" /> Generate License
+                </Button>
+              </div>
+              
+              {licensesLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : licenses.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-8">No license keys generated yet</p>
+              ) : (
+                <div className="space-y-2">
+                  {licenses.map((license) => (
+                    <div key={license.id} className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <code className="text-xs font-mono bg-primary/10 px-2 py-1 rounded">{license.license_key}</code>
+                          <Badge variant={license.status === 'active' ? 'default' : 'secondary'} className="text-[9px]">
+                            {license.status}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
+                          <span>Product: {license.product_id}</span>
+                          <span>User: {license.user_id}</span>
+                          {license.expires_at && <span>Expires: {new Date(license.expires_at).toLocaleDateString()}</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => validateLicense(license.license_key)}>
+                          <Check className="h-3 w-3" /> Validate
+                        </Button>
+                        {license.status === 'active' && (
+                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={() => revokeLicense(license.id)}>
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="users" className="space-y-4 mt-4">
+            <div className="rounded-lg border border-border bg-card p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-foreground flex items-center gap-2"><Users className="h-4 w-4 text-primary" />User Management</h2>
+                <div className="flex items-center gap-2">
+                  <Select value={selectedUserRole} onValueChange={setSelectedUserRole}>
+                    <SelectTrigger className="h-7 w-32 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Users</SelectItem>
+                      <SelectItem value="buyer">Buyers</SelectItem>
+                      <SelectItem value="reseller">Resellers</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              {usersLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : users.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-8">No users found</p>
+              ) : (
+                <div className="space-y-2">
+                  {users.filter(u => selectedUserRole === 'all' || u.role === selectedUserRole).map((user) => (
+                    <div key={user.id} className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                          {user.full_name?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase() || 'U'}
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-foreground">{user.full_name || 'Unknown'}</p>
+                          <p className="text-[10px] text-muted-foreground">{user.email}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={user.role === 'reseller' ? 'default' : 'secondary'} className="text-[9px]">
+                          {user.role === 'reseller' ? 'Reseller' : 'Buyer'}
+                        </Badge>
+                        {user.role === 'reseller' && (
+                          <span className="text-[9px] text-muted-foreground">{user.commission_rate}% commission</span>
+                        )}
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setEditUser(user)}>
+                          <Edit2 className="h-3 w-3" />
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={() => deleteUser(user.id)}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="categories" className="space-y-4 mt-4">
+            <div className="rounded-lg border border-border bg-card p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-foreground flex items-center gap-2"><Folder className="h-4 w-4 text-primary" />Category Management</h2>
+                <Button size="sm" className="h-7 text-xs gap-1" onClick={() => setEditCategory({ id: `new-${Date.now()}`, name: '', description: '', icon: '', sort_order: categories.length, is_active: true })}>
+                  <Plus className="h-3 w-3" /> Add Category
+                </Button>
+              </div>
+              
+              {categoriesLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : categories.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-8">No categories yet. Add your first category!</p>
+              ) : (
+                <div className="space-y-2">
+                  {categories.map((category) => (
+                    <div key={category.id} className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30">
+                      <div className="flex items-center gap-3">
+                        {category.icon && <span className="text-lg">{category.icon}</span>}
+                        <div>
+                          <p className="text-xs font-semibold text-foreground">{category.name}</p>
+                          <p className="text-[10px] text-muted-foreground">{category.slug}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={category.is_active ? 'default' : 'secondary'} className="text-[9px]">
+                          {category.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setEditCategory(category)}>
+                          <Edit2 className="h-3 w-3" />
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={() => deleteCategory(category.id)}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </TabsContent>
 
           <TabsContent value="settings" className="space-y-4 mt-4">
             <div className="rounded-lg border border-border bg-card p-3 space-y-3">
@@ -2684,6 +3174,94 @@ export default function MarketplaceAdmin() {
                 <span className="text-xs text-muted-foreground">{editDiscountRule.is_active ? 'Active' : 'Disabled'}</span>
               </div>
               <Button className="h-9 text-sm" onClick={saveDiscountRule} disabled={saving}>Save Rule</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Phase 3: Category Dialog */}
+      {editCategory && (
+        <Dialog open={!!editCategory} onOpenChange={() => setEditCategory(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-sm">{editCategory.id.startsWith('new-') ? 'Add' : 'Edit'} Category</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 mt-2">
+              <Field label="Category Name"><Input value={editCategory.name} onChange={(e) => setEditCategory({ ...editCategory, name: e.target.value })} className="h-9 text-sm" placeholder="e.g., Retail" /></Field>
+              <Field label="Description"><Textarea value={editCategory.description || ''} onChange={(e) => setEditCategory({ ...editCategory, description: e.target.value })} className="min-h-[60px] text-sm" placeholder="Category description" /></Field>
+              <Field label="Icon (emoji)"><Input value={editCategory.icon || ''} onChange={(e) => setEditCategory({ ...editCategory, icon: e.target.value })} className="h-9 text-sm" placeholder="e.g., 🛒" /></Field>
+              <Field label="Sort Order"><Input type="number" value={editCategory.sort_order} onChange={(e) => setEditCategory({ ...editCategory, sort_order: Number(e.target.value || 0) })} className="h-9 text-sm" /></Field>
+              <div className="flex items-center gap-2">
+                <Switch checked={editCategory.is_active} onCheckedChange={(v) => setEditCategory({ ...editCategory, is_active: v })} />
+                <span className="text-xs text-muted-foreground">{editCategory.is_active ? 'Active' : 'Disabled'}</span>
+              </div>
+              <Button className="h-9 text-sm" onClick={saveCategory} disabled={saving}>Save Category</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Phase 3: User Dialog */}
+      {editUser && (
+        <Dialog open={!!editUser} onOpenChange={() => setEditUser(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-sm">Edit User</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 mt-2">
+              <Field label="Email"><Input value={editUser.email} disabled className="h-9 text-sm" /></Field>
+              <Field label="Full Name"><Input value={editUser.full_name || ''} onChange={(e) => setEditUser({ ...editUser, full_name: e.target.value })} className="h-9 text-sm" /></Field>
+              <Field label="Role">
+                <Select value={editUser.role} onValueChange={(v) => updateUserRole(editUser.id, v)}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="buyer">Buyer</SelectItem>
+                    <SelectItem value="reseller">Reseller</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              {editUser.role === 'reseller' && (
+                <>
+                  <Field label="Company Name"><Input value={editUser.company_name || ''} onChange={(e) => setEditUser({ ...editUser, company_name: e.target.value })} className="h-9 text-sm" /></Field>
+                  <Field label="Commission Rate (%)"><Input type="number" value={editUser.commission_rate || 10} onChange={(e) => setEditUser({ ...editUser, commission_rate: Number(e.target.value || 10) })} className="h-9 text-sm" /></Field>
+                </>
+              )}
+              <Button className="h-9 text-sm" onClick={saveUser} disabled={saving}>Save User</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Phase 3: License Dialog */}
+      {editLicense && (
+        <Dialog open={!!editLicense} onOpenChange={() => setEditLicense(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-sm">Generate License Key</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 mt-2">
+              <Field label="License Key">
+                <div className="flex gap-2">
+                  <Input value={editLicense.license_key} onChange={(e) => setEditLicense({ ...editLicense, license_key: e.target.value })} className="h-9 text-sm font-mono" />
+                  <Button size="sm" variant="outline" className="h-9" onClick={() => setEditLicense({ ...editLicense, license_key: generateLicenseKey() })}>
+                    <RefreshCw className="h-3 w-3" />
+                  </Button>
+                </div>
+              </Field>
+              <Field label="Product ID">
+                <Input value={editLicense.product_id} onChange={(e) => setEditLicense({ ...editLicense, product_id: e.target.value })} className="h-9 text-sm" placeholder="Enter product ID" />
+              </Field>
+              <Field label="User ID">
+                <Input value={editLicense.user_id} onChange={(e) => setEditLicense({ ...editLicense, user_id: e.target.value })} className="h-9 text-sm" placeholder="Enter user ID" />
+              </Field>
+              <Field label="Expiration Date (optional)">
+                <Input type="datetime-local" value={editLicense.expires_at?.slice(0, 16) || ''} onChange={(e) => setEditLicense({ ...editLicense, expires_at: e.target.value || null })} className="h-9 text-sm" />
+              </Field>
+              <div className="flex items-center gap-2">
+                <Switch checked={editLicense.status === 'active'} onCheckedChange={(v) => setEditLicense({ ...editLicense, status: v ? 'active' : 'revoked' })} />
+                <span className="text-xs text-muted-foreground">{editLicense.status === 'active' ? 'Active' : 'Revoked'}</span>
+              </div>
+              <Button className="h-9 text-sm" onClick={saveLicense} disabled={saving}>Generate License</Button>
             </div>
           </DialogContent>
         </Dialog>
