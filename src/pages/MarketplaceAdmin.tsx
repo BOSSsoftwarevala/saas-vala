@@ -439,6 +439,8 @@ export default function MarketplaceAdmin() {
     pipelineProducts: 0,
     totalSales: 0,
     totalDownloads: 0,
+    avgQualityScore: 0,
+    avgSellerReputation: 0,
   });
 
   const [saving, setSaving] = useState(false);
@@ -725,17 +727,59 @@ export default function MarketplaceAdmin() {
 
   const fetchStats = async () => {
     try {
-      const res = await marketplaceAdminApi.dashboard() as any;
-      const s = res?.stats || {};
-      setStats({
-        totalProducts: Number(s.total_products || 0),
-        activeProducts: Number(s.active_products || 0),
-        pipelineProducts: Math.max(0, Number(s.total_products || 0) - Number(s.active_products || 0)),
-        totalSales: Number(s.total_sales || 0),
-        totalDownloads: Number(s.downloads_total || 0),
-      });
-    } catch {
-      toast.error('Failed to load dashboard stats');
+      const res = await marketplaceAdminApi.getStats();
+      if (res) {
+        setStats({
+          totalProducts: res.total_products || 0,
+          activeProducts: res.active_products || 0,
+          pipelineProducts: res.pipeline_products || 0,
+          totalSales: res.total_sales || 0,
+          totalDownloads: res.total_downloads || 0,
+          avgQualityScore: res.avg_quality_score || 0,
+          avgSellerReputation: res.avg_seller_reputation || 0,
+        });
+      }
+    } catch (e) {
+      console.error('Failed to fetch stats:', e);
+    }
+  };
+
+  const calculateProductQualityScore = (product: Product): number => {
+    let score = 0;
+    
+    if (product.description && product.description.length > 100) score += 20;
+    else if (product.description) score += 10;
+    
+    if (product.thumbnail_url) score += 15;
+    if (product.demo_enabled && product.demo_url) score += 15;
+    if (product.apk_enabled) score += 10;
+    if (product.license_enabled) score += 10;
+    if (product.tags && product.tags.length > 0) score += 10;
+    score += (product.rating / 5) * 20;
+    
+    return Math.min(100, Math.round(score));
+  };
+
+  const calculateSellerReputation = async (sellerId: string): Promise<number> => {
+    try {
+      const { data: products } = await db
+        .from('marketplace_products')
+        .select('rating, status')
+        .eq('created_by', sellerId);
+      
+      if (!products || products.length === 0) return 50;
+      
+      const activeProducts = products.filter(p => p.status === 'active').length;
+      const avgRating = products.reduce((sum, p) => sum + (p.rating || 0), 0) / products.length;
+      
+      let reputation = 50;
+      reputation += (activeProducts / products.length) * 30;
+      reputation += (avgRating / 5) * 20;
+      
+      return Math.min(100, Math.round(reputation));
+    } catch (e) {
+      console.error('Failed to calculate seller reputation:', e);
+      return 50;
     }
   };
 

@@ -19,7 +19,8 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
   ShoppingCart, CreditCard, Wallet, Loader2, ChevronDown, ChevronUp, Copy, Key, Download,
-  Send, Paperclip, X,
+  Send, Paperclip, X, Grid, List, Filter, SlidersHorizontal, Star, TrendingUp,
+  Clock, DollarSign, Zap, Sparkles, Award, Flame,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -72,10 +73,59 @@ export default function Marketplace() {
   const { products, loading: productsLoading, totalCount } = useMarketplaceProducts();
   const [searchQuery, setSearchQuery] = useState('');
   const [visibleCount, setVisibleCount] = useState(50); // Start with 50 visible items
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'default' | 'price-asc' | 'price-desc' | 'rating' | 'newest' | 'trending'>('default');
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000]);
+  const [minRating, setMinRating] = useState<number>(0);
+  const [showFilters, setShowFilters] = useState(false);
+
+  const categories = useMemo(() => {
+    const cats = new Set(products.map(p => p.category || 'Other'));
+    return ['all', ...Array.from(cats)];
+  }, [products]);
+
+  const filteredProducts = useMemo(() => {
+    let filtered = serverSearchProducts && searchQuery.trim() ? serverSearchProducts : products;
+
+    // Category filter
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(p => p.category === selectedCategory);
+    }
+
+    // Price range filter
+    filtered = filtered.filter(p => p.price >= priceRange[0] && p.price <= priceRange[1]);
+
+    // Rating filter
+    if (minRating > 0) {
+      filtered = filtered.filter(p => p.rating >= minRating);
+    }
+
+    // Sorting
+    switch (sortBy) {
+      case 'price-asc':
+        filtered = [...filtered].sort((a, b) => a.price - b.price);
+        break;
+      case 'price-desc':
+        filtered = [...filtered].sort((a, b) => b.price - a.price);
+        break;
+      case 'rating':
+        filtered = [...filtered].sort((a, b) => b.rating - a.rating);
+        break;
+      case 'newest':
+        filtered = [...filtered].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+        break;
+      case 'trending':
+        filtered = [...filtered].sort((a, b) => (b.sales_count || 0) - (a.sales_count || 0));
+        break;
+    }
+
+    return filtered;
+  }, [products, serverSearchProducts, searchQuery, selectedCategory, priceRange, minRating, sortBy]);
 
   const activeProducts = useMemo(
-    () => (serverSearchProducts && searchQuery.trim() ? serverSearchProducts : products),
-    [products, serverSearchProducts, searchQuery]
+    () => filteredProducts,
+    [filteredProducts]
   );
 
   // Implement lazy loading - show more products as user scrolls
@@ -625,19 +675,168 @@ export default function Marketplace() {
           <HeroBannerSlider slides={bannerSlides} onBannerClick={handleBannerClick} />
 
         <div id="marketplace-healthcare-section" className="px-4 md:px-8 mt-4 mb-6">
-          <h2 className="text-2xl font-bold text-foreground mb-2">All Products</h2>
-          <p className="text-sm text-muted-foreground">
-            {searchQuery.trim()
-              ? `${visibleProducts.length} of ${activeProducts.length} products matching "${searchQuery.trim()}"`
-              : productsLoading
-                ? 'Loading products...'
-                : `${visibleProducts.length} of ${totalCount} products available (${totalCount} total from GitHub)`}
-          </p>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-bold text-foreground mb-2">All Products</h2>
+              <p className="text-sm text-muted-foreground">
+                {searchQuery.trim()
+                  ? `${visibleProducts.length} of ${activeProducts.length} products matching "${searchQuery.trim()}"`
+                  : productsLoading
+                    ? 'Loading products...'
+                    : `${visibleProducts.length} of ${totalCount} products available (${totalCount} total from GitHub)`}
+              </p>
+            </div>
+
+            {/* View Toggle & Filter Button */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowFilters(!showFilters)}
+                className="flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-lg hover:bg-accent transition-colors"
+              >
+                <Filter className="h-4 w-4" />
+                Filters
+              </button>
+              <div className="flex items-center border border-border rounded-lg overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 ${viewMode === 'grid' ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-accent'}`}
+                >
+                  <Grid className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 ${viewMode === 'list' ? 'bg-primary text-primary-foreground' : 'bg-card hover:bg-accent'}`}
+                >
+                  <List className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Filters Panel */}
+          {showFilters && (
+            <div className="mt-4 p-4 bg-card border border-border rounded-lg space-y-4">
+              {/* Category Filter */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">Category</label>
+                <div className="flex flex-wrap gap-2">
+                  {categories.map(cat => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setSelectedCategory(cat)}
+                      className={`px-3 py-1 rounded-full text-sm ${
+                        selectedCategory === cat
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                      }`}
+                    >
+                      {cat === 'all' ? 'All Categories' : cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Price Range Filter */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">Price Range: ₹{priceRange[0]} - ₹{priceRange[1]}</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="10000"
+                  step="100"
+                  value={priceRange[1]}
+                  onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value)])}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Rating Filter */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">Minimum Rating</label>
+                <div className="flex gap-2">
+                  {[0, 1, 2, 3, 4, 5].map(rating => (
+                    <button
+                      key={rating}
+                      type="button"
+                      onClick={() => setMinRating(rating)}
+                      className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm ${
+                        minRating === rating
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                      }`}
+                    >
+                      {rating === 0 ? 'All' : `${rating}+`}
+                      {rating > 0 && <Star className="h-3 w-3 fill-current" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Sort By */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">Sort By</label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { value: 'default', label: 'Default', icon: Sparkles },
+                    { value: 'price-asc', label: 'Price: Low to High', icon: DollarSign },
+                    { value: 'price-desc', label: 'Price: High to Low', icon: DollarSign },
+                    { value: 'rating', label: 'Highest Rated', icon: Star },
+                    { value: 'newest', label: 'Newest', icon: Clock },
+                    { value: 'trending', label: 'Trending', icon: TrendingUp },
+                  ].map(sort => (
+                    <button
+                      key={sort.value}
+                      type="button"
+                      onClick={() => setSortBy(sort.value as any)}
+                      className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${
+                        sortBy === sort.value
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                      }`}
+                    >
+                      <sort.icon className="h-3 w-3" />
+                      {sort.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Multi-row Grid Display */}
+        {/* Collections Section */}
+        <div className="px-4 md:px-8 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Award className="h-5 w-5 text-primary" />
+            <h3 className="text-lg font-bold text-foreground">Featured Collections</h3>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { name: 'Best for Startup', icon: Zap, color: 'from-blue-500 to-cyan-500' },
+              { name: 'Top 2026 Tools', icon: Flame, color: 'from-orange-500 to-red-500' },
+              { name: 'Most Popular', icon: TrendingUp, color: 'from-purple-500 to-pink-500' },
+              { name: 'New Arrivals', icon: Sparkles, color: 'from-green-500 to-emerald-500' },
+            ].map((collection, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setSearchQuery(collection.name)}
+                className={`p-4 rounded-xl bg-gradient-to-br ${collection.color} text-white text-left hover:opacity-90 transition-opacity`}
+              >
+                <collection.icon className="h-6 w-6 mb-2" />
+                <p className="font-semibold text-sm">{collection.name}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Multi-row Grid/List Display */}
         <div className="px-4 md:px-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className={`${viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4' : 'space-y-4'}`}>
             {productsLoading
               ? Array.from({ length: 8 }).map((_, index) => (
                 <div key={`marketplace-skeleton-${index}`} className="h-[420px] rounded-2xl border border-border/40 bg-card/40 animate-pulse" />

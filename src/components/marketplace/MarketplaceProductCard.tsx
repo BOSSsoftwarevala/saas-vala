@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   ShoppingCart, Bell, Heart, Star, Info, Download,
-  Package, Play, Box, Copy, ExternalLink
+  Package, Play, Box, Copy, ExternalLink, Eye, X, ChevronRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -47,6 +47,8 @@ const MarketplaceProductCard: React.FC<MarketplaceProductCardProps> = memo(({ pr
   const [featuresOpen, setFeaturesOpen] = useState(false);
   const [downloadChecking, setDownloadChecking] = useState(false);
   const [buttonLoading, setButtonLoading] = useState<string | null>(null);
+  const [showQuickView, setShowQuickView] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   
   // Performance optimizations
   const cardRef = useRef<HTMLDivElement>(null);
@@ -201,7 +203,7 @@ const MarketplaceProductCard: React.FC<MarketplaceProductCardProps> = memo(({ pr
 
     setDownloadChecking(true);
     try {
-      const downloadRes = await publicMarketplaceApi.downloadAPK(product.id);
+      const downloadRes = await publicMarketplaceApi.getDownloadUrl(product.id);
       const secureUrl = downloadRes?.download_url || downloadRes?.signed_url || downloadRes?.url;
 
       if (!downloadRes?.success || !secureUrl) {
@@ -238,11 +240,13 @@ const MarketplaceProductCard: React.FC<MarketplaceProductCardProps> = memo(({ pr
           willChange: 'transform, box-shadow',
         }}
         onMouseEnter={e => {
+          setIsHovered(true);
           e.currentTarget.style.transform = 'scale(1.05) translateY(-6px)';
           e.currentTarget.style.boxShadow = '0 20px 60px rgba(37,99,235,0.25), inset 0 1px 1px rgba(255,255,255,0.12), inset 0 0 30px rgba(37,99,235,0.1)';
           e.currentTarget.style.borderColor = 'rgba(37,99,235,0.5)';
         }}
         onMouseLeave={e => {
+          setIsHovered(false);
           e.currentTarget.style.transform = 'scale(1) translateY(0)';
           e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.08)';
           e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)';
@@ -263,6 +267,17 @@ const MarketplaceProductCard: React.FC<MarketplaceProductCardProps> = memo(({ pr
             <span className="text-[9px] font-black text-black px-2 py-0.5 rounded-full bg-amber-400 flex-shrink-0" style={{ boxShadow: '0 2px 8px rgba(251,191,36,0.3)' }}>PIPELINE</span>
           )}
           <span className="absolute top-2 right-3 text-[10px] font-bold text-white/15">#{cardRank}</span>
+          {/* Quick View Button on Hover */}
+          {isHovered && (
+            <button
+              type="button"
+              onClick={() => setShowQuickView(true)}
+              className="absolute top-2 right-10 p-1.5 rounded-full bg-primary/90 text-white hover:bg-primary transition-all"
+              title="Quick View"
+            >
+              <Eye className="h-3 w-3" />
+            </button>
+          )}
         </div>
 
         {/* Body */}
@@ -371,6 +386,62 @@ const MarketplaceProductCard: React.FC<MarketplaceProductCardProps> = memo(({ pr
                   </Button>
                 </>
               )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Quick View Dialog */}
+      {showQuickView && (
+        <Dialog open={showQuickView} onOpenChange={setShowQuickView}>
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <DialogTitle className="text-lg font-bold">{product.title}</DialogTitle>
+                  <DialogDescription className="text-sm mt-1">{product.category} • {rating} ★ • {(product as any).sales_count || 0} sales</DialogDescription>
+                </div>
+                <Badge className={cn(isPipeline ? 'bg-amber-500' : 'bg-green-500')}>
+                  {isPipeline ? 'PIPELINE' : 'LIVE'}
+                </Badge>
+              </div>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              {/* Price */}
+              <div className="flex items-center gap-3">
+                <span className="text-2xl font-black text-primary">${price}</span>
+                {originalPrice && <span className="text-lg text-muted-foreground line-through">${originalPrice}</span>}
+                {discount > 0 && <Badge variant="destructive">{discount}% OFF</Badge>}
+              </div>
+
+              {/* Description */}
+              <div className="rounded-lg bg-muted/50 p-4">
+                <p className="text-sm text-foreground">{product.subtitle || 'Complete solution with all features, reports, and integrations.'}</p>
+              </div>
+
+              {/* Features */}
+              <div>
+                <h4 className="text-sm font-bold mb-2">Key Features</h4>
+                <div className="flex flex-wrap gap-2">
+                  {features.slice(0, 6).map((f, i) => (
+                    <Badge key={i} variant="secondary" className="text-xs">{f}</Badge>
+                  ))}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                {buyEnabled && (
+                  <Button className="flex-1" onClick={() => { setShowQuickView(false); onBuyNow(product); }}>
+                    <Package className="mr-2 h-4 w-4" /> Buy Now
+                  </Button>
+                )}
+                {demoEnabled && (
+                  <Button variant="outline" className="flex-1" onClick={() => { setShowQuickView(false); if (onDemo) onDemo(product); }}>
+                    <Play className="mr-2 h-4 w-4" /> Demo
+                  </Button>
+                )}
+              </div>
             </div>
           </DialogContent>
         </Dialog>
