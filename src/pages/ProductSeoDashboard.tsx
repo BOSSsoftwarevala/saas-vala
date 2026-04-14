@@ -371,9 +371,157 @@ export default function ProductSeoDashboard() {
                 <CardDescription>Detailed SEO metrics and performance data</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>SEO Table implementation in progress</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/40">
+                      <tr>
+                        <th className="p-2 text-left">Metric</th>
+                        <th className="p-2 text-left">Value</th>
+                        <th className="p-2 text-left">Status</th>
+                        <th className="p-2 text-left">Last Updated</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-t border-border">
+                        <td className="p-2 font-medium">SEO Score</td>
+                        <td className="p-2">{seoData?.seo_score || 0}/100</td>
+                        <td className="p-2">{getStatusBadge(seoData?.seo_score >= 80 ? 'indexed' : seoData?.seo_score >= 60 ? 'pending' : 'error')}</td>
+                        <td className="p-2 text-muted-foreground">{seoData?.updated_at ? new Date(seoData.updated_at).toLocaleDateString() : '—'}</td>
+                      </tr>
+                      <tr className="border-t border-border">
+                        <td className="p-2 font-medium">Content Score</td>
+                        <td className="p-2">{seoData?.content_score || 0}/100</td>
+                        <td className="p-2">{getStatusBadge(seoData?.content_score >= 80 ? 'indexed' : seoData?.content_score >= 60 ? 'pending' : 'error')}</td>
+                        <td className="p-2 text-muted-foreground">{seoData?.updated_at ? new Date(seoData.updated_at).toLocaleDateString() : '—'}</td>
+                      </tr>
+                      <tr className="border-t border-border">
+                        <td className="p-2 font-medium">Page Speed Score</td>
+                        <td className="p-2">{seoData?.page_speed_score || 0}/100</td>
+                        <td className="p-2">{getStatusBadge(seoData?.page_speed_score >= 80 ? 'indexed' : seoData?.page_speed_score >= 60 ? 'pending' : 'error')}</td>
+                        <td className="p-2 text-muted-foreground">{seoData?.updated_at ? new Date(seoData.updated_at).toLocaleDateString() : '—'}</td>
+                      </tr>
+                      <tr className="border-t border-border">
+                        <td className="p-2 font-medium">Backlink Quality Score</td>
+                        <td className="p-2">{seoData?.backlink_quality_score || 0}/100</td>
+                        <td className="p-2">{getStatusBadge(seoData?.backlink_quality_score >= 80 ? 'indexed' : seoData?.backlink_quality_score >= 60 ? 'pending' : 'error')}</td>
+                        <td className="p-2 text-muted-foreground">{seoData?.updated_at ? new Date(seoData.updated_at).toLocaleDateString() : '—'}</td>
+                      </tr>
+                      <tr className="border-t border-border">
+                        <td className="p-2 font-medium">Internal Link Score</td>
+                        <td className="p-2">{seoData?.internal_link_score || 0}/100</td>
+                        <td className="p-2">{getStatusBadge(seoData?.internal_link_score >= 80 ? 'indexed' : seoData?.internal_link_score >= 60 ? 'pending' : 'error')}</td>
+                        <td className="p-2 text-muted-foreground">{seoData?.updated_at ? new Date(seoData.updated_at).toLocaleDateString() : '—'}</td>
+                      </tr>
+                      <tr className="border-t border-border">
+                        <td className="p-2 font-medium">Trend Match Score</td>
+                        <td className="p-2">{seoData?.trend_match_score || 0}/100</td>
+                        <td className="p-2">{getStatusBadge(seoData?.trend_match_score >= 80 ? 'indexed' : seoData?.trend_match_score >= 60 ? 'pending' : 'error')}</td>
+                        <td className="p-2 text-muted-foreground">{seoData?.updated_at ? new Date(seoData.updated_at).toLocaleDateString() : '—'}</td>
+                      </tr>
+                      <tr className="border-t border-border">
+                        <td className="p-2 font-medium">Keyword Positions</td>
+                        <td className="p-2">{seoData?.keyword_positions ? Object.keys(seoData.keyword_positions).length : 0} keywords</td>
+                        <td className="p-2">{getStatusBadge('pending')}</td>
+                        <td className="p-2 text-muted-foreground">{seoData?.updated_at ? new Date(seoData.updated_at).toLocaleDateString() : '—'}</td>
+                      </tr>
+                      <tr className="border-t border-border">
+                        <td className="p-2 font-medium">Content Gap</td>
+                        <td className="p-2">{seoData?.content_gap ? Object.keys(seoData.content_gap).length : 0} gaps</td>
+                        <td className="p-2">{getStatusBadge('pending')}</td>
+                        <td className="p-2 text-muted-foreground">{seoData?.updated_at ? new Date(seoData.updated_at).toLocaleDateString() : '—'}</td>
+                      </tr>
+                      <tr className="border-t border-border">
+                        <td className="p-2 font-medium">Index Status</td>
+                        <td className="p-2">{seoData?.index_status || 'pending'}</td>
+                        <td className="p-2">{getStatusBadge(seoData?.index_status || 'pending')}</td>
+                        <td className="p-2 text-muted-foreground">{seoData?.last_indexed_at ? new Date(seoData.last_indexed_at).toLocaleDateString() : '—'}</td>
+                      </tr>
+                      <tr className="border-t border-border">
+                        <td className="p-2 font-medium">Schema Status</td>
+                        <td className="p-2">{seoData?.schema_status || 'pending'}</td>
+                        <td className="p-2">{getStatusBadge(seoData?.schema_status || 'pending')}</td>
+                        <td className="p-2 text-muted-foreground">{seoData?.updated_at ? new Date(seoData.updated_at).toLocaleDateString() : '—'}</td>
+                      </tr>
+                      <tr className="border-t border-border">
+                        <td className="p-2 font-medium">Hreflang Status</td>
+                        <td className="p-2">{seoData?.hreflang_status || 'pending'}</td>
+                        <td className="p-2">{getStatusBadge(seoData?.hreflang_status || 'pending')}</td>
+                        <td className="p-2 text-muted-foreground">{seoData?.updated_at ? new Date(seoData.updated_at).toLocaleDateString() : '—'}</td>
+                      </tr>
+                      <tr className="border-t border-border">
+                        <td className="p-2 font-medium">Backlink Count</td>
+                        <td className="p-2">{seoData?.backlink_count || 0}</td>
+                        <td className="p-2">{getStatusBadge(seoData?.backlink_count > 0 ? 'indexed' : 'pending')}</td>
+                        <td className="p-2 text-muted-foreground">{seoData?.updated_at ? new Date(seoData.updated_at).toLocaleDateString() : '—'}</td>
+                      </tr>
+                      <tr className="border-t border-border">
+                        <td className="p-2 font-medium">Target Country</td>
+                        <td className="p-2">{seoData?.target_country || 'IN'}</td>
+                        <td className="p-2">{getStatusBadge('indexed')}</td>
+                        <td className="p-2 text-muted-foreground">{seoData?.updated_at ? new Date(seoData.updated_at).toLocaleDateString() : '—'}</td>
+                      </tr>
+                      <tr className="border-t border-border">
+                        <td className="p-2 font-medium">Target Language</td>
+                        <td className="p-2">{seoData?.target_language || 'en'}</td>
+                        <td className="p-2">{getStatusBadge('indexed')}</td>
+                        <td className="p-2 text-muted-foreground">{seoData?.updated_at ? new Date(seoData.updated_at).toLocaleDateString() : '—'}</td>
+                      </tr>
+                      <tr className="border-t border-border">
+                        <td className="p-2 font-medium">Keywords Count</td>
+                        <td className="p-2">{seoData?.keywords?.length || 0}</td>
+                        <td className="p-2">{getStatusBadge(seoData?.keywords && seoData.keywords.length > 0 ? 'indexed' : 'pending')}</td>
+                        <td className="p-2 text-muted-foreground">{seoData?.updated_at ? new Date(seoData.updated_at).toLocaleDateString() : '—'}</td>
+                      </tr>
+                      <tr className="border-t border-border">
+                        <td className="p-2 font-medium">Hashtags Count</td>
+                        <td className="p-2">{seoData?.hashtags?.length || 0}</td>
+                        <td className="p-2">{getStatusBadge(seoData?.hashtags && seoData.hashtags.length > 0 ? 'indexed' : 'pending')}</td>
+                        <td className="p-2 text-muted-foreground">{seoData?.updated_at ? new Date(seoData.updated_at).toLocaleDateString() : '—'}</td>
+                      </tr>
+                      <tr className="border-t border-border">
+                        <td className="p-2 font-medium">Auto Update Enabled</td>
+                        <td className="p-2">{seoData?.auto_update_enabled ? 'Yes' : 'No'}</td>
+                        <td className="p-2">{getStatusBadge(seoData?.auto_update_enabled ? 'indexed' : 'pending')}</td>
+                        <td className="p-2 text-muted-foreground">{seoData?.updated_at ? new Date(seoData.updated_at).toLocaleDateString() : '—'}</td>
+                      </tr>
+                      <tr className="border-t border-border">
+                        <td className="p-2 font-medium">Auto Update Timer</td>
+                        <td className="p-2">{seoData?.auto_update_timer || 7} days</td>
+                        <td className="p-2">{getStatusBadge('indexed')}</td>
+                        <td className="p-2 text-muted-foreground">{seoData?.updated_at ? new Date(seoData.updated_at).toLocaleDateString() : '—'}</td>
+                      </tr>
+                      <tr className="border-t border-border">
+                        <td className="p-2 font-medium">Competitor Data</td>
+                        <td className="p-2">{seoData?.competitor_data ? Object.keys(seoData.competitor_data).length : 0} competitors</td>
+                        <td className="p-2">{getStatusBadge('pending')}</td>
+                        <td className="p-2 text-muted-foreground">{seoData?.updated_at ? new Date(seoData.updated_at).toLocaleDateString() : '—'}</td>
+                      </tr>
+                      <tr className="border-t border-border">
+                        <td className="p-2 font-medium">Revenue Generated</td>
+                        <td className="p-2">₹{seoData?.revenue_generated || 0}</td>
+                        <td className="p-2">{getStatusBadge(seoData?.revenue_generated > 0 ? 'indexed' : 'pending')}</td>
+                        <td className="p-2 text-muted-foreground">{seoData?.updated_at ? new Date(seoData.updated_at).toLocaleDateString() : '—'}</td>
+                      </tr>
+                      <tr className="border-t border-border">
+                        <td className="p-2 font-medium">Slug</td>
+                        <td className="p-2">{seoData?.slug || '—'}</td>
+                        <td className="p-2">{getStatusBadge('indexed')}</td>
+                        <td className="p-2 text-muted-foreground">{seoData?.updated_at ? new Date(seoData.updated_at).toLocaleDateString() : '—'}</td>
+                      </tr>
+                      <tr className="border-t border-border">
+                        <td className="p-2 font-medium">Title</td>
+                        <td className="p-2 truncate max-w-xs">{seoData?.title || '—'}</td>
+                        <td className="p-2">{getStatusBadge(seoData?.title ? 'indexed' : 'error')}</td>
+                        <td className="p-2 text-muted-foreground">{seoData?.updated_at ? new Date(seoData.updated_at).toLocaleDateString() : '—'}</td>
+                      </tr>
+                      <tr className="border-t border-border">
+                        <td className="p-2 font-medium">Meta Description</td>
+                        <td className="p-2 truncate max-w-xs">{seoData?.meta_description ? seoData.meta_description.substring(0, 50) + '...' : '—'}</td>
+                        <td className="p-2">{getStatusBadge(seoData?.meta_description ? 'indexed' : 'error')}</td>
+                        <td className="p-2 text-muted-foreground">{seoData?.updated_at ? new Date(seoData.updated_at).toLocaleDateString() : '—'}</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </CardContent>
             </Card>
