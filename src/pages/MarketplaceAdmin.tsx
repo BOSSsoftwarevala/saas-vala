@@ -512,6 +512,20 @@ export default function MarketplaceAdmin() {
     lastSubmitted: null as string | null,
   });
 
+  // Phase 10: Auto Language + Translation SEO (Module 104)
+  const [translationConfig, setTranslationConfig] = useState({
+    targetLanguage: 'hi',
+    autoTranslateContent: false,
+    autoTranslateMeta: false,
+    autoTranslateTitle: false,
+    createLanguageVariants: false,
+  });
+  const [translationStats, setTranslationStats] = useState({
+    translatedPages: 0,
+    pendingTranslation: 0,
+    lastTranslated: null as string | null,
+  });
+
   const [apkForm, setApkForm] = useState({
     product_id: '',
     version: '1.0.0',
@@ -1806,6 +1820,141 @@ export default function MarketplaceAdmin() {
     } catch (e) {
       console.error('Failed to fetch indexing stats:', e);
     }
+  };
+
+  // Phase 10: Auto Language + Translation SEO (Module 104)
+  const translateContent = async () => {
+    setSaving(true);
+    try {
+      // Get pages that need translation
+      const { data: pagesToTranslate } = await db
+        .from('programmable_pages')
+        .select('*')
+        .eq('status', 'published')
+        .neq('language_code', translationConfig.targetLanguage)
+        .limit(50);
+
+      if (!pagesToTranslate || pagesToTranslate.length === 0) {
+        toast.info('No pages to translate');
+        setSaving(false);
+        return;
+      }
+
+      let translatedCount = 0;
+
+      for (const page of pagesToTranslate) {
+        const payload: any = {
+          language_code: translationConfig.targetLanguage,
+        };
+
+        if (translationConfig.autoTranslateTitle && page.title) {
+          payload.title = translateText(page.title, translationConfig.targetLanguage);
+        }
+
+        if (translationConfig.autoTranslateMeta && page.meta_description) {
+          payload.meta_description = translateText(page.meta_description, translationConfig.targetLanguage);
+        }
+
+        if (translationConfig.autoTranslateContent && page.content) {
+          payload.content = translateText(page.content, translationConfig.targetLanguage);
+        }
+
+        if (translationConfig.createLanguageVariants) {
+          // Create a new page with the translated content
+          const { error } = await db
+            .from('programmable_pages')
+            .insert({
+              slug: `${page.slug}-${translationConfig.targetLanguage}`,
+              title: payload.title || page.title,
+              page_type: page.page_type,
+              base_keyword: page.base_keyword,
+              country_code: page.country_code,
+              city: page.city,
+              language_code: translationConfig.targetLanguage,
+              meta_title: page.meta_title,
+              meta_description: payload.meta_description || page.meta_description,
+              meta_keywords: page.meta_keywords,
+              hashtags: page.hashtags,
+              content: payload.content || page.content,
+              content_template: page.content_template,
+              status: 'draft',
+              auto_generated: true,
+            });
+
+          if (!error) translatedCount++;
+        } else {
+          // Update existing page
+          const { error } = await db
+            .from('programmable_pages')
+            .update(payload)
+            .eq('id', page.id);
+
+          if (!error) translatedCount++;
+        }
+      }
+
+      setTranslationStats({
+        translatedPages: translationStats.translatedPages + translatedCount,
+        pendingTranslation: 0,
+        lastTranslated: new Date().toISOString(),
+      });
+
+      setSaving(false);
+      toast.success(`Translated ${translatedCount} pages to ${translationConfig.targetLanguage}`);
+    } catch (e) {
+      console.error('Failed to translate content:', e);
+      toast.error('Failed to translate content');
+      setSaving(false);
+    }
+  };
+
+  const translateText = (text: string, targetLang: string): string => {
+    // Placeholder for actual translation API
+    // In production, this would call Google Translate API or similar
+    const translations: Record<string, Record<string, string>> = {
+      'hi': {
+        'software': 'सॉफ्टवेयर',
+        'solutions': 'समाधान',
+        'system': 'प्रणाली',
+        'best': 'सर्वश्रेष्ठ',
+        'premium': 'प्रीमियम',
+        'top': 'शीर्ष',
+      },
+      'ar': {
+        'software': 'برنامج',
+        'solutions': 'حلول',
+        'system': 'نظام',
+        'best': 'الأفضل',
+        'premium': 'متميز',
+        'top': 'أعلى',
+      },
+      'fr': {
+        'software': 'logiciel',
+        'solutions': 'solutions',
+        'system': 'système',
+        'best': 'meilleur',
+        'premium': 'premium',
+        'top': 'top',
+      },
+      'es': {
+        'software': 'software',
+        'solutions': 'soluciones',
+        'system': 'sistema',
+        'best': 'mejor',
+        'premium': 'premium',
+        'top': 'top',
+      },
+    };
+
+    let translated = text;
+    const langDict = translations[targetLang] || {};
+    
+    Object.entries(langDict).forEach(([enWord, translatedWord]) => {
+      const regex = new RegExp(enWord, 'gi');
+      translated = translated.replace(regex, translatedWord);
+    });
+
+    return translated;
   };
 
   const fetchApks = async () => {
@@ -4981,6 +5130,77 @@ export default function MarketplaceAdmin() {
               {indexingStats.lastSubmitted && (
                 <p className="text-[10px] text-muted-foreground text-center">
                   Last submitted: {new Date(indexingStats.lastSubmitted).toLocaleString()}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Module 104: Auto Language + Translation SEO */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Globe className="h-4 w-4" /> Module 104: Auto Language + Translation SEO
+              </CardTitle>
+              <CardDescription>Auto translate pages, meta, and content to target languages</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-muted/30 rounded-lg text-center">
+                  <p className="text-[10px] text-muted-foreground">Translated Pages</p>
+                  <p className="text-lg font-bold">{translationStats.translatedPages}</p>
+                </div>
+                <div className="p-3 bg-muted/30 rounded-lg text-center">
+                  <p className="text-[10px] text-muted-foreground">Pending Translation</p>
+                  <p className="text-lg font-bold">{translationStats.pendingTranslation}</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-medium">Target Language</label>
+                <select 
+                  className="w-full h-8 text-xs rounded-md border border-input bg-background px-3"
+                  value={translationConfig.targetLanguage}
+                  onChange={(e) => setTranslationConfig({...translationConfig, targetLanguage: e.target.value})}
+                >
+                  <option value="hi">Hindi (हिन्दी)</option>
+                  <option value="ar">Arabic (العربية)</option>
+                  <option value="fr">French (Français)</option>
+                  <option value="es">Spanish (Español)</option>
+                </select>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Auto Translate Title</span>
+                <Switch 
+                  checked={translationConfig.autoTranslateTitle}
+                  onCheckedChange={(checked) => setTranslationConfig({...translationConfig, autoTranslateTitle: checked})}
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Auto Translate Meta Description</span>
+                <Switch 
+                  checked={translationConfig.autoTranslateMeta}
+                  onCheckedChange={(checked) => setTranslationConfig({...translationConfig, autoTranslateMeta: checked})}
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Auto Translate Content</span>
+                <Switch 
+                  checked={translationConfig.autoTranslateContent}
+                  onCheckedChange={(checked) => setTranslationConfig({...translationConfig, autoTranslateContent: checked})}
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Create Language Variants (New Pages)</span>
+                <Switch 
+                  checked={translationConfig.createLanguageVariants}
+                  onCheckedChange={(checked) => setTranslationConfig({...translationConfig, createLanguageVariants: checked})}
+                />
+              </div>
+              <Button size="sm" className="w-full" onClick={translateContent} disabled={saving}>
+                {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Translate Content'}
+              </Button>
+              {translationStats.lastTranslated && (
+                <p className="text-[10px] text-muted-foreground text-center">
+                  Last translated: {new Date(translationStats.lastTranslated).toLocaleString()}
                 </p>
               )}
             </CardContent>
