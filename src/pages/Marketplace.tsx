@@ -3,6 +3,8 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { MarketplaceHeader } from '@/components/marketplace/MarketplaceHeader';
 import { MarketplaceProductCard } from '@/components/marketplace/MarketplaceProductCard';
 import { HeroBannerSlider } from '@/components/marketplace/HeroBannerSlider';
+import { TopTickerBar } from '@/components/marketplace/TopTickerBar';
+import { BannerHeroSlider } from '@/components/marketplace/BannerHeroSlider';
 import { useMarketplaceProducts, type MarketplaceProduct } from '@/hooks/useMarketplaceProducts';
 import { toast } from 'sonner';
 import { useFraudDetection } from '@/hooks/useFraudDetection';
@@ -781,24 +783,12 @@ export default function Marketplace() {
         onSearchSubmit={handleSearchSubmit}
       />
       <div className="pt-16">
-        {/* Top Offers Strip */}
-        <div className="bg-primary/10 border-b border-primary/20 py-2 overflow-hidden">
-          <div className="flex items-center whitespace-nowrap animate-marquee">
-            {offers.map((offer, i) => (
-              <button
-                type="button"
-                key={i}
-                className="inline-flex items-center mx-6 text-sm font-medium text-primary cursor-pointer hover:text-primary/80 transition-colors"
-                onClick={() => handleOfferClick(offer)}
-              >
-                {offer}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* Dynamic Top Ticker Bar */}
+        <TopTickerBar />
 
         <main className="pb-8">
-          <HeroBannerSlider slides={bannerSlides} onBannerClick={handleBannerClick} />
+          {/* Dynamic Banner Hero Slider */}
+          <BannerHeroSlider />
 
         <div id="marketplace-healthcare-section" className="px-4 md:px-8 mt-4 mb-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">

@@ -28,7 +28,7 @@ import {
   Search, Plus, Edit2, Trash2, Layout, Menu, Package, Truck, CreditCard, Tags, RefreshCw,
   Upload, Download, Eye, Copy, X, ChevronRight, Loader2, CheckCircle, XCircle, AlertCircle, Info,
   BarChart3, Calendar, MessageSquare, Clock, TrendingUp, Users, DollarSign, Star, ThumbsUp, ThumbsDown,
-  Folder,
+  Folder, Image,
 } from 'lucide-react';
 import { generateProductThumbnail } from '@/lib/thumbnailGenerator';
 import { marketplaceAdminApi } from '@/lib/api';
@@ -441,6 +441,15 @@ export default function MarketplaceAdmin() {
   const [licenses, setLicenses] = useState<any[]>([]);
   const [licensesLoading, setLicensesLoading] = useState(true);
   const [editLicense, setEditLicense] = useState<any>(null);
+
+  // Phase 4: Banner + Ticker Management
+  const [tickerMessages, setTickerMessages] = useState<any[]>([]);
+  const [tickerLoading, setTickerLoading] = useState(true);
+  const [editTicker, setEditTicker] = useState<any>(null);
+  const [bannerSlides, setBannerSlides] = useState<any[]>([]);
+  const [bannerLoading, setBannerLoading] = useState(true);
+  const [editBanner, setEditBanner] = useState<any>(null);
+  const [bannerSettings, setBannerSettings] = useState<any>(null);
 
   const [apkForm, setApkForm] = useState({
     product_id: '',
@@ -958,6 +967,202 @@ export default function MarketplaceAdmin() {
     }
   };
 
+  // Phase 4: Fetch ticker messages
+  const fetchTickerMessages = async () => {
+    setTickerLoading(true);
+    try {
+      const { data, error } = await (db as any)
+        .from('marketplace_ticker_messages')
+        .select('*')
+        .order('sort_order', { ascending: true });
+
+      if (error) {
+        console.error('Failed to fetch ticker messages:', error);
+        setTickerMessages([]);
+      } else {
+        setTickerMessages(data || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch ticker messages:', e);
+      setTickerMessages([]);
+    } finally {
+      setTickerLoading(false);
+    }
+  };
+
+  // Phase 4: Save ticker message
+  const saveTickerMessage = async () => {
+    if (!editTicker) return;
+    if (!editTicker.message.trim()) {
+      toast.error('Message is required');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const payload = {
+        message_type: editTicker.message_type,
+        message: editTicker.message.trim(),
+        emoji: editTicker.emoji || null,
+        is_active: Boolean(editTicker.is_active),
+        sort_order: Number(editTicker.sort_order || 0),
+      };
+
+      const query = editTicker.id.startsWith('new-')
+        ? db.from('marketplace_ticker_messages').insert(payload)
+        : db.from('marketplace_ticker_messages').update(payload).eq('id', editTicker.id);
+
+      const { error } = await query;
+      setSaving(false);
+
+      if (error) toast.error(error.message);
+      else {
+        toast.success('Ticker message saved');
+        setEditTicker(null);
+        fetchTickerMessages();
+      }
+    } catch (e) {
+      console.error('Failed to save ticker message:', e);
+      toast.error('Failed to save ticker message');
+      setSaving(false);
+    }
+  };
+
+  // Phase 4: Delete ticker message
+  const deleteTickerMessage = async (id: string) => {
+    if (!confirm('Delete this ticker message?')) return;
+    const { error } = await (db as any).from('marketplace_ticker_messages').delete().eq('id', id);
+    if (error) toast.error(error.message);
+    else {
+      toast.success('Ticker message deleted');
+      fetchTickerMessages();
+    }
+  };
+
+  // Phase 4: Fetch banner slides
+  const fetchBannerSlides = async () => {
+    setBannerLoading(true);
+    try {
+      const { data, error } = await (db as any)
+        .from('marketplace_banner_slides')
+        .select('*')
+        .order('sort_order', { ascending: true });
+
+      if (error) {
+        console.error('Failed to fetch banner slides:', error);
+        setBannerSlides([]);
+      } else {
+        setBannerSlides(data || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch banner slides:', e);
+      setBannerSlides([]);
+    } finally {
+      setBannerLoading(false);
+    }
+  };
+
+  // Phase 4: Save banner slide
+  const saveBannerSlide = async () => {
+    if (!editBanner) return;
+
+    setSaving(true);
+    try {
+      const payload = {
+        slide_type: editBanner.slide_type,
+        product_id: editBanner.product_id || null,
+        title: editBanner.title || null,
+        description: editBanner.description || null,
+        cta_text: editBanner.cta_text || null,
+        cta_link: editBanner.cta_link || null,
+        background_gradient: editBanner.background_gradient || null,
+        is_active: Boolean(editBanner.is_active),
+        sort_order: Number(editBanner.sort_order || 0),
+      };
+
+      const query = editBanner.id.startsWith('new-')
+        ? db.from('marketplace_banner_slides').insert(payload)
+        : db.from('marketplace_banner_slides').update(payload).eq('id', editBanner.id);
+
+      const { error } = await query;
+      setSaving(false);
+
+      if (error) toast.error(error.message);
+      else {
+        toast.success('Banner slide saved');
+        setEditBanner(null);
+        fetchBannerSlides();
+      }
+    } catch (e) {
+      console.error('Failed to save banner slide:', e);
+      toast.error('Failed to save banner slide');
+      setSaving(false);
+    }
+  };
+
+  // Phase 4: Delete banner slide
+  const deleteBannerSlide = async (id: string) => {
+    if (!confirm('Delete this banner slide?')) return;
+    const { error } = await (db as any).from('marketplace_banner_slides').delete().eq('id', id);
+    if (error) toast.error(error.message);
+    else {
+      toast.success('Banner slide deleted');
+      fetchBannerSlides();
+    }
+  };
+
+  // Phase 4: Fetch banner settings
+  const fetchBannerSettings = async () => {
+    try {
+      const { data, error } = await (db as any)
+        .from('marketplace_banner_settings')
+        .select('*')
+        .single();
+
+      if (error) {
+        console.error('Failed to fetch banner settings:', error);
+      } else {
+        setBannerSettings(data);
+      }
+    } catch (e) {
+      console.error('Failed to fetch banner settings:', e);
+    }
+  };
+
+  // Phase 4: Save banner settings
+  const saveBannerSettings = async () => {
+    if (!bannerSettings) return;
+
+    setSaving(true);
+    try {
+      const payload = {
+        ticker_enabled: Boolean(bannerSettings.ticker_enabled),
+        ticker_speed: Number(bannerSettings.ticker_speed || 10),
+        ticker_color_theme: bannerSettings.ticker_color_theme || 'orange',
+        banner_enabled: Boolean(bannerSettings.banner_enabled),
+        banner_speed: Number(bannerSettings.banner_speed || 5),
+        banner_auto_rotate: Boolean(bannerSettings.banner_auto_rotate),
+      };
+
+      const { error } = await (db as any)
+        .from('marketplace_banner_settings')
+        .update(payload)
+        .eq('id', bannerSettings.id);
+
+      setSaving(false);
+
+      if (error) toast.error(error.message);
+      else {
+        toast.success('Banner settings saved');
+        fetchBannerSettings();
+      }
+    } catch (e) {
+      console.error('Failed to save banner settings:', e);
+      toast.error('Failed to save banner settings');
+      setSaving(false);
+    }
+  };
+
   const fetchApks = async () => {
     setApksLoading(true);
     const [{ data: apkData }, { data: versionData }] = await Promise.all([
@@ -1252,6 +1457,9 @@ export default function MarketplaceAdmin() {
       fetchCategories(),
       fetchUsers(),
       fetchLicenses(),
+      fetchTickerMessages(),
+      fetchBannerSlides(),
+      fetchBannerSettings(),
     ]);
     setProductsLoading(false);
   };
@@ -2118,12 +2326,13 @@ export default function MarketplaceAdmin() {
         </div>
 
         <Tabs defaultValue="settings" className="w-full">
-          <TabsList className="grid h-10 w-full grid-cols-12">
+          <TabsList className="grid h-10 w-full grid-cols-13">
             <TabsTrigger value="settings" className="text-[10px] gap-1"><Layout className="h-3 w-3" />Settings</TabsTrigger>
             <TabsTrigger value="products" className="text-[10px] gap-1"><Package className="h-3 w-3" />Products</TabsTrigger>
             <TabsTrigger value="categories" className="text-[10px] gap-1"><Folder className="h-3 w-3" />Categories</TabsTrigger>
             <TabsTrigger value="users" className="text-[10px] gap-1"><Users className="h-3 w-3" />Users</TabsTrigger>
             <TabsTrigger value="licenses" className="text-[10px] gap-1"><Shield className="h-3 w-3" />Licenses</TabsTrigger>
+            <TabsTrigger value="banner" className="text-[10px] gap-1"><Image className="h-3 w-3" />Banner</TabsTrigger>
             <TabsTrigger value="apk" className="text-[10px] gap-1"><Truck className="h-3 w-3" />APK</TabsTrigger>
             <TabsTrigger value="payments" className="text-[10px] gap-1"><CreditCard className="h-3 w-3" />Payments</TabsTrigger>
             <TabsTrigger value="offers" className="text-[10px] gap-1"><Tags className="h-3 w-3" />Offers</TabsTrigger>
@@ -2179,6 +2388,123 @@ export default function MarketplaceAdmin() {
                   ))}
                 </div>
               )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="banner" className="space-y-4 mt-4">
+            <div className="rounded-lg border border-border bg-card p-3 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-foreground flex items-center gap-2"><Image className="h-4 w-4 text-primary" />Banner Control</h2>
+              </div>
+
+              {/* Banner Settings */}
+              {bannerSettings && (
+                <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
+                  <h3 className="text-xs font-semibold text-foreground">Banner Settings</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted-foreground">Ticker Enabled</label>
+                      <Switch checked={bannerSettings.ticker_enabled} onCheckedChange={(checked) => setBannerSettings({ ...bannerSettings, ticker_enabled: checked })} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted-foreground">Banner Enabled</label>
+                      <Switch checked={bannerSettings.banner_enabled} onCheckedChange={(checked) => setBannerSettings({ ...bannerSettings, banner_enabled: checked })} />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted-foreground">Ticker Speed (sec)</label>
+                      <Input type="number" value={bannerSettings.ticker_speed} onChange={(e) => setBannerSettings({ ...bannerSettings, ticker_speed: parseInt(e.target.value) })} className="h-7 text-xs" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted-foreground">Banner Speed (sec)</label>
+                      <Input type="number" value={bannerSettings.banner_speed} onChange={(e) => setBannerSettings({ ...bannerSettings, banner_speed: parseInt(e.target.value) })} className="h-7 text-xs" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted-foreground">Ticker Color Theme</label>
+                      <Select value={bannerSettings.ticker_color_theme} onValueChange={(value) => setBannerSettings({ ...bannerSettings, ticker_color_theme: value })}>
+                        <SelectTrigger className="h-7 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="orange">Orange</SelectItem>
+                          <SelectItem value="blue">Blue</SelectItem>
+                          <SelectItem value="purple">Purple</SelectItem>
+                          <SelectItem value="green">Green</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-muted-foreground">Auto Rotate Banner</label>
+                      <Switch checked={bannerSettings.banner_auto_rotate} onCheckedChange={(checked) => setBannerSettings({ ...bannerSettings, banner_auto_rotate: checked })} />
+                    </div>
+                  </div>
+                  <Button size="sm" className="h-7 text-xs" onClick={saveBannerSettings} disabled={saving}>
+                    {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save Settings'}
+                  </Button>
+                </div>
+              )}
+
+              {/* Ticker Messages */}
+              <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-semibold text-foreground">Ticker Messages</h3>
+                  <Button size="sm" className="h-7 text-xs gap-1" onClick={() => setEditTicker({ id: `new-${Date.now()}`, message_type: 'offer', message: '', emoji: '', is_active: true, sort_order: 0 })}>
+                    <Plus className="h-3 w-3" /> Add Message
+                  </Button>
+                </div>
+                {tickerLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </div>
+                ) : tickerMessages.length === 0 ? (
+                  <p className="text-[10px] text-muted-foreground text-center py-4">No ticker messages</p>
+                ) : (
+                  <div className="space-y-2">
+                    {tickerMessages.map((ticker) => (
+                      <div key={ticker.id} className="flex items-center gap-2 p-2 rounded bg-card border border-border">
+                        <span className="text-lg">{ticker.emoji || '📢'}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium truncate">{ticker.message}</p>
+                          <p className="text-[10px] text-muted-foreground">{ticker.message_type}</p>
+                        </div>
+                        <Badge variant={ticker.is_active ? 'default' : 'secondary'} className="text-[9px]">{ticker.is_active ? 'ON' : 'OFF'}</Badge>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setEditTicker(ticker)}><Edit2 className="h-3 w-3" /></Button>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => deleteTickerMessage(ticker.id)}><Trash2 className="h-3 w-3" /></Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Banner Slides */}
+              <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-semibold text-foreground">Banner Slides</h3>
+                  <Button size="sm" className="h-7 text-xs gap-1" onClick={() => setEditBanner({ id: `new-${Date.now()}`, slide_type: 'product', product_id: null, title: '', description: '', cta_text: '', cta_link: '', background_gradient: '', is_active: true, sort_order: 0 })}>
+                    <Plus className="h-3 w-3" /> Add Slide
+                  </Button>
+                </div>
+                {bannerLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </div>
+                ) : bannerSlides.length === 0 ? (
+                  <p className="text-[10px] text-muted-foreground text-center py-4">No banner slides</p>
+                ) : (
+                  <div className="space-y-2">
+                    {bannerSlides.map((slide) => (
+                      <div key={slide.id} className="flex items-center gap-2 p-2 rounded bg-card border border-border">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium truncate">{slide.title || slide.slide_type}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">{slide.description || slide.cta_text || '—'}</p>
+                        </div>
+                        <Badge variant={slide.is_active ? 'default' : 'secondary'} className="text-[9px]">{slide.is_active ? 'ON' : 'OFF'}</Badge>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setEditBanner(slide)}><Edit2 className="h-3 w-3" /></Button>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => deleteBannerSlide(slide.id)}><Trash2 className="h-3 w-3" /></Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </TabsContent>
 
@@ -3262,6 +3588,96 @@ export default function MarketplaceAdmin() {
                 <span className="text-xs text-muted-foreground">{editLicense.status === 'active' ? 'Active' : 'Revoked'}</span>
               </div>
               <Button className="h-9 text-sm" onClick={saveLicense} disabled={saving}>Generate License</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Phase 4: Ticker Message Dialog */}
+      {editTicker && (
+        <Dialog open={!!editTicker} onOpenChange={() => setEditTicker(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-sm">{editTicker.id.startsWith('new-') ? 'Add' : 'Edit'} Ticker Message</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 mt-2">
+              <Field label="Message Type">
+                <Select value={editTicker.message_type} onValueChange={(v) => setEditTicker({ ...editTicker, message_type: v })}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="offer">Offer</SelectItem>
+                    <SelectItem value="franchise">Franchise</SelectItem>
+                    <SelectItem value="product">Product</SelectItem>
+                    <SelectItem value="lead">Lead</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Message">
+                <Input value={editTicker.message} onChange={(e) => setEditTicker({ ...editTicker, message: e.target.value })} className="h-9 text-sm" placeholder="Enter ticker message" />
+              </Field>
+              <Field label="Emoji">
+                <Input value={editTicker.emoji || ''} onChange={(e) => setEditTicker({ ...editTicker, emoji: e.target.value })} className="h-9 text-sm" placeholder="🔥" />
+              </Field>
+              <Field label="Sort Order">
+                <Input type="number" value={editTicker.sort_order} onChange={(e) => setEditTicker({ ...editTicker, sort_order: Number(e.target.value || 0) })} className="h-9 text-sm" />
+              </Field>
+              <div className="flex items-center gap-2">
+                <Switch checked={editTicker.is_active} onCheckedChange={(v) => setEditTicker({ ...editTicker, is_active: v })} />
+                <span className="text-xs text-muted-foreground">{editTicker.is_active ? 'Active' : 'Disabled'}</span>
+              </div>
+              <Button className="h-9 text-sm" onClick={saveTickerMessage} disabled={saving}>Save Message</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Phase 4: Banner Slide Dialog */}
+      {editBanner && (
+        <Dialog open={!!editBanner} onOpenChange={() => setEditBanner(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-sm">{editBanner.id.startsWith('new-') ? 'Add' : 'Edit'} Banner Slide</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 mt-2">
+              <Field label="Slide Type">
+                <Select value={editBanner.slide_type} onValueChange={(v) => setEditBanner({ ...editBanner, slide_type: v })}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="product">Product</SelectItem>
+                    <SelectItem value="offer">Offer</SelectItem>
+                    <SelectItem value="franchise">Franchise</SelectItem>
+                    <SelectItem value="category">Category</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              {editBanner.slide_type === 'product' && (
+                <Field label="Product ID">
+                  <Input value={editBanner.product_id || ''} onChange={(e) => setEditBanner({ ...editBanner, product_id: e.target.value })} className="h-9 text-sm" placeholder="Enter product ID" />
+                </Field>
+              )}
+              <Field label="Title">
+                <Input value={editBanner.title || ''} onChange={(e) => setEditBanner({ ...editBanner, title: e.target.value })} className="h-9 text-sm" placeholder="Slide title" />
+              </Field>
+              <Field label="Description">
+                <Input value={editBanner.description || ''} onChange={(e) => setEditBanner({ ...editBanner, description: e.target.value })} className="h-9 text-sm" placeholder="Slide description" />
+              </Field>
+              <Field label="CTA Text">
+                <Input value={editBanner.cta_text || ''} onChange={(e) => setEditBanner({ ...editBanner, cta_text: e.target.value })} className="h-9 text-sm" placeholder="Button text" />
+              </Field>
+              <Field label="CTA Link">
+                <Input value={editBanner.cta_link || ''} onChange={(e) => setEditBanner({ ...editBanner, cta_link: e.target.value })} className="h-9 text-sm" placeholder="Button link" />
+              </Field>
+              <Field label="Background Gradient">
+                <Input value={editBanner.background_gradient || ''} onChange={(e) => setEditBanner({ ...editBanner, background_gradient: e.target.value })} className="h-9 text-sm" placeholder="from-blue-500 to-purple-500" />
+              </Field>
+              <Field label="Sort Order">
+                <Input type="number" value={editBanner.sort_order} onChange={(e) => setEditBanner({ ...editBanner, sort_order: Number(e.target.value || 0) })} className="h-9 text-sm" />
+              </Field>
+              <div className="flex items-center gap-2">
+                <Switch checked={editBanner.is_active} onCheckedChange={(v) => setEditBanner({ ...editBanner, is_active: v })} />
+                <span className="text-xs text-muted-foreground">{editBanner.is_active ? 'Active' : 'Disabled'}</span>
+              </div>
+              <Button className="h-9 text-sm" onClick={saveBannerSlide} disabled={saving}>Save Slide</Button>
             </div>
           </DialogContent>
         </Dialog>
