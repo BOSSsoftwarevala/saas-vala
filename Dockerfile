@@ -16,6 +16,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Remove any timestamped files that might cause build issues
+RUN find . -name '*.timestamp-*' -delete
+
 # Build the application
 RUN npm run build
 
