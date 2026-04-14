@@ -535,9 +535,76 @@ export default function ProductSeoDashboard() {
                 <CardDescription>Track keyword positions and performance</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>Keyword tracking implementation in progress</p>
+                <div className="space-y-4">
+                  {/* Add Keyword Form */}
+                  <div className="flex gap-2">
+                    <Input placeholder="Add new keyword..." className="h-9 text-sm" />
+                    <Button size="sm" className="h-9">
+                      <Plus className="h-4 w-4 mr-2" /> Add
+                    </Button>
+                  </div>
+
+                  {/* Keywords List */}
+                  {seoData?.keywords && seoData.keywords.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead className="bg-muted/40">
+                          <tr>
+                            <th className="p-2 text-left">Keyword</th>
+                            <th className="p-2 text-center">Position</th>
+                            <th className="p-2 text-center">Change</th>
+                            <th className="p-2 text-center">Volume</th>
+                            <th className="p-2 text-center">Difficulty</th>
+                            <th className="p-2 text-center">Status</th>
+                            <th className="p-2 text-center">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {seoData.keywords.map((keyword, index) => (
+                            <tr key={index} className="border-t border-border">
+                              <td className="p-2 font-medium">{keyword}</td>
+                              <td className="p-2 text-center">
+                                {seoData.keyword_positions?.[keyword] || '—'}
+                              </td>
+                              <td className="p-2 text-center">
+                                <span className="text-green-500">↑</span>
+                              </td>
+                              <td className="p-2 text-center">—</td>
+                              <td className="p-2 text-center">—</td>
+                              <td className="p-2 text-center">
+                                {getStatusBadge('pending')}
+                              </td>
+                              <td className="p-2 text-center">
+                                <Button variant="ghost" size="icon" className="h-6 w-6">
+                                  <Edit2 className="h-3 w-3" />
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Search className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No keywords tracked yet</p>
+                      <p className="text-xs mt-2">Add keywords to start tracking their performance</p>
+                    </div>
+                  )}
+
+                  {/* Hashtags */}
+                  {seoData?.hashtags && seoData.hashtags.length > 0 && (
+                    <div className="border-t border-border pt-4">
+                      <h4 className="text-sm font-medium mb-3">Hashtags</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {seoData.hashtags.map((hashtag, index) => (
+                          <Badge key={index} variant="secondary">
+                            #{hashtag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
