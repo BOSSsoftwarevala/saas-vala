@@ -451,6 +451,19 @@ export default function MarketplaceAdmin() {
   const [editBanner, setEditBanner] = useState<any>(null);
   const [bannerSettings, setBannerSettings] = useState<any>(null);
 
+  // Phase 5: Programmable Pages Management (Module 101)
+  const [programmablePages, setProgrammablePages] = useState<any[]>([]);
+  const [programmablePagesLoading, setProgrammablePagesLoading] = useState(true);
+  const [editProgrammablePage, setEditProgrammablePage] = useState<any>(null);
+  const [pageGenerationConfig, setPageGenerationConfig] = useState({
+    baseKeywords: '',
+    targetCountries: 'all',
+    targetCities: '',
+    pageTemplate: 'default',
+    autoGenerateContent: false,
+    autoIndexPages: false,
+  });
+
   const [apkForm, setApkForm] = useState({
     product_id: '',
     version: '1.0.0',
@@ -1163,6 +1176,172 @@ export default function MarketplaceAdmin() {
     }
   };
 
+  // Phase 5: Programmable Pages Management (Module 101)
+  const fetchProgrammablePages = async () => {
+    setProgrammablePagesLoading(true);
+    try {
+      const { data } = await db
+        .from('programmable_pages')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      setProgrammablePages(data || []);
+      setProgrammablePagesLoading(false);
+    } catch (e) {
+      console.error('Failed to fetch programmable pages:', e);
+      setProgrammablePagesLoading(false);
+    }
+  };
+
+  const saveProgrammablePage = async (page: any) => {
+    setSaving(true);
+    try {
+      const payload = {
+        slug: page.slug,
+        title: page.title,
+        page_type: page.page_type,
+        base_keyword: page.base_keyword,
+        country_code: page.country_code,
+        city: page.city,
+        language_code: page.language_code,
+        meta_title: page.meta_title,
+        meta_description: page.meta_description,
+        meta_keywords: page.meta_keywords,
+        hashtags: page.hashtags,
+        content: page.content,
+        content_template: page.content_template,
+        status: page.status || 'draft',
+        auto_generated: page.auto_generated || false,
+        auto_index_enabled: page.auto_index_enabled || false,
+        auto_update_enabled: page.auto_update_enabled || false,
+      };
+
+      if (page.id) {
+        const { error } = await db
+          .from('programmable_pages')
+          .update(payload)
+          .eq('id', page.id);
+
+        setSaving(false);
+
+        if (error) toast.error(error.message);
+        else {
+          toast.success('Programmable page updated');
+          fetchProgrammablePages();
+          setEditProgrammablePage(null);
+        }
+      } else {
+        const { error } = await db
+          .from('programmable_pages')
+          .insert(payload)
+          .select();
+
+        setSaving(false);
+
+        if (error) toast.error(error.message);
+        else {
+          toast.success('Programmable page created');
+          fetchProgrammablePages();
+          setEditProgrammablePage(null);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to save programmable page:', e);
+      toast.error('Failed to save programmable page');
+      setSaving(false);
+    }
+  };
+
+  const deleteProgrammablePage = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this programmable page?')) return;
+
+    try {
+      const { error } = await db
+        .from('programmable_pages')
+        .delete()
+        .eq('id', id);
+
+      if (error) toast.error(error.message);
+      else {
+        toast.success('Programmable page deleted');
+        fetchProgrammablePages();
+      }
+    } catch (e) {
+      console.error('Failed to delete programmable page:', e);
+      toast.error('Failed to delete programmable page');
+    }
+  };
+
+  const generateProgrammablePages = async () => {
+    if (!pageGenerationConfig.baseKeywords) {
+      toast.error('Please enter base keywords');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const keywords = pageGenerationConfig.baseKeywords.split(',').map(k => k.trim());
+      const countries = pageGenerationConfig.targetCountries === 'all' 
+        ? ['IN', 'US', 'AE', 'UK', 'CA'] 
+        : [pageGenerationConfig.targetCountries];
+      const cities = pageGenerationConfig.targetCities 
+        ? pageGenerationConfig.targetCities.split(',').map(c => c.trim())
+        : [];
+
+      const pagesToCreate: any[] = [];
+
+      // Generate combinations
+      keywords.forEach(keyword => {
+        countries.forEach(country => {
+          // Country-specific page
+          pagesToCreate.push({
+            slug: `${keyword}-${country.toLowerCase()}`,
+            title: `${keyword.replace(/-/g, ' ').toUpperCase()} ${country}`,
+            page_type: 'service',
+            base_keyword: keyword,
+            country_code: country,
+            language_code: 'en',
+            status: 'draft',
+            auto_generated: true,
+          });
+
+          // City-specific pages if cities provided
+          cities.forEach(city => {
+            pagesToCreate.push({
+              slug: `${keyword}-${city.toLowerCase()}-${country.toLowerCase()}`,
+              title: `${keyword.replace(/-/g, ' ').toUpperCase()} ${city} ${country}`,
+              page_type: 'location',
+              base_keyword: keyword,
+              country_code: country,
+              city: city,
+              language_code: 'en',
+              status: 'draft',
+              auto_generated: true,
+            });
+          });
+        });
+      });
+
+      // Batch insert
+      const { error } = await db
+        .from('programmable_pages')
+        .insert(pagesToCreate);
+
+      setSaving(false);
+
+      if (error) toast.error(error.message);
+      else {
+        toast.success(`Generated ${pagesToCreate.length} programmable pages`);
+        fetchProgrammablePages();
+      }
+    } catch (e) {
+      console.error('Failed to generate programmable pages:', e);
+      toast.error('Failed to generate programmable pages');
+      setSaving(false);
+    }
+  };
+
   const fetchApks = async () => {
     setApksLoading(true);
     const [{ data: apkData }, { data: versionData }] = await Promise.all([
@@ -1460,6 +1639,7 @@ export default function MarketplaceAdmin() {
       fetchTickerMessages(),
       fetchBannerSlides(),
       fetchBannerSettings(),
+      fetchProgrammablePages(),
     ]);
     setProductsLoading(false);
   };
@@ -3952,11 +4132,20 @@ export default function MarketplaceAdmin() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-xs font-medium">Base Keywords</label>
-                  <Input placeholder="crm-software, inventory-system, pos-system" className="h-8 text-xs" />
+                  <Input 
+                    placeholder="crm-software, inventory-system, pos-system" 
+                    className="h-8 text-xs"
+                    value={pageGenerationConfig.baseKeywords}
+                    onChange={(e) => setPageGenerationConfig({...pageGenerationConfig, baseKeywords: e.target.value})}
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-medium">Target Countries</label>
-                  <select className="w-full h-8 text-xs rounded-md border border-input bg-background px-3">
+                  <select 
+                    className="w-full h-8 text-xs rounded-md border border-input bg-background px-3"
+                    value={pageGenerationConfig.targetCountries}
+                    onChange={(e) => setPageGenerationConfig({...pageGenerationConfig, targetCountries: e.target.value})}
+                  >
                     <option value="all">All Countries</option>
                     <option value="IN">India</option>
                     <option value="US">USA</option>
@@ -3967,11 +4156,20 @@ export default function MarketplaceAdmin() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-medium">Target Cities</label>
-                  <Input placeholder="mumbai, delhi, bangalore" className="h-8 text-xs" />
+                  <Input 
+                    placeholder="mumbai, delhi, bangalore" 
+                    className="h-8 text-xs"
+                    value={pageGenerationConfig.targetCities}
+                    onChange={(e) => setPageGenerationConfig({...pageGenerationConfig, targetCities: e.target.value})}
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-medium">Page Template</label>
-                  <select className="w-full h-8 text-xs rounded-md border border-input bg-background px-3">
+                  <select 
+                    className="w-full h-8 text-xs rounded-md border border-input bg-background px-3"
+                    value={pageGenerationConfig.pageTemplate}
+                    onChange={(e) => setPageGenerationConfig({...pageGenerationConfig, pageTemplate: e.target.value})}
+                  >
                     <option value="default">Default Template</option>
                     <option value="service">Service Page</option>
                     <option value="location">Location Page</option>
@@ -3980,15 +4178,52 @@ export default function MarketplaceAdmin() {
               </div>
               <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
                 <span className="text-xs">Auto Generate Content</span>
-                <Switch checked={false} />
+                <Switch 
+                  checked={pageGenerationConfig.autoGenerateContent}
+                  onCheckedChange={(checked) => setPageGenerationConfig({...pageGenerationConfig, autoGenerateContent: checked})}
+                />
               </div>
               <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
                 <span className="text-xs">Auto Index Pages</span>
-                <Switch checked={false} />
+                <Switch 
+                  checked={pageGenerationConfig.autoIndexPages}
+                  onCheckedChange={(checked) => setPageGenerationConfig({...pageGenerationConfig, autoIndexPages: checked})}
+                />
               </div>
-              <Button size="sm" className="w-full" onClick={() => toast.info('Page Factory coming soon')}>
-                Generate Pages
+              <Button size="sm" className="w-full" onClick={generateProgrammablePages} disabled={saving}>
+                {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Generate Pages'}
               </Button>
+
+              {/* Programmable Pages List */}
+              <div className="mt-4">
+                <h3 className="text-xs font-semibold mb-2">Generated Pages ({programmablePages.length})</h3>
+                {programmablePagesLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </div>
+                ) : programmablePages.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">No pages generated yet</p>
+                ) : (
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {programmablePages.slice(0, 10).map((page) => (
+                      <div key={page.id} className="flex items-center justify-between p-2 rounded bg-muted/30 text-xs">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{page.title}</p>
+                          <p className="text-muted-foreground truncate">/{page.slug}</p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Badge variant={page.status === 'published' ? 'default' : 'secondary'} className="text-[9px]">
+                            {page.status}
+                          </Badge>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteProgrammablePage(page.id)}>
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
 
