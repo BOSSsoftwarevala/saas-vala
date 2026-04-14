@@ -71,6 +71,7 @@ const Automation = React.lazy(() => import("./pages/Automation"));
 const Cart = React.lazy(() => import("./pages/Cart"));
 const OfflineAppTemplate = React.lazy(() => import("./pages/OfflineAppTemplate"));
 const MarketplaceAdmin = React.lazy(() => import("./pages/MarketplaceAdmin"));
+const ProductSeoDashboard = React.lazy(() => import("./pages/ProductSeoDashboard"));
 
 // PWA Components - grouped for better chunking
 const EduPwa = React.lazy(() => import("./pages/EduPwa"));
@@ -201,6 +202,7 @@ function AppRoutes() {
         <Route path="/" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
         <Route path="/marketplace" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
         <Route path="/marketplace/product/:id" element={<LazyWrapper><ProductDetail /></LazyWrapper>} />
+        <Route path="/product/:slug/seo-dashboard" element={<LazyWrapper><ProductSeoDashboard /></LazyWrapper>} />
         <Route path="/marketplace/category/:category" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
         <Route path="/marketplace/search" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
         <Route path="/demo/:slug" element={<LazyWrapper><SoftwareDemo /></LazyWrapper>} />
