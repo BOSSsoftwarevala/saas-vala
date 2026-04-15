@@ -158,7 +158,7 @@ function AppRoutes() {
         <Route path="/settings" element={<ProtectedRoute><LazyWrapper><Settings /></LazyWrapper></ProtectedRoute>} />
         <Route path="/audit-logs" element={<ProtectedRoute><AdminRoute><LazyWrapper><AuditLogs /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         <Route path="/system-health" element={<ProtectedRoute><AdminRoute><LazyWrapper><SystemHealth /></LazyWrapper></AdminRoute></ProtectedRoute>} />
-        <Route path="/automation" element={<ProtectedRoute><AdminRoute><LazyWrapper><Automation /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/automation" element={<ProtectedRoute><LazyWrapper><Automation /></LazyWrapper></ProtectedRoute>} />
         <Route path="/:demoSlug" element={<LazyWrapper><DemoHostRoute /></LazyWrapper>} />
 
         {/* 404 fallback → redirect to appropriate dashboard */}
