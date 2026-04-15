@@ -28,7 +28,7 @@ import {
   Search, Plus, Edit2, Trash2, Layout, Menu, Package, Truck, CreditCard, Tags, RefreshCw,
   Upload, Download, Eye, Copy, X, ChevronRight, Loader2, CheckCircle, XCircle, AlertCircle, Info,
   BarChart3, Calendar, MessageSquare, Clock, TrendingUp, Users, DollarSign, Star, ThumbsUp, ThumbsDown,
-  Folder, Image, Shield, Globe, Hash, FileText, Target, Zap, Map, Mail, Send, Kanban,
+  Folder, Image, Shield, Globe, Hash, FileText, Target, Zap, Map, Mail, Send, Kanban, Cpu, Share2, Mic,
 } from 'lucide-react';
 import { generateProductThumbnail } from '@/lib/thumbnailGenerator';
 import { marketplaceAdminApi } from '@/lib/api';
@@ -3229,6 +3229,7 @@ export default function MarketplaceAdmin() {
             <TabsTrigger value="seo" className="text-[10px] gap-1"><TrendingUp className="h-3 w-3" />SEO</TabsTrigger>
             <TabsTrigger value="global-seo" className="text-[10px] gap-1"><Globe className="h-3 w-3" />Global SEO</TabsTrigger>
             <TabsTrigger value="lead-gen" className="text-[10px] gap-1"><Users className="h-3 w-3" />Lead Gen</TabsTrigger>
+            <TabsTrigger value="ai-api" className="text-[10px] gap-1"><Cpu className="h-3 w-3" />AI API</TabsTrigger>
           </TabsList>
 
           <TabsContent value="licenses" className="space-y-4 mt-4">
@@ -5546,6 +5547,345 @@ export default function MarketplaceAdmin() {
               </CardContent>
             </Card>
           </div>
+        </div>
+      </TabsContent>
+
+      {/* AI API Management Tab */}
+      <TabsContent value="ai-api" className="mt-6">
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold">AI API Management</h2>
+              <p className="text-muted-foreground">Manage 105+ AI APIs with priority, failover, and cost control</p>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => {}}>
+                <RefreshCw className="h-4 w-4 mr-2" /> Refresh
+              </Button>
+              <Button size="sm" className="bg-primary">
+                <Plus className="h-4 w-4 mr-2" /> Add API Integration
+              </Button>
+            </div>
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <Card className="glass-card">
+              <CardContent className="p-4">
+                <p className="text-[10px] text-muted-foreground">Total APIs</p>
+                <p className="text-2xl font-bold">105</p>
+              </CardContent>
+            </Card>
+            <Card className="glass-card">
+              <CardContent className="p-4">
+                <p className="text-[10px] text-muted-foreground">Active APIs</p>
+                <p className="text-2xl font-bold text-green-600">0</p>
+              </CardContent>
+            </Card>
+            <Card className="glass-card">
+              <CardContent className="p-4">
+                <p className="text-[10px] text-muted-foreground">Billing Enabled</p>
+                <p className="text-2xl font-bold text-blue-600">0</p>
+              </CardContent>
+            </Card>
+            <Card className="glass-card">
+              <CardContent className="p-4">
+                <p className="text-[10px] text-muted-foreground">Today's Cost</p>
+                <p className="text-2xl font-bold text-purple-600">$0.00</p>
+              </CardContent>
+            </Card>
+            <Card className="glass-card">
+              <CardContent className="p-4">
+                <p className="text-[10px] text-muted-foreground">Total Requests</p>
+                <p className="text-2xl font-bold text-orange-600">0</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Category Tabs */}
+          <Tabs defaultValue="core_ai_models" className="w-full">
+            <TabsList className="grid w-full grid-cols-6 h-auto gap-1 bg-muted/30 p-1.5 rounded-xl">
+              <TabsTrigger value="core_ai_models" className="text-[10px] gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Cpu className="h-3 w-3" /> Core AI
+              </TabsTrigger>
+              <TabsTrigger value="seo_content_generation" className="text-[10px] gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <FileText className="h-3 w-3" /> SEO Content
+              </TabsTrigger>
+              <TabsTrigger value="keyword_seo_data" className="text-[10px] gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Search className="h-3 w-3" /> Keywords
+              </TabsTrigger>
+              <TabsTrigger value="scraping_lead_extraction" className="text-[10px] gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Globe className="h-3 w-3" /> Scraping
+              </TabsTrigger>
+              <TabsTrigger value="email_lead_enrichment" className="text-[10px] gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Mail className="h-3 w-3" /> Email
+              </TabsTrigger>
+              <TabsTrigger value="social_media_automation" className="text-[10px] gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Share2 className="h-3 w-3" /> Social
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="core_ai_models" className="mt-6">
+              <Card className="glass-card">
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium">Core AI Models (Primary + Fallback)</CardTitle>
+                  <CardDescription>OpenAI, Google Gemini, Anthropic Claude, Mistral, Groq, Together AI, OpenRouter, DeepSeek, Perplexity, Cohere</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="text-xs text-muted-foreground">10 AI providers available</div>
+                    <Button size="sm" className="w-full" variant="outline">Configure Core AI Models</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="seo_content_generation" className="mt-6">
+              <Card className="glass-card">
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium">SEO Content Generation (High Value)</CardTitle>
+                  <CardDescription>Writesonic, Copy.ai, Jasper AI, Rytr, Anyword, Scalenut, Outranking, Frase, SurferSEO AI, NeuronWriter</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="text-xs text-muted-foreground">10 SEO content generation tools available</div>
+                    <Button size="sm" className="w-full" variant="outline">Configure SEO Content Generation</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="keyword_seo_data" className="mt-6">
+              <Card className="glass-card">
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium">Keyword + SEO Data</CardTitle>
+                  <CardDescription>DataForSEO, SerpAPI, Zenserp, Serper.dev, Google Search Console, Google Trends, Ahrefs, SEMrush, KeywordTool, Ubersuggest</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="text-xs text-muted-foreground">10 keyword and SEO data APIs available</div>
+                    <Button size="sm" className="w-full" variant="outline">Configure Keyword + SEO Data</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="scraping_lead_extraction" className="mt-6">
+              <Card className="glass-card">
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium">Scraping + Lead Extraction</CardTitle>
+                  <CardDescription>Apify, BrightData, ScraperAPI, Diffbot, Zyte, PhantomBuster, TexAu, Octoparse, WebScraper.io, Proxycrawl</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="text-xs text-muted-foreground">10 scraping and lead extraction services available</div>
+                    <Button size="sm" className="w-full" variant="outline">Configure Scraping + Lead Extraction</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="email_lead_enrichment" className="mt-6">
+              <Card className="glass-card">
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium">Email + Lead Enrichment</CardTitle>
+                  <CardDescription>Hunter.io, Snov.io, Clearbit, Apollo, Lusha, Dropcontact, RocketReach, FullContact, PeopleDataLabs, LeadGenius</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="text-xs text-muted-foreground">10 email and lead enrichment APIs available</div>
+                    <Button size="sm" className="w-full" variant="outline">Configure Email + Lead Enrichment</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="social_media_automation" className="mt-6">
+              <Card className="glass-card">
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium">Social Media Automation</CardTitle>
+                  <CardDescription>Meta Graph API, Twitter/X API, LinkedIn API, Buffer, Hootsuite, SocialBee, Publer, Later, Sprout Social, Missinglettr</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="text-xs text-muted-foreground">10 social media automation APIs available</div>
+                    <Button size="sm" className="w-full" variant="outline">Configure Social Media Automation</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+
+          {/* More Categories */}
+          <Tabs defaultValue="chat_support_ai" className="w-full">
+            <TabsList className="grid w-full grid-cols-6 h-auto gap-1 bg-muted/30 p-1.5 rounded-xl">
+              <TabsTrigger value="chat_support_ai" className="text-[10px] gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <MessageSquare className="h-3 w-3" /> Chat AI
+              </TabsTrigger>
+              <TabsTrigger value="voice_translation" className="text-[10px] gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Mic className="h-3 w-3" /> Voice
+              </TabsTrigger>
+              <TabsTrigger value="image_design_ai" className="text-[10px] gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Image className="h-3 w-3" /> Image AI
+              </TabsTrigger>
+              <TabsTrigger value="automation_workflow" className="text-[10px] gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Zap className="h-3 w-3" /> Automation
+              </TabsTrigger>
+              <TabsTrigger value="analytics_tracking" className="text-[10px] gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <BarChart3 className="h-3 w-3" /> Analytics
+              </TabsTrigger>
+              <TabsTrigger value="bonus_high_impact" className="text-[10px] gap-1 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Star className="h-3 w-3" /> Bonus
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="chat_support_ai" className="mt-6">
+              <Card className="glass-card">
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium">Chat + Support AI</CardTitle>
+                  <CardDescription>Chatbase, Botpress, Rasa, Tidio, Crisp Chat, Intercom, Drift, Kommunicate, ManyChat, Landbot</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="text-xs text-muted-foreground">10 chat and support AI services available</div>
+                    <Button size="sm" className="w-full" variant="outline">Configure Chat + Support AI</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="voice_translation" className="mt-6">
+              <Card className="glass-card">
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium">Voice + Translation</CardTitle>
+                  <CardDescription>Google Speech-to-Text, Whisper (OpenAI), AssemblyAI, Deepgram, ElevenLabs, Azure Speech, Amazon Polly, Google Translate, DeepL, Rev.ai</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="text-xs text-muted-foreground">10 voice and translation services available</div>
+                    <Button size="sm" className="w-full" variant="outline">Configure Voice + Translation</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="image_design_ai" className="mt-6">
+              <Card className="glass-card">
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium">Image / Design AI (For Marketing)</CardTitle>
+                  <CardDescription>Stability AI, Midjourney, DALL·E, Leonardo AI, Runway ML, Canva API, Remove.bg, Clipdrop, Bannerbear, Pixelcut</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="text-xs text-muted-foreground">10 image and design AI services available</div>
+                    <Button size="sm" className="w-full" variant="outline">Configure Image / Design AI</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="automation_workflow" className="mt-6">
+              <Card className="glass-card">
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium">Automation + Workflow</CardTitle>
+                  <CardDescription>Zapier, Make (Integromat), n8n, Pipedream, IFTTT</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="text-xs text-muted-foreground">5 automation and workflow services available</div>
+                    <Button size="sm" className="w-full" variant="outline">Configure Automation + Workflow</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="analytics_tracking" className="mt-6">
+              <Card className="glass-card">
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium">Analytics + Tracking</CardTitle>
+                  <CardDescription>Google Analytics, Mixpanel, Amplitude, PostHog, Plausible</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="text-xs text-muted-foreground">5 analytics and tracking platforms available</div>
+                    <Button size="sm" className="w-full" variant="outline">Configure Analytics + Tracking</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="bonus_high_impact" className="mt-6">
+              <Card className="glass-card">
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium">Bonus (High Impact)</CardTitle>
+                  <CardDescription>Stripe (billing AI triggers), Razorpay, Firebase (realtime), Supabase (DB + auth), Algolia (search AI)</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="text-xs text-muted-foreground">5 high-impact bonus integrations available</div>
+                    <Button size="sm" className="w-full" variant="outline">Configure Bonus Integrations</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+
+          {/* Usage Mapping Section */}
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Target className="h-4 w-4 text-primary" /> Usage Mapping
+              </CardTitle>
+              <CardDescription>SEO → Cheap Model | Chat → Mid Model | Critical → Best Model</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-3 bg-muted/30 rounded-lg">
+                  <p className="text-xs font-medium text-green-600 mb-2">SEO Requests</p>
+                  <p className="text-[10px] text-muted-foreground">Preferred: DeepSeek</p>
+                  <p className="text-[10px] text-muted-foreground">Fallback: Groq, Mistral, Together AI</p>
+                </div>
+                <div className="p-3 bg-muted/30 rounded-lg">
+                  <p className="text-xs font-medium text-blue-600 mb-2">Chat Requests</p>
+                  <p className="text-[10px] text-muted-foreground">Preferred: Groq</p>
+                  <p className="text-[10px] text-muted-foreground">Fallback: DeepSeek, Together AI, OpenAI</p>
+                </div>
+                <div className="p-3 bg-muted/30 rounded-lg">
+                  <p className="text-xs font-medium text-purple-600 mb-2">Critical Requests</p>
+                  <p className="text-[10px] text-muted-foreground">Preferred: OpenAI</p>
+                  <p className="text-[10px] text-muted-foreground">Fallback: Claude, Gemini, OpenRouter</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Cost Control Section */}
+          <Card className="glass-card">
+            <CardHeader>
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-primary" /> Cost Control
+              </CardTitle>
+              <CardDescription>Manage daily budget limits, max tokens, and auto-pause settings</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Daily Budget Limit</span>
+                <Input type="number" className="w-24 h-8 text-xs" placeholder="10.00" />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Max Tokens Per Request</span>
+                <Input type="number" className="w-24 h-8 text-xs" placeholder="4096" />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Alert Threshold (%)</span>
+                <Input type="number" className="w-24 h-8 text-xs" placeholder="80" />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                <span className="text-xs">Enable Auto-Pause</span>
+                <Switch />
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </TabsContent>
 
