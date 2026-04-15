@@ -157,7 +157,7 @@ function AppRoutes() {
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/auth" element={<LazyWrapper><Auth /></LazyWrapper>} />
-        <Route path="/" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
+        <Route path="/" element={<LazyWrapper><Auth /></LazyWrapper>} />
         <Route path="/marketplace" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
         <Route path="/marketplace/product/:id" element={<LazyWrapper><ProductDetail /></LazyWrapper>} />
         <Route path="/marketplace/category/:category" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
