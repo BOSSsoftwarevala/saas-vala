@@ -20,6 +20,7 @@ export default defineConfig(({ mode }) => {
     preview: {
       host: "::",
       port: 8082,
+      allowedHosts: ['www.saasvala.com', 'saasvala.com'],
     },
 
     plugins: [
