@@ -309,11 +309,11 @@ export default function Dashboard() {
         <div className="neon-card rounded-xl p-5">
           <h3 className="font-display text-lg font-bold text-foreground mb-4 flex items-center gap-2">
             <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-            Quick Actions
+            BOSS PANEL - Quick Actions
           </h3>
           <div className="flex flex-wrap gap-3">
             <button
-              onClick={() => navigate('/admin/add-product')}
+              onClick={() => navigate('/products/add')}
               className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-md gap-2 shadow-lg"
             >
               ➕ Add Product
@@ -341,17 +341,45 @@ export default function Dashboard() {
             </button>
             
             <button
-              onClick={() => navigate('/wallet')}
+              onClick={() => navigate('/resellers')}
               className="bg-green hover:opacity-90 text-white px-4 py-2 rounded-md gap-2 shadow-lg"
             >
-              💰 Add Credits
+              � Manage Resellers
             </button>
             
             <button
-              onClick={() => navigate('/support')}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-md gap-2 shadow-lg"
+              onClick={() => navigate('/marketplace-admin')}
+              className="bg-orange hover:opacity-90 text-white px-4 py-2 rounded-md gap-2 shadow-lg"
             >
-              🎧 Support
+              🛒 Marketplace Admin
+            </button>
+            
+            <button
+              onClick={() => navigate('/wallet')}
+              className="bg-pink hover:opacity-90 text-white px-4 py-2 rounded-md gap-2 shadow-lg"
+            >
+              💰 Wallet
+            </button>
+            
+            <button
+              onClick={() => navigate('/saas-ai')}
+              className="bg-indigo hover:opacity-90 text-white px-4 py-2 rounded-md gap-2 shadow-lg"
+            >
+              🤖 SaaS AI
+            </button>
+            
+            <button
+              onClick={() => navigate('/ai-apis')}
+              className="bg-blue hover:opacity-90 text-white px-4 py-2 rounded-md gap-2 shadow-lg"
+            >
+              🔌 AI APIs
+            </button>
+            
+            <button
+              onClick={() => navigate('/system-health')}
+              className="bg-red hover:opacity-90 text-white px-4 py-2 rounded-md gap-2 shadow-lg"
+            >
+              🔒 System Health
             </button>
           </div>
         </div>

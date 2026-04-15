@@ -73,12 +73,6 @@ const OfflineAppTemplate = React.lazy(() => import("./pages/OfflineAppTemplate")
 const MarketplaceAdmin = React.lazy(() => import("./pages/MarketplaceAdmin"));
 const ProductSeoDashboard = React.lazy(() => import("./pages/ProductSeoDashboard"));
 
-// Role detail components
-const RoleDetail = React.lazy(() => import("./pages/RoleDetail"));
-const TransportRoleDetail = React.lazy(() => import("./pages/TransportRoleDetail"));
-const ManufacturingRoleDetail = React.lazy(() => import("./pages/ManufacturingRoleDetail"));
-const EducationCategory = React.lazy(() => import("./pages/EducationCategory"));
-
 // Install page (critical for PWA)
 const Install = React.lazy(() => import("./pages/Install"));
 import ProtectedShellProviders from './components/layout/ProtectedShellProviders';
@@ -206,40 +200,18 @@ function AppRoutes() {
         <Route path="/seo-leads" element={<ProtectedRoute><AdminRoute><LazyWrapper><SeoLeads /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         
         {/* System modules */}
-        <Route path="/notifications" element={<ProtectedRoute><AdminRoute><LazyWrapper><Dashboard /></LazyWrapper></AdminRoute></ProtectedRoute>} />
-        <Route path="/logs" element={<ProtectedRoute><AdminRoute><LazyWrapper><AuditLogs /></LazyWrapper></AdminRoute></ProtectedRoute>} />
-        <Route path="/profile" element={<ProtectedRoute><LazyWrapper><Settings /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/security" element={<ProtectedRoute><AdminRoute><LazyWrapper><SystemHealth /></LazyWrapper></AdminRoute></ProtectedRoute>} />
-        <Route path="/role-detail" element={<ProtectedRoute><LazyWrapper><RoleDetail /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/transport-role-detail" element={<ProtectedRoute><LazyWrapper><TransportRoleDetail /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/manufacturing-role-detail" element={<ProtectedRoute><LazyWrapper><ManufacturingRoleDetail /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/education" element={<ProtectedRoute><LazyWrapper><EducationCategory /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/vala-builder" element={<ProtectedRoute><LazyWrapper><ValaBuilder /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/vala-builder-openai" element={<ProtectedRoute><LazyWrapper><ValaBuilderOpenAI /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/ai-settings" element={<ProtectedRoute><AdminRoute><LazyWrapper><AIIntegrationsSettings /></LazyWrapper></AdminRoute></ProtectedRoute>} />
-        <Route path="/ai-test" element={<ProtectedRoute><LazyWrapper><RealTimeAITest /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/flow-test" element={<ProtectedRoute><LazyWrapper><FlowTestSystem /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/live-demo" element={<ProtectedRoute><LazyWrapper><LiveAIDemo /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/ai-factory" element={<ProtectedRoute><LazyWrapper><AISoftwareFactory /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/ultra-factory" element={<ProtectedRoute><LazyWrapper><UltraAISoftwareFactory /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/world-class-factory" element={<ProtectedRoute><LazyWrapper><WorldClassFactory /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/apk-pipeline" element={<ProtectedRoute><AdminRoute><LazyWrapper><APKPipelineAdmin /></LazyWrapper></AdminRoute></ProtectedRoute>} />
-        <Route path="/ultra-apk-pipeline" element={<ProtectedRoute><AdminRoute><LazyWrapper><UltraAPKPipelineAdmin /></LazyWrapper></AdminRoute></ProtectedRoute>} />
-        <Route path="/extreme-apk-pipeline" element={<ProtectedRoute><AdminRoute><LazyWrapper><ExtremeAPKPipelineAdmin /></LazyWrapper></AdminRoute></ProtectedRoute>} />
-        <Route path="/ai-chat" element={<ProtectedRoute><LazyWrapper><AiChatLive /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/support" element={<ProtectedRoute><LazyWrapper><Support /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/saas-ai" element={<ProtectedRoute><LazyWrapper><SaasAiDashboard /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/ai-apis" element={<ProtectedRoute><LazyWrapper><AiApis /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/wallet" element={<ProtectedRoute><LazyWrapper><Wallet /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/reseller/dashboard" element={<ProtectedRoute><LazyWrapper><ResellerDashboard /></LazyWrapper></ProtectedRoute>} />
-        
-        {/* Admin-only routes */}
-        <Route path="/settings" element={<ProtectedRoute><AdminRoute><LazyWrapper><Settings /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute><LazyWrapper><Settings /></LazyWrapper></ProtectedRoute>} />
         <Route path="/audit-logs" element={<ProtectedRoute><AdminRoute><LazyWrapper><AuditLogs /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         <Route path="/system-health" element={<ProtectedRoute><AdminRoute><LazyWrapper><SystemHealth /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         <Route path="/automation" element={<ProtectedRoute><AdminRoute><LazyWrapper><Automation /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         <Route path="/:demoSlug" element={<LazyWrapper><DemoHostRoute /></LazyWrapper>} />
         <Route path="/marketplace-admin" element={<ProtectedRoute><AdminRoute><LazyWrapper><MarketplaceAdmin /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/reseller/dashboard" element={<ProtectedRoute><LazyWrapper><ResellerDashboard /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/saas-ai" element={<ProtectedRoute><LazyWrapper><SaasAiDashboard /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/ai-apis" element={<ProtectedRoute><LazyWrapper><AiApis /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/wallet" element={<ProtectedRoute><LazyWrapper><Wallet /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/support" element={<ProtectedRoute><LazyWrapper><Support /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/ai-chat" element={<ProtectedRoute><LazyWrapper><AiChatLive /></LazyWrapper></ProtectedRoute>} />
 
         {/* 404 fallback → redirect to appropriate dashboard */}
         <Route path="*" element={<FallbackRedirect />} />
