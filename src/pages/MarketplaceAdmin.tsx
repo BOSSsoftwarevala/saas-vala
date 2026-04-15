@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AIAPIUsageDashboard } from '@/components/ai-api/AIAPIUsageDashboard';
 import {
   Dialog,
   DialogContent,
@@ -5568,39 +5569,8 @@ export default function MarketplaceAdmin() {
             </div>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <Card className="glass-card">
-              <CardContent className="p-4">
-                <p className="text-[10px] text-muted-foreground">Total APIs</p>
-                <p className="text-2xl font-bold">105</p>
-              </CardContent>
-            </Card>
-            <Card className="glass-card">
-              <CardContent className="p-4">
-                <p className="text-[10px] text-muted-foreground">Active APIs</p>
-                <p className="text-2xl font-bold text-green-600">0</p>
-              </CardContent>
-            </Card>
-            <Card className="glass-card">
-              <CardContent className="p-4">
-                <p className="text-[10px] text-muted-foreground">Billing Enabled</p>
-                <p className="text-2xl font-bold text-blue-600">0</p>
-              </CardContent>
-            </Card>
-            <Card className="glass-card">
-              <CardContent className="p-4">
-                <p className="text-[10px] text-muted-foreground">Today's Cost</p>
-                <p className="text-2xl font-bold text-purple-600">$0.00</p>
-              </CardContent>
-            </Card>
-            <Card className="glass-card">
-              <CardContent className="p-4">
-                <p className="text-[10px] text-muted-foreground">Total Requests</p>
-                <p className="text-2xl font-bold text-orange-600">0</p>
-              </CardContent>
-            </Card>
-          </div>
+          {/* Usage Monitoring Dashboard */}
+          <AIAPIUsageDashboard />
 
           {/* Category Tabs */}
           <Tabs defaultValue="core_ai_models" className="w-full">
