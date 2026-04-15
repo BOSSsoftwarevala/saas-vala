@@ -72,35 +72,6 @@ const Cart = React.lazy(() => import("./pages/Cart"));
 const OfflineAppTemplate = React.lazy(() => import("./pages/OfflineAppTemplate"));
 const MarketplaceAdmin = React.lazy(() => import("./pages/MarketplaceAdmin"));
 const ProductSeoDashboard = React.lazy(() => import("./pages/ProductSeoDashboard"));
-const BossDashboard = React.lazy(() => import("./pages/BossDashboard"));
-
-// PWA Components - grouped for better chunking
-const EduPwa = React.lazy(() => import("./pages/EduPwa"));
-const HealthPwa = React.lazy(() => import("./pages/HealthPwa"));
-const RealEstatePwa = React.lazy(() => import("./pages/RealEstatePwa"));
-const EcomPwa = React.lazy(() => import("./pages/EcomPwa"));
-const RetailPwa = React.lazy(() => import("./pages/RetailPwa"));
-const FoodPwa = React.lazy(() => import("./pages/FoodPwa"));
-const HospitalityPwa = React.lazy(() => import("./pages/HospitalityPwa"));
-const TransportPwa = React.lazy(() => import("./pages/TransportPwa"));
-const LogisticsPwa = React.lazy(() => import("./pages/LogisticsPwa"));
-const FinancePwa = React.lazy(() => import("./pages/FinancePwa"));
-const MediaPwa = React.lazy(() => import("./pages/MediaPwa"));
-const SocialPwa = React.lazy(() => import("./pages/SocialPwa"));
-const AiToolsPwa = React.lazy(() => import("./pages/AiToolsPwa"));
-const DevToolsPwa = React.lazy(() => import("./pages/DevToolsPwa"));
-const ProductivityPwa = React.lazy(() => import("./pages/ProductivityPwa"));
-const CyberSecurityPwa = React.lazy(() => import("./pages/CyberSecurityPwa"));
-const InvestPwa = React.lazy(() => import("./pages/InvestPwa"));
-const ManufacturingPwa = React.lazy(() => import("./pages/ManufacturingPwa"));
-const ConstructionPwa = React.lazy(() => import("./pages/ConstructionPwa"));
-const AutomotivePwa = React.lazy(() => import("./pages/AutomotivePwa"));
-const AgriculturePwa = React.lazy(() => import("./pages/AgriculturePwa"));
-const EnergyPwa = React.lazy(() => import("./pages/EnergyPwa"));
-const TelecomPwa = React.lazy(() => import("./pages/TelecomPwa"));
-const ItSoftwarePwa = React.lazy(() => import("./pages/ItSoftwarePwa"));
-const CloudDevopsPwa = React.lazy(() => import("./pages/CloudDevopsPwa"));
-const AnalyticsPwa = React.lazy(() => import("./pages/AnalyticsPwa"));
 
 // Role detail components
 const RoleDetail = React.lazy(() => import("./pages/RoleDetail"));
@@ -176,13 +147,6 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function BossRoute({ children }: { children: React.ReactNode }) {
-  const { isSuperAdmin, homePath, loading } = useAuth();
-  if (loading) return <PageLoader />;
-  if (!isSuperAdmin) return <Navigate to={homePath} replace />;
-  return <>{children}</>;
-}
-
 function FallbackRedirect() {
   const { user, homePath, loading } = useAuth();
   if (loading) return <PageLoader />;
@@ -218,33 +182,7 @@ function AppRoutes() {
         <Route path="/orders" element={<ProtectedRoute><LazyWrapper><Orders /></LazyWrapper></ProtectedRoute>} />
 
         {/* Public lazy routes */}
-        <Route path="/edu-pwa" element={<LazyWrapper><EduPwa /></LazyWrapper>} />
         <Route path="/install" element={<LazyWrapper><Install /></LazyWrapper>} />
-        <Route path="/health-pwa" element={<LazyWrapper><HealthPwa /></LazyWrapper>} />
-        <Route path="/realestate-pwa" element={<LazyWrapper><RealEstatePwa /></LazyWrapper>} />
-        <Route path="/ecom-pwa" element={<LazyWrapper><EcomPwa /></LazyWrapper>} />
-        <Route path="/retail-pwa" element={<LazyWrapper><RetailPwa /></LazyWrapper>} />
-        <Route path="/food-pwa" element={<LazyWrapper><FoodPwa /></LazyWrapper>} />
-        <Route path="/hospitality-pwa" element={<LazyWrapper><HospitalityPwa /></LazyWrapper>} />
-        <Route path="/transport-pwa" element={<LazyWrapper><TransportPwa /></LazyWrapper>} />
-        <Route path="/logistics-pwa" element={<LazyWrapper><LogisticsPwa /></LazyWrapper>} />
-        <Route path="/finance-pwa" element={<LazyWrapper><FinancePwa /></LazyWrapper>} />
-        <Route path="/media-pwa" element={<LazyWrapper><MediaPwa /></LazyWrapper>} />
-        <Route path="/social-pwa" element={<LazyWrapper><SocialPwa /></LazyWrapper>} />
-        <Route path="/ai-tools-pwa" element={<LazyWrapper><AiToolsPwa /></LazyWrapper>} />
-        <Route path="/devtools-pwa" element={<LazyWrapper><DevToolsPwa /></LazyWrapper>} />
-        <Route path="/productivity-pwa" element={<LazyWrapper><ProductivityPwa /></LazyWrapper>} />
-        <Route path="/cybersecurity-pwa" element={<LazyWrapper><CyberSecurityPwa /></LazyWrapper>} />
-        <Route path="/invest-pwa" element={<LazyWrapper><InvestPwa /></LazyWrapper>} />
-        <Route path="/manufacturing-pwa" element={<LazyWrapper><ManufacturingPwa /></LazyWrapper>} />
-        <Route path="/construction-pwa" element={<LazyWrapper><ConstructionPwa /></LazyWrapper>} />
-        <Route path="/automotive-pwa" element={<LazyWrapper><AutomotivePwa /></LazyWrapper>} />
-        <Route path="/agriculture-pwa" element={<LazyWrapper><AgriculturePwa /></LazyWrapper>} />
-        <Route path="/energy-pwa" element={<LazyWrapper><EnergyPwa /></LazyWrapper>} />
-        <Route path="/telecom-pwa" element={<LazyWrapper><TelecomPwa /></LazyWrapper>} />
-        <Route path="/it-software-pwa" element={<LazyWrapper><ItSoftwarePwa /></LazyWrapper>} />
-        <Route path="/cloud-devops-pwa" element={<LazyWrapper><CloudDevopsPwa /></LazyWrapper>} />
-        <Route path="/analytics-pwa" element={<LazyWrapper><AnalyticsPwa /></LazyWrapper>} />
         <Route path="/cart" element={<LazyWrapper><Cart /></LazyWrapper>} />
         <Route path="/offline-app" element={<LazyWrapper><OfflineAppTemplate /></LazyWrapper>} />
 
@@ -302,9 +240,6 @@ function AppRoutes() {
         <Route path="/automation" element={<ProtectedRoute><AdminRoute><LazyWrapper><Automation /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         <Route path="/:demoSlug" element={<LazyWrapper><DemoHostRoute /></LazyWrapper>} />
         <Route path="/marketplace-admin" element={<ProtectedRoute><AdminRoute><LazyWrapper><MarketplaceAdmin /></LazyWrapper></AdminRoute></ProtectedRoute>} />
-        
-        {/* Boss-only routes */}
-        <Route path="/boss" element={<ProtectedRoute><BossRoute><LazyWrapper><BossDashboard /></LazyWrapper></BossRoute></ProtectedRoute>} />
 
         {/* 404 fallback → redirect to appropriate dashboard */}
         <Route path="*" element={<FallbackRedirect />} />
