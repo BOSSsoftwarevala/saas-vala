@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef, createContext, useContext, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { tokenRefreshService } from '@/services/token-refresh.service';
+import { cleanupService } from '@/services/cleanup.service';
+import { errorHandler } from '@/services/error-handler.service';
+import { notification } from '@/services/notification.service';
 
 export type AppRole = 'super_admin' | 'admin' | 'reseller' | 'master_reseller' | 'support' | 'user';
 
@@ -186,43 +190,82 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
-    // Safety net: if onAuthStateChange is delayed/missed, set state from returned session.
-    if (!error) {
+      if (error) {
+        errorHandler.handleError(error, { action: 'signin' });
+        notification.loginFailed(error.message);
+        return { error: error as Error | null };
+      }
+
+      // Safety net: if onAuthStateChange is delayed/missed, set state from returned session.
       const nextSession = data.session ?? (await supabase.auth.getSession()).data.session;
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
       if (nextSession?.user) {
         queueMicrotask(() => ensureUserRole(nextSession.user.id));
       }
-    }
 
-    return { error: error as Error | null };
+      // Start token refresh service
+      tokenRefreshService.startAutoRefresh();
+      
+      notification.loginSuccess();
+      return { error: null };
+    } catch (error) {
+      errorHandler.handleError(error as Error, { action: 'signin' });
+      notification.loginFailed();
+      return { error: error as Error | null };
+    }
   };
 
   const signUp = async (email: string, password: string, fullName: string, requestedRole?: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          full_name: fullName,
-          requested_role: requestedRole || 'user',
+    try {
+      const redirectUrl = `${window.location.origin}/`;
+      
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            full_name: fullName,
+            requested_role: requestedRole || 'user',
+          },
         },
-      },
-    });
-    return { error: error as Error | null };
+      });
+
+      if (error) {
+        errorHandler.handleError(error, { action: 'signup' });
+        notification.signupFailed(error.message);
+        return { error: error as Error | null };
+      }
+
+      notification.signupSuccess();
+      return { error: null };
+    } catch (error) {
+      errorHandler.handleError(error as Error, { action: 'signup' });
+      notification.signupFailed();
+      return { error: error as Error | null };
+    }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setSession(null);
-    setRole(null);
+    try {
+      await supabase.auth.signOut();
+      await cleanupService.performFullCleanup();
+      setUser(null);
+      setSession(null);
+      setRole(null);
+      notification.logoutSuccess();
+    } catch (error) {
+      errorHandler.handleError(error as Error, { action: 'signout' });
+      // Force cleanup even if error occurs
+      await cleanupService.performFullCleanup();
+      setUser(null);
+      setSession(null);
+      setRole(null);
+    }
   };
 
   const loading = initializing || roleLoading;

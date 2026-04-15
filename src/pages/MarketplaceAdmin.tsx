@@ -590,8 +590,6 @@ export default function MarketplaceAdmin() {
     }
   }, [editProduct?.id]);
   const [editHeaderMenu, setEditHeaderMenu] = useState<HeaderMenu | null>(null);
-  const [editBanner, setEditBanner] = useState<Banner | null>(null);
-  const [editTicker, setEditTicker] = useState<Ticker | null>(null);
   const [editCoupon, setEditCoupon] = useState<Coupon | null>(null);
   const [editDiscountRule, setEditDiscountRule] = useState<DiscountRule | null>(null);
 

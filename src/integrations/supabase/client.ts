@@ -13,11 +13,15 @@ export const hasSupabaseEnv = Boolean(normalizedSupabaseUrl && normalizedSupabas
 
 const safeSupabaseUrl = normalizedSupabaseUrl.length > 0
   ? normalizedSupabaseUrl
-  : 'https://invalid.supabase.local';
+  : (() => {
+    throw new Error('VITE_SUPABASE_URL is not configured. Please set it in your .env file.');
+  })();
 
 const safeSupabasePublishableKey = normalizedSupabasePublishableKey.length > 0
   ? normalizedSupabasePublishableKey
-  : 'invalid-publishable-key';
+  : (() => {
+    throw new Error('VITE_SUPABASE_PUBLISHABLE_KEY is not configured. Please set it in your .env file.');
+  })();
 
 if (!hasSupabaseEnv) {
   // Keep the app renderable and surface a clear runtime diagnostic instead of a blank crash.

@@ -546,7 +546,7 @@ export class AIApiService {
       } = {};
 
       const providerLogs: { [key: string]: AIAPIUsageLog[] } = {};
-      logs.forEach(log => {
+      for (const log of logs) {
         const api = await this.getAPIIntegrationById(log.api_integration_id);
         if (api) {
           if (!providerLogs[api.provider]) {
@@ -554,7 +554,7 @@ export class AIApiService {
           }
           providerLogs[api.provider].push(log);
         }
-      });
+      }
 
       Object.keys(providerLogs).forEach(provider => {
         const providerRequestLogs = providerLogs[provider];

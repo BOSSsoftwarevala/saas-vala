@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +25,9 @@ import {
   CreditCard,
   Smartphone,
   Globe,
+  AlertTriangle,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWallet } from '@/hooks/useWallet';
@@ -34,6 +37,12 @@ import { AddCreditsModal } from '@/components/wallet/AddCreditsModal';
 import { AdminWalletManager } from '@/components/wallet/AdminWalletManager';
 import { AutoPaySettingsModal } from '@/components/wallet/AutoPaySettingsModal';
 import { WalletStatsCards } from '@/components/wallet/WalletStatsCards';
+import { walletLockService } from '@/services/wallet-lock.service';
+import { errorHandler } from '@/services/error-handler.service';
+import { notification } from '@/services/notification.service';
+import { apiClient } from '@/services/api-client.service';
+import { cacheControl } from '@/services/cache-control.service';
+import { transactionLock } from '@/services/transaction-lock.service';
 
 const ITEMS_PER_PAGE = 25;
 
@@ -69,6 +78,37 @@ export default function Wallet() {
   const [currentPage, setCurrentPage] = useState(1);
   const [showAddCredits, setShowAddCredits] = useState(false);
   const [showAutoPaySettings, setShowAutoPaySettings] = useState(false);
+  const [walletLocked, setWalletLocked] = useState(false);
+  const [lockThreshold, setLockThreshold] = useState(50);
+
+  useEffect(() => {
+    const loadWalletData = async () => {
+      try {
+        // Subscribe to wallet lock status changes
+        const unsubscribe = walletLockService.subscribe((locked, balance) => {
+          setWalletLocked(locked);
+        });
+
+        // Initial check with error handling
+        const locked = await apiClient.withRetry(
+          () => walletLockService.checkWalletBalance(),
+          { retries: 3, showToast: false }
+        );
+        setWalletLocked(locked);
+        const lockStatus = walletLockService.getLockStatus();
+        setLockThreshold(lockStatus.threshold);
+
+        // Cache wallet data
+        cacheControl.set('wallet:lock_status', lockStatus);
+
+        return unsubscribe;
+      } catch (error) {
+        errorHandler.handleError(error as Error, { action: 'load_wallet_lock_status' });
+      }
+    };
+
+    loadWalletData();
+  }, []);
 
   const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
 
@@ -93,9 +133,17 @@ export default function Wallet() {
 
   const lastPayment = getLastPaymentStatus();
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    fetchTransactions(page, ITEMS_PER_PAGE);
+  const handlePageChange = async (page: number) => {
+    try {
+      setCurrentPage(page);
+      await apiClient.withRetry(
+        () => fetchTransactions(page, ITEMS_PER_PAGE),
+        { retries: 3, showToast: false }
+      );
+    } catch (error) {
+      errorHandler.handleError(error as Error, { action: 'fetch_transactions' });
+      notification.serverError();
+    }
   };
 
   const getPaymentMethod = (tx: typeof transactions[0]) => {
@@ -127,13 +175,69 @@ export default function Wallet() {
             </Button>
             <Button 
               className="bg-orange-gradient hover:opacity-90 text-white gap-2"
-              onClick={() => setShowAddCredits(true)}
+              onClick={async () => {
+                try {
+                  await transactionLock.withWalletLock(
+                    useAuth().user?.id || 'unknown',
+                    () => {
+                      setShowAddCredits(true);
+                      return Promise.resolve();
+                    }
+                  );
+                } catch (error) {
+                  errorHandler.handleError(error as Error, { action: 'add_credits' });
+                  notification.permissionDenied();
+                }
+              }}
             >
               <Plus className="h-4 w-4" />
               Add Credits
             </Button>
           </div>
         </div>
+
+        {/* Wallet Lock Warning Banner */}
+        {walletLocked && (
+          <div className="bg-gradient-to-r from-red-500/10 to-orange-500/10 border border-red-500/30 rounded-xl p-4 flex items-center gap-4">
+            <div className="p-3 rounded-lg bg-red-500/20">
+              <Lock className="h-5 w-5 text-red-500" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-red-500 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                System Locked - Low Balance
+              </h3>
+              <p className="text-sm text-red-400/80 mt-1">
+                Your wallet balance (${wallet?.balance?.toFixed(2) || '0.00'}) is below the minimum threshold (${lockThreshold}). 
+                Add credits to unlock full system access.
+              </p>
+            </div>
+            <Button 
+              className="bg-red-500 hover:bg-red-600 text-white gap-2"
+              onClick={() => setShowAddCredits(true)}
+            >
+              <Plus className="h-4 w-4" />
+              Add Credits Now
+            </Button>
+          </div>
+        )}
+
+        {/* Wallet Unlocked Banner */}
+        {!walletLocked && wallet?.balance >= lockThreshold && (
+          <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/30 rounded-xl p-4 flex items-center gap-4">
+            <div className="p-3 rounded-lg bg-green-500/20">
+              <Unlock className="h-5 w-5 text-green-500" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-green-500">
+                System Unlocked
+              </h3>
+              <p className="text-sm text-green-400/80 mt-1">
+                Your wallet balance (${wallet?.balance?.toFixed(2) || '0.00'}) is above the minimum threshold. Full system access is available.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Stats Cards */}
         <WalletStatsCards

@@ -26,6 +26,12 @@ import {
   MessageSquare, CheckCircle, XCircle, ThumbsUp, ThumbsDown, Eye,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { errorHandler } from '@/services/error-handler.service';
+import { notification } from '@/services/notification.service';
+import { apiClient } from '@/services/api-client.service';
+import { cacheControl } from '@/services/cache-control.service';
+import { duplicatePrevention } from '@/services/duplicate-prevention.service';
+import { searchIndex } from '@/services/search-index.service';
 
 const WISE_PAY_LINK = 'https://wise.com/pay/business/manojkumar21?utm_source=quick_pay';
 
@@ -254,24 +260,35 @@ export default function Marketplace() {
     }
   };
 
-  // Phase 2: Fetch reviews for product
+  // Phase 2: Fetch reviews for product with production services
   const fetchReviews = async (productId: string) => {
     try {
+      // Check cache first
+      const cachedReviews = cacheControl.get(`reviews:${productId}`);
+      if (cachedReviews) {
+        setReviews(cachedReviews);
+        return;
+      }
+
       // product_reviews table may not exist yet, handle gracefully
-      const { data, error } = await (supabase as any)
-        .from('product_reviews')
-        .select('*')
-        .eq('product_id', productId)
-        .order('created_at', { ascending: false });
+      const { data, error } = await apiClient.withRetry(
+        () => (supabase as any)
+          .from('product_reviews')
+          .select('*')
+          .eq('product_id', productId)
+          .order('created_at', { ascending: false }),
+        { retries: 3, showToast: false }
+      );
       
       if (error) {
-        console.error('Failed to fetch reviews:', error);
+        errorHandler.handleError(error, { action: 'fetch_reviews', productId });
         setReviews([]);
       } else {
         setReviews(data || []);
+        cacheControl.set(`reviews:${productId}`, data || []);
       }
     } catch (e) {
-      console.error('Failed to fetch reviews:', e);
+      errorHandler.handleError(e as Error, { action: 'fetch_reviews', productId });
       setReviews([]);
     }
   };
@@ -317,6 +334,30 @@ export default function Marketplace() {
       }
     } catch (loadError) {
       console.error('Failed to load reseller data:', loadError);
+    }
+  };
+
+  const loadWalletData = async () => {
+    try {
+      const { data: wallet } = await (supabase as any)
+        .from('wallets')
+        .select('balance')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      setResellerCredits(Number(wallet?.balance || 0));
+
+      if (resellerId) {
+        const { data: keys, error: keysError } = await (supabase as any)
+          .from('license_keys')
+          .select('*')
+          .eq('assigned_to', resellerId);
+
+        if (!keysError && Array.isArray(keys)) {
+          setOwnedLicenseKeys(keys);
+        }
+      }
+    } catch (loadError) {
+      errorHandler.handleError(loadError as Error, { action: 'load_wallet_data' });
     }
   };
 

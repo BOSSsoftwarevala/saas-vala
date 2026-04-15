@@ -9,6 +9,7 @@ export default defineConfig(({ mode }) => {
   const isDev = mode === "development";
 
   return {
+    envPrefix: 'VITE_',
     server: {
       host: "::",
       port: 8080,

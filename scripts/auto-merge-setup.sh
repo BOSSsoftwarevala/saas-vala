@@ -16,20 +16,19 @@ cat > .git/hooks/post-commit << 'EOF'
 #!/bin/bash
 # Post-commit hook for auto-merge
 
-# Check if commit has enterprise features
-if git log --oneline -1 | grep -q "enterprise"; then
-    echo "🎯 Enterprise commit detected - preparing auto-merge..."
-    
-    # Create a PR if not on main branch
-    CURRENT_BRANCH=$(git branch --show-current)
-    if [ "$CURRENT_BRANCH" != "main" ]; then
-        echo "📋 Creating PR for auto-merge..."
-        gh pr create --title "Auto-merge: $(git log --oneline -1)" --body "This PR contains enterprise features and is ready for auto-merge." --label "auto-merge,enterprise" --assignee @me || echo "PR already exists or failed to create"
-    fi
+echo "🎯 Commit detected - preparing auto-merge..."
+
+# Create a PR if not on main branch
+CURRENT_BRANCH=$(git branch --show-current)
+if [ "$CURRENT_BRANCH" != "main" ]; then
+    echo "📋 Creating PR for auto-merge..."
+    gh pr create --title "Auto-merge: $(git log --oneline -1)" --body "This PR is ready for auto-merge." --label "auto-merge" --assignee @me || echo "PR already exists or failed to create"
     
     # Push to remote
     git push origin "$CURRENT_BRANCH"
     echo "✅ Pushed to remote with auto-merge ready"
+else
+    echo "✅ Already on main branch - no merge needed"
 fi
 EOF
 

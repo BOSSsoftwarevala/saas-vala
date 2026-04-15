@@ -2,7 +2,9 @@ import { supabase } from '@/integrations/supabase/client';
 
 const normalizeEnv = (value: string | undefined): string => (value ?? '').trim().replace(/^['"]|['"]$/g, '');
 const normalizedSupabaseUrl = normalizeEnv(import.meta.env.VITE_SUPABASE_URL);
-const API_BASE = `${normalizedSupabaseUrl || 'https://invalid.supabase.local'}/functions/v1/api-gateway`;
+const API_BASE = `${normalizedSupabaseUrl || (() => {
+  throw new Error('VITE_SUPABASE_URL is not configured. Please set it in your .env file.');
+})()}/functions/v1/api-gateway`;
 
 /** Timeout for all API requests (ms). */
 const API_TIMEOUT_MS = 30_000;

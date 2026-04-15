@@ -72,6 +72,7 @@ const Cart = React.lazy(() => import("./pages/Cart"));
 const OfflineAppTemplate = React.lazy(() => import("./pages/OfflineAppTemplate"));
 const MarketplaceAdmin = React.lazy(() => import("./pages/MarketplaceAdmin"));
 const ProductSeoDashboard = React.lazy(() => import("./pages/ProductSeoDashboard"));
+const BossDashboard = React.lazy(() => import("./pages/BossDashboard"));
 
 // PWA Components - grouped for better chunking
 const EduPwa = React.lazy(() => import("./pages/EduPwa"));
@@ -172,6 +173,13 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   const { isAdmin, isReseller, homePath, loading } = useAuth();
   if (loading) return <PageLoader />;
   if (!isAdmin) return <Navigate to={isReseller ? '/reseller/dashboard' : homePath} replace />;
+  return <>{children}</>;
+}
+
+function BossRoute({ children }: { children: React.ReactNode }) {
+  const { isSuperAdmin, homePath, loading } = useAuth();
+  if (loading) return <PageLoader />;
+  if (!isSuperAdmin) return <Navigate to={homePath} replace />;
   return <>{children}</>;
 }
 
@@ -294,6 +302,9 @@ function AppRoutes() {
         <Route path="/automation" element={<ProtectedRoute><AdminRoute><LazyWrapper><Automation /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         <Route path="/:demoSlug" element={<LazyWrapper><DemoHostRoute /></LazyWrapper>} />
         <Route path="/marketplace-admin" element={<ProtectedRoute><AdminRoute><LazyWrapper><MarketplaceAdmin /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        
+        {/* Boss-only routes */}
+        <Route path="/boss" element={<ProtectedRoute><BossRoute><LazyWrapper><BossDashboard /></LazyWrapper></BossRoute></ProtectedRoute>} />
 
         {/* 404 fallback → redirect to appropriate dashboard */}
         <Route path="*" element={<FallbackRedirect />} />

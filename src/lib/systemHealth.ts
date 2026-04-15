@@ -228,7 +228,7 @@ class SystemHealthMonitor {
 
   // Check API health
   private async checkAPIHealth(): Promise<APIHealth[]> {
-    const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const endpoints = [
       supabaseUrl ? `${supabaseUrl}/rest/v1/` : null,
     ].filter(Boolean) as string[];
