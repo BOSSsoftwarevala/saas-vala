@@ -29,7 +29,7 @@ import {
   Search, Plus, Edit2, Trash2, Layout, Menu, Package, Truck, CreditCard, Tags, RefreshCw,
   Upload, Download, Eye, Copy, X, ChevronRight, Loader2, CheckCircle, XCircle, AlertCircle, Info,
   BarChart3, Calendar, MessageSquare, Clock, TrendingUp, Users, DollarSign, Star, ThumbsUp, ThumbsDown,
-  Folder, Image, Shield, Globe, Hash, FileText, Target, Zap, Map, Mail, Send, Kanban, Cpu, Share2, Mic,
+  Folder, Image, Shield, Globe, Hash, FileText, Target, Zap, Map, Mail, Send, Kanban, Cpu, Share2, Mic, Key, Monitor, Settings,
 } from 'lucide-react';
 import { generateProductThumbnail } from '@/lib/thumbnailGenerator';
 import { marketplaceAdminApi } from '@/lib/api';
@@ -3231,6 +3231,7 @@ export default function MarketplaceAdmin() {
             <TabsTrigger value="global-seo" className="text-[10px] gap-1"><Globe className="h-3 w-3" />Global SEO</TabsTrigger>
             <TabsTrigger value="lead-gen" className="text-[10px] gap-1"><Users className="h-3 w-3" />Lead Gen</TabsTrigger>
             <TabsTrigger value="ai-api" className="text-[10px] gap-1"><Cpu className="h-3 w-3" />AI API</TabsTrigger>
+            <TabsTrigger value="keys" className="text-[10px] gap-1"><Key className="h-3 w-3" />Keys</TabsTrigger>
           </TabsList>
 
           <TabsContent value="licenses" className="space-y-4 mt-4">
