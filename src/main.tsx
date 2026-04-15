@@ -3,6 +3,18 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
+// Runtime guard to fix Map constructor error
+if (typeof Map !== "function") {
+  window.Map = globalThis.Map;
+}
+
+// Lock Map to prevent override
+Object.defineProperty(window, 'Map', {
+  value: globalThis.Map,
+  writable: false,
+  configurable: false
+});
+
 Sentry.init({
   dsn: "https://8f2c43b81696e0bcb5ec8c2c34ab64eb@o4511025445339136.ingest.de.sentry.io/4511025447698512",
   integrations: [

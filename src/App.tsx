@@ -42,28 +42,14 @@ const Dashboard = React.lazy(() => import("./pages/Dashboard"));
 const Products = React.lazy(() => import("./pages/Products"));
 const Keys = React.lazy(() => import("./pages/Keys"));
 const Servers = React.lazy(() => import("./pages/Servers"));
-const ValaBuilder = React.lazy(() => import("./pages/ValaBuilder"));
-const ValaBuilderOpenAI = React.lazy(() => import("./components/ValaBuilderOpenAI"));
-const AIIntegrationsSettings = React.lazy(() => import("./components/AIIntegrationsSettings"));
-const RealTimeAITest = React.lazy(() => import("./components/RealTimeAITest"));
-const FlowTestSystem = React.lazy(() => import("./components/FlowTestSystem"));
-const LiveAIDemo = React.lazy(() => import("./components/LiveAIDemo"));
-const AISoftwareFactory = React.lazy(() => import("./components/AISoftwareFactory"));
-const UltraAISoftwareFactory = React.lazy(() => import("./components/UltraAISoftwareFactory"));
-const WorldClassFactory = React.lazy(() => import("./components/WorldClassFactory"));
-const APKPipelineAdmin = React.lazy(() => import("./components/APKPipelineAdmin"));
-const UltraAPKPipelineAdmin = React.lazy(() => import("./components/UltraAPKPipelineAdmin"));
-const ExtremeAPKPipelineAdmin = React.lazy(() => import("./components/ExtremeAPKPipelineAdmin"));
-const SeoLeads = React.lazy(() => import("./pages/SeoLeads"));
 const Resellers = React.lazy(() => import("./pages/Resellers"));
-const DemoPage = React.lazy(() => import("./pages/DemoPage"));
+const MarketplaceAdmin = React.lazy(() => import("./pages/MarketplaceAdmin"));
 const Settings = React.lazy(() => import("./pages/Settings"));
 const AuditLogs = React.lazy(() => import("./pages/AuditLogs"));
 const SystemHealth = React.lazy(() => import("./pages/SystemHealth"));
 const Automation = React.lazy(() => import("./pages/Automation"));
 const Cart = React.lazy(() => import("./pages/Cart"));
-const OfflineAppTemplate = React.lazy(() => import("./pages/OfflineAppTemplate"));
-const MarketplaceAdmin = React.lazy(() => import("./pages/MarketplaceAdmin"));
+const DemoPage = React.lazy(() => import("./pages/DemoPage"));
 
 // Install page (critical for PWA)
 const Install = React.lazy(() => import("./pages/Install"));
@@ -169,7 +155,6 @@ function AppRoutes() {
         {/* Public lazy routes */}
         <Route path="/install" element={<LazyWrapper><Install /></LazyWrapper>} />
         <Route path="/cart" element={<LazyWrapper><Cart /></LazyWrapper>} />
-        <Route path="/offline-app" element={<LazyWrapper><OfflineAppTemplate /></LazyWrapper>} />
 
         {/* Protected routes */}
         <Route path="/dashboard" element={<ProtectedRoute><AdminRoute><LazyWrapper><Dashboard /></LazyWrapper></AdminRoute></ProtectedRoute>} />
