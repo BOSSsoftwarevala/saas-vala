@@ -40,7 +40,7 @@ export default defineConfig(({ mode }) => {
       target: "es2020",
       cssCodeSplit: true,
       sourcemap: false,
-      minify: false,
+      minify: "terser",
       reportCompressedSize: true,
       chunkSizeWarningLimit: 1000,
       rollupOptions: {
