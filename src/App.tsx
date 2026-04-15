@@ -40,9 +40,6 @@ const Favorites = React.lazy(() => import("./pages/Favorites"));
 const Orders = React.lazy(() => import("./pages/Orders"));
 const Dashboard = React.lazy(() => import("./pages/Dashboard"));
 const Products = React.lazy(() => import("./pages/Products"));
-const AddProduct = React.lazy(() => import("./pages/AddProduct"));
-const Support = React.lazy(() => import("./pages/Support"));
-const AiChatLive = React.lazy(() => import("./pages/AiChatLive"));
 const Keys = React.lazy(() => import("./pages/Keys"));
 const Servers = React.lazy(() => import("./pages/Servers"));
 const ValaBuilder = React.lazy(() => import("./pages/ValaBuilder"));
@@ -57,21 +54,16 @@ const WorldClassFactory = React.lazy(() => import("./components/WorldClassFactor
 const APKPipelineAdmin = React.lazy(() => import("./components/APKPipelineAdmin"));
 const UltraAPKPipelineAdmin = React.lazy(() => import("./components/UltraAPKPipelineAdmin"));
 const ExtremeAPKPipelineAdmin = React.lazy(() => import("./components/ExtremeAPKPipelineAdmin"));
-const SaasAiDashboard = React.lazy(() => import("./pages/SaasAiDashboard"));
-const AiApis = React.lazy(() => import("./pages/AiApis"));
-const Wallet = React.lazy(() => import("./pages/Wallet"));
 const SeoLeads = React.lazy(() => import("./pages/SeoLeads"));
 const Resellers = React.lazy(() => import("./pages/Resellers"));
 const DemoPage = React.lazy(() => import("./pages/DemoPage"));
 const Settings = React.lazy(() => import("./pages/Settings"));
 const AuditLogs = React.lazy(() => import("./pages/AuditLogs"));
 const SystemHealth = React.lazy(() => import("./pages/SystemHealth"));
-const ResellerDashboard = React.lazy(() => import("./pages/ResellerDashboard"));
 const Automation = React.lazy(() => import("./pages/Automation"));
 const Cart = React.lazy(() => import("./pages/Cart"));
 const OfflineAppTemplate = React.lazy(() => import("./pages/OfflineAppTemplate"));
 const MarketplaceAdmin = React.lazy(() => import("./pages/MarketplaceAdmin"));
-const ProductSeoDashboard = React.lazy(() => import("./pages/ProductSeoDashboard"));
 
 // Install page (critical for PWA)
 const Install = React.lazy(() => import("./pages/Install"));
@@ -168,7 +160,6 @@ function AppRoutes() {
         <Route path="/" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
         <Route path="/marketplace" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
         <Route path="/marketplace/product/:id" element={<LazyWrapper><ProductDetail /></LazyWrapper>} />
-        <Route path="/product/:slug/seo-dashboard" element={<LazyWrapper><ProductSeoDashboard /></LazyWrapper>} />
         <Route path="/marketplace/category/:category" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
         <Route path="/marketplace/search" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
         <Route path="/demo/:slug" element={<LazyWrapper><SoftwareDemo /></LazyWrapper>} />
@@ -185,7 +176,6 @@ function AppRoutes() {
         
         {/* Products module */}
         <Route path="/products" element={<ProtectedRoute><LazyWrapper><Products /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/products/add" element={<ProtectedRoute><LazyWrapper><AddProduct /></LazyWrapper></ProtectedRoute>} />
         
         {/* Keys module */}
         <Route path="/keys" element={<ProtectedRoute><LazyWrapper><Keys /></LazyWrapper></ProtectedRoute>} />
@@ -196,8 +186,8 @@ function AppRoutes() {
         {/* Resellers module */}
         <Route path="/resellers" element={<ProtectedRoute><AdminRoute><LazyWrapper><Resellers /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         
-        {/* Leads module */}
-        <Route path="/seo-leads" element={<ProtectedRoute><AdminRoute><LazyWrapper><SeoLeads /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        {/* Marketplace admin */}
+        <Route path="/marketplace-admin" element={<ProtectedRoute><AdminRoute><LazyWrapper><MarketplaceAdmin /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         
         {/* System modules */}
         <Route path="/settings" element={<ProtectedRoute><LazyWrapper><Settings /></LazyWrapper></ProtectedRoute>} />
@@ -205,13 +195,6 @@ function AppRoutes() {
         <Route path="/system-health" element={<ProtectedRoute><AdminRoute><LazyWrapper><SystemHealth /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         <Route path="/automation" element={<ProtectedRoute><AdminRoute><LazyWrapper><Automation /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         <Route path="/:demoSlug" element={<LazyWrapper><DemoHostRoute /></LazyWrapper>} />
-        <Route path="/marketplace-admin" element={<ProtectedRoute><AdminRoute><LazyWrapper><MarketplaceAdmin /></LazyWrapper></AdminRoute></ProtectedRoute>} />
-        <Route path="/reseller/dashboard" element={<ProtectedRoute><LazyWrapper><ResellerDashboard /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/saas-ai" element={<ProtectedRoute><LazyWrapper><SaasAiDashboard /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/ai-apis" element={<ProtectedRoute><LazyWrapper><AiApis /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/wallet" element={<ProtectedRoute><LazyWrapper><Wallet /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/support" element={<ProtectedRoute><LazyWrapper><Support /></LazyWrapper></ProtectedRoute>} />
-        <Route path="/ai-chat" element={<ProtectedRoute><LazyWrapper><AiChatLive /></LazyWrapper></ProtectedRoute>} />
 
         {/* 404 fallback → redirect to appropriate dashboard */}
         <Route path="*" element={<FallbackRedirect />} />
