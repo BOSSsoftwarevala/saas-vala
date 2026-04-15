@@ -1,24 +1,4 @@
 import React from 'react';
-// Global error boundary for critical failures
-class GlobalErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: any}> {
-  constructor(props: any) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-  static getDerivedStateFromError(error: any) {
-    return { hasError: true, error };
-  }
-  componentDidCatch(error: any, info: any) {
-    // eslint-disable-next-line no-console
-    console.error('Global error boundary caught:', error, info);
-  }
-  render() {
-    if (this.state.hasError) {
-      return <div style={{padding: 32, color: 'red', fontWeight: 'bold'}}>Critical error: {String(this.state.error)}<br/>Check your environment variables and API connectivity.<br/>See console for details.</div>;
-    }
-    return this.props.children;
-  }
-}
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -205,21 +185,19 @@ const App = () => {
   }, []);
 
   return (
-    <GlobalErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <AuthProvider>
-              <CartProvider>
-                <AppRoutes />
-              </CartProvider>
-            </AuthProvider>
-          </BrowserRouter>
-        </TooltipProvider>
-      </QueryClientProvider>
-    </GlobalErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <CartProvider>
+              <AppRoutes />
+            </CartProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 };
 
