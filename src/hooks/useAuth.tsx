@@ -191,9 +191,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
+      console.log('[Auth] Starting sign in for:', email);
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
+      console.log('[Auth] Sign in response:', { data, error });
+
       if (error) {
+        console.error('[Auth] Sign in error:', error);
         errorHandler.handleError(error, { action: 'signin' });
         notification.loginFailed(error.message);
         return { error: error as Error | null };
@@ -201,9 +205,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Safety net: if onAuthStateChange is delayed/missed, set state from returned session.
       const nextSession = data.session ?? (await supabase.auth.getSession()).data.session;
+      console.log('[Auth] Session set:', nextSession);
       setSession(nextSession);
       setUser(nextSession?.user ?? null);
       if (nextSession?.user) {
+        console.log('[Auth] Ensuring user role for:', nextSession.user.id);
         queueMicrotask(() => ensureUserRole(nextSession.user.id));
       }
 
@@ -213,6 +219,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       notification.loginSuccess();
       return { error: null };
     } catch (error) {
+      console.error('[Auth] Sign in exception:', error);
       errorHandler.handleError(error as Error, { action: 'signin' });
       notification.loginFailed();
       return { error: error as Error | null };
