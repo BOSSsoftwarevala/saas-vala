@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { eventLogger, EventType } from './eventLogger';
 
 const normalizeEnv = (value: string | undefined): string => (value ?? '').trim().replace(/^['"]|['"]$/g, '');
 const normalizedSupabaseUrl = normalizeEnv(import.meta.env.VITE_SUPABASE_URL);
@@ -79,6 +80,7 @@ async function apiCall<T = any>(
   const exec = async (): Promise<T> => {
   const timeoutMs = options.timeoutMs ?? API_TIMEOUT_MS;
   const isMutation = method === 'POST' || method === 'PUT' || method === 'PATCH';
+  const startTime = Date.now();
 
   let attempt = 0;
   let lastError: Error = new Error('Request failed');
@@ -112,6 +114,8 @@ async function apiCall<T = any>(
       const res = await fetch(`${API_BASE}/${resolvedPath}`, config);
       clearTimeout(timeoutId);
 
+      const duration = Date.now() - startTime;
+
       // Parse JSON safely — body may be empty on some error responses
       let data: any;
       const contentType = res.headers.get('content-type') ?? '';
@@ -122,10 +126,16 @@ async function apiCall<T = any>(
         data = text ? { message: text } : {};
       }
 
+      // Log API call
+      eventLogger.logApiCall(method, path, undefined, res.status, duration);
+
       if (!res.ok) {
         const errMsg = (typeof data?.error === 'string' && data.error)
           ? data.error
           : `API error: ${res.status}`;
+
+        // Log error
+        eventLogger.logError(`API ${method} ${path}`, new Error(errMsg));
 
         // Only retry on transient server errors (5xx), not client errors (4xx)
         if (res.status >= 500 && attempt < MAX_RETRIES - 1) {
