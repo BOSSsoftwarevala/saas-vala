@@ -154,7 +154,7 @@ function AppRoutes() {
         
         {/* System modules */}
         <Route path="/settings" element={<ProtectedRoute><AdminRoute><LazyWrapper><Settings /></LazyWrapper></AdminRoute></ProtectedRoute>} />
-        <Route path="/audit-logs" element={<ProtectedRoute><LazyWrapper><AuditLogs /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/audit-logs" element={<ProtectedRoute><AdminRoute><LazyWrapper><AuditLogs /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         <Route path="/system-health" element={<ProtectedRoute><AdminRoute><LazyWrapper><SystemHealth /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         <Route path="/automation" element={<ProtectedRoute><AdminRoute><LazyWrapper><Automation /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         <Route path="/vala-builder" element={<ProtectedRoute><LazyWrapper><ValaBuilder /></LazyWrapper></ProtectedRoute>} />

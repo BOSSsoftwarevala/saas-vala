@@ -43,8 +43,8 @@ const navItems: NavItem[] = [
   { title: 'Marketplace Admin', icon: Store, href: '/marketplace-admin', adminOnly: true },
   { title: 'Keys', icon: Key, href: '/keys' },
   { title: 'Servers', icon: Server, href: '/servers' },
-  { title: 'Automation', icon: Bot, href: '/automation' },
-  { title: 'Audit Logs', icon: FileText, href: '/audit-logs' },
+  { title: 'Automation', icon: Bot, href: '/automation', adminOnly: true },
+  { title: 'Audit Logs', icon: FileText, href: '/audit-logs', adminOnly: true },
   { title: 'System Health', icon: Activity, href: '/system-health', adminOnly: true },
   { title: 'Settings', icon: Settings, href: '/settings', adminOnly: true },
 ];
