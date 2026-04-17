@@ -22,10 +22,14 @@ function resolvePrimaryRole(roles: Array<{ role: string }> | null | undefined): 
 }
 
 function getHomePathForRole(role: AppRole | null): string {
+  // Boss (super_admin/admin) → /dashboard
   if (role === 'super_admin' || role === 'admin') return '/dashboard';
-  if (role === 'reseller' || role === 'master_reseller') return '/reseller/dashboard';
+  // Reseller (reseller/master_reseller) → /reseller-dashboard
+  if (role === 'reseller' || role === 'master_reseller') return '/reseller-dashboard';
+  // Support → /support
   if (role === 'support') return '/support';
-  return '/';
+  // User → /marketplace
+  return '/marketplace';
 }
 
 interface AuthContextType {

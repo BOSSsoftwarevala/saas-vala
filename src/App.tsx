@@ -150,6 +150,7 @@ function AppRoutes() {
         
         {/* Resellers module */}
         <Route path="/resellers" element={<ProtectedRoute><AdminRoute><LazyWrapper><Resellers /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/reseller-dashboard" element={<ProtectedRoute><LazyWrapper><Resellers /></LazyWrapper></ProtectedRoute>} />
         
         {/* Marketplace admin */}
         <Route path="/marketplace-admin" element={<ProtectedRoute><AdminRoute><LazyWrapper><MarketplaceAdmin /></LazyWrapper></AdminRoute></ProtectedRoute>} />
@@ -157,8 +158,13 @@ function AppRoutes() {
         {/* System modules */}
         <Route path="/settings" element={<ProtectedRoute><LazyWrapper><Settings /></LazyWrapper></ProtectedRoute>} />
         <Route path="/audit-logs" element={<ProtectedRoute><LazyWrapper><AuditLogs /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/logs" element={<ProtectedRoute><LazyWrapper><AuditLogs /></LazyWrapper></ProtectedRoute>} />
         <Route path="/system-health" element={<ProtectedRoute><AdminRoute><LazyWrapper><SystemHealth /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/system" element={<ProtectedRoute><AdminRoute><LazyWrapper><SystemHealth /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         <Route path="/automation" element={<ProtectedRoute><LazyWrapper><Automation /></LazyWrapper></ProtectedRoute>} />
+        <Route path="/saas-ai" element={<ProtectedRoute><AdminRoute><LazyWrapper><Automation /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/apk" element={<ProtectedRoute><AdminRoute><LazyWrapper><Automation /></LazyWrapper></AdminRoute></ProtectedRoute>} />
+        <Route path="/seo" element={<ProtectedRoute><AdminRoute><LazyWrapper><Automation /></LazyWrapper></AdminRoute></ProtectedRoute>} />
         <Route path="/:demoSlug" element={<LazyWrapper><DemoHostRoute /></LazyWrapper>} />
 
         {/* 404 fallback → redirect to appropriate dashboard */}

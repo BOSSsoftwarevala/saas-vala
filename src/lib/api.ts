@@ -182,6 +182,7 @@ async function apiCall<T = any>(
 
 // ===================== AUTH =====================
 export const authApi = {
+  login: (email: string, password: string) => apiCall('POST', 'auth/login', { email, password }),
   me: () => apiCall('GET', 'auth/me'),
 };
 
@@ -212,6 +213,14 @@ export const marketplaceApi = {
   orders: () => apiCall('GET', 'marketplace/orders'),
   pricing: (productId: string, price: number, discount?: number) =>
     apiCall('PUT', 'marketplace/pricing', { product_id: productId, price, discount_percent: discount }),
+};
+
+// ===================== ORDER =====================
+export const orderApi = {
+  create: (data: any) => apiCall('POST', 'order', data),
+  list: (params?: { page?: number; limit?: number; status?: string }) =>
+    apiCall('GET', 'orders', params),
+  get: (id: string) => apiCall('GET', `orders/${id}`),
 };
 
 // ===================== MARKETPLACE ADMIN =====================
@@ -415,6 +424,8 @@ export const githubApi = {
 
 // ===================== AI =====================
 export const aiApi = {
+  generate: (data: any) => apiCall('POST', 'ai/generate', data),
+  chat: (data: any) => apiCall('POST', 'ai/chat', data),
   run: (data: any) => apiCall('POST', 'ai/run', data),
   models: () => apiCall('GET', 'ai/models'),
   usage: () => apiCall('GET', 'ai/usage'),
@@ -452,6 +463,8 @@ export const walletApi = {
   get: () => apiCall('GET', 'wallet'),
   add: (amount: number, description?: string, paymentMethod?: string) =>
     apiCall('POST', 'wallet/add', { amount, description, payment_method: paymentMethod }),
+  deduct: (amount: number, description?: string, referenceId?: string, referenceType?: string) =>
+    apiCall('POST', 'wallet/deduct', { amount, description, reference_id: referenceId, reference_type: referenceType }),
   withdraw: (amount: number, description?: string, referenceId?: string, referenceType?: string) =>
     apiCall('POST', 'wallet/withdraw', { amount, description, reference_id: referenceId, reference_type: referenceType }),
   transactions: (params?: { page?: number; limit?: number }) =>
@@ -625,6 +638,7 @@ export const leadsApi = {
 };
 
 export const seoApi = {
+  update: (data: any) => apiCall('POST', 'seo/update', data),
   analytics: () => apiCall('GET', 'seo/analytics'),
   marketplaceProducts: (params?: { limit?: number; search?: string }) => apiCall('GET', 'seo/marketplace/products', params),
   automationRuns: (params?: { limit?: number }) => apiCall('GET', 'seo/automation/runs', params),
