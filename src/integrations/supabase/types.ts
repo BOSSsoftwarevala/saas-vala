@@ -1079,6 +1079,76 @@ export type Database = {
           },
         ]
       }
+      sub_categories: {
+        Row: {
+          category_id: string
+          created_at: string | null
+          id: string
+          name: string
+          order: number
+          slug: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string | null
+          id?: string
+          name: string
+          order: number
+          slug: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string | null
+          id?: string
+          name?: string
+          order?: number
+          slug?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sub_categories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      micro_categories: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          order: number
+          slug: string
+          sub_category_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          order: number
+          slug: string
+          sub_category_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          order?: number
+          slug?: string
+          sub_category_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "micro_categories_sub_category_id_fkey"
+            columns: ["sub_category_id"]
+            isOneToOne: false
+            referencedRelation: "sub_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_channel_members: {
         Row: {
           channel_id: string
@@ -2850,6 +2920,8 @@ export type Database = {
           buy_enabled: boolean
           category_id: string | null
           created_at: string | null
+          micro_category_id: string | null
+          sub_category_id: string | null
           created_by: string | null
           currency: string | null
           deep_category: string | null
@@ -2918,6 +2990,8 @@ export type Database = {
           buy_enabled?: boolean
           category_id?: string | null
           created_at?: string | null
+          micro_category_id?: string | null
+          sub_category_id?: string | null
           created_by?: string | null
           currency?: string | null
           deep_category?: string | null
@@ -2986,6 +3060,8 @@ export type Database = {
           buy_enabled?: boolean
           category_id?: string | null
           created_at?: string | null
+          micro_category_id?: string | null
+          sub_category_id?: string | null
           created_by?: string | null
           currency?: string | null
           deep_category?: string | null

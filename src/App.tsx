@@ -124,6 +124,11 @@ function AppRoutes() {
         <Route path="/" element={<LazyWrapper><Auth /></LazyWrapper>} />
         <Route path="/marketplace" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
         <Route path="/marketplace/product/:id" element={<LazyWrapper><ProductDetail /></LazyWrapper>} />
+        
+        {/* Category hierarchy routes */}
+        <Route path="/marketplace/:category" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
+        <Route path="/marketplace/:category/:sub" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
+        <Route path="/marketplace/:category/:sub/:micro" element={<LazyWrapper><Marketplace /></LazyWrapper>} />
 
         {/* Protected routes */}
         <Route path="/dashboard" element={<ProtectedRoute><LazyWrapper><Dashboard /></LazyWrapper></ProtectedRoute>} />
