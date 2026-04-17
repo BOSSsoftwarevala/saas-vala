@@ -13,6 +13,8 @@ PROJECT_NAME="saas-vala"
 DEPLOY_DIR="/var/www/${PROJECT_NAME}"
 BACKUP_DIR="/var/backups/${PROJECT_NAME}"
 DOCKER_COMPOSE_FILE="docker-compose.yml"
+APP_PORT="8082"
+APP_DOMAIN="saasvala.com"
 
 # Colors for output
 RED='\033[0;31m'
