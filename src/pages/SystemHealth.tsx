@@ -221,14 +221,6 @@ const SystemHealthPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [loadHealthDashboard]);
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <RefreshCw className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
-
   const okCount = healthChecks.filter(c => c.status === 'ok').length;
   const healthPercentage = Math.round((okCount / healthChecks.length) * 100);
 
