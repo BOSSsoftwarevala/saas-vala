@@ -53,6 +53,8 @@ const tableIcons: Record<string, React.ComponentType<{ className?: string }>> = 
 };
 
 export default function AuditLogs() {
+  console.log("LOADED:", window.location.pathname);
+  
   const navigate = useNavigate();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);

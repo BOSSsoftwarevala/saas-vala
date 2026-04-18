@@ -40,6 +40,8 @@ interface HealthCheck {
 }
 
 const SystemHealthPage: React.FC = () => {
+  console.log("LOADED:", window.location.pathname);
+  
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);

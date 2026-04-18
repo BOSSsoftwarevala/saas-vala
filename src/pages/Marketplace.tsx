@@ -75,6 +75,8 @@ export default function Marketplace() {
   const [bannerSlides, setBannerSlides] = useState<any[] | undefined>(undefined);
   const [serverSearchProducts, setServerSearchProducts] = useState<MarketplaceProduct[] | null>(null);
   const navigate = useNavigate();
+  
+  console.log("LOADED:", window.location.pathname);
   const buyParamHandled = useRef(false);
   const { checkUserStatus } = useFraudDetection();
   const { user } = useAuth();

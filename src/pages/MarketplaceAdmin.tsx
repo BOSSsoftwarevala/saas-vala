@@ -387,7 +387,9 @@ const Field = ({
   </div>
 );
 
-export default function MarketplaceAdmin() {
+export default function MarketplaceAdminPage() {
+  console.log("LOADED:", window.location.pathname);
+  
   const { user } = useAuth();
   const navigate = useNavigate();
   const [initialized, setInitialized] = useState(false);

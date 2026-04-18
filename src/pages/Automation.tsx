@@ -11,6 +11,8 @@ import { automationIntegrator } from '@/lib/offline/moduleIntegration';
 import { supabase } from "@/lib/supabase";
 
 export default function Automation() {
+  console.log("LOADED:", window.location.pathname);
+  
   const navigate = useNavigate();
   const [tab, setTab] = useState('autopilot');
   const [loading, setLoading] = useState(true);
