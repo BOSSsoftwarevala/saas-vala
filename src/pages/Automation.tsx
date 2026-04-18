@@ -20,12 +20,16 @@ export default function Automation() {
     
     // Force database connection check
     const test = async () => {
-      const { data, error } = await supabase
-        .from('auth.users')
-        .select('*')
-        .limit(1)
+      try {
+        const { data, error } = await supabase
+          .from('auth.users')
+          .select('*')
+          .limit(1)
 
-      console.log("DB FORCE:", data, error)
+        console.log("DB FORCE:", data, error)
+      } catch (e) {
+        console.error("DB check error:", e)
+      }
     }
     test();
 
@@ -33,9 +37,9 @@ export default function Automation() {
     const init = async () => {
       try {
         await automationIntegrator.initialize();
-        setLoading(false);
       } catch (error) {
         console.error('Failed to initialize automation module:', error);
+      } finally {
         setLoading(false);
       }
     };
@@ -44,7 +48,11 @@ export default function Automation() {
 
     // Cleanup on unmount
     return () => {
-      automationIntegrator.cleanup();
+      try {
+        automationIntegrator.cleanup();
+      } catch (e) {
+        console.error('Cleanup error:', e);
+      }
     };
   }, []);
 

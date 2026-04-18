@@ -68,9 +68,9 @@ const SystemHealthPage: React.FC = () => {
     const init = async () => {
       try {
         await systemHealthIntegrator.initialize();
-        setInitialized(true);
       } catch (error) {
         console.error('Failed to initialize system health module:', error);
+      } finally {
         setInitialized(true);
       }
     };
@@ -79,7 +79,11 @@ const SystemHealthPage: React.FC = () => {
 
     // Cleanup on unmount
     return () => {
-      systemHealthIntegrator.cleanup();
+      try {
+        systemHealthIntegrator.cleanup();
+      } catch (e) {
+        console.error('Cleanup error:', e);
+      }
     };
   }, []);
 

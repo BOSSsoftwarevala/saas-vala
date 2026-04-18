@@ -402,9 +402,9 @@ export default function MarketplaceAdmin() {
     const init = async () => {
       try {
         await marketplaceAdminIntegrator.initialize();
-        setInitialized(true);
       } catch (error) {
         console.error('Failed to initialize marketplace admin module:', error);
+      } finally {
         setInitialized(true);
       }
     };
@@ -413,9 +413,14 @@ export default function MarketplaceAdmin() {
 
     // Cleanup on unmount
     return () => {
-      marketplaceAdminIntegrator.cleanup();
+      try {
+        marketplaceAdminIntegrator.cleanup();
+      } catch (e) {
+        console.error('Cleanup error:', e);
+      }
     };
   }, []);
+
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());

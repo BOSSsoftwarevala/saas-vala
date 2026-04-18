@@ -68,9 +68,9 @@ export default function AuditLogs() {
     const init = async () => {
       try {
         await auditLogsIntegrator.initialize();
-        setInitialized(true);
       } catch (error) {
         console.error('Failed to initialize audit logs module:', error);
+      } finally {
         setInitialized(true);
       }
     };
@@ -79,7 +79,11 @@ export default function AuditLogs() {
 
     // Cleanup on unmount
     return () => {
-      auditLogsIntegrator.cleanup();
+      try {
+        auditLogsIntegrator.cleanup();
+      } catch (e) {
+        console.error('Cleanup error:', e);
+      }
     };
   }, []);
 
