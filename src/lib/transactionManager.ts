@@ -4,7 +4,7 @@
  * Ensures atomicity: BEGIN → PROCESS → COMMIT, FAIL → ROLLBACK
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { eventLogger, EventType } from './eventLogger';
 import { invariantChecker, checkWalletBalance, checkOrderUser, checkKeyProduct } from './invariantChecker';
 

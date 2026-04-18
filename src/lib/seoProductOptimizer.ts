@@ -4,7 +4,7 @@
   * POWERED BY SOFTWAREVALA™
   */
  
- import { supabase } from '@/integrations/supabase/client';
+ import { supabase } from '@/lib/supabase';
  
  export interface ProductSeoData {
    productId: string;

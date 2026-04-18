@@ -26,7 +26,7 @@ import { usePaymentSettings } from '@/hooks/usePaymentSettings';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfile } from '@/hooks/useProfile';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 function ChangePasswordForm() {
   const [newPassword, setNewPassword] = useState('');

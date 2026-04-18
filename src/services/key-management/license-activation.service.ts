@@ -1,5 +1,5 @@
 // License Activation Server - Central API for key activation
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import type {
   Key,
   KeyValidationRequest,

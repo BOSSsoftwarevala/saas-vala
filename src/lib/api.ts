@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { eventLogger, EventType } from './eventLogger';
 
 const normalizeEnv = (value: string | undefined): string => (value ?? '').trim().replace(/^['"]|['"]$/g, '');

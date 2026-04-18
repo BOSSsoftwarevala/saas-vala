@@ -1,6 +1,6 @@
 // API Client Service - Production-ready API calls with retry, loading, and error handling
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { errorHandler } from './error-handler.service';
 
 export interface ApiOptions {

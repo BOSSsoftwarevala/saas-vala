@@ -30,7 +30,7 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import softwareValaLogo from '@/assets/softwarevala-logo.png';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 interface AddCreditsModalProps {
   open: boolean;
@@ -208,7 +208,7 @@ export function AddCreditsModal({ open, onOpenChange, onSuccess }: AddCreditsMod
 
     const processPayment = async (attempt: number): Promise<boolean> => {
       try {
-        const { supabase } = await import('@/integrations/supabase/client');
+        const { supabase } = await import('@/lib/supabase');
         const { data: userData } = await supabase.auth.getUser();
         if (!userData.user) return false;
 

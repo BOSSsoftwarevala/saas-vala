@@ -5,7 +5,7 @@
  * Prevents database overload
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { eventLogger, EventType } from './eventLogger';
 
 export enum OperationType {

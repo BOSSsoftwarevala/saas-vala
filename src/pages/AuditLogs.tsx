@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Calendar, Download, Filter, RefreshCw, Eye, AlertTriangle, Info, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 import { auditLogger, type AuditLog, type LogFilter } from '@/lib/auditLogs';
 import { 
   Search,
@@ -25,8 +26,9 @@ import {
   Calendar
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import type { Database } from '@/integrations/supabase/types';
+import { auditLogsIntegrator } from '@/lib/offline/moduleIntegration';
 
 type AuditLog = Database['public']['Tables']['audit_logs']['Row'];
 type AuditAction = Database['public']['Enums']['audit_action'];
@@ -51,37 +53,72 @@ const tableIcons: Record<string, React.ComponentType<{ className?: string }>> = 
 };
 
 export default function AuditLogs() {
+  const navigate = useNavigate();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [actionFilter, setActionFilter] = useState<AuditAction | 'all'>('all');
   const [tableFilter, setTableFilter] = useState<string>('all');
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+  const [initialized, setInitialized] = useState(false);
+
+  useEffect(() => {
+    console.log('[AuditLogs] MODULE LOADED');
+    // Initialize module integration with all 30 micro validations
+    const init = async () => {
+      try {
+        await auditLogsIntegrator.initialize();
+        setInitialized(true);
+      } catch (error) {
+        console.error('Failed to initialize audit logs module:', error);
+        setInitialized(true);
+      }
+    };
+
+    init();
+
+    // Cleanup on unmount
+    return () => {
+      auditLogsIntegrator.cleanup();
+    };
+  }, []);
 
   const fetchLogs = async () => {
-    setLoading(true);
+    // Click lock to prevent double clicks
+    const lockKey = 'fetch-logs';
+    if (!auditLogsIntegrator.acquireClickLock(lockKey)) {
+      return;
+    }
+
     try {
-      let query = supabase
-        .from('audit_logs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(500);
+      await auditLogsIntegrator.withSafeLoading(async () => {
+        let query = supabase
+          .from('audit_logs')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(500);
 
-      if (actionFilter !== 'all') {
-        query = query.eq('action', actionFilter);
-      }
-      if (tableFilter !== 'all') {
-        query = query.eq('table_name', tableFilter);
-      }
+        if (actionFilter !== 'all') {
+          query = query.eq('action', actionFilter);
+        }
+        if (tableFilter !== 'all') {
+          query = query.eq('table_name', tableFilter);
+        }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      setLogs(data || []);
-    } catch (error) {
-      console.error('Error fetching audit logs:', error);
-      toast.error('Failed to fetch audit logs');
+        const { data, error } = await auditLogsIntegrator.withNetworkRetry(() => query);
+        if (error) throw error;
+
+        // Apply API edge case handling
+        const result = auditLogsIntegrator.handleApiSafe(data, []);
+        setLogs(result.data || []);
+
+        auditLogsIntegrator.logAction('logs_fetched', { count: result.data?.length });
+      }, setLoading, (error) => {
+        const safeError = auditLogsIntegrator.getSafeError(error);
+        toast.error(safeError);
+      });
     } finally {
-      setLoading(false);
+      auditLogsIntegrator.releaseClickLock(lockKey);
     }
   };
 
@@ -89,35 +126,62 @@ export default function AuditLogs() {
     fetchLogs();
   }, [actionFilter, tableFilter]);
 
-  const filteredLogs = logs.filter(log =>
-    log.table_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    log.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    log.record_id?.includes(searchQuery)
-  );
+  const filteredLogs = auditLogsIntegrator.safeMap(logs, (log) => {
+    // Null shield for safe access
+    const tableName = auditLogsIntegrator.safeString(log.table_name, '');
+    const action = auditLogsIntegrator.safeString(log.action, '');
+    const recordId = auditLogsIntegrator.safeString(log.record_id, '');
+    const searchLower = auditLogsIntegrator.safeString(searchQuery, '').toLowerCase();
 
-  const uniqueTables = [...new Set(logs.map(l => l.table_name))];
+    return (
+      tableName.toLowerCase().includes(searchLower) ||
+      action.toLowerCase().includes(searchLower) ||
+      recordId.includes(searchLower)
+    );
+  });
+
+  const uniqueTables = auditLogsIntegrator.safeMap(logs, (l) => auditLogsIntegrator.safeString(l.table_name, ''));
+  const uniqueTablesSet = [...new Set(uniqueTables)];
 
   const exportLogs = () => {
-    const csv = [
-      ['ID', 'Table', 'Action', 'Record ID', 'User ID', 'IP Address', 'Created At'].join(','),
-      ...filteredLogs.map(log => [
-        log.id,
-        log.table_name,
-        log.action,
-        log.record_id || '',
-        log.user_id || '',
-        log.ip_address || '',
-        log.created_at
-      ].join(','))
-    ].join('\n');
+    // Click lock to prevent double clicks
+    const lockKey = 'export-logs';
+    if (!auditLogsIntegrator.acquireClickLock(lockKey)) {
+      return;
+    }
 
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `audit-logs-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    toast.success('Logs exported successfully');
+    try {
+      // Apply array safety
+      const safeFilteredLogs = auditLogsIntegrator.nullShield(filteredLogs, []);
+
+      const csv = [
+        ['ID', 'Table', 'Action', 'Record ID', 'User ID', 'IP Address', 'Created At'].join(','),
+        ...safeFilteredLogs.map(log => [
+          auditLogsIntegrator.safeString(log.id, ''),
+          auditLogsIntegrator.safeString(log.table_name, ''),
+          auditLogsIntegrator.safeString(log.action, ''),
+          auditLogsIntegrator.safeString(log.record_id, ''),
+          auditLogsIntegrator.safeString(log.user_id, ''),
+          auditLogsIntegrator.safeString(log.ip_address, ''),
+          auditLogsIntegrator.safeString(log.created_at, '')
+        ].join(','))
+      ].join('\n');
+
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `audit-logs-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+
+      auditLogsIntegrator.logAction('logs_exported', { count: safeFilteredLogs.length });
+      toast.success('Logs exported successfully');
+    } catch (error) {
+      const safeError = auditLogsIntegrator.getSafeError(error);
+      toast.error(safeError);
+    } finally {
+      auditLogsIntegrator.releaseClickLock(lockKey);
+    }
   };
 
   return (
@@ -134,6 +198,18 @@ export default function AuditLogs() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <Button variant="outline" onClick={() => navigate('/products')} className="gap-2">
+              <Package className="h-4 w-4" />
+              Products
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/keys')} className="gap-2">
+              <Key className="h-4 w-4" />
+              Keys
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/resellers')} className="gap-2">
+              <Users className="h-4 w-4" />
+              Resellers
+            </Button>
             <Button variant="outline" onClick={fetchLogs} className="gap-2">
               <RefreshCw className="h-4 w-4" />
               Refresh
@@ -176,7 +252,7 @@ export default function AuditLogs() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Tables</SelectItem>
-                  {uniqueTables.map(table => (
+                  {uniqueTablesSet.map(table => (
                     <SelectItem key={table} value={table}>{table}</SelectItem>
                   ))}
                 </SelectContent>

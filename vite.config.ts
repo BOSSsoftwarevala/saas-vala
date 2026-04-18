@@ -9,6 +9,7 @@ export default defineConfig(({ mode }) => {
   const isDev = mode === "development";
 
   return {
+    base: "/",
     envPrefix: 'VITE_',
     server: {
       host: "::",

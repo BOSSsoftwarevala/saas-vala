@@ -33,7 +33,7 @@ export function useLicenseKeys() {
       console.error('Keys fetch error:', e);
       // Fallback: try direct Supabase query
       try {
-        const { supabase } = await import('@/integrations/supabase/client');
+        const { supabase } = await import('@/lib/supabase');
         const { data } = await supabase.from('license_keys').select('*').order('created_at', { ascending: false });
         setKeys((data || []) as LicenseKey[]);
       } catch {

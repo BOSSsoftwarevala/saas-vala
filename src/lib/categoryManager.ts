@@ -4,7 +4,7 @@
  * Auto connect products, SEO generation, validation
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { eventLogger, EventType } from './eventLogger';
 
 export interface Category {

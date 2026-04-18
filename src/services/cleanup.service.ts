@@ -1,5 +1,5 @@
 // Cleanup Service - Proper logout and state cleanup
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 class CleanupService {
   private static instance: CleanupService;

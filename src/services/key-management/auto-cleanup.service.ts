@@ -1,5 +1,5 @@
 // Auto Cleanup Cron System for Key Management
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { keyGeneratorService } from './key-generator.service';
 import { sessionTokenService } from './session-token.service';
 import { deviceFingerprintService } from './device-fingerprint.service';

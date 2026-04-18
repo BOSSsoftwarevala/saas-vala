@@ -1,5 +1,5 @@
 // Auto Token Refresh Service - Automatic token refresh for Supabase
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 class TokenRefreshService {
   private static instance: TokenRefreshService;

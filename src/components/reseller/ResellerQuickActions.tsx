@@ -13,7 +13,7 @@
  import { Shield, Ban, Play, CheckCircle, XCircle, Loader2 } from 'lucide-react';
  import type { Reseller } from '@/hooks/useResellers';
  import type { Json } from '@/integrations/supabase/types';
- import { supabase } from '@/integrations/supabase/client';
+ import { supabase } from '@/lib/supabase';
  import { toast } from 'sonner';
  
  interface ResellerQuickActionsProps {

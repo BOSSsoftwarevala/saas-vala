@@ -1,5 +1,5 @@
 // Real-time Updates Service - Supabase Realtime subscriptions
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 export type RealtimeEvent = 'INSERT' | 'UPDATE' | 'DELETE';

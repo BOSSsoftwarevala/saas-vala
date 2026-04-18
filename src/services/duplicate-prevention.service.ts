@@ -1,5 +1,5 @@
 // Duplicate Prevention Service - Prevent duplicate entries
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 class DuplicatePreventionService {
   private static instance: DuplicatePreventionService;

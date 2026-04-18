@@ -1,5 +1,5 @@
 // Lead Generation Database Service
-import { supabase as db } from '@/integrations/supabase/client';
+import { supabase as db } from '@/lib/supabase';
 import type {
   Lead,
   Campaign,

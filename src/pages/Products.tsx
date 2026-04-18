@@ -61,7 +61,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { useProducts, type Product } from '@/hooks/useProducts';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import {

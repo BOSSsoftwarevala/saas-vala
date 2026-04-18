@@ -381,6 +381,27 @@ export default function Dashboard() {
             >
               🔒 System Health
             </button>
+
+            <button
+              onClick={() => navigate('/automation')}
+              className="bg-indigo hover:opacity-90 text-white px-4 py-2 rounded-md gap-2 shadow-lg"
+            >
+              🤖 Automation
+            </button>
+
+            <button
+              onClick={() => navigate('/audit-logs')}
+              className="bg-slate hover:opacity-90 text-white px-4 py-2 rounded-md gap-2 shadow-lg"
+            >
+              📋 Audit Logs
+            </button>
+
+            <button
+              onClick={() => navigate('/marketplace')}
+              className="bg-orange hover:opacity-90 text-white px-4 py-2 rounded-md gap-2 shadow-lg"
+            >
+              🛒 Marketplace
+            </button>
           </div>
         </div>
 

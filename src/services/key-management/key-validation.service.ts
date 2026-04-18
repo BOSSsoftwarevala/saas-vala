@@ -1,5 +1,5 @@
 // Key Validation Service with Device Binding and Security Checks
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import type {
   Key,
   KeyValidationRequest,

@@ -25,7 +25,7 @@ import {
   Megaphone,
   Target,
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 
 type ContentType = 'landing' | 'blog' | 'faq' | 'product' | 'ad' | 'cta';

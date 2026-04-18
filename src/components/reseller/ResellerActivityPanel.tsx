@@ -1,5 +1,5 @@
  import { useState, useEffect } from 'react';
- import { supabase } from '@/integrations/supabase/client';
+ import { supabase } from '@/lib/supabase';
  import { Badge } from '@/components/ui/badge';
  import { ScrollArea } from '@/components/ui/scroll-area';
  import { Button } from '@/components/ui/button';

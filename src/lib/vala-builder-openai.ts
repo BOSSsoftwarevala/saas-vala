@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 export interface ValaBuilderOpenAIConfig {
   model: 'gpt-4' | 'gpt-3.5-turbo' | 'claude-3' | 'gemini-pro';

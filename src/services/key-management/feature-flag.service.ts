@@ -1,5 +1,5 @@
 // Feature Flag System for Key Management
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 export interface FeatureFlag {
   id: string;

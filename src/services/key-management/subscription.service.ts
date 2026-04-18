@@ -1,5 +1,5 @@
 // Plan/Subscription Engine for Key Management
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 export type SubscriptionStatus = 'active' | 'expired' | 'cancelled' | 'suspended' | 'pending';
 export type BillingCycle = 'monthly' | 'yearly' | 'lifetime';

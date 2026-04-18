@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AIAPIUsageDashboard } from '@/components/ai-api/AIAPIUsageDashboard';
+import { marketplaceAdminIntegrator } from '@/lib/offline/moduleIntegration';
 import {
   Dialog,
   DialogContent,
@@ -387,10 +389,33 @@ const Field = ({
 
 export default function MarketplaceAdmin() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const [initialized, setInitialized] = useState(false);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [productCatalog, setProductCatalog] = useState<Array<{ id: string; name: string; status: string; apk_enabled: boolean }>>([]);
   const [productsLoading, setProductsLoading] = useState(true);
+
+  useEffect(() => {
+    console.log('[MarketplaceAdmin] MODULE LOADED');
+    // Initialize module integration with all 30 micro validations
+    const init = async () => {
+      try {
+        await marketplaceAdminIntegrator.initialize();
+        setInitialized(true);
+      } catch (error) {
+        console.error('Failed to initialize marketplace admin module:', error);
+        setInitialized(true);
+      }
+    };
+
+    init();
+
+    // Cleanup on unmount
+    return () => {
+      marketplaceAdminIntegrator.cleanup();
+    };
+  }, []);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -3182,9 +3207,20 @@ export default function MarketplaceAdmin() {
             </p>
           </div>
 
-          <Button size="sm" variant="outline" className="gap-1" onClick={() => { fetchProducts(); refreshAll(); }}>
-            <RefreshCw className="h-3 w-3" /> Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" className="gap-1" onClick={() => navigate('/products')}>
+              Products
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1" onClick={() => navigate('/automation')}>
+              Automation
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1" onClick={() => navigate('/audit-logs')}>
+              Audit Logs
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1" onClick={() => { fetchProducts(); refreshAll(); }}>
+              <RefreshCw className="h-3 w-3" /> Refresh
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-2 md:grid-cols-5">

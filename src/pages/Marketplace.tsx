@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams, useParams } from 'react-router-dom';
 import { MarketplaceHeader } from '@/components/marketplace/MarketplaceHeader';
 import { MarketplaceProductCard } from '@/components/marketplace/MarketplaceProductCard';
 import { HeroBannerSlider } from '@/components/marketplace/HeroBannerSlider';
@@ -12,7 +12,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { dashboardApi } from '@/lib/dashboardApi';
 import { publicMarketplaceApi } from '@/lib/api';
 import { resolveMaskedDemoUrl } from '@/lib/demoMasking';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
+import { validateCategoryHierarchy, getSlugByCategoryId } from '@/lib/slugConsistency';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
@@ -78,6 +79,7 @@ export default function Marketplace() {
   const { checkUserStatus } = useFraudDetection();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { category, sub, micro } = useParams<{ category?: string; sub?: string; micro?: string }>();
   
   const { products, loading: productsLoading, totalCount } = useMarketplaceProducts();
   const [searchQuery, setSearchQuery] = useState('');
@@ -200,6 +202,40 @@ export default function Marketplace() {
       setDarkMode(JSON.parse(savedDarkMode));
     }
   }, []);
+
+  // Slug consistency validation - auto-redirect on mismatch
+  useEffect(() => {
+    const validateSlugs = async () => {
+      if (!category) return; // No category slug to validate
+
+      try {
+        const validation = await validateCategoryHierarchy(category, sub, micro);
+        
+        if (!validation.valid && validation.correctSlugs) {
+          const { category: correctCategory, sub: correctSub, micro: correctMicro } = validation.correctSlugs;
+          
+          // Build redirect path
+          let redirectPath = '/marketplace';
+          if (correctCategory) {
+            redirectPath += `/${correctCategory}`;
+          }
+          if (correctSub) {
+            redirectPath += `/${correctSub}`;
+          }
+          if (correctMicro) {
+            redirectPath += `/${correctMicro}`;
+          }
+          
+          // Redirect to correct slug
+          navigate(redirectPath, { replace: true });
+        }
+      } catch (error) {
+        console.error('Slug validation error:', error);
+      }
+    };
+
+    validateSlugs();
+  }, [category, sub, micro, navigate]);
 
   // Phase 2: Toggle dark mode
   const toggleDarkMode = () => {

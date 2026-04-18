@@ -1,5 +1,5 @@
 // Usage Metering System for Key Management
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 export interface UsageMetric {
   id: string;

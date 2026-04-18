@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Globe, CheckCircle2, Shield, Copy, Check, ExternalLink, Loader2, Rocket, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 interface SubdomainResult {
   slug: string;

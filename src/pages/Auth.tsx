@@ -8,7 +8,7 @@
  import { Checkbox } from '@/components/ui/checkbox';
  import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
  import { Loader2, Mail, Lock, User, Eye, EyeOff, KeyRound, Store } from 'lucide-react';
- import { supabase } from '@/integrations/supabase/client';
+ import { supabase } from '@/lib/supabase';
  import { useToast } from '@/hooks/use-toast';
  import { z } from 'zod';
  import { motion, AnimatePresence } from 'framer-motion';

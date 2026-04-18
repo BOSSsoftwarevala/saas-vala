@@ -1,5 +1,5 @@
 // Global Search Service - Search across all entities
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 export interface SearchResult {
   id: string;

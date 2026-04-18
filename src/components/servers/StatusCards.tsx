@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Server, Rocket, AlertCircle, Globe, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 interface StatusCardProps {
   icon: typeof Server;

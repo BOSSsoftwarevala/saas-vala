@@ -35,7 +35,7 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 import { useWallet, Wallet as WalletType } from '@/hooks/useWallet';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 

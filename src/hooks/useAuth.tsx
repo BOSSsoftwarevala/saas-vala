@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { tokenRefreshService } from '@/services/token-refresh.service';
 import { cleanupService } from '@/services/cleanup.service';
 import { errorHandler } from '@/services/error-handler.service';

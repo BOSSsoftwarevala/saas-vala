@@ -1,5 +1,5 @@
 // Pagination Service - Handle large datasets with pagination
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 export interface PaginationOptions {
   page?: number;

@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { 
   Activity, 
   Server, 
@@ -24,6 +25,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { getCurrentSystemHealth, getHealthHistory } from '@/lib/systemHealth';
+import { systemHealthIntegrator } from '@/lib/offline/moduleIntegration';
 
 interface HealthCheck {
   name: string;
@@ -41,6 +43,7 @@ const SystemHealthPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
   const [historyCount, setHistoryCount] = useState(0);
   const [activeAlerts, setActiveAlerts] = useState(0);
   const [queuePending, setQueuePending] = useState(0);
@@ -58,6 +61,27 @@ const SystemHealthPage: React.FC = () => {
     { name: 'AI Usage Tracking', status: 'checking', message: 'Checking...', icon: Cpu },
     { name: 'Storage Buckets', status: 'checking', message: 'Checking...', icon: HardDrive },
   ]);
+
+  useEffect(() => {
+    console.log('[SystemHealth] MODULE LOADED');
+    // Initialize module integration with all 30 micro validations
+    const init = async () => {
+      try {
+        await systemHealthIntegrator.initialize();
+        setInitialized(true);
+      } catch (error) {
+        console.error('Failed to initialize system health module:', error);
+        setInitialized(true);
+      }
+    };
+
+    init();
+
+    // Cleanup on unmount
+    return () => {
+      systemHealthIntegrator.cleanup();
+    };
+  }, []);
 
   const loadHealthDashboard = useCallback(async (silent = false) => {
     if (!silent) {
@@ -205,17 +229,18 @@ const SystemHealthPage: React.FC = () => {
   const healthPercentage = Math.round((okCount / healthChecks.length) * 100);
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">System Health</h1>
-          <p className="text-muted-foreground">Real-time system monitoring</p>
+    <DashboardLayout>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">System Health</h1>
+            <p className="text-muted-foreground">Real-time system monitoring</p>
+          </div>
+          <Button onClick={runHealthCheck}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
         </div>
-        <Button onClick={runHealthCheck}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
-      </div>
 
       {/* Overall Status */}
       <Card>
@@ -323,6 +348,15 @@ const SystemHealthPage: React.FC = () => {
             <Button variant="outline" onClick={() => navigate('/audit-logs')}>
               View Audit Logs
             </Button>
+            <Button variant="outline" onClick={() => navigate('/servers')}>
+              View Servers
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/automation')}>
+              View Automation
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/marketplace-admin')}>
+              View Marketplace Admin
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -339,6 +373,7 @@ const SystemHealthPage: React.FC = () => {
         </Card>
       )}
     </div>
+    </DashboardLayout>
   );
 };
 

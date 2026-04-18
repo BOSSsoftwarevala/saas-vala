@@ -1,5 +1,5 @@
 // Socket Chat Service - Real-time chat with WebSocket
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 interface ChatMessage {
   id: string;

@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 import { withErrorHandling, withRetry, validators, security, rateLimiter, ValidationError, PermissionError, DashboardError } from './errorHandling';
 import { createPhpOfflineRuntimePack, generateSecureLicenseKey, generateKeySignature, generateSecureOfflineLicenseKey, verifySecureOfflineLicenseKey, verifyKeySignature } from '@/lib/licenseUtils';
 

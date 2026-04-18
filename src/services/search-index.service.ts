@@ -1,5 +1,5 @@
 // Search Index Service - Fast search queries with indexing
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabase';
 
 interface SearchIndexEntry {
   id: string;
