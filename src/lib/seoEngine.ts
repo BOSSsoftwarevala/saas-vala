@@ -433,9 +433,120 @@
    if (meta.schema && Object.keys(meta.schema).length > 0) {
      score += 20;
    } else {
-     issues.push('Missing schema markup');
-     suggestions.push('Add JSON-LD schema for rich snippets');
-   }
-   
-   return { score, issues, suggestions };
- }
+    issues.push('Missing schema markup');
+    suggestions.push('Add JSON-LD schema for rich snippets');
+  }
+  
+  return { score, issues, suggestions };
+}
+
+// =====================================================
+// PRODUCT MANAGER SEO INTEGRATION
+// =====================================================
+
+export interface ProductSeoData {
+  name: string;
+  slug: string;
+  short_description?: string;
+  full_description?: string;
+  category?: string;
+  tags?: string[];
+  price?: number;
+  rating?: number;
+  thumbnail_url?: string;
+}
+
+// Generate SEO data for a product
+export function generateProductSeo(product: ProductSeoData): MetaData {
+  const title = generateMetaTitle(
+    product.name,
+    product.category || 'Software',
+    'india'
+  );
+
+  const description = generateMetaDescription(
+    product.name,
+    product.category || 'Software',
+    'india',
+    product.tags || []
+  );
+
+  const keywords = generateKeywords(
+    product.name,
+    product.category || 'Software',
+    'india',
+    product.tags || []
+  );
+
+  const schema = generateSchema('SoftwareApplication', {
+    name: product.name,
+    description: product.short_description || product.full_description || description,
+    price: product.price?.toString(),
+    rating: product.rating,
+    url: `https://saasvala.com/product/${product.slug}`,
+  });
+
+  return {
+    title,
+    description,
+    keywords,
+    ogTitle: title,
+    ogDescription: description,
+    ogImage: product.thumbnail_url,
+    schema,
+    canonical: `https://saasvala.com/product/${product.slug}`,
+  };
+}
+
+// Generate structured data for product listing page
+export function generateProductListSchema(products: ProductSeoData[]): object {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    itemListElement: products.map((product, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      item: {
+        '@type': 'SoftwareApplication',
+        name: product.name,
+        url: `https://saasvala.com/product/${product.slug}`,
+        description: product.short_description,
+        offers: {
+          '@type': 'Offer',
+          price: product.price?.toString() || '0',
+          priceCurrency: 'INR',
+        },
+      },
+    })),
+  };
+}
+
+// Generate breadcrumb schema
+export function generateBreadcrumbSchema(breadcrumbs: { name: string; url: string }[]): object {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: breadcrumbs.map((crumb, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: crumb.name,
+      item: crumb.url,
+    })),
+  };
+}
+
+// Generate FAQ schema
+export function generateFAQSchema(faqs: { question: string; answer: string }[]): object {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.map(faq => ({
+      '@type': 'Question',
+      name: faq.question,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: faq.answer,
+      },
+    })),
+  };
+}
