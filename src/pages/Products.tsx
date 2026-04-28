@@ -63,6 +63,7 @@ import {
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { useProducts, type Product } from '@/hooks/useProducts';
+import { useGitHubAccounts, useGitHubRepos, useGitHubImport, useGitHubOAuth } from '@/hooks/useGitHub';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import {
   AlertDialog,
@@ -75,6 +76,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
+import type { GitHubRepo } from '@/lib/githubApi';
 
 const statusStyles = {
   active: 'bg-success/20 text-success border-success/30',
@@ -106,6 +108,13 @@ export default function Products() {
   const navigate = useNavigate();
   const { isSuperAdmin } = useAuth();
   const { products, categories, loading, createProduct, updateProduct, deleteProduct, suspendProduct, activateProduct } = useProducts();
+  
+  // GitHub integration hooks
+  const { accounts, loading: loadingAccounts, connectAccount } = useGitHubAccounts();
+  const { repos, loading: loadingRepos, fetchRepos } = useGitHubRepos(accounts[0]?.id || '');
+  const { importing, importRepo } = useGitHubImport();
+  const { initiateOAuth } = useGitHubOAuth();
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -115,10 +124,8 @@ export default function Products() {
 
   // Git import state
   const [gitDialogOpen, setGitDialogOpen] = useState(false);
-  const [gitRepos, setGitRepos] = useState<GitHubRepo[]>([]);
-  const [loadingRepos, setLoadingRepos] = useState(false);
   const [importingRepos, setImportingRepos] = useState<Set<number>>(new Set());
-  const [gitConnected] = useState(true); // Always true - uses server tokens
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -225,27 +232,22 @@ export default function Products() {
     }
   };
 
-  // Git import functions - uses server-side tokens, no OAuth needed
+  // Git import functions - uses real GitHub OAuth
   const openGitImport = async () => {
+    if (accounts.length === 0) {
+      // No GitHub account connected, initiate OAuth
+      initiateOAuth();
+      return;
+    }
+    
+    setSelectedAccountId(accounts[0].id);
     setGitDialogOpen(true);
-    await fetchGitRepos();
+    await fetchRepos();
   };
 
-  const fetchGitRepos = async () => {
-    setLoadingRepos(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('github-connect', {
-        body: { action: 'repos' },
-      });
-      if (error) throw error;
-      if (!data?.success) throw new Error('Failed to fetch repos');
-      setGitRepos(data.repos || []);
-    } catch (error) {
-      toast.error('Failed to fetch repositories');
-      console.error(error);
-    } finally {
-      setLoadingRepos(false);
-    }
+  const handleAccountSelect = async (accountId: string) => {
+    setSelectedAccountId(accountId);
+    await fetchRepos();
   };
 
   const importRepoAsProduct = async (repo: GitHubRepo) => {
@@ -258,20 +260,17 @@ export default function Products() {
       return;
     }
 
+    if (!selectedAccountId) {
+      toast.error('No GitHub account selected');
+      return;
+    }
+
     setImportingRepos((prev) => new Set(prev).add(repo.id));
     try {
-      // API CALL
-      await createProduct({
-        name: repo.name.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-        slug: repo.name.toLowerCase(),
-        description: repo.description || `Imported from GitHub: ${repo.full_name}`,
-        git_repo_url: repo.html_url,
-        git_repo_name: repo.full_name,
-        git_default_branch: repo.default_branch,
-        deploy_status: 'idle',
-        status: 'draft',
-        price: 0,
-      });
+      // API CALL - Use real GitHub import
+      const [owner, name] = repo.full_name.split('/');
+      await importRepo(selectedAccountId, owner, name);
+      
       // STATE UPDATE + UI REFLECT
       toast.success(`Imported "${repo.name}" as product`);
     } catch (error: any) {
@@ -289,7 +288,7 @@ export default function Products() {
 
   const importAllRepos = async () => {
     // VALIDATION
-    const unimported = gitRepos.filter(
+    const unimported = repos.filter(
       (repo) => !products.some((p) => p.git_repo_url === repo.html_url || p.git_repo_name === repo.full_name)
     );
     if (unimported.length === 0) {
@@ -322,6 +321,8 @@ export default function Products() {
       (p) => p.git_repo_url === repo.html_url || p.git_repo_name === repo.full_name
     );
   };
+
+  const gitConnected = accounts.length > 0;
 
   return (
     <DashboardLayout>
@@ -648,18 +649,37 @@ export default function Products() {
             </DialogDescription>
           </DialogHeader>
 
+          {/* GitHub Account Selection */}
+          {accounts.length > 1 && (
+            <div className="mb-4">
+              <Label className="text-sm">GitHub Account</Label>
+              <Select value={selectedAccountId || ''} onValueChange={handleAccountSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.username}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {loadingRepos ? (
             <div className="flex items-center justify-center p-8">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
-          ) : gitRepos.length === 0 ? (
+          ) : repos.length === 0 ? (
             <div className="text-center p-8 text-muted-foreground">
-              No repositories found. Make sure your GitHub is connected in Servers → Git.
+              No repositories found. Connect your GitHub account to import repositories.
             </div>
           ) : (
             <>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-muted-foreground">{gitRepos.length} repositories found</span>
+                <span className="text-sm text-muted-foreground">{repos.length} repositories found</span>
                 <Button 
                   size="sm" 
                   variant="outline" 
@@ -673,7 +693,7 @@ export default function Products() {
               </div>
               <ScrollArea className="h-[350px] border border-border rounded-lg">
                 <div className="divide-y divide-border">
-                  {gitRepos.map((repo) => {
+                  {repos.map((repo) => {
                     const imported = isRepoImported(repo);
                     const importing = importingRepos.has(repo.id);
                     return (

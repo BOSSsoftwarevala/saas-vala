@@ -364,3 +364,120 @@ BEGIN
   RETURN result;
 END;
 $$ LANGUAGE plpgsql;
+
+-- =====================================================
+-- MODULE 11: GITHUB INTEGRATION SYSTEM
+-- =====================================================
+
+-- GitHub OAuth Accounts
+CREATE TABLE IF NOT EXISTS github_accounts (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  github_id BIGINT NOT NULL,
+  username TEXT NOT NULL,
+  access_token_encrypted TEXT NOT NULL,
+  refresh_token_encrypted TEXT,
+  token_expires_at TIMESTAMP WITH TIME ZONE,
+  scopes TEXT[],
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, github_id)
+);
+
+-- GitHub Webhooks
+CREATE TABLE IF NOT EXISTS github_webhooks (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  github_account_id UUID NOT NULL REFERENCES github_accounts(id) ON DELETE CASCADE,
+  webhook_id BIGINT,
+  webhook_url TEXT NOT NULL,
+  secret TEXT,
+  events TEXT[] DEFAULT '{"push", "release"}',
+  is_active BOOLEAN DEFAULT true,
+  last_triggered_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- GitHub Import History
+CREATE TABLE IF NOT EXISTS github_import_history (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  github_account_id UUID NOT NULL REFERENCES github_accounts(id) ON DELETE CASCADE,
+  repo_owner TEXT NOT NULL,
+  repo_name TEXT NOT NULL,
+  repo_url TEXT NOT NULL,
+  commit_sha TEXT,
+  branch TEXT DEFAULT 'main',
+  import_status TEXT DEFAULT 'pending', -- pending, success, failed
+  import_metadata JSONB DEFAULT '{}'::jsonb,
+  error_message TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- =====================================================
+-- GITHUB INTEGRATION INDEXES
+-- =====================================================
+
+CREATE INDEX IF NOT EXISTS idx_github_accounts_user_id ON github_accounts(user_id);
+CREATE INDEX IF NOT EXISTS idx_github_accounts_github_id ON github_accounts(github_id);
+CREATE INDEX IF NOT EXISTS idx_github_accounts_is_active ON github_accounts(is_active);
+
+CREATE INDEX IF NOT EXISTS idx_github_webhooks_product_id ON github_webhooks(product_id);
+CREATE INDEX IF NOT EXISTS idx_github_webhooks_github_account_id ON github_webhooks(github_account_id);
+CREATE INDEX IF NOT EXISTS idx_github_webhooks_is_active ON github_webhooks(is_active);
+
+CREATE INDEX IF NOT EXISTS idx_github_import_history_product_id ON github_import_history(product_id);
+CREATE INDEX IF NOT EXISTS idx_github_import_history_github_account_id ON github_import_history(github_account_id);
+CREATE INDEX IF NOT EXISTS idx_github_import_history_status ON github_import_history(import_status);
+
+-- =====================================================
+-- GITHUB INTEGRATION RLS POLICIES
+-- =====================================================
+
+ALTER TABLE github_accounts ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users read own github accounts" ON github_accounts
+  FOR SELECT TO authenticated USING (user_id = auth.uid());
+CREATE POLICY "Users insert own github accounts" ON github_accounts
+  FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
+CREATE POLICY "Users update own github accounts" ON github_accounts
+  FOR UPDATE TO authenticated USING (user_id = auth.uid());
+CREATE POLICY "Users delete own github accounts" ON github_accounts
+  FOR DELETE TO authenticated USING (user_id = auth.uid());
+
+ALTER TABLE github_webhooks ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users read own github webhooks" ON github_webhooks
+  FOR SELECT TO authenticated USING (
+    EXISTS (
+      SELECT 1 FROM github_accounts ga 
+      WHERE ga.id = github_webhooks.github_account_id AND ga.user_id = auth.uid()
+    )
+  );
+CREATE POLICY "Authenticated insert github webhooks" ON github_webhooks
+  FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Authenticated update github webhooks" ON github_webhooks
+  FOR UPDATE TO authenticated USING (true);
+CREATE POLICY "Authenticated delete github webhooks" ON github_webhooks
+  FOR DELETE TO authenticated USING (true);
+
+ALTER TABLE github_import_history ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users read own import history" ON github_import_history
+  FOR SELECT TO authenticated USING (
+    EXISTS (
+      SELECT 1 FROM github_accounts ga 
+      WHERE ga.id = github_import_history.github_account_id AND ga.user_id = auth.uid()
+    )
+  );
+CREATE POLICY "Authenticated insert import history" ON github_import_history
+  FOR INSERT TO authenticated WITH CHECK (true);
+
+-- =====================================================
+-- GITHUB INTEGRATION TRIGGERS
+-- =====================================================
+
+CREATE TRIGGER update_github_accounts_updated_at BEFORE UPDATE ON github_accounts
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_github_webhooks_updated_at BEFORE UPDATE ON github_webhooks
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
