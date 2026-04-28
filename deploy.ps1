@@ -52,30 +52,31 @@ try {
     
     Write-Host "[INFO] Uploading deploy script to VPS..." -ForegroundColor Yellow
     
-    # Create batch file with proper escaping
-    $batchContent = @"
-@echo off
-set VPS_PASSWORD=r9EH64xnvP4Bqnr#r9EH64xnvP4Bqnr#
-set VPS_USER=root
-set VPS_IP=72.61.236.249
-echo %%VPS_PASSWORD%% | ssh -o StrictHostKeyChecking=no %%VPS_USER%%@%%VPS_IP%% "cat > /tmp/deploy_remote.sh" < deploy_remote.sh
-if %%errorlevel%% neq 0 exit /b 1
-echo %%VPS_PASSWORD%% | ssh -o StrictHostKeyChecking=no %%VPS_USER%%@%%VPS_IP%% "chmod +x /tmp/deploy_remote.sh && bash /tmp/deploy_remote.sh"
-"@
+    # Use plink if available, otherwise use SSH with password
+    $plinkPath = Get-Command plink -ErrorAction SilentlyContinue
     
-    $batchContent | Out-File -FilePath "deploy_helper.bat" -Encoding ASCII
-    
-    # Execute batch
-    $result = cmd /c deploy_helper.bat 2>&1
-    Write-Host $result
-    
-    if ($LASTEXITCODE -neq 0) {
-        throw "Deployment failed with exit code $LASTEXITCODE"
+    if ($plinkPath) {
+        Write-Host "[INFO] Using plink for SSH connection..." -ForegroundColor Yellow
+        
+        # Upload script
+        $uploadCmd = "plink -batch -pw $VPS_PASSWORD $VPS_USER@$VPS_IP 'cat > /tmp/deploy_remote.sh' < deploy_remote.sh"
+        Invoke-Expression $uploadCmd
+        
+        # Execute script
+        Write-Host "[INFO] Executing deploy on VPS..." -ForegroundColor Yellow
+        $executeCmd = "plink -batch -pw $VPS_PASSWORD $VPS_USER@$VPS_IP 'chmod +x /tmp/deploy_remote.sh && bash /tmp/deploy_remote.sh'"
+        Invoke-Expression $executeCmd
+    } else {
+        Write-Host "[INFO] Using Windows OpenSSH..." -ForegroundColor Yellow
+        
+        # Use SSH with password - this will prompt for password
+        Write-Host "[WARNING] SSH will prompt for password..." -ForegroundColor Yellow
+        ssh -o StrictHostKeyChecking=no $VPS_USER@$VPS_IP "cat > /tmp/deploy_remote.sh" < deploy_remote.sh
+        ssh -o StrictHostKeyChecking=no $VPS_USER@$VPS_IP "chmod +x /tmp/deploy_remote.sh && bash /tmp/deploy_remote.sh"
     }
     
     # Cleanup
     Remove-Item deploy_remote.sh -ErrorAction SilentlyContinue
-    Remove-Item deploy_helper.bat -ErrorAction SilentlyContinue
     
     Write-Host "==========================================" -ForegroundColor Green
     Write-Host "DEPLOYMENT COMPLETED SUCCESSFULLY" -ForegroundColor Green
@@ -92,7 +93,6 @@ catch {
     Write-Host $_.Exception.Message -ForegroundColor Red
     
     Remove-Item deploy_remote.sh -ErrorAction SilentlyContinue
-    Remove-Item deploy_helper.bat -ErrorAction SilentlyContinue
     
     exit 1
 }

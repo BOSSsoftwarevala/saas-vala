@@ -37,8 +37,8 @@ echo echo "[$(date)] Deployment successful" ^>^> /var/log/saas-vala/deploy.log
 
 echo [INFO] Deploy script created
 
-REM Use PowerShell to execute SSH with password
-powershell -Command "Get-Content deploy_commands.sh | ssh -o StrictHostKeyChecking=no -o PreferredAuthentications=password -o PubkeyAuthentication=no %VPS_USER%@%VPS_IP% 'bash -s'"
+REM Use PowerShell with SSH password via environment variable
+powershell -Command "$env:SSH_PASSWORD='%VPS_PASSWORD%'; Get-Content deploy_commands.sh | ssh -o StrictHostKeyChecking=no -o PreferredAuthentications=password -o PubkeyAuthentication=no %VPS_USER%@%VPS_IP% 'bash -s'"
 
 if %errorlevel% neq 0 (
     echo [ERROR] Deployment failed
