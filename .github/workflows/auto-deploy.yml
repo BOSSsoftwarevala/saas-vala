@@ -1,0 +1,88 @@
+# =====================================================
+# FULL AUTO DEPLOY SYSTEM - GITHUB ACTIONS
+# =====================================================
+# ZERO MANUAL WORK - FULLY AUTONOMOUS
+# =====================================================
+
+name: Auto Deploy to VPS
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            set -e
+            
+            # Create log directory
+            sudo mkdir -p /var/log/saas-vala
+            
+            # Navigate to project
+            cd /var/www/saas-vala || git clone https://github.com/BOSSsoftwarevala/saas-vala.git /var/www/saas-vala
+            
+            # Pull latest code
+            git fetch origin main
+            git reset --hard origin/main
+            
+            # Install dependencies
+            npm install
+            
+            # Build project
+            npm run build
+            
+            # Kill existing processes
+            pkill -f "npm.*preview" || true
+            pkill -f "vite" || true
+            sleep 2
+            
+            # Start with PM2
+            pm2 delete app || true
+            pm2 start npm --name app -- run preview -- --port 8082
+            pm2 save
+            
+            # Verify deployment
+            sleep 5
+            if lsof -i :8082 > /dev/null 2>&1; then
+              echo "Deployment successful - app running on port 8082"
+            else
+              echo "ERROR: App not running on port 8082"
+              exit 1
+            fi
+            
+            # Log deployment
+            echo "[$(date)] Deployment successful via GitHub Actions" >> /var/log/saas-vala/deploy.log
+
+      - name: Verify deployment
+        run: |
+          echo "Verifying deployment at https://www.saasvala.com"
+          curl -f https://www.saasvala.com || exit 1
