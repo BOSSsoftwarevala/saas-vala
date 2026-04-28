@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Marketplace from "./pages/Marketplace";
+import Auth from "./pages/Auth";
 import Automation from "./pages/Automation";
 import AuditLogs from "./pages/AuditLogs";
 import MarketplaceAdmin from "./pages/MarketplaceAdmin";
@@ -10,6 +11,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/auth" element={<Auth />} />
         <Route path="/" element={<Marketplace />} />
         <Route path="/marketplace" element={<Marketplace />} />
         <Route path="/automation" element={<Automation />} />
